@@ -111,7 +111,7 @@ JOIN dm.dm_rpt_sales_group_t s ON det.vkgrp = s.sale_grp
 **D. 结果合理性？**
 - [ ] OTD 履约数据量级：单月订单行通常数十万级别
 - [ ] 未交付表通常几千行，如果返回大量行可能是过滤条件问题
-- [ ] 签收率通常不会是0%或100%，中间值才合理
+- [ ] 签收率(receiving_status)全表仅4.5%，是系统性问题非时间窗口问题。如果用户问"签收率"，建议改用 **出库率(outbound_status)** 或 **发运率(shipping_status, 39.9%)** 作为履约完成度的代理指标
 
 ### 第 6 步：输出结果
 
@@ -151,13 +151,17 @@ FROM dm.dm_otd_so_order_not_user_t
 WHERE creation_time >= '2026-05-01';
 ```
 
-### 模式 B：签收率趋势（按日）
+### 模式 B：出库率/发运率趋势（按日）— 替代签收率
+
+> ⚠️ `receiving_status` 全表仅 4.5% 为'已签收'，签收数据覆盖率极低。用出库率或发运率代替。
 
 ```sql
 SELECT DATE(creation_time) as order_date,
        COUNT(*) as total,
-       SUM(CASE WHEN receiving_status = '已签收' THEN 1 ELSE 0 END) as received,
-       ROUND(SUM(CASE WHEN receiving_status = '已签收' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as receiving_rate
+       SUM(CASE WHEN outbound_status = '已出库' THEN 1 ELSE 0 END) as outbounded,
+       ROUND(SUM(CASE WHEN outbound_status = '已出库' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as outbound_rate,
+       SUM(CASE WHEN shipping_status = '已发运' THEN 1 ELSE 0 END) as shipped,
+       ROUND(SUM(CASE WHEN shipping_status = '已发运' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) as shipping_rate
 FROM dm.dm_otd_so_order_not_user_t
 WHERE creation_time >= '2026-05-01'
 GROUP BY DATE(creation_time)

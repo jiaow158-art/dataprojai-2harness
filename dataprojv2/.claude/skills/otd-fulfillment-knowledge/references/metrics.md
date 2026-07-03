@@ -180,3 +180,6 @@ dm_otd_sales_order_det_t (订单底表)
 11. **no_deliver_order_dtl 是Hive外表同步** — ETL包含 `CREATE TABLE IF NOT EXISTS` DDL，可能与GaussDB实际结构有差异
 12. **预估返点金额**: `zfdje` 是预估金额，含条件逻辑（KURRF8~KURRF11四个条件类型求和）
 13. **单价计算因年份而异**: 2024年 ×(1-0.04), 2025年 ×(1-0.05), 其他年 ×(1+zsyjf_percent)
+14. **签收数据覆盖率仅 4.5%，不可用作履约完成率**: 全表 794 万行中 receiving_status='已签收' 仅 35 万行（4.5%），95.1% 为'待签收'。TMS 签收数据集成不完整，大部分订单永远不会流转到已签收状态。评估履约完成度请使用 **outbound_status（出库率）** 或 **shipping_status（发运率 39.9%）** 替代。
+15. **两表 JOIN 匹配率约 99%**: `so_order_not_user_t` LEFT JOIN `sales_order_det_t` 时有约 1% 行无法匹配（sap_number/sap_item_num 在 sales_order_det_t 中不存在对应 vbeln/posnr）。使用 INNER JOIN 会静默丢弃这些行。
+16. **状态字段不严格级联**: ETL 不保证 OTD 状态顺序。已验证出现 `shipping_status='已发运' AND outbound_status IS NULL`（448/69733 ≈ 0.6%）和 `holding_status IS NULL`（388/69733 ≈ 0.6%）。分析时需考虑状态 NULL 和跳跃的情况。
