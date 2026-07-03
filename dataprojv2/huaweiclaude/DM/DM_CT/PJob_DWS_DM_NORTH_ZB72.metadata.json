@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB72",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "共享仓辐射中小经销商提货占比ZB72",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

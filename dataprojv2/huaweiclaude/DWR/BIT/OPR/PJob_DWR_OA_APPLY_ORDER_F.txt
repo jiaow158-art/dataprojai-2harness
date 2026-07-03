@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/05/12 15:49:26 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRBIT.DWR_OA_APPLY_ORDER_F
+SELECT A.SQRQ AS APPLY_DATE --申请日期
+      ,A.LCID AS REQUEST_CODE --流程id
+      ,A.LSH AS SERIAL_NUM --流水号
+      ,A.MLCID AS MTHR_REQUEST_CODE --母流程id
+      ,A.ZLCID AS SUB_REQUEST_CODE --子流程id
+      ,A.ZMLC AS REQUEST_TYPE --流程标识
+      ,A.DQJDID AS CUR_NODE_ID --当前节点id
+      ,A.DQJD AS CUR_NODE_NAME --当前节点
+      ,A.BPO AS BPO_ID --BPO人员ID
+	  ,B.SAPID AS BPO_EMP_NUM --BPO人员工号
+	  ,B.LASTNAME AS BPO_EMP_NAME --BPO人员名称
+	  ,B.DEPARTMENTID AS BPO_DEPT_ID --BPO部门ID
+	  ,E.DEPARTMENTNAME AS BPO_DEPT_NAME --BPO部门名称
+	  ,E.DEPARTMENTMARK AS BPO_DEPT_SHORT_NAME --BPO部门简称
+      ,A.LPO AS LPO_ID --LPO人员ID
+	  ,C.SAPID AS LPO_EMP_NUM --LPO人员工号
+	  ,C.LASTNAME AS LPO_EMP_NAME --LPO人员名称	
+      ,C.DEPARTMENTID AS LPO_DEPT_ID --LPO部门ID
+	  ,F.DEPARTMENTNAME AS LPO_DEPT_NAME --LPO部门名称
+	  ,F.DEPARTMENTMARK AS LPO_DEPT_SHORT_NAME --LPO部门简称	  
+      ,A.SJKFRY AS DEV_ID --子流程开发人员ID
+	  ,D.SAPID AS DEV_EMP_NUM --子流程开发人员工号
+	  ,D.LASTNAME AS DEV_EMP_NAME --子流程开发人员名称
+	  ,D.DEPARTMENTID AS DEV_DEPT_ID --子流程开发人员部门ID
+	  ,G.DEPARTMENTNAME AS DEV_DEPT_NAME --子流程开发人员部门名称
+	  ,G.DEPARTMENTMARK AS DEV_DEPT_SHORT_NAME --子流程开发人员部门简称
+      ,A.GDSJ AS ARCH_DATE --归档时间
+      ,A.YJLCMC AS L1_REQUEST_NAME --L1流程名称
+      ,A.PF AS COMT_NUM --评分
+      ,A.GDBS AS ARCH_CODE --归档标识编码
+	  ,CASE WHEN A.GDBS = 'Over' THEN '流程归档'
+	        ELSE '未流程归档'
+			 END AS ARCH_NAME --归档标识名称
+	  ,CASE WHEN H.SFWB = '0' THEN '内部'
+	        WHEN H.SFWB = '1' THEN '外部'
+			ELSE ''
+			 END AS DEV_TYPE --子流程开发人员分类
+      ,CASE WHEN H.JS = '0' THEN '业务顾问'
+	        WHEN H.JS = '1' THEN '工程师'
+			WHEN H.JS = '2' THEN '负责人'
+            ELSE ''
+             END AS DEV_SUB_TYPE --子流程开发人员子分类
+	  ,H.RTDJ75H AS MAN_DAY_AMT --人天金额
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_UF_XQLCMX_1004 A
+  LEFT JOIN SDI.SDI_HRMRESOURCE_1004 B
+    ON A.BPO = B.ID
+   AND B.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_HRMRESOURCE_1004 C
+    ON A.LPO = C.ID
+   AND C.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_HRMRESOURCE_1004 D
+    ON A.SJKFRY = D.ID
+   AND D.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_HRMDEPARTMENT_1004 E
+    ON B.DEPARTMENTID = E.ID
+   AND E.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_HRMDEPARTMENT_1004 F
+    ON C.DEPARTMENTID = F.ID
+   AND F.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_HRMDEPARTMENT_1004 G
+    ON D.DEPARTMENTID = G.ID
+   AND G.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_UF_ITRYJG_1004 H
+    ON A.SJKFRY = H.RYXM
+;

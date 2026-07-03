@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PAM_ENERGY_CONVERSION_COEFFICIENT_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT/PAM",
+    "description": "das折标系数表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_ECO_COST_RCVY_STAT_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

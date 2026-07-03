@@ -1,0 +1,15 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/07/20 16:45:42 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE SDI.SDI_DP_V_MYORDERNUM_1028
+SELECT
+  shopid, 
+  shopname, 
+  ordernum, 
+  orderingnum, 
+  tostorenum,
+  'N' AS del_flag	,
+  CURRENT_TIMESTAMP() AS dw_last_update_date	
+FROM STG.STG_DP_V_MYORDERNUM_1028;

@@ -1,0 +1,675 @@
+/*create table if not exists dm.dm_ct_cockpit_GSA_t
+(
+    seq                 varchar(50),
+    campaign            varchar(500),
+    GSAindex            varchar(500),
+    month_val           decimal(32, 10),
+    quarter_val         decimal(32, 10),
+    year_val            decimal(32, 10),
+    unit                varchar(500),
+    dw_last_update_date timestamp default now()
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(seq);
+comment on table dm.dm_ct_cockpit_GSA_t is '瓷砖经营驾驶舱GSA指标表（key-value）';
+
+comment on column dm.dm_ct_cockpit_GSA_t.seq is '序号';
+comment on column dm.dm_ct_cockpit_GSA_t.campaign is '战役';
+comment on column dm.dm_ct_cockpit_GSA_t.GSAindex is 'GSA指标';
+comment on column dm.dm_ct_cockpit_GSA_t.month_val is '值';
+comment on column dm.dm_ct_cockpit_GSA_t.quarter_val is '季度值';
+comment on column dm.dm_ct_cockpit_GSA_t.year_val is '年度值';
+comment on column dm.dm_ct_cockpit_GSA_t.unit is '单位'; */
+-- update：2024/03/28 事业部层级剔除数据来源U
+-- update：2024/03/29 商机部分更新
+-- update：2024/03/30 嘉颖说共享仓辐射清空
+-- update：2024/04/02 嘉颖改顺序
+-- update：2024/04/15 嘉颖门店cxrq修改为MDCXGDRQ
+-- update：2024/04/16 补充qdbm in ('01','02')
+-- update：2024/04/20 高值修改
+-- update：2024/04/22 高值修改，包含整合渠道2等于空
+-- update：2024/04/25 嘉颖增加是否上线
+-- update：2024/05/11 商机报表部分修改
+-- update：2024/05/30 补充新品相关指标，根据物料主档产品上线时间倒退12个月
+-- update：2024/06/23 修改逻辑：ART+层级架构修改，剔除ART+
+truncate table dm.dm_ct_cockpit_GSA_t;
+with zjl_base as (
+    select tj_month --统计月份
+         , case
+               when vtweg = '06' then '工程'
+               when (vtweg not in ('08', '06') or vtweg is null) then '零售'
+               when vtweg = '08' then '整装'
+               else '' end                                                                channel_text
+         , department
+         , werks
+         , count(case
+                     when SFZDJF = 'Y' then VBELN
+                     else concat(VBELN, POSNR)
+        end)                                                                              order_cnt
+         , count(case
+                     when is_zdjfzj = '是' then case
+                                                   when SFZDJF = 'Y' then VBELN
+                                                   else concat(VBELN, POSNR)
+                         end end)                                                         zj_cnt
+         , sum(zj_qty * a.unit_area) as                                                   zj_area
+         , sum(kwmeng * a.unit_area) as                                                   order_area
+         , sum(case when b.material_num is not null then zj_qty * a.unit_area else 0 end) new_prod_zj_area
+         , sum(case when b.material_num is not null then kwmeng * a.unit_area else 0 end) new_prod_area
+    from dm.DM_SO_FZL_ORDER_ZJ_PRE_T a
+             left join dwimd.dwi_md_data_material_general_t b
+                       on a.matnr = b.material_num and length(b.product_listed_date) = 7 and
+                          substr(b.product_listed_date, 5, 1) = '-' and product_listed_date >
+                                                                        to_char(CURRENT_DATE + INTERVAL '-1 day' - interval '1 year', 'yyyy-MM')
+    where is_zdjfzj in ('是', '否')
+      and vtweg = '06'
+      and bstdk <= replace(CURRENT_DATE + INTERVAL '-1 day', '-', '')
+    group by tj_month, channel_text, department, werks
+
+    union all
+
+    select tj_month
+         , '工程'                                                                           channel_text
+         , department
+         , werks
+         , count(case
+                     when SFZDJF = '是' then zjhd
+                     else zjhdid
+        end)
+         , count(case
+                     when is_zdjfzj = '是' then case
+                                                   when SFZDJF = '是' then zjhd
+                                                   else zjhdid
+                         end end)
+         , sum(zj_qty * a.unit_area) as                                                   zj_area
+         , sum(menge * a.unit_area)  as                                                   order_area
+         , sum(case when b.material_num is not null then zj_qty * a.unit_area else 0 end) new_prod_zj_area
+         , sum(case when b.material_num is not null then menge * a.unit_area else 0 end)  new_prod_area
+    from dm.DM_SO_ZL_ORDER_ZJ_PRE_T a
+             left join dwimd.dwi_md_data_material_general_t b
+                       on a.matnr = b.material_num and length(b.product_listed_date) = 7 and
+                          substr(b.product_listed_date, 5, 1) = '-' and product_listed_date >
+                                                                        to_char(CURRENT_DATE + INTERVAL '-1 day' - interval '1 year', 'yyyy-MM')
+    where is_zdjfzj in ('是', '否')
+      and bstdk <= replace(CURRENT_DATE + INTERVAL '-1 day', '-', '')
+    group by tj_month
+           , department
+           , werks
+)
+        ,
+     ztl_base as (
+         select tj_month --统计月份
+              , case
+                    when vtweg = '06' then '工程'
+                    when (vtweg not in ('08', '06') or vtweg is null) then '零售'
+                    when vtweg = '08' then '整装'
+                    else '' end            channel_text
+              , department
+              , werks
+              , count(case
+                          when SFZDJF = 'Y' then VBELN
+                          else concat(VBELN, POSNR)
+             end)                          order_cnt
+              , count(case
+                          when is_zdjfzt = '是' then case
+                                                        when SFZDJF = 'Y' then VBELN
+                                                        else concat(VBELN, POSNR)
+                              end end)     zt_cnt
+              , sum(zt_qty * unit_area) as zt_area
+              , sum(kwmeng * unit_area) as order_area
+         from dm.DM_SO_FZL_ORDER_PRE_T a
+         where is_zdjfzt in ('是', '否')
+           and vtweg = '06'
+--and yt_date <= replace(CURRENT_DATE + INTERVAL '-1 day','-','')
+         group by tj_month --统计月份
+                , channel_text
+                , department
+                , werks
+         union all
+
+         select tj_month
+              , '工程'                    as vtweg
+              , department
+              , werks
+              , count(case
+                          when SFZDJF = '是' then zjhd
+                          else zjhdid
+             end)
+              , count(case
+                          when is_zdjfzt = '是' then case
+                                                        when SFZDJF = '是' then zjhd
+                                                        else zjhdid
+                              end end)
+              , sum(zt_qty * unit_area) as zt_area
+              , sum(menge * unit_area)  as order_area
+         from dm.DM_SO_ZL_ORDER_PRE_T
+         where is_zdjfzt in ('是', '否')
+         group by tj_month
+                , department
+                , werks
+     ),
+     mid as (
+         select tj_month,
+                channel_text,
+                department,
+                werks,
+                order_cnt  as order_cnt_1,
+                zj_cnt,
+                zj_area,
+                new_prod_zj_area,
+                new_prod_area,
+                order_area as order_area_1,
+                0          as order_cnt_2,
+                0          as zt_cnt,
+                0          as zt_area,
+                0          as order_area_2
+         from zjl_base
+         union all
+         select tj_month,
+                channel_text,
+                department,
+                werks,
+                0,
+                0,
+                0,
+                0             new_prod_zj_area,
+                0             new_prod_area,
+                0,
+                order_cnt  as order_cnt_2,
+                zt_cnt,
+                zt_area,
+                order_area as order_area_2
+         from ztl_base
+     ),
+     result as (
+         select sum(case when tj_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM') then zj_area else 0 end) 月度准交面积,
+                sum(case
+                        when tj_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM') then order_area_1
+                        else 0 end)                                                                         月度准交订单面积,
+                sum(case
+                        when to_char((tj_month || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                            then zj_area
+                        else 0 end)                                                                         季度准交面积,
+                sum(case
+                        when to_char((tj_month || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                            then order_area_1
+                        else 0 end)                                                                         季度准交订单面积,
+                sum(case
+                        when substr(tj_month, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy') then zj_area
+                        else 0 end)                                                                         年度准交面积,
+                sum(case
+                        when substr(tj_month, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy') then order_area_1
+                        else 0 end)                                                                         年度准交订单面积,
+                sum(case
+                        when tj_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM') then new_prod_zj_area
+                        else 0 end)                                                                         月度新品准交面积,
+                sum(case
+                        when to_char((tj_month || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                            then new_prod_zj_area
+                        else 0 end)                                                                         季度新品准交面积,
+                sum(case
+                        when substr(tj_month, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy') then new_prod_zj_area
+                        else 0 end)                                                                         年度新品准交面积,
+                sum(case
+                        when tj_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM') then new_prod_area
+                        else 0 end)                                                                         月度新品订单面积,
+                sum(case
+                        when to_char((tj_month || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                            then new_prod_area
+                        else 0 end)                                                                         季度新品订单面积,
+                sum(case
+                        when substr(tj_month, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy') then new_prod_area
+                        else 0 end)                                                                         年度新品订单面积
+         from mid
+         where tj_month between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+     )
+insert
+into dm.dm_ct_cockpit_GSA_t
+select 1,
+       'G1渠道效率提升',
+       '共享仓辐射中小经销商收入同比增长率',
+       case
+           when sum(last_year_month_achievement) = 0 then 0
+           else (sum(month_achievement) -
+                 sum(last_year_month_achievement)) / sum(last_year_month_achievement) END,
+       case
+           when sum(last_year_quarter_achievement) = 0 then 0
+           else (sum(quarter_achievement) -
+                 sum(last_year_quarter_achievement)) / sum(last_year_quarter_achievement) END,
+       case
+           when sum(last_year_achievement) = 0 then 0
+           else (sum(year_achievement) -
+                 sum(last_year_achievement)) / sum(last_year_achievement) END,
+       '%',
+       current_timestamp,
+       1
+from dm.ct_sales_performance_daily_t a
+         join upload.UPLOAD_CT_SHARE_CUSTOMER_REL_1037 c on a.customer = lpad(c.customer_code, 10, '0')
+where level2_code = 'H03230618'
+  and integrate_channel_code = 'GD01'
+  and c.is_small_and_medium = '是'
+  and double_count = 0
+  and customer_end_date = '99991231'
+  and a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+union all
+select 2,
+       'G1渠道效率提升',
+       '共享仓辐射中小经销商高值产品收入占比',
+       case
+           when sum(month_achievement) = 0 then 0
+           else sum(high_value_month_achievement) / sum(month_achievement) END,
+       case
+           when sum(quarter_achievement) = 0 then 0
+           else sum(high_value_quarter_achievement) / sum(quarter_achievement) END,
+       case
+           when sum(year_achievement) = 0 then 0
+           else sum(high_value_year_achievement) / sum(year_achievement) END,
+       '%',
+       current_timestamp,
+       1
+from dm.ct_sales_performance_daily_t a
+         join upload.UPLOAD_CT_SHARE_CUSTOMER_REL_1037 c on a.customer = lpad(c.customer_code, 10, '0')
+where level2_code = 'H03230618'
+  and integrate_channel_code = 'GD01'
+  and c.is_small_and_medium = '是'
+  and double_count = 0
+  and customer_end_date = '99991231'
+  and a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+union all
+select 3,
+       'G1渠道效率提升',
+       '强抢拓收入',
+       0,
+       0,
+       0,
+       '万元',
+       current_timestamp,
+       0
+union all
+select 4,
+       'G1渠道效率提升',
+       '含税销售收入（工程渠道-工程运营平台）',
+       0,
+       0,
+       0,
+       '万元',
+       current_timestamp,
+       0
+union all
+select 5,
+       'G2单店产出提升',
+       '新零售转化率',
+       0,
+       0,
+       0,
+       '%',
+       current_timestamp,
+       0
+union all
+select 6,
+       'G2单店产出提升',
+       '大规格产品销售面积占比（零售渠道）',
+       case
+           when sum(month_sales_area) = 0 then 0
+           else sum(large_spec_month_achievement) / sum(month_sales_area) END,
+       case
+           when sum(quarter_sales_area) = 0 then 0
+           else sum(large_spec_quarter_achievement) / sum(quarter_sales_area) END,
+       case
+           when sum(year_sales_area) = 0 then 0
+           else sum(large_spec_year_achievement) / sum(year_sales_area) END,
+       '%',
+       current_timestamp,
+       1
+from dm.ct_sales_performance_daily_t a
+where level2_code = 'H03230618'
+  and integrate_channel_code = 'GD01'
+  and double_count = 0
+  and a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+union all
+select 7,
+       'G3门店高质覆盖',
+       '专卖店及以上门店净增数量',
+       count(distinct case
+                          when to_char(a.dmjdsj::date, 'yyyyMM') = to_char('${P_PERIOD_D}'::date, 'yyyyMM')
+                              then xjmdbh end)
+           -
+       count(distinct case
+                          when coalesce(to_char(a.MDCXGDRQ::date, 'yyyyMM'),
+                                        case zt
+                                            when 0
+                                                then to_char(current_date + interval '1 years', 'yyyyMM')
+                                            else '199001' end)
+                              = to_char('${P_PERIOD_D}'::date, 'yyyyMM')
+                              then xjmdbh end),
+       count(distinct case
+                          when to_char(a.dmjdsj::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                              then xjmdbh end)
+           -
+       count(distinct case
+                          when coalesce(to_char(a.MDCXGDRQ::date, 'yyyyQ'),
+                                        case zt
+                                            when 0
+                                                then to_char(current_date + interval '1 years', 'yyyyQ')
+                                            else '19901' end)
+                              = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                              then xjmdbh end),
+       count(distinct case
+                          when to_char(a.dmjdsj::date, 'yyyy') = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                              then xjmdbh end)
+           -
+       count(distinct case
+                          when coalesce(to_char(a.MDCXGDRQ::date, 'yyyy'),
+                                        case zt
+                                            when 0
+                                                then to_char(current_date + interval '1 years', 'yyyy')
+                                            else '1990' end)
+                              = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                              then xjmdbh end),
+       '个',
+       current_timestamp,
+       1
+from DWIMD.DWI_MD_SHOP_INFO_OA_T a
+where a.MDLX = 1
+  and (zt = 0 or (zt = 1 and MDCXGDRQ is not null))
+  and qdbm in ('01', '02')
+  and left(xjmdbh, 4) = 'DPCZ'
+  and dt in (0, 1, 2, 7, 21, 22, 25)
+union all
+select 8,
+       'G3门店高质覆盖',
+       '专营店升级专卖店数量',
+       0,
+       0,
+       0,
+       '个',
+       current_timestamp,
+       0
+union all
+select 9,
+       'G4工程转型升级',
+       '高值产品销售收入（工程渠道）',
+       sum(case
+               when a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04' and
+                    calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                   and a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04'
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                   and a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04'
+                   then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join dwimd.dwi_md_data_material_general_t d on a.material = d.material_num
+where b.node_name2 = 'H11000001'
+  and integrate_channel = 'GD03'
+  and node_name3 = 'H03230618'
+  and node_name4 not in ('H03230613', 'H04240301')
+  and node_name5 not in ('H03230612', 'H03230605')
+  and node_name6 != 'H03230627'
+  and node_name9 not in ('R2T', 'REQ')
+  and a.calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select 10,
+       'G4工程转型升级',
+       '工程A标产品销售额',
+       sum(case
+               when a.calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM') and
+                    a.calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((a.calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ') and
+                    a.calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when a.calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM') and
+                    a.calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from dm.dm_ambv2_zzt_xssr_t a
+         left join dm.dm_md_sale_grp_reset_t b on a.sales_grp = b.node_name9
+         join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+where node_name3 = 'H03230618'
+  and integrate_channel = 'GD03'
+  and c.product_brand_code = 'A18'
+  and a.calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select 11,
+       'G4工程转型升级',
+       '含税销售收入（三房）',
+       sum(case
+               when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                   then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from DWRLTC.DWR_BO_PROJECT_DETAIL_F a
+         left join dm.dm_ambv2_zzt_xssr_t b on a.bo_code = b.z_gcbbh
+         left join dm.dm_rpt_sales_group_t c on b.sales_grp = c.node_name9
+where 1 = 1
+  and (node_name4 in ('H04230655', 'H04230685', 'H04230600')
+    and node_name5 != 'H03230605')
+  and a.one_bo_name in ('三房')
+  and integrate_channel = 'GD03'
+  and calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select 12,
+       'G4工程转型升级',
+       '含税销售收入（医疗）',
+       sum(case
+               when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                   then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from DWRLTC.DWR_BO_PROJECT_DETAIL_F a
+         left join dm.dm_ambv2_zzt_xssr_t b on a.bo_code = b.z_gcbbh
+         left join dm.dm_rpt_sales_group_t c on b.sales_grp = c.node_name9
+where 1 = 1
+  and (node_name4 in ('H04230655', 'H04230685', 'H04230600')
+    and node_name5 != 'H03230605')
+  and one_bo_name in ('医疗康养')
+  and integrate_channel = 'GD03'
+  and calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select 13,
+       'G4工程转型升级',
+       '含税销售收入（酒店）',
+       sum(case
+               when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                   then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from DWRLTC.DWR_BO_PROJECT_DETAIL_F a
+         left join dm.dm_ambv2_zzt_xssr_t b on a.bo_code = b.z_gcbbh
+         left join dm.dm_rpt_sales_group_t c on b.sales_grp = c.node_name9
+where 1 = 1
+  and (node_name4 in ('H04230655', 'H04230685', 'H04230600')
+    and node_name5 != 'H03230605')
+  and one_bo_name in ('酒店')
+  and integrate_channel = 'GD03'
+  and calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select 14,
+       'G5供应链效率提升',
+       '准时交付率（工程）',
+       case when sum(月度准交订单面积) = 0 then 0 else sum(月度准交面积) / sum(月度准交订单面积) end month_val,
+       case when sum(季度准交订单面积) = 0 then 0 else sum(季度准交面积) / sum(季度准交订单面积) end quarter_val,
+       case when sum(年度准交订单面积) = 0 then 0 else sum(年度准交面积) / sum(年度准交订单面积) end quarter_val,
+       '%',
+       current_timestamp,
+       1
+from result
+union all
+select 15,
+       'G5供应链效率提升',
+       '准时交付率（新品）',
+       case when sum(月度新品订单面积) = 0 then 0 else sum(月度新品准交面积) / sum(月度新品订单面积) end month_val,
+       case when sum(季度新品订单面积) = 0 then 0 else sum(季度新品准交面积) / sum(季度新品订单面积) end quarter_val,
+       case when sum(年度新品订单面积) = 0 then 0 else sum(年度新品准交面积) / sum(年度新品订单面积) end quarter_val,
+       '%',
+       current_timestamp,
+       1
+from result
+union all
+select 16,
+       'G6产品运营能力提升',
+       'SKU销值同比增长率（主菜单）',
+       0,
+       0,
+       0,
+       '%',
+       current_timestamp,
+       0
+union all
+select 17,
+       'G6产品运营能力提升',
+       '高值产品销售收入',
+       sum(case
+               when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                   and a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04'
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                   and a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04'
+                   then ambperformance
+               else 0 end) / 10000,
+       sum(case
+               when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                   and a.prod_property = 'A0001'
+                   and (product_series_name in ('918', '超大板')
+                       or (product_series_name not in ('918', '超大板') and
+                           d.product_brand_code in ('A1', 'A13', 'A14', 'A16', 'A18')))
+                   and coalesce(integrate_channel2, '#') != 'GD04'
+                   then ambperformance
+               else 0 end) / 10000,
+       '万元',
+       current_timestamp,
+       1
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         join dwimd.dwi_md_data_material_general_t d on a.material = d.material_num
+where b.node_name2 = 'H11000001'
+  and data_source != 'U'
+  and a.calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+union all
+select distinct 18,
+                'G6产品运营能力提升',
+                '新品销售收入占比',
+                case
+                    when sum(case
+                                 when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                                     then ambperformance
+                                 else 0 end) = 0 then 0
+                    else sum(case
+                                 when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                                     and d.material_num is not null
+                                     then ambperformance
+                                 else 0 end) / sum(case
+                                                       when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                                                           then ambperformance
+                                                       else 0 end) end,
+                case
+                    when sum(case
+                                 when to_char((calmonth || '-01')::date, 'yyyyQ') =
+                                      to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                                     then ambperformance
+                                 else 0 end) = 0 then 0
+                    else sum(case
+                                 when to_char((calmonth || '-01')::date, 'yyyyQ') =
+                                      to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                                     and d.material_num is not null
+                                     then ambperformance
+                                 else 0 end) / sum(case
+                                                       when to_char((calmonth || '-01')::date, 'yyyyQ') =
+                                                            to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                                                           then ambperformance
+                                                       else 0 end) end,
+                case
+                    when sum(case
+                                 when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                                     then ambperformance
+                                 else 0 end) = 0 then 0
+                    else sum(case
+                                 when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                                     and d.material_num is not null
+                                     then ambperformance
+                                 else 0 end) / sum(case
+                                                       when substr(calmonth, 1, 4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+                                                           then ambperformance
+                                                       else 0 end) end,
+                '%',
+                current_timestamp,
+                1
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join dwimd.dwi_md_data_material_general_t d
+                   on a.material = d.material_num and length(d.product_listed_date) = 7 and
+                      substr(d.product_listed_date, 5, 1) = '-' and a.calmonth <= to_char(
+                               ((d.product_listed_date || '-01')::date + interval '11 months'), 'yyyy-MM')
+where b.node_name2 = 'H11000001'
+  and data_source != 'U'
+  and a.calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')

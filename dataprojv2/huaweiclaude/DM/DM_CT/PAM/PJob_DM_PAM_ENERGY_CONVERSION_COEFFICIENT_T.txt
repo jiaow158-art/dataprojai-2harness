@@ -1,0 +1,30 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/06/18 17:15:45 GMT+08:00
+-- description:das折标系数表
+-- history list:
+-- UPDATE FROM zhz 20240718 增加筛选只取有效数据
+-- ******************************************************************** --
+
+insert overwrite table DM.DM_PAM_ENERGY_CONVERSION_COEFFICIENT_T
+SELECT 
+ site as SITE_CODE
+,site_describe as site_desc
+,work_shop as work_shop_code
+,work_shop_desc as work_shop_desc
+,fuel_category
+,lower_calorific_value_fuel
+,conversion_coefficient
+,effective_start_date as start_date
+,effective_end_date as end_date
+,creater
+,creater_id
+,create_time
+,updater
+,updater_id
+,update_time
+,delete_flag	
+,current_timestamp as dw_last_update_date
+from SDI.SDI_D_ENERGY_CONVERSION_COEFFICIENT_1006
+where delete_flag = 1

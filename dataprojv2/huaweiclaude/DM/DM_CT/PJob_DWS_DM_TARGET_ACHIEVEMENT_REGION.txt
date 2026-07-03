@@ -1,0 +1,644 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/09/29 15:09:35 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- 20241017 含1+n的目标切换数据来源
+-- 20250422 新增客户字段
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+DELETE FROM dm.dm_target_achievement_region
+WHERE start_month = 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end;
+insert into dm.dm_target_achievement_region
+--预测模块：不含1+N，含1+N的预测金额和面积情况
+with get_parent_cust_num as (
+select distinct 
+-- SALES_GROUP_CODE as sale_grp,--线组
+case 
+	when COALESCE("PARENT_ACCNT_NUMBER",'NAL') not in ('NAL') then lpad("PARENT_ACCNT_NUMBER",10,'0')
+	else lpad("ACCOUNT_NUMBER",10,'0')
+end as parent_CUST_NUM, --母
+lpad("ACCOUNT_NUMBER",10,'0') as CUST_NUM,--子
+case 
+	when "SALES_CHANNEL_CODE" = '06' then 'GD03'
+	when "SALES_CHANNEL_CODE" = '08' then 'GD02'
+	else 'GD01'
+end as zh_channel_code4,--整合渠道
+"SALES_CHANNEL_CODE" as distribution_channel_code,--渠道
+"SALES_ORGANIZATION_CODE" as SALES_ORG_CODE --组织
+From dm.dm_rpt_zmaster_cus_t
+where "PARVW" = 'AG'
+)
+,get_nopick_amount as
+(
+select *, 
+sum(XS_NETWR) over(partition by vbeln,posnr order by createdate) as XS_NETWR_SUM,
+row_number() over(partition by vbeln,posnr order by createdate desc) XS_NETWR_SUM_RN
+from dwrotd.dwr_accumulate_overdue_nopick_f
+where sale_region_name like '%运营中心'
+)
+,A as 
+(
+select 
+replace(replace(start_month,'01/02','02'),'-','') start_month
+,sales_center_code
+,sales_center_name as sales_center
+,sales_dep_code
+,sales_dep_name as sales_dep
+,sales_region_code
+,sales_region_name as sales_region
+,sum(COALESCE(amount,0)) ndn_amount_yc --不含1+n 预测金额
+,sum(COALESCE(area,0)) ndn_area_yc--不含1+n 预测面积
+
+,0 as  adn_area_yc--含1+n 预测面积
+,case when sales_center_code in ('H05230626','H05230607','H05230608','H05230623','H05230624') then 0 else sum(COALESCE(n_amount,0))+sum(COALESCE(amount,0)) end as adn_amount_yc --含1+n 预测金额
+,integrate_channel
+,dp_obj_code as sales_grp
+,null as customer
+,null as parent_CUST_NUM
+from dwrotd.dwr_wm_sales_predict_t
+group by 
+start_month
+,sales_center_code
+,sales_center_name
+,sales_dep_code
+,sales_dep_name
+,sales_region_code
+,sales_region_name 
+,integrate_channel
+,dp_obj_code
+-- union all --子公司含1+N 预测姐
+-- select 
+-- t1.start_month as start_month
+-- ,null as sales_center_code
+-- ,null as sales_center
+-- ,null as sales_dep_code
+-- ,null as sales_dep
+-- ,null as sales_region_code
+-- ,null as sales_region
+-- ,0 as  ndn_amount_yc --不含1+n 预测金额
+-- ,0 as ndn_area_yc--不含1+n 预测面积
+
+-- ,0 as  adn_area_yc--含1+n 预测面积
+-- ,sum(COALESCE(predict_amt,0)) as adn_amount_yc --含1+n 预测金额
+-- ,case 
+-- 	when t1.distribution_channel like '%零售%' then 'GD01'
+-- 	when t1.distribution_channel like '%整装%' then 'GD02'
+-- 	when t1.distribution_channel like '%工程%' then 'GD03'
+-- end as integrate_channel
+-- ,t1.sales_org_code as sales_grp
+-- ,t1.cust_num as customer
+-- from upload.upload_cust_num_predict_target_t t1
+-- left join dm.dm_rpt_sales_group_t t2 on  t1.sales_org_code =  t2.node_name9
+-- and t2.node_name5 in ('H05230626','H05230607','H05230608','H05230623','H05230624')
+-- group by 
+-- start_month
+-- ,integrate_channel
+-- ,t1.sales_org_code
+-- ,t1.cust_num
+
+union all  --不含含1+n 预测金额金额/面积：DPI、ART+、绿家、辅材、国际营销
+select 
+t1.stat_month as start_month
+,null as sales_center_code
+,null as sales_center
+,null as sales_dep_code
+,null as sales_dep
+,null as sales_region_code
+,null as sales_region
+,sum(forecast_amount) as  ndn_amount_yc --不含1+n 预测金额
+,sum(estimated_pickup_area) as ndn_area_yc--不含1+n 预测面积
+
+,0 as  adn_area_yc--含1+n 预测面积
+,0 as adn_amount_yc --含1+n 预测金额
+,case 
+	when t1.sales__channel like '%零售%' then 'GD01'
+	when t1.sales__channel like '%整装%' then 'GD02'
+	when t1.sales__channel like '%工程%' then 'GD03'
+end as integrate_channel
+,t1.sales_grp
+,null as customer
+,null as parent_CUST_NUM
+from upload.upload_sd_forecast_aroam_t t1
+left join dm.dm_rpt_sales_group_t t2 on  t1.sales_grp =  t2.node_name9
+where 1=1
+and (
+t2.node_name2 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name3 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name4 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name5 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name6 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or
+t2.node_name9 in ('REQ')
+)
+group by 
+stat_month
+,integrate_channel
+,t1.sales_grp
+
+union all --含1+n 预测金额金额：DPI、ART+、绿家、辅材、国际营销
+select 
+case when  substr(t1.stat_month,-2,2)='01' then  substr(t1.stat_month,1,4)||'02' else replace(t1.stat_month,'-','') end as start_month
+,null as sales_center_code
+,null as sales_center
+,null as sales_dep_code
+,null as sales_dep
+,null as sales_region_code
+,null as sales_region
+,0 as  ndn_amount_yc --不含1+n 预测金额
+,0 as ndn_area_yc--不含1+n 预测面积
+
+,0 as  adn_area_yc--含1+n 预测面积
+,sum(t1.adn_estimated_pickup_area)  as adn_amount_yc --含1+n 预测金额
+,case 
+	when t1.integrate_channel_name like '%零售%' then 'GD01'
+	when t1.integrate_channel_name like '%整装%' then 'GD02'
+	when t1.integrate_channel_name like '%工程%' then 'GD03'
+end as integrate_channel
+,t1.sales_grp
+,null as customer
+,null as parent_CUST_NUM
+from upload.upload_sd_forecast_adn_achievement_t t1
+left join dm.dm_rpt_sales_group_t t2 on  t1.sales_grp =  t2.node_name9
+where 1=1
+and (
+t2.node_name2 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name3 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name4 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name5 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or 
+t2.node_name6 in ('H11240102','H03230627', 'H03230604','H03230605','H03230612') or
+t2.node_name9 in ('REQ') or
+
+t2.node_name5 in ('H05230626','H05230607','H05230608','H05230623','H05230624') --子公司
+)
+group by 
+stat_month
+,integrate_channel
+,t1.sales_grp
+
+-- union all --线组粒度的 --含1+n 预测金额
+-- select 
+-- t1.start_month as start_month
+-- ,null as sales_center_code
+-- ,null as sales_center
+-- ,null as sales_dep_code
+-- ,null as sales_dep
+-- ,null as sales_region_code
+-- ,null as sales_region
+-- ,0 as  ndn_amount_yc --不含1+n 预测金额
+-- ,0 as ndn_area_yc--不含1+n 预测面积
+
+-- ,0 as  adn_area_yc--含1+n 预测面积
+-- ,sum(t1.predict_amt)  as adn_amount_yc --含1+n 预测金额
+-- ,case 
+-- 	when t1.distribution_channel like '%零售%' then 'GD01'
+-- 	when t1.distribution_channel like '%整装%' then 'GD02'
+-- 	when t1.distribution_channel like '%工程%' then 'GD03'
+-- end as integrate_channel
+-- ,t1.sales_org_code as sales_grp
+-- ,t1.cust_num as customer
+-- from upload.upload_cust_num_predict_target_t t1
+-- left join dm.dm_rpt_sales_group_t t2 on  t1.sales_org_code =  t2.node_name9
+-- where 1=1
+-- group by 
+-- start_month
+-- ,integrate_channel
+-- ,sales_grp
+-- ,customer
+
+)
+
+--达成模块：不含1+N的金额和面积达成情况
+,B as (
+select  
+cast(t1.calmonth as text) start_month
+,t2.sales_center_code
+,t2.sales_center
+,t2.sales_dep_code
+,t2.sales_dep 
+,t2.sales_region_code
+,t2.sales_region
+,sum(t1.amount) ndn_amount_dy
+,sum(t1.area) ndn_area_dy
+,t1.channel_code as integrate_channel
+,t1.sales_grp
+,t1.sold_to as customer
+,gp.parent_CUST_NUM
+from DM.DM_RPT_SALE_FORECAST_2023_T t1
+left join dm.dm_dp_api_sales_group_struct t2 on t1.sales_grp = t2.sales_grp
+left join get_parent_cust_num gp on t1.salesorg = gp.SALES_ORG_CODE and t1.distr_chan = gp.distribution_channel_code and lpad(t1.sold_to,10,'0') = gp.CUST_NUM
+where 1=1
+group by 
+t1.calmonth
+,t2.sales_center_code
+,t2.sales_center
+,t2.sales_dep_code
+,t2.sales_dep
+,t2.sales_region_code
+,t2.sales_region
+,t1.channel_code
+,t1.sales_grp
+,t1.sold_to
+,gp.parent_cust_num
+)
+
+--达成模块：含1+N的预测金额和面积达成
+,B1 as 
+(
+select 
+	case when  substr(a.calmonth,-2,2)='01' then  substr(a.calmonth,1,4)||'02' else replace(a.calmonth,'-','') end start_month
+    ,b.sales_center_code
+	,b.sales_center 
+	,b.sales_dep_code
+	,b.sales_dep 
+	,b.sales_region_code
+	,b.sales_region 
+    ,sum(a.ambperformance) adn_amount_dy
+    ,sum(a.zxsmj)        adn_area_dy
+    ,a.integrate_channel
+    ,a.sales_grp
+    ,lpad(a.customer,10,'0') as customer
+    ,sum(d.XS_NETWR_SUM) as nopick_amount
+    ,sum(d.mianji) as nopick_area
+    ,gp.parent_CUST_NUM
+from dm.dm_ambv2_zzt_xssr_t a
+         left join dm.dm_dp_api_sales_group_struct b on a.sales_grp = b.sales_grp
+         left join DM.DM_RPT_PROD_LEVEL_T c on a.ZPRODH3 = c.prod_code3 and c.PROD_CODE3 IS NOT NULL
+         left join get_nopick_amount d on a.doc_number = d.vbeln  and a.s_ord_item = d.posnr and a.refer_doc = d.vgbel and d.XS_NETWR_SUM_RN = 1
+         left join dm.dm_rpt_sales_group_t t2 on a.sales_grp = t2.node_name9
+         left join get_parent_cust_num gp on a.salesorg = gp.SALES_ORG_CODE and COALESCE(a.zsales_channel,a.distr_chan)= gp.distribution_channel_code and lpad(a.customer,10,'0') = gp.CUST_NUM
+where 1=1 
+	and t2.NODE_NAME2 = 'H11000001'
+  	and ((t2.node_name4 in ('H04230600', 'H04230655') and
+        (strpos(t2.node_desc5, '子公司') > 0 or strpos(t2.node_desc5, '运营中心') > 0))
+    	or (t2.node_name3 in ('H03230617', 'H03230628','REQ')) or t2.node_name5 in ('H03230628')
+    	or t2.node_name5 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612')
+        or t2.node_name6 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612') --ART+层级调整
+    )
+    and a.data_source <> 'U'
+    and not (coalesce(a.ambperformance,0) = 0 and coalesce(a.zxsmj,0) = 0)
+group by 
+a.calmonth
+,b.sales_center_code
+,b.sales_center
+,b.sales_dep_code
+,b.sales_dep
+,b.sales_region_code
+,b.sales_region
+,a.integrate_channel
+,a.sales_grp
+,a.customer
+,gp.parent_cust_num
+)
+
+,tem as (
+--含1+n的业绩：达成(年累计金额、年累计面积)
+select 
+    case when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end as start_month
+	,b.sales_center_code
+	,b.sales_center
+	,b.sales_dep_code
+	,b.sales_dep 
+	,b.sales_region_code
+	,b.sales_region 
+    ,sum(a.ambperformance) adn_acc_amount
+--    sum(a.performance_1n)           adn_acc_amount,
+    ,sum(zxsmj)        adn_acc_area
+	,sum(0) as adn_amount_target
+	,sum(0) as adn_area_target
+	,sum(0) as adn_acc_amount_target
+	,sum(0)  as adn_acc_area_target
+	,a.integrate_channel
+	,a.sales_grp
+	,a.customer 
+    ,sum(d.XS_NETWR_SUM) as nopick_acc_amount
+    ,sum(d.mianji) as nopick_acc_area
+    ,gp.parent_CUST_NUM
+from dm.dm_ambv2_zzt_xssr_t a
+        left join dm.dm_dp_api_sales_group_struct b on a.sales_grp = b.sales_grp
+        left join DM.DM_RPT_PROD_LEVEL_T c on a.ZPRODH3 = c.prod_code3 and c.PROD_CODE3 IS NOT NULL
+        left join get_nopick_amount d on a.doc_number = d.vbeln  and a.s_ord_item = d.posnr and a.refer_doc = d.vgbel and d.XS_NETWR_SUM_RN = 1
+        left join dm.dm_rpt_sales_group_t t2 on a.sales_grp = t2.node_name9
+        left join get_parent_cust_num gp on a.salesorg = gp.SALES_ORG_CODE and COALESCE(a.zsales_channel,a.distr_chan) = gp.distribution_channel_code and lpad(a.customer,10,'0') = gp.CUST_NUM
+where 1=1 
+    and SUBSTR(REPLACE(a.calmonth,'-',''),1,4) = REPLACE(SUBSTR(date('${PERIOD_ID_D}'),1,4),'-','') 
+    and REPLACE(a.calmonth,'-','') <= REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','')
+	and t2.NODE_NAME2 = 'H11000001'
+  	and ((t2.node_name4 in ('H04230600', 'H04230655') and
+        (strpos(t2.node_desc5, '子公司') > 0 or strpos(t2.node_desc5, '运营中心') > 0))
+    	or (t2.node_name3 in ('H03230617', 'H03230628','REQ')) or t2.node_name5 in ('H03230628')
+    	or t2.node_name5 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612')
+        or t2.node_name6 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612') --ART+层级调整
+    )
+    and a.data_source <> 'U'
+    and not (coalesce(a.ambperformance,0) = 0 and coalesce(a.zxsmj,0) = 0)
+group by 
+start_month
+,b.sales_center_code
+,b.sales_center
+,b.sales_dep_code
+,b.sales_dep
+,b.sales_region_code
+,b.sales_region
+,a.integrate_channel
+,a.sales_grp
+,a.customer
+,gp.parent_CUST_NUM
+
+union all
+
+--含1+n的业绩：目标
+select 
+	case 
+		when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(stat_month,1,7),'-','') end as start_month
+	,b.sales_center_code
+	,b.sales_center
+	,b.sales_dep_code
+	,b.sales_dep
+	,b.sales_region_code
+	,b.sales_region
+	,sum(0) as adn_acc_amount
+	,sum(0) as adn_acc_area
+	,sum(target) as adn_amount_target
+	,sum(0) as adn_area_target
+	,sum(0) as adn_acc_amount_target
+	,sum(0) as adn_acc_area_target
+	,t1.integrate_channel
+	,t1.sales_group as sales_grp
+	,null as customer
+	,0 as nopick_acc_amount
+    ,0 as nopick_acc_area
+    ,null as parent_CUST_NUM
+from upload.upload_ct_sales_performance_target_t t1
+left join dm.dm_dp_api_sales_group_struct b on t1.sales_group = b.sales_grp
+left join dm.dm_rpt_sales_group_t t2 on t1.sales_group = t2.node_name9
+where 1=1
+-- and is_double_count = 0 --0不是双计，1是双计
+and fr_delete = 0
+and coalesce(t1.sales_group,'$$$') not in('ZK01','ZB04')
+and coalesce(t1.data_source,'$$$') <> 'U'
+and  t2.NODE_NAME2 = 'H11000001'
+and case when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(stat_month,1,7),'-','') end
+	= 
+	case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+group by 
+start_month
+,b.sales_center_code
+,b.sales_center
+,b.sales_dep_code
+,b.sales_dep
+,b.sales_region_code
+,b.sales_region
+,t1.integrate_channel
+,t1.sales_group
+
+union all
+
+--含1+n的业绩：年累计目标
+select 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end as start_month
+	,b.sales_center_code
+	,b.sales_center
+	,b.sales_dep_code
+	,b.sales_dep
+	,b.sales_region_code
+	,b.sales_region
+	,sum(0) as adn_acc_amount
+	,sum(0) as adn_acc_area
+	,sum(0) as adn_amount_target
+	,sum(0) as adn_area_target
+	,sum(target) as adn_acc_amount_target 
+	,sum(0) as adn_acc_area_target
+	,t1.integrate_channel
+	,t1.sales_group as sales_grp
+	,null as customer
+	,0 as nopick_acc_amount
+    ,0 as nopick_acc_area
+    ,null as parent_CUST_NUM
+from upload.upload_ct_sales_performance_target_t t1
+left join dm.dm_dp_api_sales_group_struct b on t1.sales_group = b.sales_grp
+left join dm.dm_rpt_sales_group_t t2 on t1.sales_group = t2.node_name9
+where 1=1
+-- and is_double_count = 0 --0不是双计，1是双计
+and fr_delete = 0
+and coalesce(t1.sales_group,'$$$') not in('ZK01','ZB04')
+and coalesce(t1.data_source,'$$$') <> 'U'
+and t2.NODE_NAME2 = 'H11000001'
+and SUBSTR(stat_month,1,4) = SUBSTR(date('${PERIOD_ID_D}') ,1,4)
+and case when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(stat_month,1,7),'-','') end
+	<= 
+	case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+group by 
+start_month
+,b.sales_center_code
+,b.sales_center
+,b.sales_dep_code
+,b.sales_dep
+,b.sales_region_code
+,b.sales_region
+,t1.integrate_channel
+,t1.sales_group
+)
+
+,data_detail as
+(
+select 
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,ndn_amount_yc --不含1+n 预测金额
+,ndn_area_yc--不含1+n 预测面积
+,adn_area_yc--含1+n 预测面积
+,adn_amount_yc --含1+n 预测金额
+,0 as ndn_amount_dy
+,0 as ndn_area_dy
+,0 as adn_amount_dy
+,0 as adn_area_dy
+,0 as adn_acc_amount
+,0 as adn_acc_area
+,0 as adn_amount_target
+,0 as adn_area_target
+,0 as adn_acc_amount_target
+,0 as adn_acc_area_target
+,integrate_channel
+,sales_grp
+,customer
+,0 as nopick_amount
+,0 as nopick_area
+,0 as nopick_acc_amount
+,0 as nopick_acc_area
+,parent_CUST_NUM
+from A 
+union all
+select
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,0 as ndn_amount_yc --不含1+n 预测金额
+,0 as ndn_area_yc--不含1+n 预测面积
+,0 as adn_area_yc--含1+n 预测面积
+,0 as adn_amount_yc --含1+n 预测金额
+,ndn_amount_dy
+,ndn_area_dy
+,0 as adn_amount_dy
+,0 as adn_area_dy
+,0 as adn_acc_amount
+,0 as adn_acc_area
+,0 as adn_amount_target
+,0 as adn_area_target
+,0 as adn_acc_amount_target
+,0 as adn_acc_area_target
+,integrate_channel
+,sales_grp
+,customer
+,0 as nopick_amount
+,0 as nopick_area
+,0 as nopick_acc_amount
+,0 as nopick_acc_area
+,parent_CUST_NUM
+from B
+union all 
+select
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,0 as ndn_amount_yc --不含1+n 预测金额
+,0 as ndn_area_yc--不含1+n 预测面积
+,0 as adn_area_yc--含1+n 预测面积
+,0 as adn_amount_yc --含1+n 预测金额
+,0 as ndn_amount_dy
+,0 as ndn_area_dy
+,adn_amount_dy
+,adn_area_dy
+,0 as adn_acc_amount
+,0 as adn_acc_area
+,0 as adn_amount_target
+,0 as adn_area_target
+,0 as adn_acc_amount_target
+,0 as adn_acc_area_target
+,integrate_channel
+,sales_grp
+,customer
+,nopick_amount
+,nopick_area
+,0 as nopick_acc_amount
+,0 as nopick_acc_area
+,parent_CUST_NUM
+from B1
+union all 
+select
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,0 as ndn_amount_yc --不含1+n 预测金额
+,0 as ndn_area_yc--不含1+n 预测面积
+,0 as adn_area_yc--含1+n 预测面积
+,0 as adn_amount_yc --含1+n 预测金额
+,0 as ndn_amount_dy
+,0 as ndn_area_dy
+,0 as adn_amount_dy
+,0 as adn_area_dy
+,adn_acc_amount
+,adn_acc_area
+,adn_amount_target
+,adn_area_target
+,adn_acc_amount_target
+,adn_acc_area_target
+,integrate_channel
+,sales_grp
+,customer
+,0 as nopick_amount
+,0 as nopick_area
+,nopick_acc_amount
+,nopick_acc_area
+,parent_CUST_NUM
+from tem
+)
+
+select 
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,sum(ndn_amount_yc) as ndn_amount_yc --不含1+n 预测金额
+,sum(ndn_area_yc) as ndn_area_yc --不含1+n 预测面积
+,sum(ndn_amount_dy/10000) as ndn_amount_dy --不含1+n 实际达成金额
+,sum(ndn_area_dy/10000) as ndn_area_dy --不含1+n 实际达成面积
+
+,sum(adn_amount_target) as adn_amount_target --含1+n 金额目标
+,sum(adn_area_target) as adn_area_target --含1+n 面积目标
+
+,sum(adn_amount_yc) as adn_amount_yc --含1+n 预测金额
+,sum(adn_area_yc) as adn_area_yc--含1+n 预测面积
+,sum(adn_amount_dy/10000) as adn_amount_dy --含1+n 达成金额
+,sum(adn_area_dy/10000) as adn_area_dy --含1+n 达成面积
+
+,sum(adn_acc_amount_target) as adn_acc_amount_target --含1+n 年累计金额目标
+,sum(adn_acc_area_target) as adn_acc_area_target --含1+n 年累计面积目标
+,sum(adn_acc_amount/10000) as adn_acc_amount --含1+n 年累计达成金额
+,sum(adn_acc_area/10000) as adn_acc_area --含1+n 年累计达成面积
+,NOW() as dw_last_update_date
+,integrate_channel
+,sales_grp
+,customer
+,sum(nopick_amount)/10000 as nopick_amount
+,sum(nopick_area)/10000 as nopick_area
+,sum(nopick_acc_amount)/10000 as nopick_acc_amount
+,sum(nopick_acc_area)/10000 as nopick_acc_area
+,parent_CUST_NUM
+from data_detail
+where 1=1 
+-- and sales_grp not in ('ZX1')
+-- and sales_dep not like '%运营中心%'
+and start_month = 	
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+group by 
+start_month
+,sales_center_code
+,sales_center
+,sales_dep_code
+,sales_dep
+,sales_region_code
+,sales_region
+,integrate_channel
+,sales_grp
+,customer
+,parent_CUST_NUM

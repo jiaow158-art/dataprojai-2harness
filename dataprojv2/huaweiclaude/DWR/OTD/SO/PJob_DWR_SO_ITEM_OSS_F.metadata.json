@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_ITEM_OSS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "OSS销售订单行表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

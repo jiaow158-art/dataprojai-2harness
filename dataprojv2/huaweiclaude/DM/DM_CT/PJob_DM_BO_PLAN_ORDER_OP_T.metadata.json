@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_BO_PLAN_ORDER_OP_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "一单到底工程计划单操作者查询界面汇总表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

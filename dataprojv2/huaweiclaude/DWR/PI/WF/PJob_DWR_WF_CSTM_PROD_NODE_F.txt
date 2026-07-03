@@ -1,0 +1,35 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/09/02 14:27:13 GMT+08:00
+-- update from huangwenbin 2024-11-11 剔除节点是抄送、传阅、转办的
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRPI.DWR_WF_CSTM_PROD_NODE_F
+SELECT A.REQUESTID AS RQST_ID --请求ID
+      ,A.LSH AS SER_NUM --流水号
+      ,A.SQR AS APLY_EMP_ID --申请人ID
+	  ,B.SAPID AS APLY_EMP_NUM --申请人工号
+	  ,B.LASTNAME AS APLY_EMP_NAME --申请人姓名
+      ,A.SQRQ AS APLY_DATE --申请日期
+      ,A.KB AS CUST_NUM --客户编码
+      ,A.KHMC AS CUST_NAME --客户名称
+      ,A.GCLB AS ENGR_TYPE_NAME --工程类别
+      ,A.GCMC AS ENGR_NAME --工程名称
+      ,A.CPBHFP AS MATERIAL_NUM --产品型号分配(物料编码)
+	  ,C.RECEIVE_DATE AS RECV_DATE --接受日期
+	  ,C.RECEIVE_DATE || ' ' ||C.RECEIVE_TIME AS RECV_TIME --接受时间
+	  ,COALESCE(C.OPERATE_DATE,DATE_ADD(CURRENT_DATE,-1)) AS OP_DATE --操作日期
+	  ,COALESCE(C.OPERATE_DATE,DATE_ADD(CURRENT_DATE,-1)) || ' ' ||COALESCE(C.OPERATE_TIME,'23:59:59') AS OP_TIME --操作时间
+	  ,C.OPERATION_NODE_CODE AS OP_NODE_CODE --节点ID
+	  ,D.NODE_NAME AS OP_NODE_NAME --节点名称
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_FORMTABLE_MAIN_1006_1004 A
+  LEFT JOIN SDI.SDI_HRMRESOURCE_1004 B
+    ON A.SQR = B.ID
+   AND B.DEL_FLAG = 'N'
+  LEFT JOIN DWRPI.DWR_WF_REQUESTS_NODE_CREATOR_F C
+    ON A.REQUESTID = C.REQUEST_CODE
+   AND COALESCE(C.BEFORE_CHANGE_OPERATION_TYPE,'') NOT IN('1','8','11')
+  LEFT JOIN DWRPI.DWR_WF_NODE_BASIC_INTO_F D
+    ON D.NODE_ID = C.OPERATION_NODE_CODE	
+;

@@ -1,0 +1,210 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/08 09:41:48 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM  DWIMD.DWI_MD_INVENT_TURNO_DAY_CHAN_T
+WHERE STATISTICAL_MONTH >=
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '04'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END;
+--库存成本
+WITH 
+T0 as (
+select 
+ t.month_id AS STAT_MONTH
+ ,'工程' as CHANNEL_NAME
+ from (select month_id from dm.dm_dim_date_d  where month_id >= '202101' and month_id <= substr(sysdate,1,4) || substr(sysdate,6,2)
+ group by month_id ) as t 
+ union all 
+ select 
+ t.month_id AS STAT_MONTH
+ ,'大包' as CHANNEL_NAME
+ from (select month_id from dm.dm_dim_date_d  where month_id >= '202101' and month_id <= substr(sysdate,1,4) || substr(sysdate,6,2)
+ group by month_id ) as t 
+  union all 
+  select 
+ t.month_id AS STAT_MONTH
+ ,'零售' as CHANNEL_NAME
+ from (select month_id from dm.dm_dim_date_d  where month_id >= '202101' and month_id <= substr(sysdate,1,4) || substr(sysdate,6,2)
+ group by month_id ) as t 
+  union all 
+  select 
+ t.month_id AS STAT_MONTH
+ ,'设计师' as CHANNEL_NAME
+ from (select month_id from dm.dm_dim_date_d  where month_id >= '202101' and month_id <= substr(sysdate,1,4) || substr(sysdate,6,2)
+ group by month_id ) as t 
+)
+,T1 AS(
+SELECT 
+        A.STAT_MONTH AS STAT_MONTH --月份
+       ,CASE WHEN A.CHANNEL_NAME = '家装大包' THEN '大包'
+  	         ELSE A.CHANNEL_NAME
+			  END AS CHANNEL_NAME --四大渠道
+       ,SUM(A.YM_ZYKCJE) AS YM_ZYKCJE --月末库存金额-自有库存
+       ,SUM(A.YM_ZYKCSL) AS YM_ZYKCSL --月末库存数量-自有库存
+       ,SUM(A.YM_WXKCJE) AS YM_WXKCJE --月末外协寄售金额
+       ,SUM(A.YM_WXKCSL) AS YM_WXKCSL --月末外协寄售数量
+FROM upload.upload_wm_prod_stock_dtl_t A
+where A.stat_month <= '202112'
+GROUP BY A.STAT_MONTH --月份
+       ,CASE WHEN A.CHANNEL_NAME = '家装大包' THEN '大包'
+  	         ELSE A.CHANNEL_NAME
+			  END --四大渠道
+	   
+ UNION ALL
+SELECT 
+        CAST(A."CALMONTH" AS INT) AS STAT_MONTH --月份
+       ,CASE WHEN B.RESERVED_FIELD1_NAME IN('工程','工程定制') THEN '工程'
+             WHEN B.RESERVED_FIELD1_NAME = '家装大包' OR B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+             WHEN B.RESERVED_FIELD1_NAME = '设计师' THEN '设计师'
+             ELSE '零售'
+              END CHANNEL_NAME --四大渠道
+       ,SUM(A."KCJE_YM") AS YM_ZYKCJE --月末库存金额-自有库存
+       ,SUM(A."KCSL_YM") AS YM_ZYKCSL --月末库存数量-自有库存
+       ,SUM(A."KCJE_YM_WX") AS YM_WXKCJE --月末外协寄售金额
+       ,SUM(A."KCSL_YM_WX") AS YM_WXKCSL --月末外协寄售数量
+FROM DM.DM_RPT_BIC_AZMMM_O0101_T A
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T B
+ON A."MATERIAL" = B.MATERIAL_NUM
+WHERE A."/BIC/ZA_SYAMB" = 'ZAMBID11000001'
+AND A."CALMONTH" >= '202201' 
+GROUP BY CAST(A."CALMONTH" AS INT)
+       ,CASE WHEN B.RESERVED_FIELD1_NAME IN('工程','工程定制') THEN '工程'
+             WHEN B.RESERVED_FIELD1_NAME = '家装大包' OR B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+             WHEN B.RESERVED_FIELD1_NAME = '设计师' THEN '设计师'
+             ELSE '零售'
+              END 
+)
+--销售成本
+,T2 AS(
+SELECT A.CALMONTH AS STAT_MONTH --月份
+      ,CASE WHEN A.DISTR_CHAN = '06' THEN '工程'
+            WHEN A.ZQDZH = 'G105' THEN '设计师'
+            WHEN A.DISTR_CHAN = '08' THEN '大包'
+            WHEN B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+            ELSE '零售'
+             END AS CHANNEL_NAME --四大渠道
+       ,SUM(A.ZSJCB) AS ZSJCB --实际成本
+       ,SUM(A.ZXSYJ) AS ZXSYJ --销售业绩
+FROM DM.DM_ZASD_P001_Q066V2_T A
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T B
+ON A.MATERIAL = B.MATERIAL_NUM
+WHERE A.SALES_GRP IN(SELECT DISTINCT SALES_GROUP
+                       FROM DWRFIN.DWR_GL_SALES_GROUP_F
+                      WHERE UTILITIES_DEPT = '11000001'
+		            ) 
+GROUP BY A.CALMONTH
+      ,CASE WHEN A.DISTR_CHAN = '06' THEN '工程'
+            WHEN A.ZQDZH = 'G105' THEN '设计师'
+            WHEN A.DISTR_CHAN = '08' THEN '大包'
+            WHEN B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+            ELSE '零售'
+             END
+)
+--库存周转天数=滚动累计12个月销售成本/（（滚动13个月月末库存余额/13））
+,T3 AS(
+SELECT STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道
+      ,SUM(YM_ZYKCJE) AS YM_ZYKCJE --月末库存金额-自有库存
+      ,SUM(YM_ZYKCSL) AS YM_ZYKCSL --月末库存数量-自有库存
+      ,SUM(YM_WXKCJE) AS YM_WXKCJE --月末外协寄售金额
+      ,SUM(YM_WXKCSL) AS YM_WXKCSL --月末外协寄售数量
+	  ,SUM(ZSJCB) AS ZSJCB --实际成本
+	  ,SUM(ZXSYJ) AS ZXSYJ --销售业绩 
+FROM(
+SELECT STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道
+      ,YM_ZYKCJE --月末库存金额-自有库存
+      ,YM_ZYKCSL --月末库存数量-自有库存
+      ,YM_WXKCJE --月末外协寄售金额
+      ,YM_WXKCSL --月末外协寄售数量
+	  ,0 AS ZSJCB --实际成本
+	  ,0 AS ZXSYJ --销售业绩
+  FROM T1
+  
+ UNION ALL
+
+SELECT CAST(STAT_MONTH AS INT) --统计月份
+      ,CHANNEL_NAME --四大渠道
+      ,0 AS YM_ZYKCJE --月末库存金额-自有库存
+      ,0 AS YM_ZYKCSL --月末库存数量-自有库存
+      ,0 AS YM_WXKCJE --月末外协寄售金额
+      ,0 AS YM_WXKCSL --月末外协寄售数量
+	  ,ZSJCB --实际成本
+	  ,ZXSYJ --销售业绩
+  FROM T2) T
+GROUP BY STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道 
+union all 
+select CAST(STAT_MONTH AS INT)
+	  ,CHANNEL_NAME --四大渠道
+  	  ,0 AS YM_ZYKCJE --月末库存金额-自有库存
+      ,0 AS YM_ZYKCSL --月末库存数量-自有库存
+      ,0 AS YM_WXKCJE --月末外协寄售金额
+      ,0 AS YM_WXKCSL --月末外协寄售数量
+	  ,0 as ZSJCB --实际成本
+	  ,0 as ZXSYJ --销售业绩
+	  from T0  
+)
+,T33 AS(
+SELECT STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道
+      ,sum(YM_ZYKCJE) as YM_ZYKCJE--月末库存金额-自有库存
+      ,sum(YM_ZYKCSL) as YM_ZYKCSL--月末库存数量-自有库存
+      ,sum(YM_WXKCJE) as YM_WXKCJE--月末外协寄售金额
+      ,sum(YM_WXKCSL) as YM_WXKCSL--月末外协寄售数量
+	  ,sum(ZSJCB) as ZSJCB  --实际成本
+	  ,sum(ZXSYJ) as ZXSYJ--销售业绩
+	  from T3
+	  group by 
+	  STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道 
+)
+,T4 AS(
+SELECT STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道      
+	  ,SUM(YM_ZYKCJE) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS YM_ZYKCJE --月末库存金额-自有库存
+	  ,SUM(YM_ZYKCSL) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS YM_ZYKCSL --月末库存数量-自有库存
+	  ,SUM(YM_WXKCJE) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS YM_WXKCJE --月末外协寄售金额	  
+	  ,SUM(YM_WXKCSL) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS YM_WXKCSL --月末外协寄售数量
+	  ,SUM(ZSJCB) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS ZSJCB --实际成本
+	  ,SUM(ZXSYJ) OVER( PARTITION BY CHANNEL_NAME ORDER BY STAT_MONTH ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS ZXSYJ --销售业绩
+  FROM T33	  
+)
+,T5 as (
+SELECT STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道
+	  ,SUM(COALESCE(YM_ZYKCJE,0)) as YM_ZYKCJE --月末库存金额-自有库存
+	  ,SUM(COALESCE(YM_ZYKCSL,0)) as YM_ZYKCSL--月末库存数量-自有库存
+	  ,sum(COALESCE(YM_WXKCJE,0)) as YM_WXKCJE --月末外协寄售金额	  
+	  ,sum(COALESCE(YM_WXKCSL,0)) as YM_WXKCSL --月末外协寄售数量
+	  ,SUM(COALESCE(ZSJCB,0)) AS ZSJCB --实际成本
+	  ,SUM(COALESCE(ZXSYJ,0)) AS ZXSYJ --销售业绩
+  FROM T4
+  where STAT_MONTH >= 202201
+ GROUP BY
+       STAT_MONTH --统计月份
+      ,CHANNEL_NAME --四大渠道
+)
+ INSERT INTO DWIMD.DWI_MD_INVENT_TURNO_DAY_CHAN_T
+SELECT T5.STAT_MONTH 			AS STATISTICAL_MONTH				-- 统计月份
+      ,T5.CHANNEL_NAME 			AS FOUR_CHANNEL						-- 四大渠道
+      ,SUM(T5.YM_ZYKCJE) 		AS MON_END_STOCK_AMOUNT_O_STOCK 	-- 月末库存金额-自有库存
+      ,SUM(T5.YM_ZYKCSL) 		AS MON_END_STOCK_QUANTITY_O_STOCK 	-- 月末库存数量-自有库存
+      ,SUM(T5.YM_WXKCJE) 		AS MON_END_CONSIGNMENT_AMOUNT		-- 月末外协寄售金额
+      ,SUM(T5.YM_WXKCSL) 		AS MON_END_CONSIGNMENT_QUANTITY		-- 月末外协寄售数量
+	  ,SUM(T5.ZSJCB) 			AS ACTUAL_COST 						-- 实际成本
+	  ,SUM(T5.ZXSYJ) 			AS SALES_PERFORMANCE 				-- 销售业绩 
+	  ,'N' 						AS DEL_FLAG							-- 删除标识
+	  ,CURRENT_TIMESTAMP() 		AS DW_LAST_UPDATE_DATE				-- 同步数据时间
+	  from T5
+WHERE stat_month >=
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '04'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END
+	  GROUP BY
+       T5.STAT_MONTH --统计月份
+      ,T5.CHANNEL_NAME --四大渠道 

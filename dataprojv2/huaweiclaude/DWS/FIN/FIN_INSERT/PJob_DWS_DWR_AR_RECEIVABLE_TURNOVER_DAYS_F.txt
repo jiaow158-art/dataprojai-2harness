@@ -1,0 +1,208 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002330
+-- table desc：瓷砖组织应收周转天数
+-- create time: 2022/11/21 10:57:57 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DWRFIN.DWR_AR_RECEIVABLE_TURNOVER_DAYS_F;
+INSERT INTO DWRFIN.DWR_AR_RECEIVABLE_TURNOVER_DAYS_F
+
+--------------------------应收+商承+代垫+不含税收入数据-----------------------------
+with tmp_data as (
+select  --应收（本月）
+substring(edition_date,1,6) as edition_mon,
+debitor,
+comp_code,
+sales_grp,
+sum(zysye) as zysye,   --本月余额
+0 as zhkje_wqsc,
+0 as zddk_dq, 
+0 as bhssr
+from dm.dm_rpt_receivable_quota_close_t a  
+group by edition_date,debitor,comp_code,sales_grp,zhkje_wqsc,zddk_dq,bhssr
+
+union all
+
+select   --未清商承
+t.calmonth as edition_mon, 
+t.debitor, 
+comp_code,
+t.sales_grp,
+0 as zysye,
+sum(t.zhkje_wqsc) over(partition by t.debitor,t.comp_code,t.sales_grp order by t.calmonth rows between unbounded preceding and current row) as zhkje_wqsc,
+0 as zddk_dq, 
+0 as bhssr
+from (select calmonth,debitor,comp_code,sales_grp,sum(zhkje_wqsc) as zhkje_wqsc from dm.dm_ar_return_payment_close_t group by calmonth,debitor,comp_code,sales_grp) t
+
+union all 
+
+  
+select --代垫款
+substring(edition_date,1,6) as edition_mon,
+debitor,
+comp_code,
+sales_grp,
+0 as zysye,
+0 as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq, 
+0 as bhssr
+from dm.dm_rpt_pjobect_adpay_t 
+group by edition_date,debitor,comp_code,sales_grp,zysye,zhkje_wqsc,bhssr
+
+union all
+
+select --不含税收入
+calmonth as edition_mon,
+customer as debitor,
+comp_code,
+sales_grp,
+0 as zysye,
+0 as zhkje_wqsc,
+0 as zddk_dq ,
+sum( nvl(zbhsje,0)  -nvl(zsyjf,0) + nvl(zfdje,0) -nvl(zytjf_xt,0) -nvl(zytjf_sg,0)  )  as bhssr
+from dm.dm_zzt_xssr_close_t c
+where distr_chan ='06'
+group by calmonth,customer,comp_code,sales_grp,zysye,zhkje_wqsc,zddk_dq
+)
+,tmp_yssp as(
+ select 
+edition_mon,
+debitor,
+comp_code,
+sales_grp,
+sum(zysye) as zysye,
+sum(zhkje_wqsc) as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq,
+sum(bhssr) as bhssr,
+case when m.sales_group_name in ('中国恒大','华夏幸福','泰禾集团')  then 1 else 0 end is_ignore --是否剔除
+from tmp_data  
+left join 
+
+(select *,ROW_NUMBER() over(PARTITION by cust_num,sales_org_code 
+order by case when distribution_chnl_code ='06' then 1
+			  else 2 end asc
+) as rn
+from dwrdim.dwr_dim_cust_sales_area_d) m
+ on  tmp_data.debitor=m.cust_num 
+and m.sales_org_code =tmp_data.comp_code
+and rn=1
+group by edition_mon,debitor,comp_code,sales_grp,is_ignore
+)
+, tmp as(
+select 
+edition_mon,lev2_name,lev3_name,lev4_name,lev5_name,
+sum(zysye) as zysye,
+sum(zhkje_wqsc) as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq,
+sum(bhssr) as bhssr,
+is_ignore
+from tmp_yssp left join DM.DM_RPT_SALE_GRP_T t
+on tmp_yssp.sales_grp=t.sale_grp
+--where is_ignore=0   --剔除的不统计
+group by edition_mon,lev2_name,lev3_name,lev4_name,lev5_name,is_ignore
+
+)
+
+---------------------------------------按组织维度汇总------------------------------
+,tmp_yc as(
+select edition_mon,
+'恒大，华夏，泰禾' dept,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zysye else 0 end) as zysye,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zhkje_wqsc else 0 end) as zhkje_wqsc,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zddk_dq else 0 end) as zddk_dq,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then bhssr else 0 end) as bhssr
+from tmp
+where lev2_name ='瓷砖事业部'
+and is_ignore=1
+group by edition_mon,lev2_name
+
+union all
+
+select edition_mon,
+lev2_name dept,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zysye else 0 end) as zysye,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zhkje_wqsc else 0 end) as zhkje_wqsc,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then zddk_dq else 0 end) as zddk_dq,
+sum(case when lev3_name in ('直营经营管理板块','工程市场中心') then bhssr else 0 end) as bhssr
+from tmp
+where lev2_name ='瓷砖事业部'
+and is_ignore=0
+group by edition_mon,lev2_name
+
+union all
+
+select edition_mon,
+lev3_name dept,
+sum(zysye) as zysye,
+sum(zhkje_wqsc) as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq,
+sum(bhssr) as bhssr
+from tmp
+where lev2_name ='瓷砖事业部'
+and is_ignore=0
+group by edition_mon,lev3_name
+ 
+ union all 
+ 
+ select edition_mon,
+lev4_name dept,
+sum(zysye) as zysye,
+sum(zhkje_wqsc) as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq,
+sum(bhssr) as bhssr
+from tmp
+where lev3_name ='国内营销系统'
+and is_ignore=0
+group by edition_mon,lev4_name
+
+ union all 
+ 
+ select edition_mon,
+lev5_name dept,
+sum(zysye) as zysye,
+sum(zhkje_wqsc) as zhkje_wqsc,
+sum(zddk_dq) as zddk_dq,
+sum(bhssr) as bhssr
+from tmp
+where lev4_name in ('区域运营中心','直营经营管理板块','工程市场中心')
+and is_ignore=0
+group by edition_mon,lev5_name
+
+)
+
+------------------------------------------- 计算累计13个月应收，12个月不含税收入------------------------------------
+, tmp_data2 as (
+select 
+calmonth,
+dept ,
+bhssr *10000 as bhssr,
+ys_hsp_tdd *10000 as ys_hsp_tdd
+from upload.upload_ar_overdue_receivables_history_t 
+where calmonth<='202210'
+
+union all 
+
+select 
+edition_mon as calmonth,
+dept,
+bhssr,
+nvl(zysye,0)-nvl(zhkje_wqsc,0)-nvl(zddk_dq,0) as ys_hsp_tdd --应收含未清商票剔除代垫款
+from tmp_yc
+where edition_mon>'202210'
+)
+
+, tmp_am as(
+select 
+calmonth,
+dept ,
+sum(bhssr) over(partition by dept order by calmonth ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) as bhssr_j12, --近12个月不含税销售收入
+sum(ys_hsp_tdd) over(partition by dept order by calmonth ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) as ys_hsp_tdd_j13 --近13个月应收含未清商承剔除代垫款
+from tmp_data2
+)
+
+select 
+calmonth,
+dept ,
+case when bhssr_j12=0 then 0 else ys_hsp_tdd_j13/13/bhssr_j12*360 end as zzts,
+CURRENT_TIMESTAMP() AS dw_last_update_date
+from tmp_am

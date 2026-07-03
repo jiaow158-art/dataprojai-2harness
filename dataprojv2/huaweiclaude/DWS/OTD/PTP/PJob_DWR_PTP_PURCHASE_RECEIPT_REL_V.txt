@@ -1,0 +1,201 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/10/11 17:35:31 GMT+08:00
+-- ******************************************************************** --
+create or replace view DWRPUR.DWR_PTP_PURCHASE_RECEIPT_REL_V as -- --采购单-与收货单关系表
+SELECT 
+       A.group_num,--集团
+		A.purchase_voucher_num,--采购凭证编号
+		A.purchase_vch_item_num1,--采购凭证的项目编号
+		A.given_inv_revalued,--特定库存的评估
+		A.given_inv_revalued_name,--特定库存的评估
+		A.material_account_flag,--物料帐簿在物料层被激活
+		A.inter_trade_clause_loc_1,--国际贸易条款位置1
+		A.short_text,--短文本
+		A.factory_id,--工厂ID
+		A.factory_code,--工厂编码
+		A.factory_name,--工厂名称
+		A.material_no,--物料号码
+		A.material_id,--物料ID
+		A.material_num,--物料编号
+		A.material_name,--物料名称
+		A.cust_id,--客户ID
+		A.cust_num,--客户编码
+		A.cust_name,--客户名称
+		A.address_id,--采购凭证项目中的人工地址号
+		A.company_id,--公司ID
+		A.company_code,--公司编码
+		A.company_name,--公司名称
+		A.account_assign_flag,--复式记帐的分配标识
+		A.purchase_vch_item_type,--采购凭证中的项目类别
+		A.inquiry_status,--询价状态
+		A.weight_unit,--重量单位
+		A.purchase_order_qty,--采购订单数量
+		A.software_package_num,--软件包编号
+		A.order_unit_denominator,--订单价格单位转换为订单单位的分母
+		A.order_unit_numerator,--订单价格单位转换为订单单位的分子
+		A.special_inv_flag,--特殊库存标识
+		A.special_inv_flag_name,--特殊库存标识名称
+		A.item_census_flag,--项目是统计的
+		A.print_plan_item_flag,--标识:打印相关的计划行存在
+		A.price_print_out_flag,--价格打印输出
+		A.subject_distr_type,--科目分配类别
+		A.subject_distr_type_name,--科目分配类别名称
+		A.return_item_flag,--退货项目
+		A.purchase_vch_flag,--采购凭证删除标识
+		A.stock_type,--库存类型
+		A.inv_dump_acc_flag,--存货转储的过帐逻辑
+		A.update_info_record_flag,--标识:更新信息记录
+		A.estimate_price_flag,--标识：估计价格
+		A.goods_receipt,--货物收据未评估
+		A.purchase_apply_item_num,--采购申请的项目编号
+		A.base_unti_denominator,--订单单位到基本单位转换的分母
+		A.po_currency_networth,--采购订单货币的订单净值
+		A.price_unit,--价格单位
+		A.grossweight,--毛重
+		A.purchase_tax_code,--销售税/采购税代码
+		A.netweight,--净重
+		A.purchase_vch_alter_date,--采购凭证项目更改日期
+		A.material_group,--物料组
+		A.material_group_name,--物料组名称
+		A.purchase_vch_net_pri,--采购凭证中的净价（以凭证货币计）
+		A.assessment_type,--评估类型
+		A.invoice_receipt_flag,--发票收据标识
+		A.po_currency_total_value,--以采购订单货币计的订单总价值
+		A.recently_may_receiving,--最近可能的收货
+		A.promotion,--促销
+		A.profit_center,--利润中心
+		A.vol_unit,--体积单位
+		A.base_unit,--基本计量单位
+		A.inv_location,--库存地点
+		A.plan_item_confirm_status,--货物收据标识
+		A.purchase_apply_num,--采购申请编号
+		A.revalued_type,--评估类别
+		A.revalued_type_name,--评估类别名称
+		A.item_affect_entrust,--项目影响委托
+		A.purchase_order_unit,--采购订单计量单位
+		A.material_type,--物料类型
+		A.material_type_name,--物料类型名称
+		A.vendor_use_material_num,--供应商使用的物料编号
+		A.material_trnsp_group,--物料运输组
+		A.material_trnsp_group_name,--物料运输组名称
+		A.business_volume,--业务量
+		A.delivery_flag,--“交货已完成”标识
+		A.fund_center_code,--基金中心
+		A.demand_tracking_no,--需求跟踪号
+		A.price_confirm_date,--价格确定日期
+		A.item_effective_value,--项目的有效值
+		A.part_invoice_flag,--部分发票标识
+		A.base_unti_numerator,--有关订货价格单位转换为基本单位的分子
+		A.purchase_info_record_no,--采购信息记录号
+		A.po_price_unit,--订单价格单位(采购)
+		A.receiving_deal_date_days,--以天计的收货处理时间
+		A.mrp_scope,--MRP 范围
+		A.transf_special_inv_flag,--实地库存转移的特殊库存标识
+		A.receiving_bill_flag,--标识：基于收货的发票验证
+		A.overdelivery_flag,--标识：允许未限制的过量交货
+		A.reminder_day1,--第一封催询单天数
+		A.product_type_group,--产品类型组
+		A.overdelivery_limit,--过量交货限度
+		A.plan_delivery_date_days,--按天的计划交货时间
+		A.shortest_goods_shelves_qty,--最短剩余货架寿命
+		A.settlement_related_item,--与后继（期末回扣）结算相关的项目
+		A.condition_price_process2,--从条件定价过程小计2
+		A.condition_price_process3,--从条件定价过程小计3
+		A.last_invoice_flag,--最后发票标识
+		A.consumption_entry,--消耗记帐
+		A.consumption_entry_name,--消耗记帐名称
+		A.underdelivery_limit,--交货不足限度
+		A.order_receipt_code,--订单回执编号
+		A.condition_price_process5,--从条件定价过程小计5
+		A.delivery_receive_flag,--基于发货的收货标识
+		A.inter_trade_terms_p1,--国际贸易条款（第1部分）
+		A.inter_trade_terms_p1_name,--国际贸易条款（第2部分）
+		A.inter_trade_terms_p2,--国际贸易条款（第3部分）
+		A.demand_name,--需求者/要求者名称
+		A.recv_location_time_zone,--接收位置的时区
+		A.rebate_base1,--回扣基数1
+		A.vendor_delivery_type,--退货到供应商的交货类型
+		A.item_unique_flag,--项目唯一标识相关
+		A.stock_trnsp_order_delivery,--库存运输订单发货存储地点
+		A.commitment_item_id,--承诺项目
+		A.lasttime_trnsf,--上一次传输
+		A.time1,--时间
+		A.sequence_num,--顺序编号
+		A.next_jit_deli_plan_trnsp,--下一个JIT交货计划传输
+		A.next_fore_deli_plan_trnsp,--下一个预测交货计划传输
+		A.distribute_table_item,--分配表项目
+		A.rfq_item_no,--RFQ 项目号码
+		A.purchase_vch_item_num2,--采购凭证的项目编号
+		A.sale_voucher_item,--销售凭证项目
+		A.serialno,--序号
+		A.project_num,--项目编号
+		A.sales_vch_item_num,--销售和分销凭证的项目号
+		A.purchase_vch_type,--采购凭证类别
+		A.target_qty,--目标数量
+		A.sd_inquiry_item_code,--询价项目编号(SD)
+		A.base_pur_agree_item_num,--基本采购协议的项目编号
+		A.new_base_date,--new_base_date
+		A.tr_reserve_vch_item1,--资金储备：凭证项
+		A.tr_reserve_vch_item2,--资金储备：凭证项
+		A.settle_booking_no,--结算预定号
+		A.settle_booking_item_no,--结算的预定的项目号
+		A.annwx_purchase_limit_date,--annwx_purchase_limit_date
+		A.annwx_package_key,--annwx_package_key
+		A.annwx_package_extended_key,--annwx_package_extended_key
+		A.annwx_start_date,--annwx_start_date
+		A.base_date,--base_date
+		A.points,--点数
+		A.config,--配置(内部对象号)
+		A.delivery_priority,--交货优先权
+		A.delivery_priority_name,--交货优先权名称
+		A.demand_priority,--需求优先级
+		A.project_group,--项目组
+		A.reminder,--催询单/催付信数
+		A.alter_group,--用于统计更新的更新组
+		A.wbs_element1,--工作分解结构元素(WBS元素)
+		A.wbs_element2,--工作分解结构元素(WBS元素)
+		A.reminder_day2,--第二封催询单的天数
+		A.reminder_day3,--第三封催询单的天数
+		A.control_date,--同意累积数量的统驭日期
+		A.vch_date,--凭证日期(接收/发送日期)
+		A.so_item_code,--TPOP处理中的CRM销售订单项目编号
+		A.prepaymoney_percent,--预付款百分比
+		A.serialno_number,--序列号数目
+		A.upper_purchase_vch_item,--采购凭证中上层项目
+		A.external_sort,--外部排序
+		A.bid_submit_deadline,--投标/报价提交限期
+		A.advance_pay_due_date,--预付款到期日
+		A.inquiry_item_code,--询价项目编号
+		A.center_contract_item_num,--中心合同项目编号
+		A.acceptance_period,--Acceptance
+		A.receive_start_date,--基于收货的结算的开始日期
+		A.submit_qty,--已提交数量
+		A.commitment_start_date,--可承诺量的开始日期
+		A.commitment_item_code,--Commitment
+		A.requirement_urgency,--Requirement
+		A.wka_period_start_date,--Start
+		A.wka_period_end_date,--End
+		A.work_time,--Working
+        B.MATERIAL_VCH_CODE, --物料凭证号 BELNR
+        B.MATERIAL_VCH_ITEM_CODE, --物料凭证行号 BUZEI
+        B.PO_HIS_RECORD_TYPE, --采购订单历史记录类别 BEWTP
+        B.MOVE_TYPE, --移动类型(库存管理) BWART
+        B.VOUCHER_POST_DATE, --凭证中的过帐日期 BUDAT
+        B.QUANTITY2, --数量 MENGE
+        B.BASIC_CURRENCY_AMT, --按本位币计的金额 DMBTR
+        B.VCH_CURRENCY_AMT, --凭证货币金额 WRBTR
+        B.CURRENCY_CODE, --货币码 WAERS
+        case when B.DEBIT_CREDIT_FLAG = 'S_SHKZG' then 'S'
+             when B.DEBIT_CREDIT_FLAG = 'H_SHKZG' then 'H'
+             else B.DEBIT_CREDIT_FLAG end DEBIT_CREDIT_FLAG--借方/贷方标识 SHKZG
+FROM DWRPUR.DWR_PTP_PURCHASE_VCH_ITEM_F        A        --DWI-SAP采购凭证项目表
+LEFT JOIN dwrpur.DWR_PTP_PURCHASE_VCH_HIS_F B -- sdi.sdi_ekbe_1001 B 
+ ON B.PURCHASE_VOUCHER_NUM = A.PURCHASE_VOUCHER_NUM 
+ AND B.PURCHASE_VCH_ITEM_NUM = A.PURCHASE_VCH_ITEM_NUM1 
+ AND B.PURCHASE_ORDER_HIS_RECORD = '1'  
+where A.DEL_FLAG = 'N'
+and B.DEL_FLAG = 'N';
+
+

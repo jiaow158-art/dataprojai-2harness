@@ -1,0 +1,8 @@
+{
+    "name": "DWR_WM_SALES_ORDER_STOCK_F_TMP",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "SAP销售订单库存",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

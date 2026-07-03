@@ -1,0 +1,17 @@
+INSERT OVERWRITE TABLE DWRFIN.DWR_FP_FUND_CENTER_F        --基金中心
+SELECT
+ENABLE_END_DATE                AS            ENABLE_END_DATE,
+FUND_CENTER_CODE               AS            FUND_CENTER_CODE,
+FINANCIAL_MANAGEMENT_SCOPE     AS            FINANCIAL_MANAGEMENT_SCOPE,
+GROUP_NUM                      AS            GROUP_NUM,
+INPUT_DATE                     AS            INPUT_DATE,
+LAST_UPDATE_DATE               AS            LAST_UPDATE_DATE,
+CREATER_NAME                   AS            CREATER_NAME,
+ENABLE_START_DATE              AS            ENABLE_START_DATE,
+LAST_MODIFIER_ID               AS            LAST_MODIFIER_ID,
+OWNER_ID                       AS            OWNER_ID,
+OBJECT_NUM                     AS            OBJECT_NUM,
+OWNER_NAME                     AS            OWNER_NAME,
+DEL_FLAG                       AS            DEL_FLAG,
+CURRENT_TIMESTAMP()            AS            DW_LAST_UPDATE_DATE
+FROM DWIFIN.DWI_FP_FUND_CENTER_T

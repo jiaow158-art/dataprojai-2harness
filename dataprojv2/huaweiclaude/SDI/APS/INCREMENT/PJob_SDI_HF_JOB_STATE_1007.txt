@@ -1,0 +1,25 @@
+insert overwrite table sdi.sdi_hf_job_state_1007
+select 
+id,
+job_id,
+name,
+reason,
+created_at,
+data,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_hf_job_state_1007
+UNION 
+select 
+T1.id,
+T1.job_id,
+T1.name,
+T1.reason,
+T1.created_at,
+T1.data,
+T1.DEL_FLAG,
+T1.DW_LAST_UPDATE_DATE
+from sdi.sdi_hf_job_state_1007 t1 
+left join stg.stg_hf_job_state_1007 t2 
+on T1.ID=T2.ID
+where T2.ID is null;

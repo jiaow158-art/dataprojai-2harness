@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_CLASS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD",
+    "description": "CLASS表建表脚本",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

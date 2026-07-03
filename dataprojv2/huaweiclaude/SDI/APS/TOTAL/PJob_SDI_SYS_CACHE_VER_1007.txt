@@ -1,0 +1,7 @@
+insert overwrite table sdi.sdi_sys_cache_ver_1007
+select 
+id,
+version,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_cache_ver_1007;

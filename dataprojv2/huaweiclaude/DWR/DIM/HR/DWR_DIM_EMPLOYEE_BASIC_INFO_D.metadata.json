@@ -1,0 +1,8 @@
+{
+    "name": "DWR_DIM_EMPLOYEE_BASIC_INFO_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/HR",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

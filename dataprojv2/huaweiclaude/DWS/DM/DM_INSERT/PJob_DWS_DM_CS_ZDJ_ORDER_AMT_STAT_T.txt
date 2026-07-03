@@ -1,0 +1,53 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/09/21 11:10:37 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_CS_ZDJ_ORDER_AMT_STAT_T;
+
+INSERT INTO DM.DM_CS_ZDJ_ORDER_AMT_STAT_T
+(
+       TOTAL_RG_SALE_AMT --人工-销售总额（元）
+	  ,AVG_RG_SALE_AMT --人工-平均客单价（元）
+      ,MAX_RG_SALE_AMT --人工-最大客单价（元）
+      ,MIN_RG_SALE_AMT --人工-最小客单价（元）
+	  ,TOTAL_FC_SALE_AMT --辅材-销售总额（元）
+	  ,AVG_FC_SALE_AMT --辅材-平均客单价（元）
+      ,MAX_FC_SALE_AMT --辅材-最大客单价（元）
+      ,MIN_FC_SALE_AMT --辅材-最小客单价（元）
+	  ,TOTAL_ZC_SALE_AMT --主材-销售总额（元）
+	  ,AVG_ZC_SALE_AMT --主材-平均客单价（元）
+      ,MAX_ZC_SALE_AMT --主材-最大客单价（元）
+      ,MIN_ZC_SALE_AMT --主材-最小客单价（元）
+	  ,DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,AVG_SALE_AMT --平均客单价（元）
+	  ,MAX_SALE_AMT --最大客单价（元）
+	  ,MIN_SALE_AMT --最小客单价（元）
+	  ,SALE_AMT --签单额（元）
+	  ,SALE_AREA --销售总面积
+	  ,AVG_SALE_AREA --平均客单面积
+	  ,UNIT_AREA_AMT --单位面积均价
+)
+SELECT SUM(RG_SALE_AMT) AS TOTAL_RG_SALE_AMT --人工-销售总额（元）
+	  ,SUM(RG_SALE_AMT)	/ COUNT(DISTINCT ORDER_NUM) AS AVG_RG_SALE_AMT --人工-平均客单价（元）
+      ,MAX(RG_SALE_AMT) AS MAX_RG_SALE_AMT --人工-最大客单价（元）
+      ,MIN(RG_SALE_AMT) AS MIN_RG_SALE_AMT --人工-最小客单价（元）
+	  ,SUM(FC_SALE_AMT) AS TOTAL_FC_SALE_AMT --辅材-销售总额（元）
+	  ,SUM(FC_SALE_AMT)	/ COUNT(DISTINCT ORDER_NUM) AS AVG_FC_SALE_AMT --辅材-平均客单价（元）
+      ,MAX(FC_SALE_AMT) AS MAX_FC_SALE_AMT --辅材-最大客单价（元）
+      ,MIN(FC_SALE_AMT) AS MIN_FC_SALE_AMT --辅材-最小客单价（元）
+	  ,SUM(ZC_SALE_AMT) AS TOTAL_ZC_SALE_AMT --主材-销售总额（元）
+	  ,SUM(ZC_SALE_AMT)	/ COUNT(DISTINCT ORDER_NUM) AS AVG_ZC_SALE_AMT --主材-平均客单价（元）
+      ,MAX(ZC_SALE_AMT) AS MAX_ZC_SALE_AMT --主材-最大客单价（元）
+      ,MIN(ZC_SALE_AMT) AS MIN_ZC_SALE_AMT --主材-最小客单价（元）
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,SUM(SALE_AMT) / COUNT(DISTINCT ORDER_NUM) AS AVG_SALE_AMT --平均客单价（元）
+      ,MAX(SALE_AMT) AS MAX_SALE_AMT --最大客单价（元）
+      ,MIN(CASE WHEN SALE_AMT > 0 THEN SALE_AMT END) AS MIN_SALE_AMT --最小客单价（元）
+      ,SUM(SALE_AMT) AS SALE_AMT --签单额（元）
+      ,SUM(CNSTR_AREA) AS SALE_AREA --销售总面积
+      ,SUM(CNSTR_AREA) / COUNT(DISTINCT ORDER_NUM) AS AVG_SALE_AREA --平均客单面积
+	  ,SUM(SALE_AMT) / SUM(CNSTR_AREA) AS UNIT_AREA_AMT --单位面积均价
+  FROM DWRCS.DWR_CS_ZDJ_ORDER_INFO_F A
+ WHERE A.STAGE_NAME NOT IN ('废弃订单', '合同取消')
+   AND A.CNTC_CODE IS NOT NULL

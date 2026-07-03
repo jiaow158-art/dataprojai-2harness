@@ -1,0 +1,66 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: linwei
+-- table desc：集团销售核心架构层次
+-- create time: 2022/09/13 09:53:21 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_SO_SALES_GROUP_LEVEL_T;
+insert into DM.DM_SO_SALES_GROUP_LEVEL_T 
+with recursive tmp  as (
+SELECT 
+ H."NODENAME"::varchar(250)
+,CASE WHEN R."TXTSH"::varchar(250)  IS NOT NULL THEN R."TXTSH"::varchar(250) ELSE T."txtsh"::varchar(250) END "TXTSH" 
+,H."PARENTID"::varchar(250)
+,H."NODEID"::varchar(250)
+FROM dm.dm_rpt_bi0_hsales_grp_t  H
+LEFT JOIN dm.dm_rpt_rsthiernode_t R ON R."NODENAME" = H."NODENAME" AND R."OBJVERS" = 'A' AND R."HIEID" = H."HIEID" 
+LEFT JOIN dm.dm_rpt_bi0_tsales_grp_t  T ON H."NODENAME" = T."sales_grp" AND T."langu" = '1' 
+WHERE H."HIEID" ='SP9IVH2HNAKU1VLKCL0PYAVF3' and H."TLEVEL"='01'
+union 
+select
+(t2."NODENAME"||'>,'||t1."NODENAME" )::varchar(250) "NODENAME"
+,(t2."TXTSH"||'>,'||t1."TXTSH" )::varchar(250) "TXTSH"
+,t1."PARENTID"::varchar(250) 
+,t1."NODEID"::varchar(250) 
+from  
+(SELECT 
+ H."NODENAME"::varchar(250)
+,CASE WHEN R."TXTSH"::varchar(250)  IS NOT NULL THEN R."TXTSH"::varchar(250) ELSE T."txtsh"::varchar(250) END "TXTSH" 
+,H."PARENTID"::varchar(250)
+,H."NODEID"::varchar(250)
+FROM dm.dm_rpt_bi0_hsales_grp_t  H
+LEFT JOIN dm.dm_rpt_rsthiernode_t R ON R."NODENAME" = H."NODENAME" AND R."OBJVERS" = 'A' AND R."HIEID" = H."HIEID" 
+LEFT JOIN dm.dm_rpt_bi0_tsales_grp_t  T ON H."NODENAME" = T."sales_grp" AND T."langu" = '1' 
+WHERE H."HIEID" ='SP9IVH2HNAKU1VLKCL0PYAVF3' ) t1 join tmp t2   on t1."PARENTID" = t2."NODEID"
+)
+
+select  
+ '01' "NODE1"
+,split_part("NODENAME",'>,',1)  "NODENAME1" 
+,split_part("TXTSH",'>,',1)   "NODEDESC1" 
+,'02' "NODE2"
+,coalesce(split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) )"NODENAME2" 
+,coalesce(split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) )"NODEDESC2" 
+,'03' "NODE3"
+,coalesce(split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) )"NODENAME3" 
+,coalesce(split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) )"NODEDESC3" 
+,'04' "NODE4"
+,coalesce(split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) )"NODENAME4" 
+,coalesce(split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) )"NODEDESC4" 
+,'05' "NODE5"
+,coalesce(split_part("NODENAME",'>,',5) ,split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) ) "NODENAME5" 
+,coalesce(split_part("TXTSH",'>,',5) ,split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) ) "NODEDESC5" 
+,'06' "NODE6"
+,coalesce(split_part("NODENAME",'>,',6) ,split_part("NODENAME",'>,',5) ,split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) )"NODENAME6" 
+,coalesce(split_part("TXTSH",'>,',6) ,split_part("TXTSH",'>,',5) ,split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("NODENAME",'>,',1) )"NODEDESC6" 
+,'07' "NODE7"
+,coalesce(split_part("NODENAME",'>,',7) ,split_part("NODENAME",'>,',6) ,split_part("NODENAME",'>,',5) ,split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) )"NODENAME7" 
+,coalesce(split_part("TXTSH",'>,',7) ,split_part("TXTSH",'>,',6) ,split_part("TXTSH",'>,',5) ,split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) )"NODEDESC7" 
+,'08' "NODE8"
+,coalesce(split_part("NODENAME",'>,',8) ,split_part("NODENAME",'>,',7) ,split_part("NODENAME",'>,',6) ,split_part("NODENAME",'>,',5) ,split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) ) "NODENAME8" 
+,coalesce(split_part("TXTSH",'>,',8) ,split_part("TXTSH",'>,',7) ,split_part("TXTSH",'>,',6) ,split_part("TXTSH",'>,',5) ,split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) ) "NODEDESC8" 
+,'09' "NODE9"
+,coalesce(split_part("NODENAME",'>,',9) ,split_part("NODENAME",'>,',8) ,split_part("NODENAME",'>,',7) ,split_part("NODENAME",'>,',6) ,split_part("NODENAME",'>,',5) ,split_part("NODENAME",'>,',4) ,split_part("NODENAME",'>,',3) ,split_part("NODENAME",'>,',2) ,split_part("NODENAME",'>,',1) ) "NODENAME9" 
+,coalesce(split_part("TXTSH",'>,',9) ,split_part("TXTSH",'>,',8) ,split_part("TXTSH",'>,',7) ,split_part("TXTSH",'>,',6) ,split_part("TXTSH",'>,',5) ,split_part("TXTSH",'>,',4) ,split_part("TXTSH",'>,',3) ,split_part("TXTSH",'>,',2) ,split_part("TXTSH",'>,',1) ) "NODEDESC9" 
+,current_timestamp() as DW_LAST_UPDATE_DATE
+from tmp 

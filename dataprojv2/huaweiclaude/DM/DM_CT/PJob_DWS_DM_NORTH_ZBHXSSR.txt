@@ -1,0 +1,1078 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/06/01 14:06:17 GMT+08:00
+-- description:北极星指标-含销售收入指标'ZB19','ZB26','ZB07','ZB17','ZB20','ZB24','ZB01','ZB05','ZB11','ZB25','ZB27','ZB15','ZB23','ZB34','ZB35','ZB36','ZB37','ZB38','ZB44','ZB45','ZB46','ZB48','ZB50'刷数  按月刷
+-- history list: PJob_DWS_DM_NORTH_ZBHXSSR
+-- UPDATE FROM 15000571 时间<2024年8月23日10:06:56> 统计时间剔除当天的
+-- UPDATE FROM 15000571 <2024年9月19日17:58:29> 关联dm_ambv2_zzt_xssr_t的销售组逻辑都需修改
+-- ******************************************************************** -- --
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and 
+zb_code in 
+('ZB19','ZB26','ZB07','ZB17','ZB20','ZB24','ZB01','ZB05','ZB11','ZB25','ZB27','ZB15','ZB23','ZB34','ZB35','ZB36','ZB37','ZB38','ZB44','ZB45','ZB46','ZB48','ZB50');
+with TT as (
+select 
+calmonth
+,SUM(
+case when  t2.node_desc2 = '瓷砖事业部' and t1.data_source in ('S','T','D') then T1.ambperformance else 0  end 
+)as "含税销售收入（瓷砖事业部）"
+
+,SUM(
+case when  t2.node_name3 ='H03230618'		   
+and t1.integrate_channel = 'GD03'
+and t1.data_source in ('S','T','D','U') 
+and t2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4 <> 'H04240301'
+and coalesce  (T2.NODE_name5,'#') <> 'H03230627'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程渠道）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'	
+and t1.integrate_channel = 'GD03'
+and t1.data_source in ('S','T','D','U') 
+and t2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4 <> 'H04240301'
+and coalesce  (T2.NODE_name5,'#') <> 'H03230627'
+and PROJECT_DETAIL.one_bo_name in ('医疗康养','三房','酒店')
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程细分市场）"
+
+
+,SUM(
+case when  t2.node_desc5 = '战略工程中心' 
+and t1.integrate_channel = 'GD03'
+and t1.data_source in ('S','T','D','U') 
+then T1.ambperformance else 0  end 
+)as "含税销售收入（战略工程）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'	
+and t1.integrate_channel = 'GD02' 
+and t1.data_source in ('S','T','D','U') 
+and  t2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4 <> 'H04240301'
+and coalesce  (T2.NODE_name5,'#') <> 'H03230627'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（整装头部）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D','U') 
+and  T2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4  <> 'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and t1.integrate_channel = 'GD02'
+and t1.integrate_channel2 <> 'GD04'
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in ('大地','尊石1.0','尊石2.0','世界印象')) --6月17日（将战略A剔除）
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（整装头部高值产品）"
+
+
+,SUM(
+case when  t2.NODE_NAME4  = 'H04240301'
+and t1.data_source in ('S','T','D','U') 
+then T1.ambperformance else 0  end 
+)as "含税销售收入（高端品牌营销中心）"
+
+,SUM(
+case when  t2.NODE_NAME4  = 'H04240301'
+and t1.distr_chan___t = '工程'
+and t1.data_source in ('S','T','D','U') 
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程渠道高端品牌产品）"
+
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'	
+and coalesce (t2.node_name5,'#') not in ('H03230605','H03230612','H03230604','H03230627')
+and (t1.integrate_channel = 'GD03')
+and t1.data_source in ('S','T','D') 
+and coalesce (mt.prod_property_name,'#') in ('瓷砖产品','卫浴产品','新材产品','绿家产品','辅材产品')
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程1+N）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'
+and (t1.integrate_channel = 'GD03' )
+and t1.data_source in ('S','T','D','U') 
+and  T2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4  <> 'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and PROJECT_DETAIL.one_bo_name = '三房'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程细分市场-三房）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'
+and (t1.integrate_channel = 'GD03' )
+and t1.data_source in ('S','T','D','U') 
+and  T2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4  <> 'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and PROJECT_DETAIL.one_bo_name = '医疗康养'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程细分市场-医疗）"
+
+
+,SUM(
+case when  t2.node_name3 ='H03230618'
+and (t1.integrate_channel = 'GD03' )
+and t1.data_source in ('S','T','D','U') 
+and  T2.node_name5 not in ('H03230605','H03230612')
+and t2.NODE_NAME4  <> 'H04240301'
+and PROJECT_DETAIL.one_bo_name = '酒店'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程细分市场-酒店）"
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'	
+and coalesce (t2.node_name5,'#') not in ('H03230605','H03230612','H03230604','H03230627')
+and t1.integrate_channel = 'GD03'
+and t1.data_source in ('S','T','D') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in ('战略A'))
+and mt.reserved_field6_name = '优等品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（工程渠道高值产品）"
+,SUM(
+case when  
+t2.node_desc5 = '战略工程中心'
+and t1.integrate_channel = 'GD03' 
+and t1.data_source in ('S','T','D','U') 
+and MT.PRODUCT_BRAND_NAME ='战略A'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（战略工程-A标项目）"
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t2.node_name4 in ('H04230600','H04230680','H04230655')
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and (t1.integrate_channel = 'GD01') 
+and t1.data_source in ('S','T','D','U') 
+then T1.ambperformance else 0  end 
+)as "含税销售收入（零售市场中心）"
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and (t1.integrate_channel = 'GD01') 
+and t1.data_source in ('S','T','D','U') 
+and coalesce(t2.NODE_NAME4,'#') not in ('H04240301')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（零售渠道）"
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D','U')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce(t2.NODE_NAME4,'#') not in ('H04240301')
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and (t1.integrate_channel = 'GD01') 
+and (coalesce (t1.integrate_channel2,'#') <> 'GD04') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in('大地','尊石1.0','尊石2.0','世界印象','战略A'))
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（零售渠道高值产品）"
+
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D','U')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce(t2.NODE_NAME4,'#') <>'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and (t1.integrate_channel = 'GD01') 
+and (coalesce (t1.integrate_channel2,'#') = 'GG03') 
+--and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in('大地','尊石1.0','尊石2.0','世界印象','战略A'))
+--and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（中小大包）"
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D','U')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce(t2.NODE_NAME4,'#') <>'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and (t1.integrate_channel in ('GD01','GD02')) 
+and (coalesce (t1.integrate_channel2,'#') <> 'GD04') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in('大地','尊石1.0','尊石2.0','世界印象','战略A'))
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（大零售渠道高值产品）"
+
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce(t2.NODE_NAME4,'#') <>'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and (coalesce (t1.integrate_channel2,'#') <> 'GD04') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in('大地','尊石1.0','尊石2.0','世界印象','战略A'))
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（高值产品）"
+
+
+
+
+
+,SUM(
+case when  
+T2.node_name3 ='H03230618'
+and t1.data_source in ('S','T','D')
+and coalesce(T2.NODE_name5,'#')  not in ('H03230605','H03230612') 
+and coalesce(t2.NODE_NAME4,'#') <>'H04240301'
+and coalesce (t2.NODE_name5,'#') <> 'H03230627'
+and MT.PRODUCT_BRAND_NAME ='世界印象'
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "含税销售收入（世界印象系列产品）"
+
+,SUM(
+case when  
+t2.node_name4 = 'H04230655'
+and t1.data_source in ('S','T','D','U')
+then T1.ambperformance else 0  end 
+)as "含税销售收入（国内直营中心）"
+
+
+
+,SUM(
+case when  
+t2.node_name4 = 'H04230655'
+and t1.data_source in ('S','T','D','U')
+and (coalesce (t1.integrate_channel2,'#') <> 'GD04') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in('大地','尊石1.0','尊石2.0','世界印象','战略A'))
+and mt.prod_property_name = '瓷砖产品'
+then T1.ambperformance else 0  end 
+)as "高值产品销售收入（国内直营中心）"
+
+
+from dm.dm_ambv2_zzt_xssr_t t1
+  left join dm.dm_rpt_zmaster_cus_t z
+                   on T1.customer = z."ACCOUNT_NUMBER"
+                       and T1.distr_chan = z."SALES_CHANNEL_CODE"
+                       and T1.salesorg = z."SALES_ORGANIZATION_CODE"
+                       and z."PARVW" = 'AG'
+         left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F zz
+                   on T1.wbs_elemt = zz.WBS_LEVEL3
+         left join dm.dm_rpt_sales_group_t T2 on case
+                                                    when T1.data_source in ('S', 'T')
+                                                        then COALESCE(
+                                                            COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                            T1.sales_grp)
+                                                    else T1.sales_grp
+                                                    end = T2.node_name9
+left join 
+dwimd.dwi_md_data_material_general_t mt
+on t1.material  = mt.material_num 
+left join 
+DWRLTC.DWR_BO_PROJECT_DETAIL_F PROJECT_DETAIL
+on t1.zsjbm = PROJECT_DETAIL.bo_code
+where replace(t1.calday,'-','') <= replace (current_date,'-','')-1
+group by calmonth
+)
+,TT2 as (
+select 
+calmonth ,
+'ZB01' as  ZB_CODE,
+"含税销售收入（瓷砖事业部）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB01' as  ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（瓷砖事业部）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB05' as ZB_CODE,
+"含税销售收入（工程渠道）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB05' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程渠道）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB07' as ZB_CODE,
+"含税销售收入（工程细分市场）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB07' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程细分市场）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union  all 
+select 
+calmonth ,
+'ZB11' as ZB_CODE,
+"含税销售收入（战略工程）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB11' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（战略工程）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB15' as ZB_CODE,
+"含税销售收入（整装头部）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB15' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（整装头部）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all
+select 
+calmonth ,
+'ZB17' as ZB_CODE,
+"含税销售收入（整装头部高值产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB17' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（整装头部高值产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB19' as ZB_CODE,
+"含税销售收入（高端品牌营销中心）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB19' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（高端品牌营销中心）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB20' as ZB_CODE,
+"含税销售收入（工程渠道高端品牌产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB20' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程渠道高端品牌产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all select 
+calmonth ,
+'ZB23' as ZB_CODE,
+"含税销售收入（工程1+N）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB23' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程1+N）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+calmonth ,
+'ZB24' as ZB_CODE,
+"含税销售收入（工程细分市场-三房）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB24' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程细分市场-三房）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all
+
+select 
+calmonth ,
+'ZB25' as ZB_CODE,
+"含税销售收入（工程细分市场-医疗）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB25' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程细分市场-医疗）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all
+
+select 
+calmonth ,
+'ZB26' as ZB_CODE,
+"含税销售收入（工程细分市场-酒店）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB26' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程细分市场-酒店）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+
+
+select 
+calmonth ,
+'ZB27' as ZB_CODE,
+"含税销售收入（工程渠道高值产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB27' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（工程渠道高值产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB01' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（瓷砖事业部）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB05' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程渠道）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB07' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程细分市场）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB11' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（战略工程）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB15' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（整装头部）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB17' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（整装头部高值产品）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB19' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（高端品牌营销中心）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB20' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程渠道高端品牌产品）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB23' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程1+N）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB24' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程细分市场-三房）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB25' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程细分市场-医疗）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB26' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程细分市场-酒店）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB27' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（工程渠道高值产品）") as 季度累计实绩
+from TT 
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+union all 
+select 
+calmonth ,
+'ZB34' as ZB_CODE,
+"含税销售收入（战略工程-A标项目）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB34' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（战略工程-A标项目）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB34' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（战略工程-A标项目）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+union all 
+select 
+calmonth ,
+'ZB35' as ZB_CODE,
+"含税销售收入（零售市场中心）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB35' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（零售市场中心）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB35' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（零售市场中心）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+union all 
+select 
+calmonth ,
+'ZB36' as ZB_CODE,
+"含税销售收入（零售渠道）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB36' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（零售渠道）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB36' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（零售渠道）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB37' as ZB_CODE,
+"含税销售收入（零售渠道高值产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB37' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（零售渠道高值产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB37' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（零售渠道高值产品）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB38' as ZB_CODE,
+"含税销售收入（中小大包）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB38' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（中小大包）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB38' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（中小大包）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB44' as ZB_CODE,
+"含税销售收入（高值产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB44' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（高值产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB44' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（高值产品）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB45' as ZB_CODE,
+"含税销售收入（大零售渠道高值产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB45' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（大零售渠道高值产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB45' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（大零售渠道高值产品）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+
+
+
+union all 
+select 
+calmonth ,
+'ZB46' as ZB_CODE,
+"含税销售收入（世界印象系列产品）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB46' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（世界印象系列产品）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB46' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（世界印象系列产品）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB48' as ZB_CODE,
+"含税销售收入（国内直营中心）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB48' as ZB_CODE,
+0 as 当月实绩,
+SUM("含税销售收入（国内直营中心）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB48' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("含税销售收入（国内直营中心）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+union all 
+select 
+calmonth ,
+'ZB50' as ZB_CODE,
+"高值产品销售收入（国内直营中心）" as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from tt
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB50' as ZB_CODE,
+0 as 当月实绩,
+SUM("高值产品销售收入（国内直营中心）") as 累计实绩,
+0 as 季度累计实绩
+from TT 
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB50' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("高值产品销售收入（国内直营中心）") as 季度累计实绩
+from TT 
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+
+
+
+
+)
+
+
+
+
+
+
+,AMT as (
+select 
+calmonth,
+ZB_CODE,
+sum(当月实绩)/10000 as CM_STAT_AMT,
+sum(累计实绩)/10000 as ACC_STAT_AMT,
+sum(季度累计实绩)/10000 as QTR_TGT_AMT
+from 
+TT2
+group by 
+calmonth,
+ZB_CODE
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx 
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month

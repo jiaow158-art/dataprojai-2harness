@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_COST_TRVAPP_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

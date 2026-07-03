@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_FIN_INVOICE_DETAIL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/INV",
+    "description": "发票明细模型",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

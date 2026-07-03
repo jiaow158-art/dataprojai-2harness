@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_FP_FUND_CENTER_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "基金中心",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

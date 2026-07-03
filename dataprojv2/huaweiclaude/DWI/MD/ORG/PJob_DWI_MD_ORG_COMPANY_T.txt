@@ -1,0 +1,32 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- table desc：组织公司主数据表
+/* History:
+   VERSION   DATE                  AUTHOR         MODIFICATION
+   ---      ---------              -------------  ------------
+   V1.0     2022-11-03 11:53:01    DP_10002375     Created
+   V1.1     2022-11-03 16:34:01   chenzhiyong	   修改表名
+*/
+-- ******************************************************************** --
+insert overwrite table DWIMD.DWI_MD_ORG_COMPANY_T
+select 
+a.vkorg as org_code,
+b.vtext as org_name,
+a.waers as currency,
+a.bukrs as company_code,
+c.butxt as company_name,
+a.adrnr as address,
+a.kunnr as customer_code,
+a.ekorg as purorg_code,
+a.ekgrp as purgrp_code,
+a.lifnr as supplier,
+a.werks as plant,
+a.bsart as order_type,
+a.bstyp as pur_type,
+a.bwart as move_type,
+a.lgort as location,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from sdi.sdi_tvko_1001 a
+left join sdi.sdi_tvkot_1001 b on a.VKORG = b.VKORG and b.SPRAS = '1'
+left join sdi.sdi_t001_1001 c on a.BUKRS = c.BUKRS and c.SPRAS = '1'
+;

@@ -1,0 +1,48 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: linwei
+-- create time: 2023/10/18 17:39:09 GMT+08:00
+-- description:费用类别维度表 DWRDIM.DWR_DIM_EXPENSE_TYPE_D
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update：2023/10/19 linwei 新增4个字段
+-- update:2023-11-24  linw   使用上级补充下级空缺
+-- update from chenzhiyong 20231128 将 t1.item_code 改成  i.code
+-- update from chenzhiyong 20231227 更改逻辑
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_EXPENSE_TYPE_D
+select
+	i.code    					     budget_gl_account        -- 预算科目
+	,i.name 		       	     budget_gl_account_desc   -- 预算科目描述
+	,substr(md5(t3.id),1,10) expense_category         -- 费用大类
+	,t3.name                 expense_category_desc    -- 费用大类描述
+	,substr(md5(t2.id),1,10) expense_subcategory      -- 费用小类
+	,t2.name                 expense_subcategory_desc  -- 费用小类描述
+	,COALESCE(substr(md5(t5.id),1,10),substr(md5(t2.id),1,10)) expense_detail  -- 费用细类
+	,COALESCE(t5.name,t2.name)                 expense_detail_desc    -- 费用细类描述
+	,t1.external_code 		   gl_account     -- 科目
+	,t1.external_name 		   gl_account_desc 	  -- 科目描述
+	,t5.arithmetic_code         -- 算术代码
+	,t5.arithmetic_name         -- 算术描述
+	,t5.created_date         detail_created_date      -- 费用细类创建时间
+	,t5.last_edited_date     detail_last_edited_date  -- 费用细类最后修改时间
+	,t1.id 		              budget_id                 -- 预算科目ID
+	,t1.created_date         budget_created_date      -- 预算科目创建时间
+	,t1.last_edited_date     budget_last_edited_date
+	,t3.id                   category_id
+	,t3.created_date         category_created_date
+	,t3.last_edited_date     category_last_edited_date
+	,t2.created_date         subcategory_created_date
+	,t2.last_edited_date     subcategory_date_last_edited_date
+	,CURRENT_TIMESTAMP()		dw_last_update_date			-- 同步数据时间
+	,t6.expense_type               expense_type           -- 费用分类
+	,t6.expense_type_describe      expense_type_desc      -- 费用分类描述
+	,t6.expense_category           expense_category_mange -- 分类类型-管理
+	,t6.expense_category_describe  expense_category_mange_desc  -- 分类类型-管理描述
+from SDI.SDI_ITEM_1039 i
+left join SDI.SDI_ITEM_MAP_RELATION_1039 t1 on  i.code =t1.item_code
+left join SDI.SDI_EXPENSE_TYPE_1039 t2 on t1.external_code  = t2.ledger_account_code
+left join SDI.SDI_EXPENSE_TYPE_CATEGORY_1039  t3 on t2.expense_type_category_id  = t3.id
+left join SDI.SDI_EXPENSE_TYPE_EXPENSE_DETAIL_TYPE_1039 t4 on t2.id = t4.expense_type_id
+left join SDI.SDI_EXPENSE_DETAIL_TYPE_1039 t5 on t4.expense_detail_type_id  = t5.id
+left join SDI.SDI_EXPENSE_CATEGORY_MANAGE_T_1037 t6 on i.code = t6.budget_account;

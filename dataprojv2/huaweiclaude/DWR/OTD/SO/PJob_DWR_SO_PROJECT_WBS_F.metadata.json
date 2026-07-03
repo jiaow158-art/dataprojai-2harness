@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_PROJECT_WBS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "SAP项目WBS结构元素表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

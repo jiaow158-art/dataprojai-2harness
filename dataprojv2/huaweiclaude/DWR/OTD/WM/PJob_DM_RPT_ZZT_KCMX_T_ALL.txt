@@ -1,0 +1,639 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2023/08/01 08:56:05 GMT+08:00
+-- ******************************************************************** --
+--物料库存明细底表
+--SQL性能优化设置
+-- set hive.cbo.enable=true;
+-- set hive.mapjoin.smalltable.filesize=200000000;
+-- set hive.auto.convert.join.noconditionaltask.size=400000000;
+-- set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with mat as (  --存在批次为空的物料读不到入库时间
+SELECT 
+      MATNR AS MATERIAL_NUM,
+      MIN(CASE WHEN ((BWART in ('101','911','913','701','Z01','511','982','991','309','131','531','411','561','653') and BSTTYP_SG <> 'K') 
+                or (BSTTYP_SG = 'K' and BWART ='411')) and EBELN not like '47%' and substr(WERKS,1,2) <> '31' and substr(WERKS,1,2) <> '30'  THEN BUDAT 
+               WHEN ((BWART in ('101','911','913','Z01','131','531','561','653') and BSTTYP_SG <> 'K') or (BSTTYP_SG = 'K' and BWART = '101')) 
+               THEN BUDAT END) AS EARLIEST_VOUCHER_POST_DATE_BW, ---批次最早入库日期(BW通用)
+      MIN(CASE WHEN BWART in ('101','911','913','701','Z01','511','982','991','309','131','531','411') and WERKS = '7C20' THEN BUDAT 
+               WHEN BWART in ('101','911','913','701','Z01','511','982','991','309','131','531','411') and BSTTYP_SG <> 'K' and EBELN not like '47%'
+               THEN BUDAT END) AS earliest_voucher_post_date_fc --批次最早入库日期(辅材专用)      
+  FROM SDI.SDI_MATDOC_1001
+  where charg = '' and charg_cid = ''
+  GROUP BY
+  MATNR
+)
+,mat0 as (
+select MATNR,CHARG,LIFNR,WERKS,min(BUDAT) as BUDAT
+from SDI.SDI_MATDOC_1001
+where BWART in ('101','911','913','701','Z01','511','982','991','309','131','531','411','561','653') and BSTTYP_SG = 'K'
+and EBELN not like '47%' and substr(WERKS,1,2) <> '31' and substr(WERKS,1,2) <> '30'
+group by MATNR,CHARG,LIFNR,WERKS
+)
+,MC AS (  ---物料凭证与采购信息记录表关联获取生产日期期间的日期记录
+select * from (
+select A.MBLNR,A.MJAHR,A.ZEILE,A.SHKZG,substr(B.PRODUCE_DATE,1,4)||substr(B.PRODUCE_DATE,6,2)||substr(B.PRODUCE_DATE,9,2) as HSDAT,
+c.MATNR,c.LIFNR,c.WERKS,c.EKORG,c.ESOKZ,c.KNUMH,c.KSCHL,c.DATAB,c.DATBI
+,row_number() over(partition by c.MATNR,c.LIFNR,c.WERKS,B.PRODUCE_DATE,A.MBLNR,A.MJAHR,A.ZEILE,A.SHKZG order by c.DATBI desc ) AS RN
+from SDI.SDI_MATDOC_1001 A
+inner join DWIMD.DWI_MD_MATL_BATCH_INFO_T B
+on A.MATNR = B.MATERIAL_NUM and A.CHARG = B.BATCH_NUM
+inner join SDI.SDI_A017_1001 c 
+on A.WERKS = c.WERKS and A.LIFNR = c.LIFNR and A.MATNR = c.MATNR and ESOKZ = '2' and KSCHL = 'PB00'
+and c.DATBI >= substr(B.PRODUCE_DATE,1,4)||substr(B.PRODUCE_DATE,6,2)||substr(B.PRODUCE_DATE,9,2) 
+and c.DATAB <= substr(B.PRODUCE_DATE,1,4)||substr(B.PRODUCE_DATE,6,2)||substr(B.PRODUCE_DATE,9,2)
+where BSTTYP_SG = 'K' AND B.PRODUCE_DATE IS NOT NULL
+) a where RN = 1
+)
+,MC1 AS (  --最小过账日期与采购信息记录表关联记录
+select * from (
+select A.MATNR,A.CHARG,A.LIFNR,A.WERKS,A.BUDAT
+,B.EKORG,B.ESOKZ,B.KNUMH,B.KSCHL,B.DATAB,B.DATBI
+,row_number() over(partition by A.MATNR,A.LIFNR,A.WERKS,A.BUDAT,A.MATNR,A.CHARG,A.LIFNR,A.WERKS order by B.DATBI desc ) AS RN
+from MAT0 A
+inner join SDI.SDI_A017_1001 B 
+on A.MATNR = B.MATNR and A.LIFNR = B.LIFNR and A.WERKS = B.WERKS and ESOKZ = '2' and KSCHL = 'PB00'
+and B.DATBI >= A.BUDAT and B.DATAB <= A.BUDAT
+-- where A.BSTTYP_SG = 'K'
+) a where RN = 1
+)
+,MC2 AS (  ---物料凭证与物料账目表关联获取过账日期期间的日期记录
+select * from (
+select A.MBLNR,A.MJAHR,A.ZEILE,A.SHKZG,A.BUDAT,
+B.MATNR,B.BWKEY,B.BWTAR,B.KALNR,C.VPRSV,C.PEINH,C.STPRS,C.PVPRS,C.BDATJ,C.POPER
+,row_number() over(partition by B.MATNR,B.BWKEY,B.BWTAR,A.BUDAT,A.MBLNR,A.MJAHR,A.ZEILE,A.SHKZG order by C.BDATJ||substr(C.POPER,2,2) desc) AS RN 
+from SDI.SDI_MATDOC_1001 A
+inner join SDI.SDI_CKMLHD_1001 B 
+on A.MATNR = B.MATNR and A.WERKS = B.BWKEY and A.BWTAR = B.BWTAR 
+inner join SDI.SDI_CKMLCR_1001 C 
+on B.KALNR = C.KALNR and C.BDATJ = substr(A.BUDAT,1,4) and substr(C.POPER,2,2) = substr(A.BUDAT,5,2) 
+where A.BSTTYP_SG = 'K'
+) a where RN = 1
+)
+,tmp as (
+select 
+ case when A.CHARG = '' then A.CHARG_CID ELSE A.CHARG END as batch --"批次"
+,t0.month_id as calmonth  --日历年/月
+,substr(t0.month_id,5,2) as calmonth2  --日历月
+,substr(t0.month_id,1,4) as calyear -- 日历年
+,A.BUKRS as comp_code --as "公司代码"
+,D.BUTXT as comp_code___t --公司名称
+,A.WAERS as doc_currcy --"货币",
+,O.LTEXT as doc_currcy___t --凭证货币_描述
+,B.external_matl_group_code as extmatlgrp --"外部物料组",
+,B.external_matl_group_name as extmatlgrp___t --外部物料组_描述
+,BP.bpkind as industry --"行业",
+,I.TEXT40 as industry___t -- 行业_描述
+,A.MATNR as material --"物料编码",
+,B.MATERIAL_NAME as material___t -- 物料编码_描述
+,B.matl_group_code as matl_group -- "物料组",
+,B.matl_group_name as matl_group___t --物料组名称
+,B.matl_type_code as matl_type --"物料类型",
+,B.matl_type_name as matl_type___t --物料类型_描述
+,A.WERKS as plant --"工厂",
+,E.NAME1 as plant___t -- 工厂_描述
+,substr(A.BSTTYP_SG,1,1) as stockcat --"库存类别",
+,J.DDTEXT as stockcat___t --库存类别_描述
+,A.BSTAUS_SG as stocktype --"库存类型",
+,L.DDTEXT as stocktype___t -- 库存类型_描述
+,A.LGORT as stor_loc --"库存地点",	
+,F.LGOBE as stor_loc___t --库存地点_描述
+,A.MEINS as unit --"计量单位",
+,N.MSEHL as unit___t --计量单位_描述
+,W.BKLAS as val_class --"评估类",
+,H.BKBEZ as val_class___t --评估类_描述
+,A.MAT_PSPNR as wbs_elemt -- "WBS",
+,P.POST1 as wbs_elemt___t --Wbs描述
+,case when A.MAT_PSPNR = '00000000' then '' else P.POSID end as wbs_elm_ex -- "WBS长号",
+,coalesce(substr(BB.earliest_voucher_post_date_bw,1,4)||substr(BB.earliest_voucher_post_date_bw,6,2)||substr(BB.earliest_voucher_post_date_bw,9,2),MAT.earliest_voucher_post_date_bw) as zmmm_o017_zbatch_date --"入库日期",
+,case when A.CHARG = '' then LPAD(A.CHARG_CID,10,'0') ELSE LPAD(A.CHARG,10,'0') END as zbatchmd --"物料批次主数据",
+,case when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) <> '3A' and substr(A.WERKS,1,2) <> '39' then '11000002' --卫浴事业部
+  	 when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) = '39' then '11000012' --卫浴鹏嘉家居
+  	 when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) = '3A' then '11000011' --卫浴艺耐品牌
+	 when A.LGORT = 'BE' and B.external_matl_group_code = '10060' then '11000003' --家居
+	 when B.external_matl_group_code = '10060' and A.BUKRS <> '1000' then 
+(case when substr(A.WERKS,1,1) = '3' or (substr(A.WERKS,1,1) = '8' and substr(A.WERKS,1,2) <> '8A')
+      or substr(A.WERKS,1,2) = '71' or substr(A.WERKS,1,2) = '7D' 
+      or substr(A.WERKS,1,2) = '7C' or substr(A.WERKS,1,2) = '73' then '' 
+      else (case when C.loc_code is not null  then '' else '11000003' end) end)
+	 when A.LGORT = 'A006' then '11000003' --家居
+	 when substr(A.WERKS,1,2) = '73' then '11000003'
+	 when substr(A.WERKS,1,2) = '7C' or (A.WERKS = '7220' and A.LGORT in ('TY','FC','QA','TA')) then '11000003'
+	 when B.external_matl_group_code = '10090' or A.WERKS = '7B20' or A.LGORT = 'BH' then '11000001'
+	 when B.external_matl_group_code in ('10020','10021','10022','10023','10024') and A.WERKS = '7920' then 
+         (case when C.loc_code is not null  then '' else '11000003' end)  
+     when A.WERKS = '7120' then '11000003'
+     when B.external_matl_group_code = '10070' and substr(A.WERKS,1,2) <> '21' and A.LGORT in ('BD','BA','DG','BX','DL') then '11000010'
+	 when B.external_matl_group_code = '10070' and A.WERKS = '1520' and A.LGORT = 'SA' then '11000010'     
+	 when substr(A.WERKS,1,2) = '21' and A.LGORT <> '0020' then '11000010' --生态新材  	      
+	  end as zdpsyb --事业部编码
+--,'' as zdpsyb___t --事业部_描述
+,case when A.LGORT = 'A006' then '33000033' --"ART+
+	 when B.external_matl_group_code = '10060' and A.BUKRS <> '1000' then
+(case when substr(A.WERKS,1,1) = '3' or (substr(A.WERKS,1,1) = '8' and substr(A.WERKS,1,2) <> '8A')
+       or substr(A.WERKS,1,2) = '71' or substr(A.WERKS,1,2) = '7D' 
+       or substr(A.WERKS,1,2) = '7C' or substr(A.WERKS,1,2) = '73' then '' 
+     else (case when C.loc_code is not null  then '' else '33000033' end) end) 
+     when A.LGORT = 'BE' and B.external_matl_group_code = '10060' then '33000033'
+     when substr(A.WERKS,1,2) = '73' then '33000016' --绿家
+     when substr(A.WERKS,1,2) = '7C' or (A.WERKS = '7220' and A.LGORT in ('TY','FC','QA','TA')) then '33000018'-- "辅材
+     when B.external_matl_group_code = '10090' or A.WERKS = '7B20' or A.LGORT = 'BH' then '33000019'-- "整装
+	 when B.external_matl_group_code in ('10020','10021','10022','10023','10024') and A.WERKS = '7920' then 
+       (case when C.loc_code is not null  then '' else '33000014' end)  --DPI
+     when A.WERKS = '7120' then '33000001'-- "木业
+end as zdpzgsdq --"子公司大区"
+--,'' as zdpzgsdq___t --子公司大区_描述
+,case when substr(A.WERKS,3,2) = '80' then 'Y' 
+	  when substr(A.WERKS,1,1) = '3' and substr(A.WERKS,1,2) <> '37' and (substr(A.LGORT,3,2) = '90' or B.reserved_field_4 = '00003')
+	  then 'Y' else 'N' end as zisqc --"是否清仓"
+,'' as ziswx --"是否外协"
+,case when W.BKLAS in ('7920','7940') then 'CCP' --产成品
+      when W.BKLAS in ('7900','7910') then 'BCP' --半成品
+      when W.BKLAS in ('7930','7950') then 'WGSP' --外购商品
+      when substr(W.BKLAS,1,1) = '3' then 'YCL' --原材料
+      else 'QT' end as zmatltype --"物料类别" ,--其他类型
+--,'' as zmatltype___t --物料类别_描述
+,coalesce(B.product_level3_code,B.product_level2_code,B.product_level1_code) as zprodh3 
+,coalesce(B.product_level3_name,B.product_level2_name,B.product_level1_name) as zprodh3___t
+,BB.product_area_code_bw AS zww010 --"产区",
+,'' as zww010___t --产区_描述
+,B.reserved_field_1 as zyl01 --"产品渠道",
+,B.reserved_field1_name as zyl01___t  --产品渠道名称
+,B.reserved_field_6 as zyl06 --"产品等级",
+,B.reserved_field6_name as zyl06___t --"产品等级_描述,
+,SUM(A.STOCK_QTY) as quantity--"库存数量" 
+,SUM(CASE WHEN A.BSTTYP_SG = 'K' AND W.BWTTY <> 'X'   --k库存且评估类别<>X (非批次成本)
+	     THEN COALESCE(y1.KBETR,y3.KBETR,yy.KBETR) / COALESCE(y1.KPEIN,y3.KPEIN,yy.KPEIN) * A.STOCK_QTY --取当期采购价，取不到再取小于入库/过账日期的最新日期采购价
+	     WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'S' --为标准价
+	     THEN COALESCE(y5.STPRS,y7.STPRS) / COALESCE(y5.PEINH,y7.PEINH) * A.STOCK_QTY  --k库存逻辑 正常按成本估算号找不到，按工厂物料评估类取当期标准价，取不到拿小于入库/过账日期往期最大标准价
+		 WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'V' --为移动平均价
+		 THEN COALESCE(y5.PVPRS,y7.PVPRS) / COALESCE(y5.PEINH,y7.PEINH) * A.STOCK_QTY  --k库存逻辑 正常按成本估算号找不到，按工厂物料评估类取当期移动平均价，取不到拿小于入库/过账日期往期最大移动平均价 
+	     WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'S' 
+	     THEN COALESCE(x.STPRS,y.STPRS) / COALESCE(x.PEINH,y.PEINH) * A.STOCK_QTY --非K库存按S价取当期标准价，取不到拿往期最大期标准价
+		 WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'V' 
+		 THEN COALESCE(x.PVPRS,y.PVPRS) / COALESCE(x.PEINH,y.PEINH) * A.STOCK_QTY --非K库存按V价取当期移动平均价，取不到拿往期最大期移动平均价 
+		 ELSE 0 END) zsjkcje --实际库存金额
+,BB.SHELF_end_DATE as z_vfdat --"货架寿命到期日",
+,B.product_level1_code as zprodh1 
+,B.product_level1_name as zprodh1___t
+,coalesce(B.product_level2_code,B.product_level1_code) as zprodh2 
+,coalesce(B.product_level2_name,B.product_level1_name) as zprodh2___t
+,coalesce(B.product_level4_code,B.product_level3_code,B.product_level2_code,B.product_level1_code) as zprodh4 
+,coalesce(B.product_level4_name,B.product_level3_name,B.product_level2_name,B.product_level1_name) as zprodh4___t
+,coalesce(B.product_level5_code,B.product_level4_code,B.product_level3_code,B.product_level2_code,B.product_level1_code) as zprodh5 
+,coalesce(B.product_level5_name,B.product_level4_name,B.product_level3_name,B.product_level2_name,B.product_level1_name)  as zprodh5___t
+,G.MATL_GROUP1_CODE as matl_grp_1 --物料组1 
+,G.MATL_GROUP1_NAME as matl_grp_1___t --物料组1描述 
+,G.MATL_GROUP2_CODE as matl_grp_2 --物料组2 
+,G.MATL_GROUP2_NAME as matl_grp_2___t --物料组2描述 
+,G.MATL_GROUP3_CODE as matl_grp_3 --物料组3
+,G.MATL_GROUP3_NAME as matl_grp_3___t --物料组3描述 
+,G.MATL_GROUP4_CODE as matl_grp_4 --物料组4 
+,G.MATL_GROUP4_NAME as matl_grp_4___t --物料组4描述 
+,G.MATL_GROUP5_CODE as matl_grp_5 --物料组5 
+,G.MATL_GROUP5_NAME as matl_grp_5___t --物料组5描述 
+,A.LIFNR as vendor --"供应商编码",
+,BP.BU_SORT1 as vendor___t --供应商_描述
+,CASE WHEN A.BSTTYP_SG = 'K' AND W.BWTTY <> 'X'   --k库存且评估类别<>X (非批次成本)
+	     THEN COALESCE(y1.KBETR,y3.KBETR,yy.KBETR) / COALESCE(y1.KPEIN,y3.KPEIN,yy.KPEIN)  --取当期入库/过账日期采购价，保底期初数取所在信息记录最小一条采购价
+	     WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'S' --为标准价
+	     THEN COALESCE(y5.STPRS,y7.STPRS) / COALESCE(y5.PEINH,y7.PEINH)  --k库存逻辑 正常按成本估算号找不到，按工厂物料评估类取当期入库/过账日期标准价
+		 WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'V' --为移动平均价
+		 THEN COALESCE(y5.PVPRS,y7.PVPRS) / COALESCE(y5.PEINH,y7.PEINH)   --k库存逻辑  正常按成本估算号找不到，按工厂物料评估类取当期入库/过账日期移动平均价
+	     WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'S' 
+	     THEN COALESCE(x.STPRS,y.STPRS) / COALESCE(x.PEINH,y.PEINH)  --非K库存按S价取当期标准价，取不到拿往期最大期标准价
+		 WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'V' 
+		 THEN COALESCE(x.PVPRS,y.PVPRS) / COALESCE(x.PEINH,y.PEINH)  --非K库存按V价取当期移动平均价，取不到拿往期最大期移动平均价 
+		 ELSE 0 END as zmmm_o017_zzqj--周期价
+,B.product_specify_code as zgg01 --"产品规格",
+,B.product_specify_name as zgg01___t --产品规格_描述 
+,coalesce(substr(BB.earliest_voucher_post_date_fc,1,4)||substr(BB.earliest_voucher_post_date_fc,6,2)||substr(BB.earliest_voucher_post_date_fc,9,2),MAT.earliest_voucher_post_date_fc) as zpcrk_fc --批次入库日期（辅材专用）
+,SUM(B.length_1 * B.width * A.STOCK_QTY / 1000000) as zmmm_o017_zkcmj --库存面积
+,A.BWTAR as val_type --"评估类型"
+,BB.PRODUCE_DATE --生产日期
+,A.KDAUF as doc_number --"销售凭证"
+,A.KDPOS as s_ord_item --"项目",
+,A.kalnr --成本估算号
+,A.SAKTO  --科目号
+,Q.KONTS AS FIPOS  --承诺项目
+,t0.month_id as period_id_m
+from SDI.SDI_MATDOC_1001 A
+left join dwimd.dwi_md_data_material_general_t B 
+on A.MATNR = B.MATERIAL_NUM
+LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T BB
+ON A.MATNR = BB.MATERIAL_NUM AND (case when A.CHARG = '' then A.CHARG_CID ELSE A.CHARG END) = BB.BATCH_NUM
+left join SDI.SDI_JJ_LOC_EXCLUDE_1037 C
+on A.LGORT = C.loc_code
+left join sdi.sdi_t001_1001 D
+on A.BUKRS = D.BUKRS and D.MANDT = '800' and D.SPRAS = '1'
+left join sdi.sdi_t001w_1001 E  
+on A.WERKS = E.WERKS and E.MANDT = '800'
+left join sdi.sdi_t001l_1001 F
+on A.WERKS = F.WERKS and A.LGORT = F.LGORT and F.MANDT = '800'
+left join (select MATERIAL_NUM,max(matl_group1_code) as matl_group1_code,max(matl_group2_code) as matl_group2_code,max(matl_group3_code) as matl_group3_code,max(matl_group4_code) as matl_group4_code,max(matl_group5_code) as matl_group5_code,max(matl_group1_name) as matl_group1_name,max(matl_group2_name) as matl_group2_name,max(matl_group3_name) as matl_group3_name,max(matl_group4_name) as matl_group4_name,max(matl_group5_name) as matl_group5_name from DWIMD.DWI_MD_DATA_MATERIAL_SALES_T group by MATERIAL_NUM )G
+on A.MATNR = G.MATERIAL_NUM 
+left join sdi.sdi_mbew_1001 W
+on A.MATNR = W.MATNR and A.WERKS = W.BWKEY and coalesce(A.BWTAR,'#') = coalesce(W.BWTAR,'#')
+left join sdi.sdi_t025t_1001 H 
+on W.BKLAS = H.bklas and H.spras = '1' and H.MANDT = '800'
+left join sdi.sdi_but000_1001 BP
+on A.LIFNR = BP.partner and BP.CLIENT = '800'
+left join SDI.SDI_TB004T_1001 I
+on BP.bpkind = I.BPKIND and I.SPRAS = '1' and I.CLIENT = '800'
+left join sdi.sdi_dd07t_1001 J
+on A.BSTTYP_SG = J.domvalue_l and J.domname = 'BSTTYP' and J.DDLANGUAGE = '1'
+left join sdi.sdi_dd07t_1001 L
+on A.BSTAUS_SG = L.domvalue_l and L.domname = 'BSTAUS' and L.DDLANGUAGE = '1' 
+LEFT JOIN MAT 
+ON A.MATNR = MAT.MATERIAL_NUM 
+left join sdi.sdi_T006A_1001 N 
+on A.MEINS = N.MSEHI and N.SPRAS = '1' and N.MANDT = '800'
+left join SDI.SDI_TCURT_1001 O 
+on A.WAERS = O.WAERS and O.MANDT = '800' and O.SPRAS = '1'
+left join sdi.sdi_prps_1001 p   
+on p.MANDT = '800' and a.MAT_PSPNR = p.pspnr
+left join sdi.sdi_t030_1001 Q
+on W.BKLAS = Q.BKLAS AND Q.KTOPL = 'CNDP' and Q.KTOSL = 'BSX'
+join  (select month_id,
+			  max(day_dt) as day_dt 
+	   from dm.dm_dim_date_d dddd 
+       where 1=1
+       and substr(day_dt,1,4)||substr(day_dt,6,2) between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+       group by month_id  
+	   ) t0 on 1=1
+left join sdi.sdi_ckmlcr_1001 x 
+on a.KALNR = x.kalnr and x.bdatj = substr(t0.month_id,1,4) and substr(x.POPER,2,2) = substr(t0.month_id,5,2) 
+left join (select kalnr,vprsv,peinh,stprs,pvprs,bdatj||POPER
+,row_number() over(partition by kalnr order by bdatj||POPER desc ) as rn 
+from sdi.sdi_ckmlcr_1001 ) y 
+on a.KALNR = y.kalnr and y.rn = 1
+----------------------------------------------取物料批次的生产日期所在的信息记录--------------------------------------
+left join MC x1
+on A.MBLNR = x1.MBLNR and A.ZEILE = x1.ZEILE and A.MJAHR = x1.MJAHR and A.SHKZG = x1.SHKZG  
+------------------------------------------------------------------------------------------------------------
+----------------------------------------------取所在月过账日期所在的信息记录---------------------------------------
+left join MC1 x3
+ON A.MATNR = x3.MATNR AND A.CHARG = x3.CHARG AND A.LIFNR = x3.LIFNR AND A.WERKS = x3.WERKS
+-------------------------------------------------------------------------------------------------------------
+----------------------------------------------保底期初数取所在信息记录最小一条---------------------------------------
+left join (select MATNR,LIFNR,WERKS,EKORG,ESOKZ,KNUMH,KSCHL,DATAB,DATBI
+,row_number() over(partition by MATNR,LIFNR,WERKS,KSCHL order by DATBI ) AS RN from SDI.SDI_A017_1001 
+where ESOKZ = '2' ) xx
+on A.WERKS = xx.WERKS and A.LIFNR = xx.LIFNR and A.MATNR = xx.MATNR and xx.RN = 1 
+-------------------------------------------------------------------------------------------------------------
+left join SDI.SDI_KONP_1001 y1
+on x1.KNUMH = y1.KNUMH and x1.KSCHL = y1.KSCHL and y1.LOEVM_KO <> 'X'--|获
+left join SDI.SDI_KONP_1001 y3
+on x3.KNUMH = y3.KNUMH and x3.KSCHL = y3.KSCHL and y3.LOEVM_KO <> 'X'--|采
+left join SDI.SDI_KONP_1001 yy
+on xx.KNUMH = yy.KNUMH and xx.KSCHL = yy.KSCHL and yy.LOEVM_KO <> 'X'--|价
+----------------------------------------------取物料批次的生产日期所在的标准价--------------------------------------
+left join (select MATNR,BWKEY,BWTAR,KALNR,row_number() over(partition by MATNR,BWKEY,BWTAR ) AS RN from SDI.SDI_CKMLHD_1001) x5
+on A.MATNR = x5.MATNR and A.WERKS = x5.BWKEY and A.BWTAR = x5.BWTAR and x5.RN = 1
+left join sdi.sdi_ckmlcr_1001 y5 
+on x5.KALNR = y5.KALNR and y5.BDATJ = substr(BB.PRODUCE_DATE,1,4) and substr(y5.POPER,2,2) = substr(BB.PRODUCE_DATE,6,2)
+-----------------------------------------------------------------------------------------------------
+---------------------------------------------取物的过账日期所在的标准价------------------------------
+left join MC2 y7
+on A.MBLNR = y7.MBLNR and A.ZEILE = y7.ZEILE and A.MJAHR = y7.MJAHR and A.SHKZG = y7.SHKZG 
+------------------------------------------------------------------------------------------------------------
+where substr(a.BUDAT,1,4)||'-'||substr(a.BUDAT,5,2)||'-'||substr(a.BUDAT,7,2) < date_add(t0.day_dt,1)  
+group by 
+ case when A.CHARG = '' then A.CHARG_CID ELSE A.CHARG END  --"批次"
+,t0.month_id   --日历年/月
+,substr(t0.month_id,5,2)   --日历月
+,substr(t0.month_id,1,4)  -- 日历年
+,A.BUKRS -- "公司代码"
+,D.BUTXT  --公司名称
+,A.WAERS  --"货币",
+,O.LTEXT  --凭证货币_描述
+,B.external_matl_group_code  --"外部物料组",
+,B.external_matl_group_name  --外部物料组_描述
+,BP.bpkind  --"行业",
+,I.TEXT40  -- 行业_描述
+,A.MATNR --"物料编码",
+,B.MATERIAL_NAME  -- 物料编码_描述
+,B.matl_group_code  -- "物料组",
+,B.matl_group_name  --物料组名称
+,B.matl_type_code  --"物料类型",
+,B.matl_type_name  --物料类型_描述
+,A.WERKS  --"工厂",
+,E.NAME1  -- 工厂_描述
+,substr(A.BSTTYP_SG,1,1)  --"库存类别",
+,J.DDTEXT  --库存类别_描述
+,A.BSTAUS_SG  --"库存类型",
+,L.DDTEXT -- 库存类型_描述
+,A.LGORT  --"库存地点",	
+,F.LGOBE --库存地点_描述
+,A.MEINS  --"计量单位",
+,N.MSEHL --计量单位_描述
+,W.BKLAS  --"评估类",
+,H.BKBEZ  --评估类_描述
+,A.MAT_PSPNR  -- "WBS",
+,P.POST1  --Wbs描述
+,case when A.MAT_PSPNR = '00000000' then '' else P.POSID end  -- "WBS长号",
+,coalesce(substr(BB.earliest_voucher_post_date_bw,1,4)||substr(BB.earliest_voucher_post_date_bw,6,2)||substr(BB.earliest_voucher_post_date_bw,9,2),MAT.earliest_voucher_post_date_bw)  --"入库日期",
+,case when A.CHARG = '' then LPAD(A.CHARG_CID,10,'0') ELSE LPAD(A.CHARG,10,'0') END  --"物料批次主数据",
+,case when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) <> '3A' and substr(A.WERKS,1,2) <> '39' then '11000002' --卫浴事业部
+  	 when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) = '39' then '11000012' --卫浴鹏嘉家居
+  	 when substr(A.WERKS,1,1) = '3' and B.external_matl_group_code <> '10090' and substr(A.WERKS,1,2) = '3A' then '11000011' --卫浴艺耐品牌
+	 when A.LGORT = 'BE' and B.external_matl_group_code = '10060' then '11000003' --家居
+	 when B.external_matl_group_code = '10060' and A.BUKRS <> '1000' then 
+(case when substr(A.WERKS,1,1) = '3' or (substr(A.WERKS,1,1) = '8' and substr(A.WERKS,1,2) <> '8A')
+      or substr(A.WERKS,1,2) = '71' or substr(A.WERKS,1,2) = '7D' 
+      or substr(A.WERKS,1,2) = '7C' or substr(A.WERKS,1,2) = '73' then '' 
+      else (case when C.loc_code is not null  then '' else '11000003' end) end)
+	 when A.LGORT = 'A006' then '11000003' --家居
+	 when substr(A.WERKS,1,2) = '73' then '11000003'
+	 when substr(A.WERKS,1,2) = '7C' or (A.WERKS = '7220' and A.LGORT in ('TY','FC','QA','TA')) then '11000003'
+	 when B.external_matl_group_code = '10090' or A.WERKS = '7B20' or A.LGORT = 'BH' then '11000001'
+	 when B.external_matl_group_code in ('10020','10021','10022','10023','10024') and A.WERKS = '7920' then 
+         (case when C.loc_code is not null  then '' else '11000003' end)  
+     when A.WERKS = '7120' then '11000003'
+     when B.external_matl_group_code = '10070' and substr(A.WERKS,1,2) <> '21' and A.LGORT in ('BD','BA','DG','BX','DL') then '11000010'
+	 when B.external_matl_group_code = '10070' and A.WERKS = '1520' and A.LGORT = 'SA' then '11000010'     
+	 when substr(A.WERKS,1,2) = '21' and A.LGORT <> '0020' then '11000010' --生态新材  	      
+	  end  --事业部编码
+--,'' as zdpsyb___t --事业部_描述
+,case when A.LGORT = 'A006' then '33000033' --"ART+
+	 when B.external_matl_group_code = '10060' and A.BUKRS <> '1000' then
+(case when substr(A.WERKS,1,1) = '3' or (substr(A.WERKS,1,1) = '8' and substr(A.WERKS,1,2) <> '8A')
+       or substr(A.WERKS,1,2) = '71' or substr(A.WERKS,1,2) = '7D' 
+       or substr(A.WERKS,1,2) = '7C' or substr(A.WERKS,1,2) = '73' then '' 
+     else (case when C.loc_code is not null  then '' else '33000033' end) end) 
+     when A.LGORT = 'BE' and B.external_matl_group_code = '10060' then '33000033'
+     when substr(A.WERKS,1,2) = '73' then '33000016' --绿家
+     when substr(A.WERKS,1,2) = '7C' or (A.WERKS = '7220' and A.LGORT in ('TY','FC','QA','TA')) then '33000018'-- "辅材
+     when B.external_matl_group_code = '10090' or A.WERKS = '7B20' or A.LGORT = 'BH' then '33000019'-- "整装
+	 when B.external_matl_group_code in ('10020','10021','10022','10023','10024') and A.WERKS = '7920' then 
+       (case when C.loc_code is not null  then '' else '33000014' end)  --DPI
+     when A.WERKS = '7120' then '33000001'-- "木业
+end  --"子公司大区"
+,case when substr(A.WERKS,3,2) = '80' then 'Y' 
+	  when substr(A.WERKS,1,1) = '3' and substr(A.WERKS,1,2) <> '37' and (substr(A.LGORT,3,2) = '90' or B.reserved_field_4 = '00003')
+	  then 'Y' else 'N' end  --"是否清仓"
+ --"是否外协"
+,case when W.BKLAS in ('7920','7940') then 'CCP' --产成品
+      when W.BKLAS in ('7900','7910') then 'BCP' --半成品
+      when W.BKLAS in ('7930','7950') then 'WGSP' --外购商品
+      when substr(W.BKLAS,1,1) = '3' then 'YCL' --原材料
+      else 'QT' end  --"物料类别" ,--其他类型
+ --物料类别_描述
+,coalesce(B.product_level3_code,B.product_level2_code,B.product_level1_code) 
+,coalesce(B.product_level3_name,B.product_level2_name,B.product_level1_name) 
+,BB.product_area_code_bw  --"产区",
+--产区_描述
+,B.reserved_field_1  --"产品渠道",
+,B.reserved_field1_name   --产品渠道名称
+,B.reserved_field_6  --"产品等级",
+,B.reserved_field6_name  --"产品等级_描述,
+,BB.SHELF_end_DATE  --"货架寿命到期日",
+,B.product_level1_code
+,B.product_level1_name 
+,coalesce(B.product_level2_code,B.product_level1_code) 
+,coalesce(B.product_level2_name,B.product_level1_name) 
+,coalesce(B.product_level4_code,B.product_level3_code,B.product_level2_code,B.product_level1_code) 
+,coalesce(B.product_level4_name,B.product_level3_name,B.product_level2_name,B.product_level1_name) 
+,coalesce(B.product_level5_code,B.product_level4_code,B.product_level3_code,B.product_level2_code,B.product_level1_code) 
+,coalesce(B.product_level5_name,B.product_level4_name,B.product_level3_name,B.product_level2_name,B.product_level1_name)  
+,G.MATL_GROUP1_CODE  --物料组1 
+,G.MATL_GROUP1_NAME  --物料组1描述 
+,G.MATL_GROUP2_CODE  --物料组2 
+,G.MATL_GROUP2_NAME  --物料组2描述 
+,G.MATL_GROUP3_CODE  --物料组3
+,G.MATL_GROUP3_NAME  --物料组3描述 
+,G.MATL_GROUP4_CODE  --物料组4 
+,G.MATL_GROUP4_NAME  --物料组4描述 
+,G.MATL_GROUP5_CODE  --物料组5 
+,G.MATL_GROUP5_NAME  --物料组5描述 
+,A.LIFNR  --"供应商编码",
+,BP.BU_SORT1  --供应商_描述
+,CASE WHEN A.BSTTYP_SG = 'K' AND W.BWTTY <> 'X'   --k库存且评估类别<>X (非批次成本)
+	     THEN COALESCE(y1.KBETR,y3.KBETR,yy.KBETR) / COALESCE(y1.KPEIN,y3.KPEIN,yy.KPEIN)  --取当期入库/过账日期采购价，保底期初数取所在信息记录最小一条采购价
+	     WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'S' --为标准价
+	     THEN COALESCE(y5.STPRS,y7.STPRS) / COALESCE(y5.PEINH,y7.PEINH)  --k库存逻辑 正常按成本估算号找不到，按工厂物料评估类取当期入库/过账日期标准价
+		 WHEN A.BSTTYP_SG = 'K' AND W.BWTTY = 'X' AND COALESCE(y5.VPRSV,y7.VPRSV) = 'V' --为移动平均价
+		 THEN COALESCE(y5.PVPRS,y7.PVPRS) / COALESCE(y5.PEINH,y7.PEINH)   --k库存逻辑  正常按成本估算号找不到，按工厂物料评估类取当期入库/过账日期移动平均价
+	     WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'S' 
+	     THEN COALESCE(x.STPRS,y.STPRS) / COALESCE(x.PEINH,y.PEINH)  --非K库存按S价取当期标准价，取不到拿往期最大期标准价
+		 WHEN A.BSTTYP_SG <> 'K' AND COALESCE(x.VPRSV,y.VPRSV) = 'V' 
+		 THEN COALESCE(x.PVPRS,y.PVPRS) / COALESCE(x.PEINH,y.PEINH)  --非K库存按V价取当期移动平均价，取不到拿往期最大期移动平均价 
+		 ELSE 0 END --周期价
+,B.product_specify_code  --"产品规格",
+,B.product_specify_name  --产品规格_描述 
+,coalesce(substr(BB.earliest_voucher_post_date_fc,1,4)||substr(BB.earliest_voucher_post_date_fc,6,2)||substr(BB.earliest_voucher_post_date_fc,9,2),MAT.earliest_voucher_post_date_fc)  --批次入库日期（辅材专用）
+,A.BWTAR  --"评估类型"
+,BB.PRODUCE_DATE --生产日期
+,A.KDAUF  --"销售凭证"
+,A.KDPOS  --"项目",
+,A.kalnr --成本估算号
+,A.SAKTO  --科目号
+,Q.KONTS   --承诺项目
+,t0.month_id 
+)
+insert overwrite table dm.dm_rpt_zzt_kcmx_t partition (period_id_m) 
+--   truncate table dm.dm_rpt_zzt_kcmx_t
+select 
+ batch --"批次"
+,calmonth  --日历年/月
+,calmonth2  --日历月
+,calyear -- 日历年
+,comp_code --as "公司代码"
+,comp_code___t --公司名称
+,doc_currcy --"货币",
+,doc_currcy___t --凭证货币_描述
+,extmatlgrp --"外部物料组",
+,extmatlgrp___t --外部物料组_描述
+,industry --"行业",
+,industry___t -- 行业_描述
+,material --"物料编码",
+,material___t -- 物料编码_描述
+,matl_group -- "物料组",
+,matl_group___t --物料组名称
+,matl_type --"物料类型",
+,matl_type___t --物料类型_描述
+,plant --"工厂",
+,plant___t -- 工厂_描述
+,'' as reqtsn --请求序列号
+,stockcat --"库存类别",
+,stockcat___t --库存类别_描述
+,stocktype --"库存类型",
+,stocktype___t -- 库存类型_描述
+,stor_loc --"库存地点",	
+,stor_loc___t --库存地点_描述
+,unit --"计量单位",
+,unit___t --计量单位_描述
+,val_class --"评估类",
+,val_class___t --评估类_描述
+,wbs_elemt -- "WBS",
+,wbs_elemt___t --Wbs描述
+,wbs_elm_ex -- "WBS长号",
+,zmmm_o017_zbatch_date --"入库日期",
+,zbatchmd --"物料批次主数据",
+,case when zdpsyb = '' or zdpsyb is null then '11000001' else zdpsyb end as zdpsyb--事业部编码
+,case when zdpsyb = '' or zdpsyb is null then '瓷砖事业部' 
+      when zdpsyb = '11000012' then "卫浴事业部-非全资"
+      when zdpsyb = '11000011' then "卫浴事业部-非全资" 
+      else SYB.txtsh end as zdpsyb___t --事业部_描述
+,zdpzgsdq --"子公司大区"
+,DQ.txtsh as zdpzgsdq___t --子公司大区_描述
+,zisqc --"是否清仓",
+-- ,case when zdpsyb = '11000010' and stor_loc in ('DL','HB') then 'Y' 
+-- 	  when zdpsyb = '' and stor_loc in ('BJ','BE') and extmatlgrp not in ('10060','10070') then 'Y'
+--  	  else ziswx end as ziswx --"是否外协"
+,ziswx --"是否外协
+,zmatltype --"物料类别" 
+,case when zmatltype = 'CCP' then '产成品' 
+	  when zmatltype = 'BCP' then '半成品'
+	  when zmatltype = 'WGSP' then '外购商品'
+	  when zmatltype = 'YCL' then '原材料'
+	  else '其他类型' end as zmatltype___t --物料类别_描述
+,zprodh3 
+,zprodh3___t
+,zww010 --"产区",
+,K.BEZEK as zww010___t --产区_描述
+,zyl01 --"产品渠道",
+,zyl01___t  --产品渠道名称
+,zyl06 --"产品等级",
+,zyl06___t --"产品等级_描述,
+,quantity --"库存数量" 
+,zsjkcje--实际库存金额
+,current_timestamp as DW_LAST_UPDATE_DATE
+,z_vfdat --"货架寿命到期日",
+,zprodh1 
+,zprodh1___t
+,zprodh2 
+,zprodh2___t
+,zprodh4 
+,zprodh4___t
+,zprodh5 
+,zprodh5___t
+,matl_grp_1 --物料组1 
+,matl_grp_1___t --物料组1描述 
+,matl_grp_2 --物料组2 
+,matl_grp_2___t --物料组2描述 
+,matl_grp_3 --物料组3
+,matl_grp_3___t --物料组3描述 
+,matl_grp_4 --物料组4 
+,matl_grp_4___t --物料组4描述 
+,matl_grp_5 --物料组5 
+,matl_grp_5___t --物料组5描述 
+,vendor --"供应商编码",
+,vendor___t --供应商_描述
+,zmmm_o017_zzqj --周期价
+,zgg01 --"产品规格",
+,zgg01___t --产品规格_描述 
+,zpcrk_fc --批次入库日期（辅材专用）
+,zmmm_o017_zkcmj --库存面积
+,val_type --"评估类型"
+,doc_number -- 销售单号
+,s_ord_item -- 销售行号
+,PRODUCE_DATE -- 生产日期
+,kalnr --成本估算号
+,SAKTO  --科目号
+,FIPOS  --承诺项目
+,period_id_m
+from tmp 
+left join SDI.SDI_BIC_TZDPZGSDQ_1009 DQ
+on DQ.`/bic/zdpzgsdq` = tmp.zdpzgsdq
+left join SDI.SDI_BIC_TZDPSYB_1009 SYB
+on SYB.`/bic/zdpsyb` = tmp.zdpsyb
+left join sdi.sdi_t25a0_1001 K
+on tmp.zww010 = K.WW010 and K.SPRAS = '1' and K.MANDT = '800'
+
+--   drop table dm.dm_rpt_zzt_kcmx_t
+-- CREATE TABLE dm.dm_rpt_zzt_kcmx_t (
+-- 	batch varchar(500)  ,
+-- 	calmonth varchar(500)  ,
+-- 	calmonth2 varchar(500)  ,
+-- 	calyear varchar(500)  ,
+-- 	comp_code varchar(500)  ,
+-- 	comp_code___t varchar(500)  ,
+-- 	doc_currcy varchar(500)  ,
+-- 	doc_currcy___t varchar(500)  ,
+-- 	extmatlgrp varchar(500)  ,
+-- 	extmatlgrp___t varchar(500)  ,
+-- 	industry varchar(500)  ,
+-- 	industry___t varchar(500)  ,
+-- 	material varchar(500)  ,
+-- 	material___t varchar(500)  ,
+-- 	matl_group varchar(500)  ,
+-- 	matl_group___t varchar(500)  ,
+-- 	matl_type varchar(500)  ,
+-- 	matl_type___t varchar(500)  ,
+-- 	plant varchar(500)  ,
+-- 	plant___t varchar(500)  ,
+--  	reqtsn varchar(500)  ,
+-- 	stockcat varchar(500)  ,
+-- 	stockcat___t varchar(500)  ,
+-- 	stocktype varchar(500)  ,
+-- 	stocktype___t varchar(500)  ,
+-- 	stor_loc varchar(500)  ,
+-- 	stor_loc___t varchar(500)  ,
+-- 	unit varchar(500)  ,
+-- 	unit___t varchar(500)  ,
+-- 	val_class varchar(500)  ,
+-- 	val_class___t varchar(500)  ,
+-- 	wbs_elemt varchar(500)  ,
+-- 	wbs_elemt___t varchar(500)  ,
+-- 	wbs_elm_ex varchar(500)  ,
+-- 	zmmm_o017_zbatch_date varchar(500)  ,
+-- 	zbatchmd varchar(500)  ,
+-- 	zdpsyb varchar(500)  ,
+-- 	zdpsyb___t varchar(500)  ,
+-- 	zdpzgsdq varchar(500)  ,
+-- 	zdpzgsdq___t varchar(500)  ,
+-- 	zisqc varchar(500)  ,
+-- 	ziswx varchar(500)  ,
+-- 	zmatltype varchar(500)  ,
+-- 	zmatltype___t varchar(500)  ,
+--  	zprodh3 varchar(500)  ,
+--  	zprodh3___t varchar(500)  ,
+-- 	zww010 varchar(500)  ,
+-- 	zww010___t varchar(500)  ,
+-- 	zyl01 varchar(500)  ,
+-- 	zyl01___t varchar(500)  ,
+-- 	zyl06 varchar(500)  ,
+-- 	zyl06___t varchar(500)  ,
+-- 	quantity numeric(38, 10)  ,
+-- 	zsjkcje numeric(38, 10)  ,
+-- 	dw_last_update_date timestamp  ,
+-- 	z_vfdat varchar(500)  ,
+-- 	zprodh1 varchar(500)  ,
+-- 	zprodh1___t varchar(500)  ,
+-- 	zprodh2 varchar(500)  ,
+-- 	zprodh2___t varchar(500)  ,
+-- 	zprodh4 varchar(500)  ,
+-- 	zprodh4___t varchar(500)  ,
+-- 	zprodh5 varchar(500)  ,
+-- 	zprodh5___t varchar(500)  ,
+-- 	matl_grp_1 varchar(500)  ,
+-- 	matl_grp_1___t varchar(500)  ,
+-- 	matl_grp_2 varchar(500)  ,
+-- 	matl_grp_2___t varchar(500)  ,
+-- 	matl_grp_3 varchar(500)  ,
+-- 	matl_grp_3___t varchar(500)  ,
+-- 	matl_grp_4 varchar(500)  ,
+-- 	matl_grp_4___t varchar(500)  ,
+-- 	matl_grp_5 varchar(500)  ,
+-- 	matl_grp_5___t varchar(500)  ,
+-- 	vendor varchar(500)  ,
+-- 	vendor___t varchar(500)  ,
+-- 	zmmm_o017_zzqj numeric(38, 10)  ,
+-- 	zgg01 varchar(500)  ,
+-- 	zgg01___t varchar(500)  ,
+-- 	zpcrk_fc varchar(500)  ,
+-- 	zmmm_o017_zkcmj numeric(38, 10)  ,
+-- 	val_type varchar(500)  ,
+--      doc_number varchar(500),
+--     s_ord_item varchar(500),
+--     produce_date  timestamp 
+
+--  alter table dm.dm_rpt_zzt_kcmx_t add columns(FIPOS varchar(500)) cascade;
+-- )
+-- PARTITIonED by (
+-- `period_id_m` string COMMENT '分区（月）')DM_WM_ALL_TYPE_STOCK_T_HIS

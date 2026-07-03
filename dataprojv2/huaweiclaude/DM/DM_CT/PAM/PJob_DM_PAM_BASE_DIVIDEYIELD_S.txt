@@ -1,0 +1,63 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/05/24 14:01:32 GMT+08:00
+-- description:瓷砖各基地分级产量表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20240613 拆分规格的长跟宽从物料主档取
+-- UPDATE FROM CHENZHIYONG 20240617 修改清远的分级产量的取数逻辑
+-- UPDATE FROM CHENZHIYONG 20240617 新增字段：优等、一级、次品、废品
+-- update from zhz 20240618 优等、一级、次品、废品都乘以单位面积
+-- UPDATE FROM CHENZHIYONG 20240619 修改湖南的分级产量逻辑（分级车间产品下线单记录表 + 湖南产品升降级记录明细表 - 产品破损情况登记表）
+-- UPDATE FROM CHENZHIYONG 20240625 修改湖南分级产量的逻辑
+-- UPDATE FROM CHENZHIYONG 20240626 拆分一张DWR明细表出来
+-- UPDATE FROM ZHZ 20241129 alter table DM.DM_PAM_BASE_DIVIDEYIELD_S add columns (batch_num string COMMENT '批次号') cascade  新增批次字段
+-- update from zhz 20241223 alter table DM.DM_PAM_BASE_DIVIDEYIELD_S add columns (SHIFT_CODE string COMMENT '班次代码') cascade;--新增班次代码
+--                          alter table DM.DM_PAM_BASE_DIVIDEYIELD_S add columns (GROUP_CODE string COMMENT '班组代码') cascade;--新增班组代码
+--                          alter table DM.DM_PAM_BASE_DIVIDEYIELD_S add columns (MATERIAL_LENGTH string COMMENT '物料长度') cascade;
+--                          alter table DM.DM_PAM_BASE_DIVIDEYIELD_S add columns (MATERIAL_WIDTH string COMMENT '物料宽度') cascade;
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE DM.DM_PAM_BASE_DIVIDEYIELD_S PARTITION(PERIOD_ID_M)
+SELECT START_DATE, -- 日期
+	   SITE_CODE, -- 基地编码
+	   WORK_SHOP_CODE, -- 车间编码
+	   PRODUCT_LINE_CODE, -- 产线编码
+       PRODUCT_MODEL,   -- 产品规则
+       MATERIAL_CODE, -- 物料编码
+	   NVL(SUM(DIVIDEYIELD_AREA * ((MATERIAL_LENGTH * MATERIAL_WIDTH)/1000000)),0) AS GRADE_QTY, -- 分级数量
+	   'N' AS DEL_FLAG , -- 删除数据标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   NVL(SUM(FIRST_RATE_AREA * MATERIAL_LENGTH * MATERIAL_WIDTH /1000000),0) AS FIRST_RATE_QTY, -- 优等
+	   NVL(SUM(ONE_GRADE_AREA * MATERIAL_LENGTH * MATERIAL_WIDTH /1000000),0) AS ONE_GRADE_QTY, -- 一级
+	   NVL(SUM(SECOND_AREA * MATERIAL_LENGTH * MATERIAL_WIDTH /1000000),0) AS SECOND_QTY, -- 次品
+	   NVL(SUM(WASTE_AREA * MATERIAL_LENGTH * MATERIAL_WIDTH /1000000),0) AS WASTE_QTY, -- 废品
+	   BATCH_NUM, --批次号
+	   SHIFT_CODE, --班次代码
+	   GROUP_CODE,--班组代码
+	   MATERIAL_LENGTH,--物料长度
+	   MATERIAL_WIDTH,--物料宽度
+	   PERIOD_ID_M -- 分区字段
+FROM DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F
+WHERE PERIOD_ID_M >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7)  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM
+GROUP BY START_DATE, -- 日期
+	     SITE_CODE, -- 基地编码
+	     WORK_SHOP_CODE, -- 车间编码
+	     PRODUCT_LINE_CODE, -- 产线编码
+         PRODUCT_MODEL,   -- 产品规则
+         MATERIAL_CODE, -- 物料编码
+         BATCH_NUM, --批次号
+         SHIFT_CODE, --班次代码
+	     GROUP_CODE,--班组代码
+	     MATERIAL_LENGTH,--物料长度
+	     MATERIAL_WIDTH,--物料宽度
+	     PERIOD_ID_M
+;

@@ -1,0 +1,35 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/07/20 16:50:41 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_SO_AREASHOP_INFO_T
+SELECT
+	id	,
+	shopowner	,
+	mobile	,
+	shopinputarea	,
+	shopprovince	,
+	shopcity	,
+	shoparea	,
+	shopname	,
+	address	,
+	imgsrc	,
+	shopdescribe	,
+	createtime	,
+	update_time	,
+	latitude	,
+	longitude	,
+	distance	,
+	shopstar	,
+	shoplabel	,
+	shoptype	,
+	imgthumbn	,
+	registrants	,
+	area	,
+	worktime	,
+	areastatus	,
+	del_flag	,
+	CURRENT_TIMESTAMP() AS dw_last_update_date	
+FROM SDI.SDI_DP_AREASHOP_1028
+WHERE del_flag = 'N';

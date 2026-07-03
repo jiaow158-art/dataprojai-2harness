@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_WM_PRODSTOCK_OUT_IN_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "SAP成品出入库表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

@@ -1,0 +1,339 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：瓷砖利润表
+-- create time: 2022/11/04 14:18:06 GMT+08:00
+-- 新增内部交易 2022-12-02 00:56:06  linw
+-- 2023/06/15 guzhengfeng 优化除数为0场景
+-- ******************************************************************** --
+DELETE FROM DM.DM_RPT_CT_PROFIT_T WHERE MONTHS = substr('${PERIOD_ID_D}',1,7);
+with dim_date as (
+ select
+ '本月' months_type
+,substr(day_id,1,6) months 
+from dm.dm_dim_date_d where '${PERIOD_ID_D}' = day_dt
+group by substr(day_id,1,6)
+union all 
+ select
+ '上月' months_type
+, substr(day_id_mend_mago,1,6) months 
+from dm.dm_dim_date_d where '${PERIOD_ID_D}' = day_dt
+group by substr(day_id_mend_mago,1,6)
+union all 
+ select
+ '去年' months_type
+, substr(day_id_mend_yago,1,6) months 
+from dm.dm_dim_date_d where '${PERIOD_ID_D}'  = day_dt
+group by substr(day_id_mend_yago,1,6)
+)
+
+
+INSERT INTO DM.DM_RPT_CT_PROFIT_T
+select 
+   substr('${PERIOD_ID_D}',1,7) months
+  ,index_type
+  ,sum(this_month) this_month 
+  ,sum(budget) budget
+  ,sum(last_month) last_month
+  ,sum(last_year) last_year
+  ,CURRENT_TIMESTAMP() dw_last_update_date
+from (
+
+
+--
+--select 
+--   index_type
+--  ,sum(this_month) this_month 
+--  ,sum(budget) budget
+--  ,sum(last_month) last_month
+--  ,sum(last_year) last_year 
+--
+--from (
+--select 
+--index_type
+-- ,sum(case when months_type = '本月' then indicator_value else 0 end  )    this_month
+-- , 0 budget
+-- ,sum(case when months_type = '上月' then indicator_value  else 0 end  )    last_month
+-- ,sum(case when months_type = '去年' then indicator_value else 0 end  )    last_year
+--from upload.upload_ct_profit_t t1
+--join dim_date t3 on t1.months  = t3.months 
+--group by index_type
+--union all 
+--select 
+--index_type 
+-- ,0 this_month
+-- , sum(case when months_type = '本月' then indicator_value else 0 end  )   budget
+-- ,0  last_month
+-- ,0 last_year
+--from upload.upload_ct_profit_budget t1
+--join dim_date t3 on t1.months  = t3.months 
+--group by index_type,t3.months
+--)
+--group by index_type
+
+SELECT 
+  '含税收入' index_type 
+ ,sum(case when months_type = '本月' then nvl(zxsyj_kjy, 0) + nvl(zxsyj_zd,0 ) else 0 end  )    this_month
+ , 0 budget
+ ,sum(case when months_type = '上月' then nvl(zxsyj_kjy, 0) + nvl(zxsyj_zd,0 ) else 0 end  )    last_month
+ ,sum(case when months_type = '去年' then nvl(zxsyj_kjy, 0) + nvl(zxsyj_zd,0 ) else 0 end  )    last_year
+FROM DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T t1 
+join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.sales_grp = t2.node_name9 
+join dim_date t3 on t1.calmonth  = t3.months 
+where 1=1
+and t2.node_name2  = '瓷砖事业部'
+
+union all  
+
+select 
+  '收入净额' index_type 
+ ,sum(case when months_type = '本月' then notax_sales_net_amt  else 0 end  )    this_month
+-- ,sum(case when months_type = '本月' then budget_notax_sales_net_amt else 0 end  )  budget
+ ,0 budget
+ ,sum(case when months_type = '上月' then notax_sales_net_amt else 0 end  )    last_month
+ ,sum(case when months_type = '本月' then last_year_notax_sales_net_amt else 0 end  )    last_year
+from DWRFIN.DWRFIN_COST_SALES_GROSS_PROFIT_D t1 
+--join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.operation_center = t2.node_name9 
+join dim_date t3 on t1.months  = t3.months 
+where 1=1
+--and t2.node_name2  = '瓷砖事业部'
+
+union all  
+
+select 
+  '成本A' index_type 
+ ,sum(case when months_type = '本月' then  actual_cost else 0 end  )    this_month
+-- ,sum(case when months_type = '本月' then budget_cost_a else 0 end  )  budget
+ ,0 budget
+ ,sum(case when months_type = '上月' then actual_cost else 0 end  )    last_month
+ ,sum(case when months_type = '本月' then last_year_actual_cost else 0 end  )    last_year
+from DWRFIN.DWRFIN_COST_SALES_GROSS_PROFIT_D t1 
+--join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.operation_center = t2.node_name9 
+join dim_date t3 on t1.months  = t3.months 
+where 1=1
+--and t2.node_name2  = '瓷砖事业部'
+
+union all  
+
+select 
+  '毛利A-含清仓' index_type 
+ ,sum(case when months_type = '本月' then  gross_profit else 0 end  )    this_month
+-- ,sum(case when months_type = '本月' then budget_gross_profit else 0 end  )  budget
+ ,0 budget
+ ,sum(case when months_type = '上月' then gross_profit else 0 end  )    last_month
+ ,sum(case when months_type = '本月' then last_year_gross_profit else 0 end  )    last_year
+from DWRFIN.DWRFIN_COST_SALES_GROSS_PROFIT_D t1 
+--join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.operation_center = t2.node_name9 
+join dim_date t3 on t1.months  = t3.months 
+where 1=1
+--and t2.node_name2  = '瓷砖事业部'
+
+union all  
+
+
+-- 新增内部交易 2022-12-02 00:56:06
+select
+'毛利率A-含清仓' index_type 
+,case when this_month_notax_sales_net_amt = 0 then 0
+    else this_month_gross_profit / this_month_notax_sales_net_amt 
+ end this_month
+, 0 budget
+,case when last_month_notax_sales_net_amt = 0 then 0
+    else last_month_gross_profit / last_month_notax_sales_net_amt
+ end last_month
+,case when last_year_notax_sales_net_amt = 0 then 0
+    else last_year_gross_profit / last_year_notax_sales_net_amt
+ end last_year
+FROM
+(
+select
+sum(this_month_gross_profit) this_month_gross_profit
+,sum(this_month_notax_sales_net_amt) this_month_notax_sales_net_amt
+,sum(last_month_gross_profit)  last_month_gross_profit
+,sum(last_month_notax_sales_net_amt) last_month_notax_sales_net_amt
+,sum(last_year_gross_profit) last_year_gross_profit
+,sum(last_year_notax_sales_net_amt) last_year_notax_sales_net_amt
+from  (
+	select 
+   sum(case when months_type = '本月' then gross_profit else 0 end )              this_month_gross_profit
+  ,sum(case when months_type = '上月' then gross_profit else 0 end )       		 last_month_gross_profit
+  ,sum(case when months_type = '本月' then last_year_gross_profit else 0 end )    last_year_gross_profit
+  ,sum(case when months_type = '本月' then notax_sales_net_amt else 0 end )              this_month_notax_sales_net_amt
+  ,sum(case when months_type = '上月' then notax_sales_net_amt else 0 end )       		 last_month_notax_sales_net_amt
+  ,sum(case when months_type = '本月' then last_year_notax_sales_net_amt else 0 end )    last_year_notax_sales_net_amt
+from DWRFIN.DWRFIN_COST_SALES_GROSS_PROFIT_D t1 
+join dim_date t3 on t1.months  = t3.months 
+where 1=1
+union all 
+select 
+  sum(case when months_type = '本月' and trim(index_type) ='毛利A-含清仓' then indicator_value else 0 end  )    this_month_gross_profit
+ ,sum(case when months_type = '上月' and trim(index_type) ='毛利A-含清仓' then indicator_value  else 0 end  )    last_month_gross_profit
+ ,sum(case when months_type = '去年' and trim(index_type) ='毛利A-含清仓' then indicator_value else 0 end  )    last_year_gross_profit
+ ,sum(case when months_type = '本月' and trim(index_type) ='收入净额' then indicator_value else 0 end  )    this_month_notax_sales_net_amt
+ ,sum(case when months_type = '上月' and trim(index_type) ='收入净额' then indicator_value  else 0 end  )    last_month_notax_sales_net_amt
+ ,sum(case when months_type = '去年' and trim(index_type) ='收入净额' then indicator_value else 0 end  )    last_year_notax_sales_net_amt
+from 
+upload.upload_ct_internal_transaction t1 join dim_date t3 on t1.months  = t3.months 
+
+)
+)
+
+union all 
+
+--
+--
+--select 
+--  '税金及附加' index_type  
+--  ,sum(nvl(this_month,0)) this_month 
+--  ,sum(nvl(budget,0)) budget
+--  ,sum(nvl(last_month,0)) last_month
+--  ,sum(nvl(last_year,0)) last_year 
+--  from (
+--  select 
+--  sum(case when months_type = '本月' then   nvl(zje,0)   else 0 end  )    this_month
+--  ,0  budget
+-- ,sum(case when months_type = '上月' then  nvl(zje,0)    else 0 end  )    last_month
+-- ,sum(case when months_type = '去年' then  nvl(zje,0)    else 0 end  )    last_year
+--from DM.DM_ZZT_QTYWSZ_T t1 
+--join dim_date t3 on t1.calmonth  = t3.months 
+--where 1 = 1 
+--and comp_code  in ( '1200','1300','1500','1600','1700','1800','1900','7700','7800','8000','8100','8200'
+--,'8300','8500','8800','7A00','7M00','7H00','7F00','7E00')
+--and gl_account in (
+-- '0054020200'   -- 税金及附加-城市维护建设税
+--,'0054020300'   -- 税金及附加-房产税
+--,'0054020900'   -- 税金及附加-车船使用税
+--,'0054020600'   -- 税金及附加-堤围费
+--,'0054021000'   -- 税金及附加-印花税
+--,'0054020500'   -- 税金及附加-环境保护税
+--,'0054020400'   -- 税金及附加-城镇土地使用税
+--,'0054020700'   -- 税金及附加-教育附加费
+--,'0054020800'   -- 税金及附加-地方教育费附加
+--,'0054020100'   -- 税金及附加-资源税
+--)
+--union all 
+--
+--   select 
+--  sum(case when months_type = '本月' then  nvl(zje,0)    else 0 end  )    this_month
+--  ,0  budget
+-- ,sum(case when months_type = '上月' then nvl(zje,0)     else 0 end  )    last_month
+-- ,sum(case when months_type = '去年' then nvl(zje,0)     else 0 end  )    last_year
+--from DM.DM_ZZT_QTYWSZ_T t1 
+--left join DWIMD.DWI_MD_COST_CENTER_INFO_T t4 on t4.zcost_center = concat('DP00',t1.costcenter)
+--join  DM.DM_RPT_SALES_GROUP_T     t2 on t4.sales_grp_code  = t2.node_name9 
+--join dim_date t3 on t1.calmonth  = t3.months 
+--where 1 = 1 
+--and t2.node_name2 ='瓷砖事业部'
+----and comp_code  in (  '1000','7500','7600','7900','7B00','8A00' )
+--and t1.comp_code ='Z000'
+--and gl_account in (
+-- '0054020200'   -- 税金及附加-城市维护建设税
+--,'0054020300'   -- 税金及附加-房产税
+--,'0054020900'   -- 税金及附加-车船使用税
+--,'0054020600'   -- 税金及附加-堤围费
+--,'0054021000'   -- 税金及附加-印花税
+--,'0054020500'   -- 税金及附加-环境保护税
+--,'0054020400'   -- 税金及附加-城镇土地使用税
+--,'0054020700'   -- 税金及附加-教育附加费
+--,'0054020800'   -- 税金及附加-地方教育费附加
+--,'0054020100'   -- 税金及附加-资源税
+--)
+--  
+--  union all 
+--     select 
+--  sum(case when months_type = '本月' then  nvl(zje,0)    else 0 end  )    this_month
+--  ,0  budget
+-- ,sum(case when months_type = '上月' then nvl(zje,0)     else 0 end  )    last_month
+-- ,sum(case when months_type = '去年' then nvl(zje,0)     else 0 end  )    last_year
+--from DM.DM_ZZT_QTYWSZ_T t1 
+--left join DWIMD.DWI_MD_COST_CENTER_INFO_T t4 on t4.zcost_center = concat('DP00',t1.costcenter)
+--join dim_date t3 on t1.calmonth  = t3.months 
+--where 1 = 1 
+--and comp_code  in (  '1000','7500','7600','7900','7B00','8A00' )
+--and gl_account in (
+-- '0054020200'   -- 税金及附加-城市维护建设税
+--,'0054020300'   -- 税金及附加-房产税
+--,'0054020900'   -- 税金及附加-车船使用税
+--,'0054020600'   -- 税金及附加-堤围费
+--,'0054021000'   -- 税金及附加-印花税
+--,'0054020500'   -- 税金及附加-环境保护税
+--,'0054020400'   -- 税金及附加-城镇土地使用税
+--,'0054020700'   -- 税金及附加-教育附加费
+--,'0054020800'   -- 税金及附加-地方教育费附加
+--,'0054020100'   -- 税金及附加-资源税
+--)
+--  )
+--
+--union all 
+--  
+  
+ select 
+     '经营费用' index_type  
+  ,sum(nvl(this_month,0)) this_month 
+  ,sum(nvl(budget,0)) budget
+  ,sum(nvl(last_month,0)) last_month
+  ,sum(nvl(last_year,0)) last_year 
+ from (
+       select
+     sum(case when months_type = '本月' then   nvl(zje, 0) + nvl(zfysgtzz, 0)    else 0 end  )    this_month
+    ,0  budget
+    ,sum(case when months_type = '上月' then    nvl(zje, 0) + nvl(zfysgtzz, 0)      else 0 end  )    last_month
+    ,sum(case when months_type = '去年' then    nvl(zje, 0) + nvl(zfysgtzz, 0)      else 0 end  )    last_year
+   
+      from dm.dm_zzt_fy_t a
+               join DM.DM_RPT_SALES_GROUP_T b on a."SALES_GRP_2" = b.node_name9
+				join dim_date t3 on a.calmonth  = t3.months 
+      where a.func_area in ('4110', '5501', '5502', '5503', '5504')
+        and b.node_name2 = '瓷砖事业部'
+--      union all 
+--  select    
+--     0 this_month
+--    ,sum(expense)  budget
+--    ,0  last_month
+--    ,0 last_year
+--      from upload.upload_budget_expense a
+--               join dim_date b on a.months =  b.months
+
+ )
+     
+  union all 
+ 
+select 
+trim(index_type)
+ ,sum(case when months_type = '本月' then indicator_value else 0 end  )    this_month
+ , 0 budget
+ ,sum(case when months_type = '上月' then indicator_value  else 0 end  )    last_month
+ ,sum(case when months_type = '去年' then indicator_value else 0 end  )    last_year
+from upload.upload_ct_profit_t t1 
+join dim_date t3 on t1.months  = t3.months 
+group by trim(index_type)
+
+union all 
+ 
+select 
+trim(index_type)  index_type
+ ,0 this_month
+ , sum(case when months_type = '本月' then indicator_value else 0 end  )   budget
+ ,0  last_month
+ ,0 last_year
+from upload.upload_ct_profit_budget t1
+join dim_date t3 on t1.months  = t3.months 
+group by trim(index_type),t3.months
+
+-- 新增内部交易 2022-12-02 00:56:06
+--- 内部交易数据 
+
+union all
+
+select 
+trim(index_type) 
+ ,sum(case when months_type = '本月' then indicator_value else 0 end  )    this_month
+ , 0 budget
+ ,sum(case when months_type = '上月' then indicator_value  else 0 end  )    last_month
+ ,sum(case when months_type = '去年' then indicator_value else 0 end  )    last_year
+from 
+upload.upload_ct_internal_transaction t1 join dim_date t3 on t1.months  = t3.months 
+group by trim(index_type) 
+
+
+) group by index_type

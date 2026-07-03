@@ -1,0 +1,33 @@
+{
+  "mcpServers": {
+    "dws": {
+      "type": "stdio",
+      "command": "/usr/bin/python3",
+      "args": [
+        "/home/dp-user/dataprojv2/dataprojv2/dws_mcp_server.py"
+      ],
+      "env": {
+        "DWS_HOST": "121.37.200.214",
+        "DWS_PORT": "8000",
+        "DWS_DBNAME": "DP_DWS",
+        "DWS_USER": "aiuser",
+        "DWS_PASSWORD": "Dp123456",
+        "DWS_SCHEMA": "public"
+      }
+    },
+    "dws2": {
+      "type": "stdio",
+      "command": "/usr/bin/python3",
+      "args": [
+        "/home/dp-user/dataprojv2/dataprojv2/dws_mcp_server.py"
+      ],
+      "env": {
+        "DWS_HOST": "121.37.200.214",
+        "DWS_PORT": "8000",
+        "DWS_DBNAME": "DP_DWS",
+        "DWS_USER": "aiuser",
+        "DWS_PASSWORD": "Dp123456"
+      }
+    }
+  }
+}

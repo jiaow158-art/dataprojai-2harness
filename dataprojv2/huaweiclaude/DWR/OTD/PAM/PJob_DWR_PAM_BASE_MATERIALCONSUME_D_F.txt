@@ -1,0 +1,165 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/05/23 20:33:03 GMT+08:00
+-- description:瓷砖各基地物耗表(日)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20240611 处理没物耗数据没有记录的情况
+-- UPDATE FROM CHENZHIYONG 20240613 当分区字段为空时，截取发散的日期作为分区月
+-- UPDATE FROM CHENZHIYONG 20240615 修改抬头文本的限制逻辑
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+WITH ACDOCA_DATA as(
+	SELECT  PERIOD_ID_M,  -- 分区字段
+			BUDAT AS START_DATE,  -- 日期
+			rbukrs AS SITE_CODE, -- 基地
+			RCNTR AS COST_CENTER, -- 成本中心
+		--	RACCT AS RACCT_SUBJECT_CODE, -- 科目
+		--	SGTXT AS REMARKS, -- 抬头文本
+			SUM(NVL(TSL,0)) AS MATERIAL_CONSUME_AMT -- 金额
+	FROM SDI.SDI_ACDOCA_1001 
+	WHERE rbukrs IN ( '1300','1500','1600','1800','1900' )  -- 基地
+	AND racct IN ( '0061401000', '0061408000', '0061406000', '0061499000', '0060530100' ) -- 科目 
+	and RFAREA = '4105' -- 功能范围
+	AND SGTXT NOT LIKE '%球旦%' -- 抬头文本
+	AND SGTXT NOT LIKE '%球石%' -- 抬头文本
+	AND SGTXT NOT LIKE '%自动打包%' -- 抬头文本
+	AND SGTXT NOT LIKE '%系统数不考核%' -- 抬头文本
+	AND RCNTR NOT IN ('1300MC0001','1500MA0055','1600MA0037','1800MA0029')
+	--AND period_id_m <> '000000'
+	--AND period_id_m >= '202405'
+	AND period_id_m >= REPLACE(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-','') -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+	GROUP BY period_id_m, 
+			 BUDAT,
+			 rbukrs,
+			 RCNTR--,
+			 --RACCT,
+			 --SGTXT
+),
+dp_deduct_balldan_amount_maint_1006_DATA AS(  --  扣减球旦金额数据
+	SELECT T1.budat AS START_DATE, -- 日期
+		   T1.site  AS SITE_CODE, -- 基地编码
+		   T2.work_shop AS WORK_SHOP_CODE, -- 车间编码
+		   T2.product_line AS PRODUCT_LINE_CODE, -- 产线编码
+		   T2.work_no_code , -- 工序编码
+		   T1.cost_center AS COST_CENTER_CODE, -- 成本中心编码
+		   sum(nvl(amount,0)) AS KJ_AMT  -- 球旦扣减金额
+	FROM SDI.SDI_dp_deduct_balldan_amount_maint_1006 T1  --  扣减球旦金额维护表
+	LEFT JOIN SDI.SDI_dj_powerconsumption_costcenter_maintenance_1006 T2 -- 清远-用电与成本中心维护表
+	ON T1.SITE = T2.SITE
+	AND T1.COST_CENTER = T2.COST_CENTER
+	AND T2.delete_flag = 1
+	WHERE T1.delete_flag = 1
+	AND T1.budat >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+	AND T1.site IN ( '1300','1500','1600','1800','1900' )  -- 基地
+	GROUP BY T1.budat,
+		     T1.site,
+		   	 T2.work_shop,
+		     T2.product_line,
+		     T2.work_no_code ,
+		     T1.cost_center
+),
+DWR_PAM_BASE_MATERIALCONSUME_D_F_DATA AS( -- 物耗数据
+	SELECT CONCAT(SUBSTRING(T1.START_DATE,1,4),'-',SUBSTRING(T1.START_DATE,5,2),'-',SUBSTRING(T1.START_DATE,7,2)) AS START_DATE, -- 日期
+		   T1.SITE_CODE, -- 基地编码
+		   T2.WORK_SHOP AS WORK_SHOP_CODE, -- 车间编码
+		   T2.PRODUCT_LINE AS PRODUCT_LINE_CODE, -- 产线编码
+		   T2.WORK_NO_CODE, -- 工序编码
+		   T1.COST_CENTER AS COST_CENTER_CODE, -- 成本中心编码
+		   T1.MATERIAL_CONSUME_AMT - NVL(T3.KJ_AMT,0) AS MATERIAL_CONSUME_AMT, -- 物耗金额
+		   CONCAT(SUBSTRING(T1.START_DATE,1,4),'-',SUBSTRING(T1.START_DATE,5,2)) AS PERIOD_ID_M -- 分区字段
+	FROM ACDOCA_DATA T1
+	LEFT JOIN SDI.sdi_dj_powerconsumption_costcenter_maintenance_1006 T2 -- 清远-用电与成本中心维护表
+	ON T1.SITE_CODE = T2.site 
+	AND T1.COST_CENTER = T2.cost_center 
+	AND T2.delete_flag = 1
+	LEFT JOIN dp_deduct_balldan_amount_maint_1006_DATA T3  --  扣减球旦金额数据
+	ON CONCAT(SUBSTRING(T1.START_DATE,1,4),'-',SUBSTRING(T1.START_DATE,5,2),'-',SUBSTRING(T1.START_DATE,7,2)) = T3.START_DATE
+	AND T1.SITE_CODE = T3.SITE_CODE
+	AND T2.WORK_SHOP = T3.WORK_SHOP_CODE
+	AND T2.PRODUCT_LINE = T3.PRODUCT_LINE_CODE
+	AND T2.WORK_NO_CODE = T3.work_no_code
+	AND T1.COST_CENTER = T3.COST_CENTER_CODE
+),
+dim_date as (    -- 日期维度,发散维度用
+	select day_dt 
+	     from dm.dm_dim_date_d 
+	  where day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) 
+	    and day_dt >=  CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+),
+ACTICAL_DETAIL_DATA AS( -- 实际数据
+	SELECT period_id_m,
+		   START_date,
+		   site_code,
+		   work_shop_code,
+		   product_line_code,
+		   work_no_code,
+		   cost_center_code,
+		   SUM(material_consume_amt) AS material_consume_amt
+	FROM DWR_PAM_BASE_MATERIALCONSUME_D_F_DATA T
+	WHERE period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7)
+	GROUP BY period_id_m,
+			 START_date,
+			 site_code,
+			 work_shop_code,
+			 product_line_code,
+			 work_no_code,
+			 cost_center_code
+),
+ACTICAL_DETAIL_DIM_DATA AS( -- 维度数据
+	SELECT period_id_m,
+		   site_code,
+		   work_shop_code,
+		   product_line_code,
+		   work_no_code,
+		   cost_center_code
+	FROM ACTICAL_DETAIL_DATA
+	GROUP BY period_id_m,
+			 site_code,
+			 work_shop_code,
+			 product_line_code,
+			 work_no_code,
+			 cost_center_code
+),
+result_data as(  -- 结果数据
+	SELECT t1.day_dt AS start_date,
+		   t2.period_id_m ,
+		   t2.site_code ,
+		   t2.work_shop_code,
+		   t2.product_line_code ,
+		   t2.work_no_code ,
+		   t2.cost_center_code ,
+		   nvl(t3.material_consume_amt,0) AS material_consume_amt
+	FROM dim_date T1
+	LEFT JOIN ACTICAL_DETAIL_DIM_DATA t2
+	ON SUBSTRING(T1.day_dt,1,7) = T2.period_id_m  -- 按月发散
+	--AND 1 = 1
+	LEFT JOIN ACTICAL_DETAIL_DATA t3
+	ON t1.day_dt = t3.START_date
+	AND t2.period_id_m = t3.period_id_m
+	AND t2.site_code = t3.site_code
+	AND t2.work_shop_code = t3.work_shop_code
+	AND t2.product_line_code = t3.product_line_code
+	AND t2.work_no_code = t3.work_no_code
+	AND t2.cost_center_code = t3.cost_center_code
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_MATERIALCONSUME_D_F PARTITION(PERIOD_ID_M)
+SELECT start_date, -- 日期
+	   site_code , -- 基地编码
+	   work_shop_code, -- 车间编码
+	   product_line_code , -- 产线编码
+	   work_no_code , -- 工序编码
+	   cost_center_code , -- 成本中心编码
+	   material_consume_amt, --  物耗金额
+	   'N' AS del_flag , -- 删除数据标识
+	   CURRENT_TIMESTAMP() AS dw_last_update_date , -- 同步数据时间
+	   NVL(PERIOD_ID_M,SUBSTRING(START_DATE,1,7)) AS PERIOD_ID_M -- 分区字段
+FROM result_data;

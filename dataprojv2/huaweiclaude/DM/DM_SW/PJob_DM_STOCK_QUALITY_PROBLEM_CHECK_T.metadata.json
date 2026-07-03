@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_STOCK_QUALITY_PROBLEM_CHECK_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm_sw"
+}

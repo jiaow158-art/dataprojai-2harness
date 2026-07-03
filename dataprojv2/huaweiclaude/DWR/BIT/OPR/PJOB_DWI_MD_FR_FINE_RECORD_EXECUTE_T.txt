@@ -1,0 +1,103 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：finereport执行日志表
+-- create time: 2022/09/26 17:11:28 GMT+08:00
+-- update from huangwenbin 2025-01-07 新增字段：员工姓名、员工工号
+-- update from huangwenbin 2025-01-07 新增字段：模板编码
+-- update from huangwenbin 2025-07-07 新增字段：访问终端、终端类型、报表分类、是否企业微信操作
+-- update from huangwenbin 2025-07-07 处理访问终端存在的一些特殊数据
+-- update from huangwenbin 2025-07-09 处理数据中心调度作业的tname对应不是模板路径问题
+-- update from huangwenbin 2025-07-09 增加字段：推送任务名称
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_FR_FINE_RECORD_EXECUTE_T
+SELECT 
+ a.uuid
+,a.id
+,a.tname as tname
+,a.displayname
+,a.type
+,a.param
+,a.ip
+,a.username
+,a.userrole
+,a.consume
+,a.begin_time
+,a.sql_text
+,a.sqltime
+,a.browser
+,a.memory
+,a.reportid
+,a.userid
+,a.complete
+,a.source
+,a.sessionid
+,a.node
+,a.error
+,a.webinfo
+,a.lastmod
+,a.detail
+,CURRENT_TIMESTAMP() AS dw_last_update_date
+,'N' AS DEL_FLAG
+,split(replace(replace(a.username,'(',';'),')',''),';')[0] as emp_name
+,split(replace(replace(a.username,'(',';'),')',''),';')[1] as emp_num
+,CASE WHEN SUBSTR(SPLIT(COALESCE(b.tname,a.tname),'/')[LENGTH(COALESCE(b.tname,a.tname)) - LENGTH(REPLACE(COALESCE(b.tname,a.tname),'/',''))],1,1) = 'M'
+	  THEN SUBSTR(SPLIT(COALESCE(b.tname,a.tname),'/')[LENGTH(COALESCE(b.tname,a.tname)) - LENGTH(REPLACE(COALESCE(b.tname,a.tname),'/',''))],1,6)
+      WHEN SUBSTR(SPLIT(COALESCE(b.tname,a.tname),'/')[LENGTH(COALESCE(b.tname,a.tname)) - LENGTH(REPLACE(COALESCE(b.tname,a.tname),'/',''))],1,1) IN('F','S','P','H')
+	  THEN SUBSTR(SPLIT(COALESCE(b.tname,a.tname),'/')[LENGTH(COALESCE(b.tname,a.tname)) - LENGTH(REPLACE(COALESCE(b.tname,a.tname),'/',''))],1,5)
+	   END AS TEMPL_CODE --模板编码
+,case when split(REPLACE(split(split(replace(a.browser,'(','@@@@'),'5.0 @@@@')[1],';')[0],')','@@@@'),'@@@@')[0] in('x11','x11 ') 
+      then 'linux'
+	  else split(REPLACE(split(split(replace(a.browser,'(','@@@@'),'5.0 @@@@')[1],';')[0],')','@@@@'),'@@@@')[0]
+       end as visit_TRML --访问终端
+,case when substr(split(split(replace(a.browser,'(','@@@@'),'5.0 @@@@')[1],';')[0],1,3) in('win','mac')
+then 'PC端' else '移动端' end TRML_TYPE_NAME --终端类型
+,case when SPLIT(a.tname,'/')[0] = 'schedule' then '推送' else '报表' end RPT_TYPE_NAME --报表分类
+,case when a.browser like '%wxwork%' then '是' else '否' end is_qywx --是否企业微信操作
+,SPLIT(a.tname,'/')[1] as task_name --推送任务名称
+FROM SDI.SDI_FR_FINE_RECORD_EXECUTE_1035 a
+left join(select reportid
+                ,tname
+				,ROW_NUMBER() over(partition by reportid order by begin_time desc) as rn
+            from SDI.SDI_FR_FINE_RECORD_EXECUTE_1035
+		   where tname like '%/PC端%' or tname like '%/MOBILE%'
+		     and reportid not in('0f654cdd-ddd3-46d3-832b-841dfeaa21ca'
+                                 ,'26bb70d4-8dee-49d4-84b5-8b74abc84361'
+                                 ,'6c56c0b9-3bbf-4ab7-bf3f-69a08623e009'
+                                 ,'a1ca3859-919a-4c93-b554-199c8dbf275e')
+		   
+		  union all 
+		  
+		  select '0f654cdd-ddd3-46d3-832b-841dfeaa21ca' as reportid
+		        ,'PC端/瓷砖事业部/研销/区域业绩日报/SA058-业绩日报（组织维度KPI口径）.cpt' as tname
+				,1 as rn
+		    from dm.dm_dim_date_d
+		   where day_id = '20250709'
+		   
+		  union all
+
+          select '26bb70d4-8dee-49d4-84b5-8b74abc84361' as reportid
+		        ,'PC端/瓷砖事业部/研销/区域业绩日报/SA280瓷砖事业部经营日报Q4冲刺.cpt' as tname
+				,1 as rn
+		    from dm.dm_dim_date_d
+		   where day_id = '20250709'
+           
+		  union all
+
+          select '6c56c0b9-3bbf-4ab7-bf3f-69a08623e009' as reportid
+		        ,'PC端/瓷砖事业部/研销/区域业绩日报/SA280瓷砖事业部经营日报Q4冲刺.cpt' as tname
+				,1 as rn
+		    from dm.dm_dim_date_d
+		   where day_id = '20250709'
+
+          union all
+
+          select 'a1ca3859-919a-4c93-b554-199c8dbf275e' as reportid
+		        ,'PC端/瓷砖事业部/研销/区域业绩日报/SA273瓷砖事业部产销存日报.cpt' as tname
+				,1 as rn
+		    from dm.dm_dim_date_d
+		   where day_id = '20250709'		  
+         ) b 
+  on a.reportid = b.reportid
+ and a.tname like 'schedule%'
+ and b.rn = 1

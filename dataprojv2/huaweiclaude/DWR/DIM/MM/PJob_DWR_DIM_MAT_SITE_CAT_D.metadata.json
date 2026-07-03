@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_MAT_SITE_CAT_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/MM",
+    "description": "基地物料品类主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

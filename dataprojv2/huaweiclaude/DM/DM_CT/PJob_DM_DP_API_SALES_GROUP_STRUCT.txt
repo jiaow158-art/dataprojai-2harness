@@ -1,0 +1,62 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/10/23 13:38:16 GMT+08:00
+-- 20231023 杨俊华  子公司不用下沉营销部；区域运营中心下 云南子公司和历史线组过滤掉；零售部下沉至销区
+-- 20231123 覃永健  工程市场中心下沉至商机资源开发部 + 幕墙工程中心 + 战略工程中心
+-- 20240725 覃永健  商机资源开发部编码调整
+-- ******************************************************************** --
+WITH
+	tem AS (
+		SELECT
+			node_name10 AS sales_grp, --线组
+			CASE
+				WHEN b.node_name4 IN ('H04230600', 'H04230655') THEN b.node_name5 --子公司和运营中心
+				WHEN b.node_name5 in ('H05240601') then 'Z033' --工程市场中心-商机资源开发部继续使用Z33编码
+				WHEN b.node_name5 in ('Z031','H05230609') then b.node_name5 --工程市场中心
+				WHEN b.node_name3 IN ('H03230617') THEN b.node_name3 --国际营销
+				WHEN b.node_name3 IN ('H03230628') THEN b.node_name3 --梦之家
+			END sales_center_code, -- 业务部门代码
+			CASE
+				WHEN b.node_name4 IN ('H04230600', 'H04230655') THEN b.node_desc5 --子公司和运营中心
+				WHEN b.node_name5 in ('H05240601', 'Z031','H05230609') then b.node_desc5  --工程市场中心：商机资源开发部 + 幕墙工程中心 + 战略工程中心
+				WHEN b.node_name3 IN ('H03230617') THEN b.node_desc3 --国际营销
+				WHEN b.node_name3 IN ('H03230628') THEN b.node_desc3 --梦之家
+			END sales_center, -- 业务部门
+			CASE
+				WHEN b.node_name4 IN ('H04230600') THEN b.node_name6
+			END sales_dep_code, -- 营销部代码
+			CASE
+				WHEN b.node_name4 IN ('H04230600') THEN b.node_desc6
+			END sales_dep, -- 营销部
+			CASE
+				WHEN b.node_name4 IN ('H04230600')  THEN b.node_name7
+			END sales_region_code, -- 销区代码
+			CASE
+				WHEN b.node_name4 IN ('H04230600')  THEN b.node_desc7
+			END sales_region, -- 销区
+			CURRENT_TIMESTAMP () AS dw_last_update_date
+		FROM
+			dm.dm_rpt_sales_group_t b
+		WHERE
+			node_name2 = 'H11000001'
+	)
+INSERT
+	OVERWRITE TABLE dm.dm_dp_api_sales_group_struct
+SELECT DISTINCT
+	sales_grp, --线组
+	sales_center_code, -- 业务部门代码
+	sales_center, -- 业务部门
+	sales_dep_code, -- 营销部代码
+	sales_dep, -- 营销部
+	sales_region_code, -- 销区代码
+	sales_region, -- 销区
+	dw_last_update_date
+FROM
+	tem
+WHERE
+	sales_center_code IS NOT NULL
+AND coalesce(sales_dep,'') not like '%云南子公司%'   -- 云南子公司和历史线组过滤掉
+AND coalesce(sales_dep,'') not like '%线组%'
+ORDER BY
+	sales_center_code

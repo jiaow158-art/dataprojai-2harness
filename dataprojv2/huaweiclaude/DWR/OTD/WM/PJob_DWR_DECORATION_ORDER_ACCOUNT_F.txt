@@ -1,0 +1,63 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2024/07/30 17:38:33 GMT+08:00
+-- update from huangwenbin 2024-12-10 增加状态描述=退回
+-- ******************************************************************** --
+insert overwrite table dwrotd.dwr_decoration_order_account_f
+select 
+    h.distributor_code, -- 服务商编码
+    h.distributor_name, -- 服务商名称
+    h.account_code, -- 核算单号
+    h.account_annual, -- 核算年度
+    case h.account_quarter 
+        when 'one' then '第一季度' 
+        when 'two' then '第二季度' 
+        when 'three' then '第三季度' 
+        when 'four' then '第四季度' 
+    end account_quarter , -- 核算季度
+    case h.order_account_status 
+        when 'draft' then '草稿' 
+        when 'cancel' then '作废' 
+        when 'business_review' then '业务审核' 
+        when 'financial_review' then '财务审核' 
+        when 'approved' then '审核通过' 
+        when 'reject' then '退回' 
+    end order_account_status , -- 状态
+    crt_user.user_full_name, -- 创建人
+    h.creation_date, -- 创建时间
+    l.product_code decoration_code , -- 装企编码
+    l.product_name decoration_name, -- 装企名称
+    l.head_enterprise_code, -- 所属头部编码
+    l.head_enterprise_name, -- 所属头部名称
+    l.product_code, -- 产品编码
+    l.product_name, -- 产品名称
+    l.size, -- 尺寸
+    if(l.main_menu = 'Y', '是', '否') as main_menu , -- 主菜单
+    l.sale_price, -- 销售单价(片)
+    l.subsidy_ratio, -- 补贴比例
+    case l.ratio_status 
+        when 'APPROVED' then '待审核' 
+        when 'PASS' then '已审核' 
+    end ratio_status , -- 比例审核
+    l.subsidy_after_price, -- 补贴后价格
+    l.delivery_price, -- 量价
+    case l.order_type 
+        when 'sale_inventory' then '销售出库' 
+        when 'sale_return_inventory' then '退货入库' 
+    end order_type , -- 订单类型
+    l.sale_qty, -- 销售数量
+    l.available_delivery_qty, -- 可用提货数量
+    l.apply_qty, -- 申请数量
+    l.review_qty, -- 复核数量
+    l.subsidy_price, -- 补贴单价
+    l.subsidy_amount, -- 补贴金额
+    l.DBS_code, -- DBS单号
+    l.supply_list_flag -- 是否按供货清单销售
+    , CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+from 
+    sdi.sdi_dtac_order_account_headers_1031 h
+left join 
+    sdi.sdi_dtac_order_account_line_1031 l on h.header_id = l.header_id
+left join 
+    sdi.sdi_base_users_1029 crt_user on h.created_by = crt_user.user_id

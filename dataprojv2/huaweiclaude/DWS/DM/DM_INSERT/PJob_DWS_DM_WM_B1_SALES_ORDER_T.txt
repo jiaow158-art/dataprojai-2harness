@@ -1,0 +1,412 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/06/20 15:12:16 GMT+08:00
+-- UPDATE FROM CHENZHIYONG 2023-06-09 新增客编逻辑
+-- UPDATE FROM CHENZHIYONG 2023-07-06 调整客编逻辑，所有都用客编关联
+-- UPDATE FROM CHENZHIYONG 2023-08-02 调整卫浴客编逻辑
+-- update from chenzhiyong 2024-01-22 新增store_code
+-- update from huangwenbin 2024-08-13 杭州东箭在2023-10-18换过子母客编，故2023-10-18以前的订单写死经销商编码与经销商名称为310549
+-- update from huangwenbin 2024-10-23 新增字段：统计日期
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_WM_B1_SALES_ORDER_T;
+
+INSERT INTO DM.DM_WM_B1_SALES_ORDER_T(
+CUSTOMER_TYPE
+,DEALER_CODE
+,DEALER_NAME
+,OUT_RETURN_GOODS
+,DOC_NUM
+,CUST_CODE
+,CUST_NAME_CN
+,CHANNEL_NAME_CN
+,CUST_ADDRESS
+,DOC_DATE
+,MATERIAL_NUM
+,MATERIAL_NAME
+,MATL_GROUP_CODE
+,MATL_GROUP_NAME
+,EXTERNAL_MATL_GROUP_CODE
+,EXTERNAL_MATL_GROUP_NAME
+,MATL_TYPE_CODE
+,MATL_TYPE_NAME
+,PRODUCT_GROUP_CODE
+,PRODUCT_GROUP_NAME
+,PRODUCT_CLASSIFY_CODE
+,PRODUCT_CLASSIFY_NAME
+,PRODUCT_LEVEL_CODE
+,PRODUCT_LEVEL_NAME
+,PRODUCT_LEVEL1_CODE
+,PRODUCT_LEVEL1_NAME
+,PRODUCT_LEVEL2_CODE
+,PRODUCT_LEVEL2_NAME
+,PRODUCT_LEVEL3_CODE
+,PRODUCT_LEVEL3_NAME
+,PRODUCT_LEVEL4_CODE
+,PRODUCT_LEVEL4_NAME
+,MATL_GROUP1_CODE
+,MATL_GROUP2_CODE
+,MATL_GROUP3_CODE
+,MATL_GROUP4_CODE
+,MATL_GROUP5_CODE
+,PRODUCT_STATUS
+,MATERIAL_QTY
+,BATCH_NUM
+,PRICE
+,LINE_TOTAL_AMT
+,UNIT
+,BAR_CODE
+,DISCOUNT_PRICE_AGO_AMT
+,DISCOUNT_PRICE_AMT
+,COST_PRICE_AMT
+,COST_TOTAL_AMT
+,GROSS_PROFIT_AMT
+,NO_CLEAR_QTY
+,LINE_NUM
+,WM_NAME
+,BATCH_NUM_STOCK
+,GROUP_NAME
+,B1_MATERIAL_GROUP_NAME
+,CUST_FROM
+,BILL_ADDRESS
+,CLOUD_ORDER_FLAG
+,DW_LAST_UPDATE_DATE
+,DEALER_AREA
+,MATERIAL_ID
+,MATERIAL_TYPE
+,PRODUCT_CLASS
+,ANALYZE_PRODUCT_CLASS
+,CUR_MATERIAL_ID
+,CUR_MATERIAL_NAME
+,CUR_MATL_GROUP_CODE
+,CUR_MATL_GROUP_NAME
+,CUR_EXTERNAL_MATL_GROUP_CODE
+,CUR_EXTERNAL_MATL_GROUP_NAME
+,CUR_MATL_TYPE_CODE
+,CUR_MATL_TYPE_NAME
+,CUR_PRODUCT_GROUP_CODE
+,CUR_PRODUCT_GROUP_NAME
+,CUR_PRODUCT_CLASSIFY_CODE
+,CUR_PRODUCT_CLASSIFY_NAME
+,CUR_PRODUCT_LEVEL_CODE
+,CUR_PRODUCT_LEVEL_NAME
+,CUR_PRODUCT_LEVEL1_CODE
+,CUR_PRODUCT_LEVEL1_NAME
+,CUR_PRODUCT_LEVEL2_CODE
+,CUR_PRODUCT_LEVEL2_NAME
+,CUR_PRODUCT_LEVEL3_CODE
+,CUR_PRODUCT_LEVEL3_NAME
+,CUR_PRODUCT_LEVEL4_CODE
+,CUR_PRODUCT_LEVEL4_NAME
+,CUST_BYNAME --客户别名
+,IS_SW --是否卫浴物料
+,CLOUD_ORDER_ID --云订货单号
+,STORE_CODE -- 门店编码
+,STAT_DATE
+,activity_code  --  活动编码
+,activity_name  --  活动名称 
+,WhsCode
+)
+with tem as  (
+select customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+         --dealer_code,     -- 经销商编码
+         case when length(dealer_code) < 10 then concat('0000',dealer_code) else dealer_code end AS dealer_code,
+         out_return_goods,	--出退货 
+	     doc_num, 			--单号
+ 	     cust_code,			--客户编码
+ 	     cust_name_cn,			--客户名称
+ 	     channel_name_cn, 		--渠道
+ 	     cust_address,		--客户地址
+ 	     doc_date,			--单据日期       
+         material_num, 				--物料编码
+         material_name,			--物料描述
+	     matl_group_code, --物料组代码
+	     matl_group_name, 		--物料组名称
+	     external_matl_group_code, -- 外部物料组
+	     external_matl_group_name, -- 外部物料组名称
+         matl_type_code   , -- 物料类型
+  	     matl_type_name   , --物料类型名称
+         product_group_code  ,-- 产品组
+  	     product_group_name  , --产品组名称 
+         product_classify_code  ,-- 产品分级
+         product_classify_name  ,-- 产品分级名称
+         product_level_code ,--  '产品层次' 
+         product_level_name ,--  '产品层次名称' 
+  	     product_level1_code,--   '产品层次1' 
+         product_level1_name,--   '产品层次1名称' 
+         product_level2_code,--   '产品层次2' 
+         product_level2_name,--   '产品层次2名称' 
+         product_level3_code,--   '产品层次3' 
+         product_level3_name,--   '产品层次3名称'
+         product_level4_code,--   '产品层次4'
+         product_level4_name,--   '产品层次4名称' 
+	     material_qty,				--数量
+	     batch_num,			--批次
+	     Price,					--单价
+	     line_total_amt,				--行合计
+	     unit,				--单位
+	     bar_code,				--条形码
+	     discount_price_ago_amt,			--折扣前价格
+	     discount_price_amt,			--折扣
+	     cost_price_amt,			--成本价
+	     cost_total_amt,	--成本合计
+	     gross_profit_amt,				--毛利
+	     no_clear_qty,					--未清数量
+	     line_num,					--行号
+	     wm_name,				-- 仓库
+	     batch_num_stock,		-- 批次库存
+         group_name,					--客户组
+         b1_material_group_name,					--物料组
+	     cust_from,				-- 客户来源
+	     bill_Address,				-- 单据地址
+	     cloud_order_flag,					-- 云订货下单标识
+	     DW_LAST_UPDATE_DATE, -- 数据同步时间
+	     MATERIAL_ID, -- 物料代理键
+		 CLOUD_ORDER_ID, --云订货单号
+		 store_code, -- 门店编码
+		 activity_code,  --  活动编码
+        activity_name,  --  活动名称 
+        WhsCode
+    from DWROTD.DWR_WM_B1_SALES_ORDER_F
+   where substr(doc_date,1,10) >= '2022-05-01'
+     and customer_type = 'SW'
+     and (CUST_NAME_CN not like '%测试%' or CUST_NAME_CN is null)
+
+union all
+
+SELECT 
+	   'SW' as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       t3.CUST_CODE as dealer_code,     -- 经销商编码
+       t1."出退货" as out_return_goods,	--出退货 
+	   CAST(t1."单据编号" AS VARCHAR)  as doc_num, 			--单号
+ 	   t1."客户编号" as cust_code,			--客户编码
+ 	   t1."客户名称" as cust_name_cn,			--客户名称
+ 	   t1.dj_channel as channel_name_cn, 		--渠道
+ 	   t1."地址" as cust_address,		--客户地址
+ 	   cast(t1."单据日期" as timestamp) as doc_date,			--单据日期       
+       t1."商品编号" as material_num, 				--物料编码
+       t1."商品描述" as material_name,			--物料描述
+	   T2.matl_group_code, --物料组代码
+	   T2.matl_group_name, 		--物料组名称
+	   T2.external_matl_group_code, -- 外部物料组
+	   T2.external_matl_group_name, -- 外部物料组名称
+       T2.matl_type_code   , -- 物料类型
+  	   T2.matl_type_name   , --物料类型名称
+       T2.product_group_code  ,-- 产品组
+  	   T2.product_group_name  , --产品组名称 
+       T2.product_classify_code  ,-- 产品分级
+       T2.product_classify_name  ,-- 产品分级名称
+       T2.product_level_code ,--  '产品层次' 
+       T2.product_level_name ,--  '产品层次名称' 
+  	   T2.product_level1_code,--   '产品层次1' 
+       T2.product_level1_name,--   '产品层次1名称' 
+       T2.product_level2_code,--   '产品层次2' 
+       T2.product_level2_name,--   '产品层次2名称' 
+       T2.product_level3_code,--   '产品层次3' 
+       T2.product_level3_name,--   '产品层次3名称'
+       T2.product_level4_code,--   '产品层次4'
+       T2.product_level4_name,--   '产品层次4名称' 
+	   t1."数量" as material_qty,				--数量
+	   t1."批次" as batch_num,			--批次
+	   t1."单价" as Price,					--单价
+	   t1."行合计" as line_total_amt,				--行合计
+	   t1."单位" as unit,				--单位
+	   t1."条形码" as bar_code,				--条形码
+	   cast(case when t1."折扣前" in('龙头','运费','蹲便器','花洒','盆','淋浴房类','浴室家具','智能坐便器','普通坐便器','小便器','分体挂墙式水箱','其它类') then '0' else t1."折扣前"
+	            end as numeric(38,10)) as discount_price_ago_amt,			--折扣前价格
+	   t1."折扣率" as discount_price_amt,			--折扣
+	   t1."成本价" as cost_price_amt,			--成本价
+	   t1."成本总额" as cost_total_amt,	--成本合计
+	   t1."毛利" as gross_profit_amt,				--毛利
+	   t1."未清数量" as no_clear_qty,					--未清数量
+	   cast(cast(t1."行号" as numeric) as int) as line_num,					--行号
+	   t1."仓库" as wm_name,				-- 仓库
+	   t1."分仓库存" as batch_num_stock,		-- 批次库存
+       t1."客户组" as group_name,					--客户组
+       t1."物料组名称" as b1_material_group_name,					--物料组
+	   t1."客户来源" as cust_from,				-- 客户来源
+	   t1."单据地址" as bill_Address,				-- 单据地址
+	   t1."云订货下单" as cloud_order_flag,					-- 云订货下单标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   T2.MATERIAL_ID, -- 物料代理键
+	   T1.CLOUD_ORDER_ID AS CLOUD_ORDER_ID, --云订货单号
+	   '' as store_code, -- 门店编码
+	   null	 activity_code,  --  活动编码
+       null  activity_name,   --  活动名称 
+       null as WhsCode
+FROM upload.upload_wm_b1_sales_order_t T1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T_HIS T2
+ON t1."商品编号" = T2.material_num
+AND substring(cast(T1."单据日期" as varchar),1,10) >= T2.start_date
+AND substring(cast(T1."单据日期" as varchar),1,10) < T2.END_DATE
+LEFT JOIN (select case when length(cust_code) < 10 then concat('0000',cust_code) else cust_code end as cust_code,
+                  abbreviation
+             from UPLOAD.UPLOAD_B1_CUSTOMER_DATA_T
+            where is_main = '是'
+		  ) T3
+--on t1."运营中心" = T3.ABBREVIATION
+on case when length(t1."运营中心") < 10 then concat('0000',t1."运营中心") else "运营中心" end = T3.cust_code
+where (t1."客户名称" not like '%测试%' or t1."客户名称" is null)
+)
+
+SELECT A.CUSTOMER_TYPE
+      ,CASE WHEN A.DEALER_CODE = '0000310549' AND SUBSTR(A.DOC_DATE,1,10) <= '2023-10-18' THEN '310549'
+	        ELSE BB.CUST_CODE
+			 END AS DEALER_CODE
+	  --,B.COMPANY_NAME AS DEALER_NAME
+      ,CASE WHEN A.DEALER_CODE = '0000310549' AND SUBSTR(A.DOC_DATE,1,10) <= '2023-10-18' THEN '温州市鸿联建材连锁有限公司'
+	        ELSE BB.COMPANY_NAME
+			 END AS DEALER_NAME
+      ,A.OUT_RETURN_GOODS
+      ,A.DOC_NUM
+      ,A.CUST_CODE
+      ,A.CUST_NAME_CN
+	  --RTM渠道与B1的渠道合并
+      ,CASE WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN = '经销渠道' THEN '零售'
+	        WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN IN('零售','零售渠道') THEN '直营'
+			WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN = '直营零售' THEN '直营'
+		    WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN = '流通渠道' THEN '流通'
+	        WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN = '家装渠道' THEN '家装'					
+		    WHEN SUBSTR(A.DOC_NUM,1,2) IN('TR','CK') AND A.CHANNEL_NAME_CN = '工程渠道' THEN '工程'				
+			ELSE A.CHANNEL_NAME_CN
+			 END AS CHANNEL_NAME_CN
+      ,A.CUST_ADDRESS
+      ,A.DOC_DATE
+      ,A.MATERIAL_NUM
+      ,A.MATERIAL_NAME
+      ,A.MATL_GROUP_CODE
+      ,A.MATL_GROUP_NAME
+      ,A.EXTERNAL_MATL_GROUP_CODE
+      ,A.EXTERNAL_MATL_GROUP_NAME
+      ,A.MATL_TYPE_CODE
+      ,A.MATL_TYPE_NAME
+      ,A.PRODUCT_GROUP_CODE
+      ,A.PRODUCT_GROUP_NAME
+      ,A.PRODUCT_CLASSIFY_CODE
+      ,A.PRODUCT_CLASSIFY_NAME
+      ,A.PRODUCT_LEVEL_CODE
+      ,A.PRODUCT_LEVEL_NAME
+      ,A.PRODUCT_LEVEL1_CODE
+      ,A.PRODUCT_LEVEL1_NAME
+      ,A.PRODUCT_LEVEL2_CODE
+      ,A.PRODUCT_LEVEL2_NAME
+      ,A.PRODUCT_LEVEL3_CODE
+      ,A.PRODUCT_LEVEL3_NAME
+      ,A.PRODUCT_LEVEL4_CODE
+      ,A.PRODUCT_LEVEL4_NAME
+	  ,C.MATL_GROUP1_CODE
+	  ,C.MATL_GROUP2_CODE
+	  ,C.MATL_GROUP3_CODE
+	  ,C.MATL_GROUP4_CODE
+	  ,C.MATL_GROUP5_CODE
+	  ,CASE WHEN D.MAIN_PUSH = '主推' THEN '主推'
+	        WHEN D.MAIN_PUSH = '主销' THEN '主销'
+	        WHEN D.MATERIAL_CODE IS NOT NULL THEN '要货有货'
+			WHEN C.MATL_GROUP2_CODE IN('J7','J8') THEN '淘汰'
+			WHEN C.MATL_GROUP3_CODE IN('TT','YT') THEN '淘汰'
+			 END AS PRODUCT_STATUS
+      ,A.MATERIAL_QTY
+      ,A.BATCH_NUM
+      ,A.PRICE
+      ,A.LINE_TOTAL_AMT
+      ,A.UNIT
+      ,A.BAR_CODE
+      ,A.DISCOUNT_PRICE_AGO_AMT
+      ,A.DISCOUNT_PRICE_AMT
+      ,A.COST_PRICE_AMT
+      ,A.COST_TOTAL_AMT
+      ,A.GROSS_PROFIT_AMT
+      ,A.NO_CLEAR_QTY
+      ,A.LINE_NUM
+      ,A.WM_NAME
+      ,A.BATCH_NUM_STOCK
+      ,A.GROUP_NAME
+      ,A.B1_MATERIAL_GROUP_NAME
+      ,A.CUST_FROM
+      ,A.BILL_ADDRESS
+      ,A.CLOUD_ORDER_FLAG
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,G.DEALER_AREA
+	  ,A.MATERIAL_ID
+      ,E.MATERIAL_TYPE
+      ,E.PRODUCT_CLASS
+      ,E.ANALYZE_PRODUCT_CLASS
+	  ,F.MATERIAL_ID AS CUR_MATERIAL_ID
+      ,F.MATERIAL_NAME AS CUR_MATERIAL_NAME
+      ,F.MATL_GROUP_CODE AS CUR_MATL_GROUP_CODE
+      ,F.MATL_GROUP_NAME AS CUR_MATL_GROUP_NAME
+      ,F.EXTERNAL_MATL_GROUP_CODE AS CUR_EXTERNAL_MATL_GROUP_CODE
+      ,F.EXTERNAL_MATL_GROUP_NAME AS CUR_EXTERNAL_MATL_GROUP_NAME
+      ,F.MATL_TYPE_CODE AS CUR_MATL_TYPE_CODE
+      ,F.MATL_TYPE_NAME AS CUR_MATL_TYPE_NAME
+      ,F.PRODUCT_GROUP_CODE AS CUR_PRODUCT_GROUP_CODE
+      ,F.PRODUCT_GROUP_NAME AS CUR_PRODUCT_GROUP_NAME
+      ,F.PRODUCT_CLASSIFY_CODE AS CUR_PRODUCT_CLASSIFY_CODE
+      ,F.PRODUCT_CLASSIFY_NAME AS CUR_PRODUCT_CLASSIFY_NAME
+      ,F.PRODUCT_LEVEL_CODE AS CUR_PRODUCT_LEVEL_CODE
+      ,F.PRODUCT_LEVEL_NAME AS CUR_PRODUCT_LEVEL_NAME
+      ,F.PRODUCT_LEVEL1_CODE AS CUR_PRODUCT_LEVEL1_CODE
+      ,F.PRODUCT_LEVEL1_NAME AS CUR_PRODUCT_LEVEL1_NAME
+      ,F.PRODUCT_LEVEL2_CODE AS CUR_PRODUCT_LEVEL2_CODE
+      ,F.PRODUCT_LEVEL2_NAME AS CUR_PRODUCT_LEVEL2_NAME
+      ,F.PRODUCT_LEVEL3_CODE AS CUR_PRODUCT_LEVEL3_CODE
+      ,F.PRODUCT_LEVEL3_NAME AS CUR_PRODUCT_LEVEL3_NAME
+      ,F.PRODUCT_LEVEL4_CODE AS CUR_PRODUCT_LEVEL4_CODE
+      ,F.PRODUCT_LEVEL4_NAME AS CUR_PRODUCT_LEVEL4_NAME
+	  ,CASE WHEN A.DEALER_CODE = '0000310549' AND SUBSTR(A.DOC_DATE,1,10) <= '2023-10-18' THEN '温州鸿联'
+	        ELSE B.ABBREVIATION
+			 END AS CUST_BYNAME --客户别名
+	  ,CASE WHEN F.MATL_GROUP_CODE  <> '1000010' THEN 1
+	        WHEN F.MATL_GROUP_CODE IS NULL THEN 1
+			ELSE 0
+			 END IS_SW --是否卫浴物料
+      ,A.CLOUD_ORDER_ID --云订货单号			 
+      ,STORE_CODE -- 门店编码
+	  ,SUBSTR(A.DOC_DATE,1,10) AS STAT_DATE --统计日期
+	  ,activity_code  --  活动编码
+    ,activity_name  --  活动名称 
+    ,WhsCode --库存地点
+FROM tem  A
+  LEFT JOIN UPLOAD.UPLOAD_B1_CUSTOMER_DATA_T B
+    ON case when length(A.DEALER_CODE) < 10 then concat('0000',A.DEALER_CODE) else A.DEALER_CODE end
+     = case when length(B.cust_code) < 10 then concat('0000',B.cust_code) else B.cust_code end
+  LEFT JOIN UPLOAD.UPLOAD_B1_CUSTOMER_DATA_T BB
+    ON B.ABBREVIATION = BB.ABBREVIATION
+    --ON B.cust_code = BB.cust_code
+   AND BB.IS_MAIN = '是'
+  LEFT JOIN (SELECT *
+                   ,ROW_NUMBER() OVER(PARTITION BY MATERIAL_NUM ORDER BY CASE WHEN MATL_GROUP2_CODE IS NOT NULL THEN 1 ELSE 0 END DESC, UPDATE_DATE DESC) AS RN
+               FROM DWIMD.DWI_MD_DATA_MATERIAL_SALES_T
+              WHERE END_DATE = '4712-12-31'
+                AND DEL_FLAG = 'N'  
+            ) C
+    ON A.MATERIAL_NUM = C.MATERIAL_NUM
+   AND C.RN = 1
+  LEFT JOIN (SELECT DISTINCT MATERIAL_CODE
+                            ,MAIN_PUSH
+							,START_DATE
+							,END_DATE
+               FROM DWRDIM.DWR_DIM_VM_YHYH_MATERIAL_D
+            ) D
+    ON A.MATERIAL_NUM = D.MATERIAL_CODE
+   AND A.DOC_DATE >= D.START_DATE
+   AND A.DOC_DATE <= D.END_DATE
+  LEFT JOIN UPLOAD.UPLOAD_VM_B1_INV_CATE_MATCH_T E
+    ON A.MATERIAL_NUM = E.MATERIAL_NUM
+  LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T F
+    ON A.MATERIAL_NUM = F.MATERIAL_NUM 	
+   LEFT JOIN (SELECT B.abbreviation
+					--B.cust_code
+				   ,SUM(A.DESIGN_AREA) AS DEALER_AREA
+               FROM DWIMD.DWI_MD_STORE_DATA_T a
+              inner join UPLOAD.UPLOAD_B1_CUSTOMER_DATA_T b
+                 on a.customer_code = b.cust_code
+			  WHERE A.DEL_FLAG = 'N'
+			    AND A.STORE_STATUS = '生效'
+				AND A.OPERATION_TYPE = 'Y'
+				AND (A.STORE_TYPE <> '专卖区'
+				 OR A.STORE_TYPE IS NULL)
+		      GROUP BY B.abbreviation --B.cust_code
+			) G
+		--ON B.cust_code = G.cust_code
+    ON B.abbreviation = G.abbreviation   

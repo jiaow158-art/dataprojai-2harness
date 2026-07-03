@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PAM_HN_BASE_PROD_DAILY_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT/PAM",
+    "description": "湖南产质量分析日报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

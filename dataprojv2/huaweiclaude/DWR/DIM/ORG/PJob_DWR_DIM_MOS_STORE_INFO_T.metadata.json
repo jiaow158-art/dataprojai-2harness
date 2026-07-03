@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_MOS_STORE_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/ORG",
+    "description": "MOS门店主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

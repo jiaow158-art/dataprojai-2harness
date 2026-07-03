@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB40",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "PJob_DWS_DM_NORTH_ZB40",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

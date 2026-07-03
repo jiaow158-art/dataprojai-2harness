@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_CT_MOBILE_STRONG_CUSTOMER_INVENTORY_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "瓷砖移动端强商库存",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

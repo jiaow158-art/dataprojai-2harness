@@ -1,0 +1,61 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/03/01 17:22:23 GMT+08:00
+-- update from chenzhiyong 20230314 限制APS产品品类
+-- update from chenzhiyong 20230320 当产品层次3关联不上，就用产品层2关联
+-- update from chenzhiyong 20230419 新增来源类型字段
+-- update from chenzhiyong 20230420 换一张底表
+-- update from chenzhiyong 20230711 开发数量小于0的，置为0
+-- 总出货明细
+-- ******************************************************************** --
+create or replace view DM_SW.DM_OTD_TOTAL_SALES_OUTGOODS_V AS
+select t1.STAT_MONTH ,-- 年月
+       t1.def_channnel , -- 渠道名称
+       t1.operation_center_code, -- 运中主客编
+       t1.operation_center_name , -- 运中名称
+       t1.area_name , -- 销售大区
+       t1.prod_category_name  , --产品类别
+       t1.material_num, -- 物料编码
+       CASE WHEN T2.matl_group4_code = 'TS' THEN '退市'
+		  ELSE '在市' END AS PROD_STATUS_NAME,    -- 产品状态名称
+       t1.sales_forecast_qty , -- 当月预测需求数
+       CASE WHEN t1.actual_billed_qty < 0 THEN 0
+	   ELSE t1.actual_billed_qty END actual_billed_qty, -- 实际发货数
+       t1.actual_billed_amt,  -- 实际开票金额
+       t1.source_type_name    -- 来源类型名称
+from (
+	  select substring(stat_date_d,1,7) as STAT_MONTH,
+			 t.def_channnel,
+			 t.operation_center_code,
+			 t.operation_center_name,
+			 t.area_name,
+			 t.prod_category_name,
+			 t.material_num,
+			 t.source_type_name,
+			 sum(t.sales_forecast_qty) as sales_forecast_qty , 
+	         sum(t.actual_billed_qty) as actual_billed_qty,
+	         sum(t.actual_billed_amt) as actual_billed_amt
+	  from DM_SW.DM_OTD_SALES_FORECAST_FACT_T t
+	  group by substring(stat_date_d,1,7),
+				 t.def_channnel,
+				 t.operation_center_code,
+				 t.operation_center_name,
+				 t.area_name,
+				 t.prod_category_name,
+				 t.material_num,
+				 t.source_type_name
+) t1
+LEFT JOIN (
+   select material_num,
+		   max(matl_group4_code) as matl_group4_code ,
+		   max(matl_group4_name) as matl_group4_name
+	from dwimd.dwi_md_data_material_sales_t   -- 物料销售
+	group by material_num 
+)T2
+ON t1.material_num = T2.material_num
+JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T3  -- 物料主数据
+ON t1.material_num = T3.material_num
+join DWIMD.DWI_MD_PRODUCT_LEVEL_APS_T T5  -- APS产品品类数据
+on case when T3.product_level3_code = T5.prod_level_code then T3.product_level3_code = T5.prod_level_code
+        else T3.product_level2_code = T5.prod_level_code end;

@@ -1,0 +1,10 @@
+insert overwrite table sdi.sdi_sys_sync_lock_1007
+select 
+id,
+ip_address,
+is_locked,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_sync_lock_1007;

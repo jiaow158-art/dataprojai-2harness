@@ -1,0 +1,25 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/10 11:42:53 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_PS_SELF_MADE_PRODUCTION_AREA_T
+SELECT
+  t1.ID , 
+  t1.BATCH_START , 
+  t1.CREATE_BY , 
+  t1.CREATE_DATE , 
+  t1.ENTERPRISE_CODE , 
+  t1.ENTERPRISE_ID , 
+  t1.INV_ORG_ID , 
+  t1.IS_ENABLE , 
+  t1.IS_PHANTOM , 
+  t1.SYNC_ID , 
+  t1.UPDATE_BY , 
+  t1.UPDATE_DATE ,
+  t1.DEL_FLAG ,
+  CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+  t2.name as product_area_name
+FROM SDI.SDI_SELF_MADE_PRODUCTION_AREA_1007 t1
+LEFT JOIN sdi.sdi_res_enterprise_1007  t2 ON t1.enterprise_id = t2.id
+WHERE t1.DEL_FLAG = 'N';

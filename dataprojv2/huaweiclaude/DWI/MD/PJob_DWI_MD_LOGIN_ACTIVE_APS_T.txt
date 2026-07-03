@@ -1,0 +1,20 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/01 14:44:27 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_LOGIN_ACTIVE_APS_T
+  SELECT ID,
+         TITLE,
+         CONTENT,
+         FRIENDLYCONTENT,
+         PRIVATECONTENT,
+         USERS,
+         MACHINENAME,
+         MODULENAME,
+         TYPE,
+         LOGTIME,
+         DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+    FROM SDI.SDI_AUDITITEM_1007
+   WHERE DEL_FLAG = 'N';

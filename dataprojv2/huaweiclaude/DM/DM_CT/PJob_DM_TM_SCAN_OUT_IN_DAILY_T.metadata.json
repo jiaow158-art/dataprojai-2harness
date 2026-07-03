@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_TM_SCAN_OUT_IN_DAILY_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "条码扫码出入库执行情况日报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

@@ -1,0 +1,29 @@
+insert overwrite table sdi.sdi_job_log_1007
+select 
+id,
+end_time,
+error,
+key,
+message,
+start_time,
+state,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_job_log_1007
+UNION 
+select 
+T1.id,
+T1.end_time,
+T1.error,
+T1.key,
+T1.message,
+T1.start_time,
+T1.state,
+T1.update_date,
+T1.DEL_FLAG,
+T1.DW_LAST_UPDATE_DATE
+from sdi.sdi_job_log_1007 t1 
+left join stg.stg_job_log_1007 t2 
+on T1.ID=T2.ID
+where T2.ID is null;

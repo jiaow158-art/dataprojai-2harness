@@ -1,0 +1,14 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/08/15 15:21:52 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_COUNTRY_NAME_D
+SELECT LANGUAGE_CODE
+      ,GROUP_NUM
+      ,CNTRY_REGION_CODE
+      ,CNTRY_REGION_NAME
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM DWIMD.DWI_MD_COUNTRY_NAME_T
+ WHERE GROUP_NUM = '800'
+;

@@ -1,0 +1,275 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/06/21 17:44:43 GMT+08:00
+-- description:卫浴基地制造成本，注浆数&收坯数
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20230704 修改泥坯--半成品--成品关系逻辑
+-- ******************************************************************** --
+--DROP TABLE IF EXISTS DWIOTD.DWI_PAM_MAT_ACTUAL_ACCEPT_T;
+--CREATE TABLE DWIOTD.DWI_PAM_MAT_ACTUAL_ACCEPT_T AS
+WITH JX_MATERIAL_GROUTING_DATA as( -- 江西基地 注浆数(物料)  
+		select substring(gp.proddate,1,7) as prod_date,    -- 生产日期
+			   gp.FACTORY as factory_code, -- 工厂编码
+		       --gpd.moldsid as mould_code,   -- 模具编号(泥坯)
+		       --c.modelid as material_num, -- 物料编码
+		       t1.material_num, -- 物料编码
+		       sum(gpd.usenum)  actual_Grouting_qty-- 实际注浆数量(同一个泥坯下的物料的注浆数一样)
+		from SDI.SDI_qis_groutingplan_1011 gp  -- 注浆计划
+		left join SDI.SDI_qis_groutingplandel_1011 gpd -- 注浆计划子表
+		on gp.uuid = gpd.planno  
+		left join SDI.SDI_qis_mud_1011 b  -- 泥坯
+		on gpd.moldsid =b.mudid 
+		and b.status<>'9'
+		left join SDI.SDI_PRODUCTMODEL_1011 c  -- 产品模型
+		on gpd.moldsid = c.mudid
+		left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t1 -- 生产BOM关系数据
+		on gp.FACTORY = t1.factory_code
+		and c.modelid = t1.small_material_num
+		where gp.status <> '9' 
+		and gp.Prodstatus='0' 
+		AND gp.FACTORY IN ('3200','3202')  
+		AND gpd.attribute = '正常'  
+		AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15')  
+		AND gp.proddate between '2022-06-01' and '${PERIOD_ID_D}'  -- 传当天
+		group by substring(gp.proddate,1,7),
+		         gp.FACTORY,
+				-- gpd.moldsid ,
+				-- c.modelid
+				t1.material_num -- 物料编码
+),
+JX_MATERIAL_ACTUAL_DATA as( -- 江西 物料收坯数
+	select substring(t1.in_stock_date,1,7) as prod_date, -- 生产日期
+		   t1.factory_code, -- 工厂编码
+		   --t1.mould_code as mould_code,   -- 模具编号(泥坯)
+		   --t2.modelid as material_num, -- 物料编码
+		   t3.material_num, -- 物料编码
+		   sum(t1.in_stock_qty) as in_stock_qty -- 收坯数
+	from(
+			select a.indate as in_stock_date , -- 入库日期
+			       a.FACTORY as factory_code,
+			       a.producttype as mould_code,  -- 泥坯型号
+			       sum(a.innum) as in_stock_qty   -- 入库数量
+			from SDI.SDI_qis_modifyoffline_1011 a   -- 改洗下线记录表（即入库条码）
+			left join SDI.SDI_QIS_GROUTINGPLAN_BARCODE_1011 c   -- 注浆条码列表
+			on a.barcode=c.barcode 
+			and c.status<>'9'
+			left join sdi.sdi_qis_mud_1011 b  -- 泥坯
+			on a.producttype =b.mudid 
+			and b.status<>'9'
+			left join SDI.SDI_QIS_GROUTINGLINE_1011 gl   -- 注浆线
+			on a.produceline=gl.LINENO 
+			and gl.status <> '9' 
+			and gl.factoryid = a.factory
+			where a.status<>'9' 
+			and (a.isabnormal='00000' or (a.gbgrade='1' and a.is_gb='0') )
+			and not exists (
+			  select 1 from SDI.SDI_QIS_REPEATCODE_1011 re  -- 重贴条码
+			  where re.code= a.barcode and re.status <>'9' 
+			  )
+			AND a.FACTORY IN ('3200') 
+			AND a.productproperty = 'AAAAA'  
+			AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15') 
+			AND a.indate between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+			group by a.indate,
+			         a.FACTORY ,
+			         a.producttype 
+			union all
+			select d.cjdate AS IN_STOCK_DATE, -- 入库日期
+			       a.FACTORY as factory_code, -- 工厂编码
+			       a.producttype as mould_code,  -- 泥坯型号
+			       -sum(case when d.uuid is not null then 1 else 0 end) as in_stock_qty   -- 入库数量
+			from SDI.SDI_QIS_REBACKLINK_1011 d    -- 跨部门报废
+			left join SDI.SDI_qis_modifyoffline_1011 a   -- 改洗下线记录表（即入库条码）
+			on d.code=a.barcode 
+			and a.status<>'9'
+			left join SDI.SDI_qis_mud_1011 b       -- 泥坯
+			on a.producttype =b.mudid 
+			and b.status<>'9'
+			left join SDI.SDI_qis_groutingplan_barcode_1011 c   -- 注浆条码列表
+			on a.barcode=c.barcode 
+			and c.status<>'9'
+			where   d.status<>'9' 
+			and d.acceptid like 'ZJ%'
+			and d.STATUS ='2'
+			and d.link in ('010203','010204','釉坯装车','装车')
+			AND a.FACTORY IN ('3200')   
+			AND a.productproperty = 'AAAAA'
+			 AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15') 
+			 AND d.cjdate between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+			 group by d.cjdate,
+			          a.FACTORY,
+			          a.producttype  
+	    )t1
+	    left join SDI.SDI_PRODUCTMODEL_1011 t2  -- 产品模型
+		on t1.mould_code = t2.mudid
+		left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t3 -- 生产BOM关系数据
+		on t1.factory_code = t3.factory_code
+		and t2.modelid = t3.small_material_num
+		group by substring(t1.in_stock_date,1,7),
+				 t1.factory_code,
+				 --t1.mould_code,
+			     --t2.modelid
+			     t3.material_num
+),
+jx_actual_accept_data as(  -- 江西 实际收坯数据
+	SELECT t1.prod_date,
+	       t1.factory_code,
+	       t1.material_num,
+	       t1.actual_Grouting_qty,
+	       t2.in_stock_qty
+	FROM JX_MATERIAL_GROUTING_DATA  T1
+	LEFT JOIN JX_MATERIAL_ACTUAL_DATA T2
+	ON t1.prod_date = t2.prod_date
+	AND t1.factory_code = t2.factory_code
+	AND t1.material_num = t2.material_num
+),
+jm_zj_data_detail as( -- 江门 注浆明细数据(jm_np_fact_num) 
+	select substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS prod_date,  -- 生产日期
+	       a.jm_factory_code as factory_code, -- 工厂编码
+		   --a.jm_np_code,   -- 泥坯编码
+		   --c.jm_code as material_num, -- 物料编码
+		   t1.material_num, -- 物料编码
+		  sum(a.jm_np_fact_num) as actual_Grouting_qty -- 模具实际数量     注浆数量
+	from SDI.SDI_jm_t_wy_zj_plan_detail_1038 a -- 注浆计划产品明细
+	join SDI.SDI_jm_t_wy_zj_plan_1038 b -- 注浆计划
+	on b.jm_uuid=a.jm_main_id   
+	left join SDI.sdi_jm_t_wy_base_gc_1038 c
+	on a.jm_np_code = c.jm_np_code
+	left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t1 -- 生产BOM关系数据
+	on a.jm_factory_code = t1.factory_code
+	and c.jm_code = t1.small_material_num
+	where a.jm_is_del=0 
+	and b.jm_is_del=0
+	and c.jm_is_del = 0
+	and substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+	group by substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) ,
+	         a.jm_factory_code,
+			 --a.jm_np_code,
+			 --c.jm_code	 
+			 t1.material_num -- 物料编码
+),
+jm_actual_data_detail as(   -- 江门 实收数
+	select t.STAT_DATE as prod_date,
+	       t.jm_factory_code as factory_code ,
+	      -- t.jm_np_code as np_code,
+	     --  t1.jm_code as material_num,
+	      t2.material_num,
+	       sum(t.jm_hg_qty) as jm_hg_qty
+	from(
+		-- 普通半检
+		select substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE, -- 评级日期
+		       a.jm_factory_code,
+			   a.jm_np_code,  -- JM_NP_CODE
+			   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty -- 是否合格('1:合格 2:返修') JM_GX_HG
+		from SDI.SDI_jm_t_gx_online_1038 a -- 改洗上线检验
+		where a.jm_is_del=0   
+		and a.jm_is_judge=1  
+		and a.JM_IS_COMPLEMENT =0 
+		and substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+				 a.jm_factory_code,
+				 a.jm_np_code
+		union all
+		-- 高压半检
+		select  substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE,
+		        a.jm_factory_code,
+				a.jm_np_code,
+				sum(case when a.jm_is_standard=1 then 1 else 0 end ) jm_hg_num
+		from SDI.SDI_JM_T_GY_PJ_1038 a 
+		left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 b
+		on a.jm_uuid=b.jm_gx_id
+		where a.jm_is_del=0
+		and substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) ,
+		         a.jm_factory_code,
+			     a.jm_np_code
+		union all
+		-- 半检报废数
+		select  substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) stat_date  ,
+		 		a.jm_factory_code ,
+				a.jm_np_code   ,
+				-sum(case when a.jm_is_standard=1 and a.JM_IS_CQ=0  then 1 else 0 end ) as jm_hg_qty
+		 from sdi.sdi_jm_t_gx_online_dumping_1038 a
+		 left join SDI.SDI_JM_T_GX_ONLINE_1038 b 
+		 on a.jm_barcode =b.jm_barcode
+		 and b.jm_is_del=0
+		where a.jm_is_del=0 
+		and a.jm_is_flow=2
+		 and b.JM_IS_COMPLEMENT =0  
+		 group by substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7)  ,
+		          a.jm_factory_code ,
+				  a.jm_np_code
+		union all
+		 -- 干补检验
+		select substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE,  -- 干补日期
+		   a.jm_factory_code ,
+		   a.jm_np_code, -- 泥坯编码
+		   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty  -- 是否合格(1:合格 2:废品) JM_GX_HG
+		from SDI.SDI_jm_t_gx_dryfilling_1038 a  -- 干补检验
+		LEFT JOIN SDI.sdi_jm_t_gx_online_1038 b
+		on a.jm_uuid = b.jm_gb_id 
+		where a.jm_is_del=0  
+		and b.jm_is_complement = 0
+		and substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+		         a.jm_factory_code,
+				 a.jm_np_code		  
+		union all
+		-- 改洗下线
+		select substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) stat_date,
+			   a.jm_factory_code ,
+			   a.jm_np_code,
+			   -sum(case when  a.jm_is_standard_gb = 1 then 1 else 0 end ) jm_hg_qty
+		 from SDI.SDI_jm_t_gx_online_dumping_1038 a
+		 left join SDI.SDI_jm_t_gx_online_1038 b 
+		 on a.JM_BARCODE=b.JM_BARCODE
+		 left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 c 
+		 on c.jm_gx_id=b.jm_uuid
+		 where a.jm_is_del=0 
+		 and a.JM_IS_CQ=0
+		 and substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10)  between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		 group by substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) ,
+		 		  a.jm_factory_code,
+				  a.jm_np_code
+		) t
+		left join SDI.sdi_jm_t_wy_base_gc_1038 t1
+		on t.jm_np_code = t1.jm_np_code
+		left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t2 -- 生产BOM关系数据
+	    on t.jm_factory_code = t2.factory_code
+	   and t1.jm_code = t2.small_material_num
+		where t1.jm_is_del = 0
+		group by t.STAT_DATE,
+			     t.jm_factory_code ,
+			     --t.jm_np_code
+			     --t1.jm_code
+			     t2.material_num
+),
+jm_actual_accept_data as(  -- 江门 实际收坯数据
+	SELECT t1.prod_date, 
+		   t1.factory_code, 
+		   t1.material_num,
+		   t1.actual_Grouting_qty,
+		   t2.jm_hg_qty as in_stock_qty
+	FROM jm_zj_data_detail t1
+	left join jm_actual_data_detail t2
+	on t1.prod_date = t2.prod_date
+	and t1.factory_code = t2.factory_code
+	and t1.material_num = t2.material_num
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_PAM_MAT_ACTUAL_ACCEPT_T
+select t.prod_date,     -- 生产日期
+	   t.factory_code,  -- 工厂编码
+	   t.material_num,  -- 物料编码
+	   sum(nvl(t.actual_grouting_qty,0)) as actual_grouting_qty,  -- 注浆数
+	   sum(nvl(t.in_stock_qty,0)) as in_stock_qty,       -- 实收数
+	   current_timestamp() as dw_last_update_date   -- 数据同步时间
+from(
+	select t1.* from jx_actual_accept_data t1
+	union all
+	select t1.* from jm_actual_accept_data t1
+    )t
+group by t.prod_date, 
+		 t.factory_code, 
+		 t.material_num;

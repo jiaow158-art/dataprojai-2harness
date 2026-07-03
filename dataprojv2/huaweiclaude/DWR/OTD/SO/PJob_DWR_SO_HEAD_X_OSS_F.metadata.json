@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_HEAD_X_OSS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

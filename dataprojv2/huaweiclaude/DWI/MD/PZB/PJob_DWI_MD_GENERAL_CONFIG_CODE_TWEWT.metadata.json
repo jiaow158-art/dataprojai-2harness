@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_TWEWT",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "来源表TWEWT",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

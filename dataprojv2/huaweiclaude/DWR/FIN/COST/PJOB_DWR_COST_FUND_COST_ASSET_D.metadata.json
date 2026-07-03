@@ -1,0 +1,8 @@
+{
+    "name": "PJOB_DWR_COST_FUND_COST_ASSET_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "资金成本",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

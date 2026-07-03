@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_OFR_ORDER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "工程价审表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

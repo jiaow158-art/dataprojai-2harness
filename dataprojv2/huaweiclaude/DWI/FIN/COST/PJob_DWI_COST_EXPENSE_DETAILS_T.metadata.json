@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_COST_EXPENSE_DETAILS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/COST",
+    "description": "汇联易-费用明细报表-SDI到DWI层",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

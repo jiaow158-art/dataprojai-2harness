@@ -1,0 +1,8 @@
+insert overwrite table sdi.sdi_sys_app_lns_1007
+select 
+id,
+create_time,
+data,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_app_lns_1007;

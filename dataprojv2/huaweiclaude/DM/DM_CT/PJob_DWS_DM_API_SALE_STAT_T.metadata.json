@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_API_SALE_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "瓷砖销售月统计表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

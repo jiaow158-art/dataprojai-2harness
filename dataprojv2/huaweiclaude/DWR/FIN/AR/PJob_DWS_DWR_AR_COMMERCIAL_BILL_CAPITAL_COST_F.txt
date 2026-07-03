@@ -1,0 +1,54 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- 需求人：霍碧琪
+-- 应收商票资金成本：DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F
+-- create time: 2023/07/26 17:56:34 GMT+08:00
+-- update：2023/08/02 guzhengfeng 新增字段是否剔除IS_ELIMINATE:读取外挂表UPLOAD.UPLOAD_DIVISION_COMP_T，公司代码相同，日历月在有效日期范围内（STAT_DATE，END_DATE）当读
+-- update：2023/08/03 guzhengfeng 是否剔除逻辑加上判断：非全资剔除'Y'，全资不剔除'N'
+-- update：2023/10/19 guzhengfeng 更新是否剔除逻辑
+-- update: 2023/12//04 zhz 外挂表增加enddate限制
+-- update: 2024/07//11 qyj 新增销售雇员字段
+-- ******************************************************************** --
+TRUNCATE TABLE DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F;
+INSERT INTO DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F
+SELECT 
+    T.business_department
+    ,T.capital_cost_type
+    ,T.month
+    ,T.comp_code
+    ,T.cust_code
+    ,T.cust_name
+    ,T.sales_group_master_file
+    ,T.wbs
+    ,T.wbs_sales_group
+    ,T.closing_balance_202012_p
+    ,T.closing_balance_202012_c
+    ,T.opening_balance
+    ,T.closing_balance
+    ,T.capital_cost
+    ,T.capital_cost_sum
+    ,T.dw_last_update_date
+    ,T.cust_group_code
+    ,CASE WHEN COALESCE (T1.DEL_FLAG,T2.DEL_FLAG) IS NOT NULL THEN COALESCE (T1.DEL_FLAG,T2.DEL_FLAG)
+		ELSE 'N'
+	 END IS_OVERDUE_CUST
+	,CASE WHEN TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T3.STAT_DATE AND T3.END_DATE AND T3.COMP_TYPE = '全资' AND T4.node_name3 <> 'H03230605' THEN 'N'
+	    ELSE 'Y'
+	 END IS_ELIMINATE       -- 是否剔除:读取外挂表UPLOAD.UPLOAD_DIVISION_COMP_T，公司代码相同，日历月在有效日期范围内（STAT_DATE，END_DATE）,公司类别为'全资'，且根据销售组主档（读取架构树DM.DM_RPT_SALES_GROUP_T）读取节点3值非'H03230605'，值为'N'，否则为'Y'
+	 ,T.sales_emp_code
+FROM 
+    DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F_01 T
+	LEFT JOIN UPLOAD.UPLOAD_AMB_CREDIT_CUSTCODE_T T1
+	ON T.CUST_CODE = T1.CUST_CODE 
+	AND T.COMP_CODE = T1.COMP_CODE 
+	AND TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T1.STAT_DATE AND T1.END_DATE
+	LEFT JOIN UPLOAD.UPLOAD_AMB_CREDIT_CUSTCODE_T T2
+	ON T.CUST_CODE = T2.CUST_CODE 
+	AND T2.COMP_CODE IS NULL
+	AND TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T2.STAT_DATE AND T2.END_DATE
+	LEFT JOIN UPLOAD.UPLOAD_DIVISION_COMP_T T3
+	ON T.COMP_CODE = T3.COMP_CODE AND TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T3.STAT_DATE AND T3.END_DATE
+	LEFT JOIN DM.DM_RPT_SALES_GROUP_T T4
+	ON T.sales_group_master_file = T4.node_name9
+;	

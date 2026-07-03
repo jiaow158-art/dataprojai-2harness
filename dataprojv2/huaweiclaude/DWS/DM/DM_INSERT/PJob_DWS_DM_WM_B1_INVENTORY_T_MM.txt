@@ -1,0 +1,132 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/24 18:13:37 GMT+08:00
+-- update from chenzhiyong 20230202 DM_B1_CUSTOMER_DATA_T 去重
+-- ******************************************************************** --
+--B1库存
+--SELECT * FROM DM.DM_WM_B1_INVENTORY_T_MM WHERE    DOCDATE_MM >='2022-03-01' AND DOCDATE_MM <'2022-04-01' 
+--SELECT  date_trunc('MONTH',ADD_MONTHS ( current_date() ,1 ))  FROM DM.DM_WM_B1_INVENTORY_T_MM PARTITION (p202101)
+--ALTER TABLE DM.DM_WM_B1_INVENTORY_T_MM TRUNCATE PARTITION p202101;
+DELETE FROM DM.DM_WM_B1_INVENTORY_T_MM 
+WHERE  DOCDATE_MM = date_trunc('MONTH', current_date());
+INSERT INTO DM.DM_WM_B1_INVENTORY_T_MM
+with dm_b1_customer_data AS
+(
+  select distinct customer_code,customer_type,customer_flag,customer_short_name from dm.dm_b1_customer_data_t
+),
+oivl as (
+select 
+	 "docdate"
+	,"transseq"
+	,"loccode"
+	,"transtype"
+	,"itemcode"
+	,"messageid"
+	,"customer_short_name" 
+	,sum("inqty") "inqty"
+	,sum("outqty") "outqty" 
+from dwiotd.dwi_wm_b1_oivl_t t1 
+join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N' 
+group by 	 "docdate","transseq","loccode","transtype","itemcode","messageid","customer_short_name" 
+)
+,ivl1 as (
+select transseq,"customer_short_name" ,sum(transvalue) transvalue  from dwiotd.dwi_wm_b1_ivl1_t  t1 
+join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+group by transseq,"customer_short_name" 
+)
+,oitm as (select itemcode,itemname,codebars,frgnname,suppcatnum,invntryuom,cardcode,itmsgrpcod,firmcode,slength1,swidth1,"customer_short_name"
+  from dwiotd.dwi_wm_b1_oitm_t t1 join dm_b1_customer_data t2 
+  on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+ and ((t1.customer_code='318120' AND t1.itmsgrpcod in ('101','108'))
+ or (t1.customer_code='353852' AND t1.itmsgrpcod in ('104','108'))
+ or (t1.customer_code='315762' AND t1.itmsgrpcod in ('101','102'))
+ or (t1.customer_code='310603' AND t1.itmsgrpcod in ('101','103')))
+group by itemcode,itemname,codebars,frgnname,suppcatnum,invntryuom,cardcode,
+itmsgrpcod,firmcode,slength1,swidth1,"customer_short_name"
+union all 
+select itemcode,itemname,codebars,frgnname,suppcatnum,invntryuom,cardcode,itmsgrpcod,firmcode,slength1,swidth1,"customer_short_name"
+  from dwiotd.dwi_wm_b1_oitm_t t1 join dm_b1_customer_data t2 
+  on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+ and t1.customer_code not in ('318120','353852','315762','310603')
+group by itemcode,itemname,codebars,frgnname,suppcatnum,invntryuom,cardcode,
+itmsgrpcod,firmcode,slength1,swidth1,"customer_short_name")
+,oitb as (
+select itmsgrpcod,itmsgrpnam,"customer_short_name"  from dwiotd.dwi_wm_b1_oitb_t 
+ t1 join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+group by itmsgrpcod,itmsgrpnam,"customer_short_name" 
+)
+,omrc as (
+select firmcode,firmname,"customer_short_name"  from dwiotd.dwi_wm_b1_omrc_t 
+ t1 join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+group by  firmcode,firmname,"customer_short_name" 
+)
+,oilm as (
+select messageid,effectqty,bpcardcode,"customer_short_name"  from dwiotd.dwi_wm_b1_oilm_t
+ t1 join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N'
+group by messageid,effectqty,bpcardcode,"customer_short_name" 
+)
+,ocrd as (
+select cardcode,cardname,"customer_short_name"  from dwiotd.dwi_wm_b1_ocrd_t
+ t1 join dm_b1_customer_data t2 on t1.customer_code =t2.customer_code and t2.customer_type ='SW' and t2.customer_flag ='N' 
+group by cardcode,cardname,"customer_short_name" 
+)
+,tmp as (
+   select t.dttype,t.itemcode,t.itemname,t.codebars,t.frgnname,t.suppcatnum,t.invntryuom,t.itmsgrpnam,t.firmname,t.loccode,t.cardcode,t.cardname, t."customer_short_name",t.docdate,
+    case when t.dttype='qc' then sum(nvl(t.inqty,0.0)) else 0.0 end as qcinqty,   case when t.dttype='qj' then sum(nvl(t.inqty,0.0)) else 0.0 end as qjinqty,   
+	case when t.dttype='qm' then sum(nvl(t.inqty,0.0)) else 0.0 end as qminqty,   case when t.dttype='qc' then sum(nvl(t.outqty,0.0)) else 0.0 end as qcoutqty,  
+	 case when t.dttype='qj' then sum(nvl(t.outqty,0.0)) else 0.0 end as qjoutqty,   case when t.dttype='qm' then sum(nvl(t.outqty,0.0)) else 0.0 end as qmoutqty,  
+	  case when t.dttype='qj' then sum(nvl(t.inlinebalance,0.0)) else 0.0 end as qjinlinebalance,   case when t.dttype='qj' then sum(nvl(t.outlinebalance,0.0)) else 0.0 end as qjoutlinebalance, 
+	    case when t.dttype='qc' then sum(nvl(t.linebalance,0.0)) else 0.0 end as qclinebalance,   case when t.dttype='qj' then sum(nvl(t.linebalance,0.0)) else 0.0 end as qjlinebalance,   
+		case when t.dttype='qm' then sum(nvl(t.linebalance,0.0)) else 0.0 end as qmlinebalance, 	   case when t.dttype='qj' then sum(nvl(t.puch_inqty,0.0)) else 0.0 end as qjpuch_inqty,   
+		case when t.dttype='qj' then sum(nvl(t.sale_inqty,0.0)) else 0.0 end as qjsale_inqty,   case when t.dttype='qj' then sum(nvl(t.other_inqty,0.0)) else 0.0 end as qjother_inqty,    
+		case when t.dttype='qj' then sum(nvl(t.puch_outqty,0.0)) else 0.0 end as qjpuch_outqty,    case when t.dttype='qj' then sum(nvl(t.sale_outqty,0.0)) else 0.0 end as qjsale_outqty,   
+		 case when t.dttype='qj' then sum(nvl(t.other_outqty,0.0)) else 0.0 end as qjother_outqty
+       from (select case when t0.docdate < date_trunc('MONTH', current_date()) then 'qc' when t0.docdate >= date_trunc('MONTH', current_date()) and t0.docdate < date_trunc('MONTH',ADD_MONTHS(current_date(),1)) then 'qj' else 'qm' end as dttype,       
+t0.itemcode,t2.itemname,t2.codebars,t2.frgnname,t2.suppcatnum,t2.invntryuom,t3.itmsgrpnam,t4.firmname,t7.cardcode,t7.cardname,t0.inqty,t0.outqty,       case when 
+nvl(t1.transvalue,0.0)>0.0 then t1.transvalue else 0.0 end as inlinebalance,       case when nvl(t1.transvalue,0.0)<0.0 then -t1.transvalue else 0.0 end as outlinebalance,	       
+case when (t0.transtype=18 or t0.transtype=20) then t0.inqty else 0.0 end as puch_inqty,        case when (t0.transtype=14 or t0.transtype=16) then t0.inqty else 0.0 end as sale_inqty,       
+ case when nvl(t1.transvalue,0.0)>=0.0 and t0.transtype<>18 and t0.transtype<>20 and t0.transtype<>14 and t0.transtype<>16 then t0.inqty else 0.0 end as other_inqty,        
+ case when (t0.transtype=19 or t0.transtype=21) then t0.outqty else 0.0 end as puch_outqty,        case when (t0.transtype=13 or t0.transtype=15) then t0.outqty else 0.0 end as sale_outqty,       
+  case when nvl(t1.transvalue,0.0)<=0.0 and t0.transtype<>19 and t0.transtype<>21 and t0.transtype<>13 and t0.transtype<>15 then t0.outqty else 0.0 end as other_outqty,     
+    t1.transvalue as linebalance,t0.loccode as loccode ,t0."customer_short_name",t0.docdate      from oivl t0  
+	inner join ivl1 t1 on t0.transseq = t1.transseq  and t0."customer_short_name" = t1."customer_short_name"         
+	inner join oitm t2  on t0.itemcode = t2.itemcode  and t0."customer_short_name" = t2."customer_short_name"      
+	inner join oitb t3  on t2.itmsgrpcod=t3.itmsgrpcod  and t2."customer_short_name" = t3."customer_short_name"
+	inner join omrc t4  on t2.firmcode=t4.firmcode    and t2."customer_short_name" = t4."customer_short_name"
+	 left join oilm t5 on nvl(t0.messageid,'') = nvl(t5.messageid,'') and nvl(t5.effectqty,0.0)<>0.0      and t0."customer_short_name" = t5."customer_short_name"
+	  left join ocrd t6 on nvl(t5.bpcardcode,'') = nvl(t6.cardcode,'')    and t5."customer_short_name" = t6."customer_short_name"   
+	  left join ocrd t7 on nvl(t2.cardcode,'')=nvl(t7.cardcode,'')        and t2."customer_short_name" = t7."customer_short_name" 
+    	   ) t  group by 
+t.dttype,t.itemcode,t.itemname,t.codebars,t.frgnname,t.suppcatnum,t.invntryuom,t.itmsgrpnam,t.firmname,t.loccode,t.cardcode,t.cardname,t."customer_short_name",t.docdate
+) 
+select  tt.dttype,
+tt."customer_short_name" ,
+tt.itemcode,
+tt.itemname,
+t5."classify",--  "分类",
+t5."category" ,-- "品类",
+date_trunc('MONTH', tt.docdate) AS DOCDATE_MM,
+t6."MATL_GROUP" ,--as "物料组",
+sum(nvl(tt.qcinqty,0.0))-sum(nvl(tt.qcoutqty,0.0)) ,--as "期初数量",
+sum(nvl(tt.qjinqty,0.0)) ,--as "本期入库",
+sum(nvl(tt.qjpuch_inqty,0.0)) ,--as "期间采购收货数量",
+sum(nvl(tt.qjsale_inqty,0.0)) ,--as "期间销售退货数量",
+sum(nvl(tt.qjother_inqty,0.0)) ,--as "期间其他入库数量",
+sum(nvl(tt.qjpuch_outqty,0.0)) ,--as "期间采购退货数量",
+sum(nvl(tt.qjoutqty,0.0)) ,--as "本期出库",
+sum(nvl(tt.qjsale_outqty,0.0)) ,--as "期间销售出库数量",
+sum(nvl(tt.qjother_outqty,0.0)) ,--as "期间其他出库数量",
+(sum(nvl(tt.qcinqty,0.0))-sum(nvl(tt.qcoutqty,0.0)))+(sum(nvl(tt.qjinqty,0.0))-sum(nvl(tt.qjoutqty,0.0))) ,--s "期末数量",
+sum(nvl(tt.qjinqty,0.0))-sum(nvl(tt.qjoutqty,0.0)) ,--as "期间发生",
+sum(nvl(tt.qclinebalance,0)) ,--as "期初金额",
+sum(nvl(tt.qjinlinebalance,0.0)) ,--as "本期入库金额",
+sum(nvl(tt.qjoutlinebalance,0.0)) ,--as "本期出库金额",
+sum(nvl(tt.qclinebalance,0.0))+sum(nvl(tt.qjlinebalance,0.0)) ,--as "期末金额", 
+sum(nvl(tt.qjlinebalance,0.0)) ,--as "本期发生金额",
+CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+from  tmp  tt 
+    join oitm t4  on tt.itemcode=t4.itemcode AND tt."customer_short_name"  =t4."customer_short_name" 
+    left join DM.DM_RPT_NODP_MATERIAL_LIST_T t5 on tt.itemcode = t5.goods_code 
+    left join  dm.dm_rpt_bi0_pmaterial_t t6 on tt.itemcode = t6."MATERIAL" 
+group by tt.dttype,tt.itemcode,tt.itemname,tt."customer_short_name" ,t5."classify" ,t5."category",date_trunc('MONTH', tt.docdate),t6."MATL_GROUP" 

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_RECEIPT_REL_V",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/PTP",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

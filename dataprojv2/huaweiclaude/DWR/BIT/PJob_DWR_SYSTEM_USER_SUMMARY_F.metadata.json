@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SYSTEM_USER_SUMMARY_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/BIT",
+    "description": "总用户数和异常用户数的用户表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

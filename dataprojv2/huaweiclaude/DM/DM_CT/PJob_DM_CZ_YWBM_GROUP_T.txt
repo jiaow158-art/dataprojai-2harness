@@ -1,0 +1,64 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/11/02 15:58:30 GMT+08:00
+-- description:瓷砖业务部门维表（瓷砖业务部门看的业务层级）
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+with tem as 
+(
+select 
+	b.*
+	,case
+	    when b.node_name4 in ('H04230600') then '运营中心'
+	    when b.node_name4 in ('H04230655') then '子公司'
+	    when b.node_name5 in ('Z033', 'Z031','H05230609') then '工程市场中心'
+	    when b.node_name3 in ('H03230617') then '国际营销'
+	    when b.node_name3 in ('H03230628') then '梦之家'
+	    end sub_name_yw --1级 业务简写的名称
+	,case
+	    when b.node_name4 in ('H04230600') then b.node_desc4 --区域运营中心
+	    when b.node_name4 in ('H04230655') then b.node_desc4 --直营经营管理板块
+	    when b.node_name5 in ('Z033', 'Z031','H05230609') then b.node_desc5 --商机资源开发部 + 幕墙工程中心 + 战略工程中心
+	    when b.node_name3 in ('H03230617') then b.node_desc3 --国际营销系统
+	    when b.node_name3 in ('H03230628') then b.node_desc3 -- 梦之家事业部
+	    end sub_name_xt --1级 系统对应的名称
+        
+    ,case
+	    when b.node_name4 in ('H04230600')  then b.node_desc5
+        when b.node_name4 in ('H04230655')  then b.node_desc5
+	    when b.node_desc5 in ('幕墙工程中心') then '幕墙'
+	    when b.node_desc5 in ('商机资源开发部') then '资源开发运营部'
+	    when b.node_desc5 in ('战略工程中心') then '战略工程'
+	    when b.node_desc3 in ('国际营销系统') then '国际营销'
+	    when b.node_desc3 in ('梦之家事业部') then '梦之家'
+	    end  sub_grp_name_yw
+	,case
+        when b.node_name4 in ('H04230600')  then b.node_desc5
+        when b.node_name4 in ('H04230655')  then b.node_desc5
+        when b.node_name5 in ('Z033', 'Z031','H05230609')  then b.node_desc5
+        when b.node_name3 in ('H03230617') then b.node_desc3 --国际营销系统
+	    when b.node_name3 in ('H03230628') then b.node_desc3 -- 梦之家事业部
+        end  sub_grp_name_xt --2级 
+     
+from dm.dm_rpt_sales_group_t b
+)
+
+INSERT OVERWRITE TABLE dm.dm_cz_ywbm_group_t
+select 
+	node_name9 as sales_grp
+	,sub_name_yw
+	,sub_name_xt
+	,sub_grp_name_yw
+	,sub_grp_name_xt
+	,CURRENT_TIMESTAMP () AS dw_last_update_date
+from tem
+where 1=1
+and node_name2 = 'H11000001'
+and 
+(
+	(node_name4 in ('H04230600', 'H04230655') and (sub_grp_name_xt like '%子公司' or sub_grp_name_xt like '%运营中心'))
+	or (node_name3 in ('H03230617', 'H03230628'))
+	or node_name5 in ('Z031', 'H05230609', 'Z033')
+)

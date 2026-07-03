@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_FAGL_TLDGRPT",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "来源表FAGL_TLDGRPT",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

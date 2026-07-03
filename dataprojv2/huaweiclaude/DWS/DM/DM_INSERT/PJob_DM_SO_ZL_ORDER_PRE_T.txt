@@ -1,0 +1,227 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/04/23 09:20:41 GMT+08:00
+-- qinyongjian 20240401 新增新品标识、绿灯产品标识字段
+-- qinyongjian 20240704 qyj 新增运营部和运营线组字段
+-- qinyongjian 20240925 qyj 新增工程计划单类型的进一步划分
+-- update from huangwenin 2025-12-29 新增字段：KA类型、NKA紧急订单标志
+-- ******************************************************************** --
+DELETE FROM DM.DM_SO_ZL_ORDER_PRE_T 
+WHERE STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval'1 day',1,7),'-','')
+AND TJ_MONTH = SUBSTR(CURRENT_DATE - interval'1 day',1,7)
+;
+
+INSERT INTO DM.DM_SO_ZL_ORDER_PRE_T(
+zjhd
+,zjhdid
+,matnr
+,maktx
+,menge
+,werks
+,zcjrq
+,zjsrq
+,zsprq
+,post1
+,zjfkhrq
+,zvkgrp
+,sfxyjg
+,xqjhsx
+,zxsry
+,extwg
+,ddzt
+,jhdhzt
+,sfzdjf
+,xqsl
+,cpsdhgc
+,yssj
+,spjjyy
+,dw
+,hx
+,syqy
+,dlkjmj
+,ts
+,ysfs
+,sfzlkh
+,zlkhmc
+,gcmc
+,sjjd
+,gcdzs
+,gcdzcs
+,gcdzjd
+,gcdzq
+,cytj
+,yqsm
+,pernr
+,pernrname
+,zby2
+,gcjhrq
+,jgts
+,zhuangtai
+,sxsm
+,jhdbz
+,czjhdhh
+,jjyy
+,matkl
+,yl06
+,prart
+,ps_psp_pnr
+,zposid
+,zsfdt
+,kunnr
+,zghcq
+,def_dl_date
+,charg
+,zzzjh
+,ztsbm
+,ztsbz
+,ztssb
+,ztscc
+,ztshd
+,ztsys
+,ztsyq
+,prdha
+,groes
+,wlgg
+,pspnr
+,cppc_period
+,is_xh
+,bstdk
+,kz_date
+,first_confirm_date
+,zxmkc
+,thdat
+,zljcksl
+,is_hzj
+,is_hzt
+,is_zdzj
+,is_zdzt
+,is_zdjfzj
+,is_zdjfzt
+,tj_month
+,dw_last_update_date
+,stat_month
+,zj_qty
+,yt_date
+,zt_qty
+,unit_area
+,department
+,new_material_flag
+,grelight_material_flag
+,operate_depart
+,operate_group
+,gc_type3
+,ka_type
+,is_ka_name
+)
+SELECT
+	zjhd
+,zjhdid
+,matnr
+,maktx
+,menge
+,werks
+,zcjrq
+,zjsrq
+,zsprq
+,post1
+,zjfkhrq
+,zvkgrp
+,sfxyjg
+,xqjhsx
+,zxsry
+,extwg
+,ddzt
+,jhdhzt
+,sfzdjf
+,xqsl
+,cpsdhgc
+,yssj
+,spjjyy
+,dw
+,hx
+,syqy
+,dlkjmj
+,ts
+,ysfs
+,sfzlkh
+,zlkhmc
+,gcmc
+,sjjd
+,gcdzs
+,gcdzcs
+,gcdzjd
+,gcdzq
+,cytj
+,yqsm
+,pernr
+,pernrname
+,zby2
+,gcjhrq
+,jgts
+,zhuangtai
+,sxsm
+,jhdbz
+,czjhdhh
+,jjyy
+,matkl
+,yl06
+,prart
+,ps_psp_pnr
+,zposid
+,zsfdt
+,kunnr
+,zghcq
+,def_dl_date
+,charg
+,zzzjh
+,ztsbm
+,ztsbz
+,ztssb
+,ztscc
+,ztshd
+,ztsys
+,ztsyq
+,prdha
+,groes
+,wlgg
+,pspnr
+,cppc_period
+,is_xh
+,bstdk
+,kz_date
+,first_confirm_date
+,zxmkc
+,thdat
+,zljcksl
+,is_hzj
+,is_hzt
+,is_zdzj
+,is_zdzt
+,is_zdjfzj
+,is_zdjfzt
+,tj_month
+,dw_last_update_date
+,stat_month
+,zj_qty
+,yt_date
+,zt_qty
+,unit_area
+,department
+,new_material_flag
+,grelight_material_flag
+,operate_depart
+,operate_group
+,case 
+	when ddzt like '%样板间%' then '样板间'
+	when ddzt like '%补货%' then '补货'
+	else '大货'
+end gc_type3
+,ka_type
+,is_ka_name
+FROM DM.DM_SO_ZL_ORDER_T
+where zcjrq >= '20220101'
+--and is_zdjfzj in('是','否')
+AND STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval'1 day',1,7),'-','')
+AND TJ_MONTH = SUBSTR(CURRENT_DATE - interval'1 day',1,7)
+;

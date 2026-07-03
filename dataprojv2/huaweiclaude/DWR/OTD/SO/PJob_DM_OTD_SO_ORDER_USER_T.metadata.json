@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_OTD_SO_ORDER_USER_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,98 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/07/22 14:37:14 GMT+08:00
+-- description:业绩划分比例汇总表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+---- 设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with tmp as 
+(
+select 
+	cust_num,sales_org_code,distribution_chnl_code,
+	ROW_NUMBER() over(partition by cust_num order by sales_org_code,distribution_chnl_code) rk
+from dwrdim.dwr_dim_cust_sales_area_d
+where 1=1
+and end_date = '4712-12-31'
+)
+,A as 
+(
+select
+'业绩' AS FLAG,--业绩、利润划分标识
+t1.opp_id,--商机编号
+t1.opp_name,--商机名称
+t1.cust_num,--经销商客编
+t1.emp_id,--业务员工号
+t1.sale_grp,--销售线组编号
+sum(t1.perf_ratio) as split_rate --划分比例
+from dwrfin.dwr_crm_ambv2_performance_split_T t1
+where 1=1 and perf_ratio not in ('0','100','-100') 
+and is_deprecated_code = '0' and status_code = 'normal'
+and opp_id in (select opp_id from dwrfin.dwr_crm_ambv2_performance_split_T 
+where opp_id <> '' and perf_ratio not in ('0','100','-100') 
+and is_deprecated_code = '0' and status_code = 'normal'
+group by opp_id having sum(perf_ratio) = 0 )
+group by  
+t1.opp_id,--商机编号
+t1.opp_name,--商机名称
+t1.cust_num,--经销商客编
+t1.emp_id,--业务员工号
+t1.sale_grp--销售线组编号
+union all 
+select
+'利润' AS FLAG,--业绩、利润划分标识
+t2.opp_id,--商机编号
+t2.opp_name,--商机名称
+t2.cust_num,--经销商客编
+t2.emp_id,--业务员工号
+t2.sale_grp,--销售线组编号
+sum(t2.profit_ratio) as split_rate--划分比例
+from dwrfin.dwr_crm_ambv2_performance_split_T t2
+where 1=1 and profit_ratio not in ('0','100','-100') 
+and is_deprecated_code = '0' and status_code = 'normal'
+and opp_id in (select opp_id from dwrfin.dwr_crm_ambv2_performance_split_T 
+where opp_id <> '' and profit_ratio not in ('0','100','-100') 
+and is_deprecated_code = '0' and status_code = 'normal'
+group by opp_id having sum(profit_ratio) = 0 )
+group by  
+t2.opp_id,--商机编号
+t2.opp_name,--商机名称
+t2.cust_num,--经销商客编
+t2.emp_id,--业务员工号
+t2.sale_grp--销售线组编号
+)
+
+INSERT OVERWRITE TABLE dm.dm_crm_ambv2_performance_split_rate_month partition (stat_month)
+select 
+t1.flag,--业绩、利润划分标识
+t1.opp_id,--商机编号
+t1.opp_name,--商机名称
+t1.cust_num,--经销商客编
+t3.name1 as cust_name,--经销商名称
+t2.sales_org_code as sales_org,--销售组织
+t2.distribution_chnl_code as channel,--渠道
+t1.emp_id,--业务员工号
+t4.NACHN AS emp_name,--业务员名称
+t1.sale_grp,--销售线组编号
+t5.bezei as sale_grp_desc,--销售线组名称
+t1.split_rate,--划分比例
+current_timestamp() as dw_last_update_date,
+substring('${PERIOD_ID_D}',1,7) as stat_month--统计月份
+from A t1 
+left join tmp t2 
+on t1.cust_num = t2.cust_num and t2.rk = 1
+left join sdi.sdi_kna1_1001 t3
+on t1.cust_num = t3.kunnr and t3.mandt = '800'
+left join sdi.sdi_pa0002_1001 t4 
+on t1.emp_id = t4.pernr and t4.endda = '99991231' and t4.mandt = '800'
+left join SDI.SDI_TVGRT_1001 t5 
+on t1.sale_grp = t5.vkgrp and t5.spras = '1'

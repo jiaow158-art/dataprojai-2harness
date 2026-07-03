@@ -1,0 +1,439 @@
+/*CREATE TABLE dm.dm_ct_so_month_analysis_t
+(
+    stat_month                               varchar(50),
+    channel_text                             varchar(50),
+    org                                      varchar(50),
+    cust_code                                varchar(50),
+    undelivered_area                         numeric(38, 10),
+    overdue_undelivered_area                 numeric(38, 10),
+    reserve_inventory_area                   numeric(38, 10),
+    overdue_area_not_withdrawn               numeric(38, 10),
+    this_month_quasi_intersection_area       numeric(38, 10),
+    this_month_approved_area                 numeric(38, 10),
+    this_month_order_quasi_intersection_area numeric(38, 10),
+    this_month_order_approved_area           numeric(38, 10),
+    dw_last_update_date                      timestamp(6)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(stat_month);
+comment on table dm.dm_ct_so_month_analysis_t is '瓷砖订单分析含留备货面积-组织、客户维度';
+comment on column dm.dm_ct_so_month_analysis_t.stat_month is '月份';
+comment on column dm.dm_ct_so_month_analysis_t.channel_text is '整合渠道';
+comment on column dm.dm_ct_so_month_analysis_t.org is '组织';
+comment on column dm.dm_ct_so_month_analysis_t.cust_code is '客编';
+comment on column dm.dm_ct_so_month_analysis_t.undelivered_area is '未交付面积';
+comment on column dm.dm_ct_so_month_analysis_t.overdue_undelivered_area is '逾期未交付';
+comment on column dm.dm_ct_so_month_analysis_t.reserve_inventory_area is '留备货面积';
+comment on column dm.dm_ct_so_month_analysis_t.overdue_area_not_withdrawn is '逾期未提面积';
+comment on column dm.dm_ct_so_month_analysis_t.this_month_quasi_intersection_area is '本月准交面积';
+comment on column dm.dm_ct_so_month_analysis_t.this_month_approved_area is '本月准提面积';
+comment on column dm.dm_ct_so_month_analysis_t.this_month_order_quasi_intersection_area is '本月准交订单面积';
+comment on column dm.dm_ct_so_month_analysis_t.this_month_order_approved_area is '本月准提订单面积';
+comment on column dm.dm_ct_so_month_analysis_t.dw_last_update_date is '最后更新时间'; */
+-- update：2024/03/29 逾期未交付修改逻辑
+-- update：2024/08/27 不再限制子公司和运营中心
+-- update：2024/08/28 新增基地字段、品类规格
+-- update：2024/08/29 增加两个字段，拆分当月以及上月累计数据
+-- update：2026/04/16 子运融合  取消子公司逻辑
+
+delete
+from dm.dm_ct_so_month_analysis_t
+where stat_month between to_char(('${PERIOD_ID_M}' || '-01')::date - interval '1 years',
+                                 'yyyy01') and to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyMM');
+insert into dm.dm_ct_so_month_analysis_t
+with monthseies as (
+    select distinct month_id,
+                    case
+                        when current_date - 1 < day_mend_dt then to_char(current_date - 1, 'yyyy-MM-dd')
+                        else day_mend_dt end
+                        month_last_day,
+                    day_mbegin_dt
+    from dm.dm_dim_date_d
+    where month_id between to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyy01') and to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyMM')
+),
+     zjl_base as (
+         select tj_month --统计月份
+              , case
+                    when vtweg = '06' then '工程'
+                    when (vtweg not in ('08', '06') or vtweg is null) then '零售'
+                    when vtweg = '08' then '整装'
+                    else '' end                                                                         channel_text
+              , case when sale_region_name like '%子公司' then sales_office_name else sale_region_name end department
+              , kunnr
+              , werks
+              , count(case
+                          when SFZDJF = 'Y' then VBELN
+                          else concat(VBELN, POSNR)
+             end)                                                                                       order_cnt
+              , count(case
+                          when is_zdjfzj = '是' then case
+                                                        when SFZDJF = 'Y' then VBELN
+                                                        else concat(VBELN, POSNR)
+                              end end)                                                                  zj_cnt
+              , sum(zj_qty * a.unit_area) as                                                            zj_area
+              , sum(kwmeng * a.unit_area) as                                                            order_area
+              , b.category_name
+              , b.dimension
+         from dm.DM_SO_FZL_ORDER_ZJ_PRE_T a
+                  left join dwimd.dwi_md_data_material_general_t b on a.matnr = b.material_num
+         where is_zdjfzj in ('是', '否')
+           and bstdk <= replace(CURRENT_DATE + INTERVAL '-1 day', '-', '')
+         group by tj_month, channel_text, case
+                                              when sale_region_name like '%子公司' then sales_office_name
+                                              else sale_region_name end
+                , werks, kunnr
+                , b.category_name
+                , b.dimension
+         union all
+         select tj_month
+              , '工程'                         channel_text
+              , department
+              , kunnr
+              , werks
+              , count(case
+                          when SFZDJF = '是' then zjhd
+                          else zjhdid
+             end)
+              , count(case
+                          when is_zdjfzj = '是' then case
+                                                        when SFZDJF = '是' then zjhd
+                                                        else zjhdid
+                              end end)
+              , sum(zj_qty * a.unit_area) as zj_area
+              , sum(menge * a.unit_area)  as order_area
+              , b.category_name
+              , b.dimension
+         from dm.DM_SO_ZL_ORDER_ZJ_PRE_T a
+                  left join dwimd.dwi_md_data_material_general_t b on a.matnr = b.material_num
+         where is_zdjfzj in ('是', '否')
+           and bstdk <= replace(CURRENT_DATE + INTERVAL '-1 day', '-', '')
+         group by tj_month
+                , department
+                , werks
+                , kunnr
+                , b.category_name
+                , b.dimension
+     ),
+     ztl_base as (
+         select tj_month --统计月份
+              , case
+                    when vtweg = '06' then '工程'
+                    when (vtweg not in ('08', '06') or vtweg is null) then '零售'
+                    when vtweg = '08' then '整装'
+                    else '' end              channel_text
+              , department
+              , kunnr
+              , werks
+              , count(case
+                          when SFZDJF = 'Y' then VBELN
+                          else concat(VBELN, POSNR)
+             end)                            order_cnt
+              , count(case
+                          when is_zdjfzt = '是' then case
+                                                        when SFZDJF = 'Y' then VBELN
+                                                        else concat(VBELN, POSNR)
+                              end end)       zt_cnt
+              , sum(zt_qty * a.unit_area) as zt_area
+              , sum(kwmeng * a.unit_area) as order_area
+              , b.category_name
+              , b.dimension
+         from dm.DM_SO_FZL_ORDER_PRE_T a
+                  left join dwimd.dwi_md_data_material_general_t b on a.matnr = b.material_num
+         where is_zdjfzt in ('是', '否')
+--and yt_date <= replace(CURRENT_DATE + INTERVAL '-1 day','-','')
+         group by tj_month --统计月份
+                , channel_text
+                , department
+                , werks
+                , kunnr
+                , b.category_name
+                , b.dimension
+         union all
+
+         select tj_month
+              , '工程'                      as vtweg
+              , department
+              , kunnr
+              , werks
+              , count(case
+                          when SFZDJF = '是' then zjhd
+                          else zjhdid
+             end)
+              , count(case
+                          when is_zdjfzt = '是' then case
+                                                        when SFZDJF = '是' then zjhd
+                                                        else zjhdid
+                              end end)
+              , sum(zt_qty * a.unit_area) as zt_area
+              , sum(menge * a.unit_area)  as order_area
+              , b.category_name
+              , b.dimension
+         from dm.DM_SO_ZL_ORDER_PRE_T a
+                  left join dwimd.dwi_md_data_material_general_t b on a.matnr = b.material_num
+         where is_zdjfzt in ('是', '否')
+         group by tj_month
+                , department
+                , kunnr
+                , werks
+                , b.category_name
+                , b.dimension
+     ),
+     mid as (
+         select tj_month,
+                channel_text,
+                case
+                    when department = '战略工程-战略二部' then '工程市场中心'
+                    when department like '%运营中心%' OR department like '%工程市场中心%'
+                        then department
+                    else '其他'
+                    end       department,
+                kunnr,
+                werks,
+                order_cnt  as order_cnt_1,
+                zj_cnt,
+                zj_area,
+                order_area as order_area_1,
+                0          as order_cnt_2,
+                0          as zt_cnt,
+                0          as zt_area,
+                0          as order_area_2,
+                category_name,
+                dimension
+         from zjl_base
+         where 1 = 1
+           and department != '山东运营中心'
+         union all
+         select tj_month,
+                channel_text,
+                case
+                    when department = '战略工程-战略二部' then '工程市场中心'
+                    when department like '%运营中心%' OR department like '%工程市场中心%'
+                        then department
+                    else '其他'
+                    end       department,
+                kunnr,
+                werks,
+                0,
+                0,
+                0,
+                0,
+                order_cnt  as order_cnt_2,
+                zt_cnt,
+                zt_area,
+                order_area as order_area_2,
+                category_name,
+                dimension
+         from ztl_base
+         where 1 = 1
+           and department != '山东运营中心'
+     )
+select stat_month,
+       channel_text,
+       org,
+       cust_code,
+       sum(未交付面积)       未交付面积,
+       sum(逾期未交付)       逾期未交付,
+       sum(留备货面积)       留备货面积,
+       sum(逾期未提面积)      逾期未提面积,
+       sum(本月准交面积)      本月准交面积,
+       sum(本月准提面积)      本月准提面积,
+       sum(本月准交订单面积)    本月准交订单面积,
+       sum(本月准提订单面积)    本月准提订单面积,
+       current_timestamp,
+       case
+           when substring(plant_code, 1, 2) in ('16') then '湖南'
+           when substring(plant_code, 1, 2) in ('17') then '华盛昌'
+           when substring(plant_code, 1, 2) in ('15') then '江西'
+           when substring(plant_code, 1, 2) in ('13') then '清远'
+           when substring(plant_code, 1, 2) in ('19') then '山西'
+           when substring(plant_code, 1, 2) in ('8A', '72', '12', '7D', '77', '75', '79') then '外协'
+           when substring(plant_code, 1, 2) in ('18') then '重庆'
+           else concat('其他', substring(plant_code, 1, 2))
+           end as       base_jd,
+       category_name,
+       dimension,
+       sum(当月逾期未交付)     当月逾期未交付,
+       sum(当月逾期未提面积)    当月逾期未提面积,
+       sum(上月及之前逾期未交付)  上月及之前逾期未交付,
+       sum(上月及之前逾期未提面积) 上月及之前逾期未提面积
+from (--未交付
+         select to_char((stat_month || '01')::date, 'yyyy-MM') stat_month,
+                case when channel_name= '大包' then '整装' else channel_name end                    channel_text,
+                case
+                    when dept_lv4_name = '工程市场中心' then '工程市场中心'
+                    when dept_lv4_name in ('直营经营管理板块', '区域运营中心') then dept_lv5_name
+                    else '其他'
+                    end                                        org,
+                cust_num                                       cust_code,
+                sum(coalesce(nodeliver_area_aps, '0'))         未交付面积,
+                sum(case
+                        when to_char(expect_date_aps::date, 'yyyyMMdd') <= to_char(c.month_last_day::date, 'yyyyMMdd')
+                            then nodeliver_area_aps
+                        else 0 end)                            逾期未交付,
+                0                                              留备货面积,
+                0                                              逾期未提面积,
+                0                                              本月准交面积,
+                0                                              本月准提面积,
+                0                                              本月准交订单面积,
+                0                                              本月准提订单面积,
+                plant_code,
+                b.category_name,
+                b.dimension,
+                sum(case
+                        when to_char(expect_date_aps::date, 'yyyyMMdd') <=
+                             to_char(c.month_last_day::date, 'yyyyMMdd')
+                            and to_char(expect_date_aps::date, 'yyyyMMdd') >=
+                                to_char(c.day_mbegin_dt::date, 'yyyyMMdd')
+                            then nodeliver_area_aps
+                        else 0 end)                            当月逾期未交付,
+                0                                              当月逾期未提面积,
+                sum(case
+                        when to_char(expect_date_aps::date, 'yyyyMMdd') <
+                             to_char(c.day_mbegin_dt::date, 'yyyyMMdd') then nodeliver_area_aps
+                        else 0 end)                            上月及之前逾期未交付,
+                0                                              上月及之前逾期未提面积
+         from DM.DM_RPT_SALES_DELIVER_T A
+                  left join dwimd.dwi_md_data_material_general_t b on a.material_num = b.material_num
+                  join monthseies c on a.stat_month = c.month_id
+         where 1 = 1
+           and nodeliver_area_aps > 0
+         group by stat_month, channel_text, cust_code, org, plant_code,
+                  b.category_name,
+                  b.dimension
+         union all
+         --准交准提
+         select tj_month,
+                channel_text,
+                department       org,
+                kunnr            cust_code,
+                0                未交付面积,
+                0                逾期未交付,
+                0                留备货面积,
+                0                逾期未提面积,
+                sum(zj_cnt)      本月准交面积,
+                sum(zt_cnt)      本月准提面积,
+                sum(order_cnt_1) 本月准交订单面积,
+                sum(order_cnt_2) 本月准提订单面积,
+                werks as         factory_code,
+                category_name,
+                dimension,
+                0                当月逾期未交付,
+                0                当月逾期未提面积,
+                0                上月及之前逾期未交付,
+                0                上月及之前逾期未提面积
+         from mid
+         where tj_month = '${PERIOD_ID_M}'
+         group by tj_month, channel_text, department, kunnr, werks,
+                  category_name,
+                  dimension
+         union all
+         --逾期未提
+         select to_char((stat_month || '01')::date, 'yyyy-MM') stat_month,
+                case
+                    when distribution_channel_code = '06' then '工程'
+                    when (distribution_channel_code not in ('08', '06') or distribution_channel_code is null)
+                        then '零售'
+                    when distribution_channel_code = '08' then '整装'
+                    else '' end                                channel_text,
+                case
+                    when lev4_name = '工程市场中心' then lev4_name
+                    when lev5_name like '%运营中心%' then lev5_name
+                    else '其他' end                              org,
+                cust_num                                       cust_code,
+                0                                              未交付面积,
+                0                                              逾期未交付,
+                sum(sal_pre_res_area)                          留备货面积,
+                sum(case
+                        when to_char(acc_time_date::date, 'yyyyMMdd') <=
+                             to_char(c.month_last_day::date, 'yyyyMMdd') then sal_pre_res_area
+                        else 0 end)                            逾期未提面积,
+                0                                              本月准交面积,
+                0                                              本月准提面积,
+                0                                              本月准交订单面积,
+                0                                              本月准提订单面积,
+                factory_code,
+                b.category_name,
+                b.dimension,
+                0                                              当月逾期未交付,
+                sum(case
+                        when to_char(acc_time_date::date, 'yyyyMMdd') >=
+                             to_char(c.day_mbegin_dt::date, 'yyyyMMdd')
+                            and to_char(acc_time_date::date, 'yyyyMMdd') <=
+                                to_char(c.month_last_day::date, 'yyyyMMdd') then sal_pre_res_area
+                        else 0 end)                            当月逾期未提面积,
+                0                                              上月及之前逾期未交付,
+                sum(case
+                        when to_char(acc_time_date::date, 'yyyyMMdd') <
+                             to_char(c.day_mbegin_dt::date, 'yyyyMMdd') then sal_pre_res_area
+                        else 0 end)                            上月及之前逾期未提面积
+         from DM.DM_RPT_SALES_DELIVER_2023_T A
+                  left join dwimd.dwi_md_data_material_general_t b on a.material_num = b.material_num
+                  join monthseies c on a.stat_month = c.month_id
+         where 1 = 1
+           and lb_type in ('销售订单留货', '专属客编留货', '销售订单备货')
+         group by stat_month, channel_text, cust_code, org, factory_code,
+                  b.category_name,
+                  b.dimension
+         union all
+         --留备货
+         select to_char((start_month || '01')::date, 'yyyy-MM')           start_month,
+                case
+                    when distribution_channel_code = '06' then '工程'
+                    when (distribution_channel_code not in ('08', '06') or distribution_channel_code is null)
+                        then '零售'
+                    when distribution_channel_code = '08' then '整装'
+                    else '' end                                           channel_text,
+                case
+                    when lev4_name = '工程市场中心' then lev4_name
+                    when lev5_name like '%运营中心%' then lev5_name
+                    else '其他' end                                         org,
+                cust_num                                                  cust_code,
+                0                                                         未交付面积,
+                0                                                         逾期未交付,
+                sum(available_stock_qty * b.length_1 * b.width / 1000000) 留备货面积,
+                sum(case
+                        when to_char(promise_stock_date::date, 'yyyyMMdd') <=
+                             to_char(c.month_last_day::date, 'yyyyMMdd')
+                            then available_stock_qty * b.length_1 * b.width / 1000000
+                        else 0 end)                                       逾期未提面积,
+                0                                                         本月准交面积,
+                0                                                         本月准提面积,
+                0                                                         本月准交订单面积,
+                0                                                         本月准提订单面积,
+                factory_code,
+                b.category_name,
+                b.dimension,
+                0                                                         当月逾期未交付,
+                sum(case
+                        when to_char(promise_stock_date::date, 'yyyyMMdd') >=
+                             to_char(c.day_mbegin_dt::date, 'yyyyMMdd')
+                            and to_char(promise_stock_date::date, 'yyyyMMdd') <=
+                                to_char(c.month_last_day::date, 'yyyyMMdd')
+                            then available_stock_qty * b.length_1 * b.width / 1000000
+                        else 0 end)                                       当月逾期未提面积,
+                0                                                         上月及之前逾期未交付,
+                sum(case
+                        when to_char(promise_stock_date::date, 'yyyyMMdd') <
+                             to_char(c.day_mbegin_dt::date, 'yyyyMMdd')
+                            then available_stock_qty * b.length_1 * b.width / 1000000
+                        else 0 end)                                       上月及之前逾期未提面积
+         from dwrotd.dwr_wm_wbs_stock_f A
+                  left join dwimd.dwi_md_data_material_general_t b
+                            on A.material_num = b.material_num
+                  join monthseies c on a.start_month = c.month_id
+         where 1 = 1
+           and available_stock_qty > 0
+           and promise_stock_date is not null
+         group by start_month, channel_text, cust_code, org, factory_code,
+                  b.category_name,
+                  b.dimension
+     ) a
+where 1 = 1
+group by stat_month, channel_text, org,
+         cust_code, base_jd,
+         category_name,
+         dimension

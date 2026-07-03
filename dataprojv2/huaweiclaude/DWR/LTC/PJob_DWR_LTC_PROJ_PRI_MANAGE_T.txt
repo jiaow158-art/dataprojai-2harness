@@ -1,0 +1,33 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2026/05/11 10:14:39 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert overwrite table DWRLTC.DWR_LTC_CNTC_PRI_MANAGE_T
+select 
+ A.contract_material_id as PROJ_ITEM_ID
+,B.size_lower_limit 
+,B.size_upper_limit
+,B.price as policy_amt 
+,B.price_directory_name AS PRI_POLICY_NAME--价格政策名称
+,B.MAT_PRI_GAR
+
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+from SDI.SDI_CONTRACT_MATERIAL_1033 A
+join (select distinct concat(NVL(T.category,''),NVL(T.product_specification,''),NVL(T.product_function,''),NVL(T.product_place_code,''),NVL(T.embryoid_body,''),NVL(T.white,''),NVL(T.kit_height,''),NVL(T.color,''),NVL(T.product_channel,''),NVL(T.height_define,'')) AS MAT_PRI_GAR,T.validity_date_start,T.validity_date_end,T.size_lower_limit,T.size_upper_limit,T.price ,T1.price_directory_name
+    from SDI.SDI_PRICE_MANAGE_MATERIAL_CZJXS_1033 T 
+    LEFT JOIN SDI.SDI_PRICE_MANAGE_CZJXS_1033 T1
+    ON T.price_manage_id = T1.price_manage_id
+    WHERE T.price <> 0 AND SUBSTR(T.validity_date_start,1,10) >= '2026-01-01' and T.delete_flag = 0 AND T1.delete_flag = 0) B
+ON concat(NVL(A.category_code,''),NVL(A.PRODUCT_SPECIFICATION,''),NVL(A.product_function_code,''),NVL(A.product_place_code,''),NVL(A.bottom_slab_code,''),NVL(A.white_code,''),NVL(A.kit_height,''),NVL(A.color_code,''),NVL(A.product_channel_code,''),NVL(A.high_value_desc_code,'')) = B.MAT_PRI_GAR
+AND A.creation_date BETWEEN B.validity_date_start AND B.validity_date_end
+where A.delete_flag = 0 AND 405480
+-- and B.price_directory_name in ('26年工程渠道价格政策')
+
+
+
+
+

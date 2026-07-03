@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GL_ACCOUNT_MASTER_RECORD_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/GL",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrdim"
+}

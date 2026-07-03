@@ -1,0 +1,38 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2026/01/24 09:28:50 GMT+08:00
+-- description:sfa获取rtm 人-商关系
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+insert overwrite table dwrdim.dwr_dim_sfa_per_org_t
+SELECT
+p.person_id,
+p.person_name,
+p.mobile_phone,
+org.org_id,
+org.org_code,
+org.org_name,
+org.org_full_name,
+case when org.creation_date > P.creation_date then org.creation_date else P.creation_date end as creation_date,
+P.last_update_date,
+p.enabled
+from sdi.sdi_base_organization_1029 org
+left join sdi.sdi_base_organization_grant_1029 gran
+on gran.org_id = org.org_id
+left join sdi.sdi_base_users_1029 u 
+on u.user_id = gran.user_id
+left join sdi.sdi_base_person_1029 p 
+on p.person_id = u.person_id
+where 1=1
+and org.organization_type = 'DISTRIBUTOR' 
+and org.enabled_flag = 'Y'
+and org.delete_flag = 0
+and gran.delete_flag = 0
+and u.source_type = 'DISTRIBUTOR'
+and u.person_id <> ''
+and u.delete_flag = 0
+
+

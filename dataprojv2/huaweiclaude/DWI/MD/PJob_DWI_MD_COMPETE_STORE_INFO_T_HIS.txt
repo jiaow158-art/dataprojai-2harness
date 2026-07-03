@@ -1,0 +1,237 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：竞争门店主数据（拉链）
+-- create time: 2022/08/19 17:42:51 GMT+08:00
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+WITH SDI AS (
+  SELECT --ROW_NUMBER() OVER() 									AS ID, 					-- 代理主键
+         ID 													AS STORE_ID, 			-- 门店id
+         BRAND_ID 												AS BRAND_ID, 			-- 品牌id
+         NAME 													AS STORE_NAME, 			-- 门店名称
+         IS_OPEN 												AS IS_OPEN, 			-- 是否营业 1-营业，0-打烊
+         PROVINCE_ID 											AS PROVINCE_ID, 		-- 省区域ID
+         PROVINCE 												AS PROVINCE_NAME, 		-- 省
+         CITY_ID 												AS CITY_ID, 			-- 市区域ID
+         CITY 													AS CITY_NAME, 			-- 市
+         DISTRICT_ID 											AS DISTRICT_ID, 		-- 区区域ID
+         DISTRICT 												AS DISTRICT_NAME, 		-- 区
+         ADDRESS 												AS ADDRESS, 			-- 详细地址
+         LONGITUDE 												AS LONGITUDE, 			-- 门店经度
+         LATITUDE 												AS LATITUDE, 			-- 门店纬度
+         CREATE_TIME 											AS CREATE_TIME, 		-- 创建时间
+         UPDATE_TIME 											AS UPDATE_TIME, 		-- 更新时间
+         SUBSTR(CREATE_TIME, 1, 10) 							AS STRAT_DATE, 			-- 开始日期
+         SUBSTR(UPDATE_TIME, 1, 10) 							AS UPDATE_DATE, 		-- 更新日期
+         '4712-12-31' 											AS END_DATE, 			-- 结束日期
+         '日增量数据' 											AS DATA_TYPE, 			-- 数据类型
+         'N' 													AS DEL_FLAG 			-- 删除标识
+         --FROM_UNIXTIME(UNIX_TIMESTAMP(), 'YYYY-MM-DD HH:MM:SS') AS DW_LAST_UPDATE_DATE 	-- 同步数据时间
+    FROM SDI.SDI_BUZ_COMPETITOR_STORE_1030
+   WHERE EP_ID = 3044
+     AND IS_DELETE = 0
+     AND DEL_FLAG = 'N'
+	),
+DWI as (
+  SELECT ID, 					-- 代理主键
+         STORE_ID, 				-- 门店id
+         BRAND_ID, 				-- 品牌id
+         STORE_NAME, 			-- 门店名称
+         IS_OPEN, 				-- 是否营业 1-营业，0-打烊
+         PROVINCE_ID, 			-- 省区域ID
+         PROVINCE_NAME, 		-- 省
+         CITY_ID, 				-- 市区域ID
+         CITY_NAME, 			-- 市
+         DISTRICT_ID, 			-- 区区域ID
+         DISTRICT_NAME, 		-- 区
+         ADDRESS, 				-- 详细地址
+         LONGITUDE, 			-- 门店经度
+         LATITUDE, 				-- 门店纬度
+         CREATE_TIME, 			-- 创建时间
+         UPDATE_TIME, 			-- 更新时间
+         STRAT_DATE, 			-- 开始日期
+         UPDATE_DATE, 			-- 结束日期
+         END_DATE, 				-- 结束日期
+         DATA_TYPE, 			-- 数据类型
+         DEL_FLAG 				-- 删除标识
+    FROM DWIMD.DWI_MD_COMPETE_STORE_INFO_T_HIS
+   WHERE DATA_TYPE <> '初始化数据'
+   ),
+MAX_RK AS (SELECT MAX(ID) AS RK FROM DWIMD.DWI_MD_COMPETE_STORE_INFO_T_HIS)
+-- 插入初始化的数据
+-- 当 sdi 存在 dwi 不存在. 		则判断是新增的数据. 新增排序.
+-- 当 dwi = 4712 且 sdi update > dwi update.则把end_Date设置为最新SDI的UPDATE
+-- 当 dwi <> 4712 且 sdi update > dwi update.则取旧的DWI的数据
+-- 当 dwi 存在 sdi 不存在. 		则判断是删除的数据. 
+-- 当sdi = dwi 且dwi = 4712  不变
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_COMPETE_STORE_INFO_T_HIS
+--插入初始化的数据
+  SELECT ID, 					-- 代理主键
+         STORE_ID, 				-- 门店id
+         BRAND_ID, 				-- 品牌id
+         STORE_NAME, 			-- 门店名称
+         IS_OPEN, 				-- 是否营业 1-营业，0-打烊
+         PROVINCE_ID, 			-- 省区域ID
+         PROVINCE_NAME, 		-- 省
+         CITY_ID, 				-- 市区域ID
+         CITY_NAME, 			-- 市
+         DISTRICT_ID, 			-- 区区域ID
+         DISTRICT_NAME, 		-- 区
+         ADDRESS, 				-- 详细地址
+         LONGITUDE, 			-- 门店经度
+         LATITUDE, 				-- 门店纬度
+         CREATE_TIME, 			-- 创建时间
+         UPDATE_TIME, 			-- 更新时间
+         STRAT_DATE, 			-- 开始日期
+         UPDATE_DATE, 			-- 结束日期
+         END_DATE, 				-- 结束日期
+         DATA_TYPE, 			-- 数据类型
+         DEL_FLAG, 				-- 删除标识
+         DW_LAST_UPDATE_DATE 	-- 同步数据时间
+    FROM DWIMD.DWI_MD_COMPETE_STORE_INFO_T_HIS	WHERE DATA_TYPE = '初始化数据'
+UNION ALL
+-- 当 sdi 存在 dwi 不存在. or sdi = dwi and sdi update > dwi update 则判断新增. 
+SELECT   COALESCE(T1.RK,0) + ROW_NUMBER() OVER() 				AS ID,						-- 代理主键
+		 SDI.STORE_ID, 				-- 门店id
+         SDI.BRAND_ID, 				-- 品牌id
+         SDI.STORE_NAME, 			-- 门店名称
+         SDI.IS_OPEN, 				-- 是否营业 1-营业，0-打烊
+         SDI.PROVINCE_ID, 			-- 省区域ID
+         SDI.PROVINCE_NAME, 		-- 省
+         SDI.CITY_ID, 				-- 市区域ID
+         SDI.CITY_NAME, 			-- 市
+         SDI.DISTRICT_ID, 			-- 区区域ID
+         SDI.DISTRICT_NAME, 		-- 区
+         SDI.ADDRESS, 				-- 详细地址
+         SDI.LONGITUDE, 			-- 门店经度
+         SDI.LATITUDE, 				-- 门店纬度
+         SDI.CREATE_TIME, 			-- 创建时间
+         SDI.UPDATE_TIME, 			-- 更新时间
+         SDI.STRAT_DATE, 			-- 开始日期
+         SDI.UPDATE_DATE, 			-- 结束日期
+         SDI.END_DATE, 				-- 结束日期
+         SDI.DATA_TYPE, 			-- 数据类型
+         SDI.DEL_FLAG, 				-- 删除标识
+		 from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') AS DW_LAST_UPDATE_DATE	-- 数据同步时间
+FROM SDI
+LEFT JOIN DWI
+ON SDI.STORE_ID = DWI.STORE_ID
+JOIN MAX_RK T1
+  ON 1 = 1
+WHERE DWI.STORE_ID IS NULL OR(DWI.END_DATE = '4712-12-31' AND DWI.UPDATE_DATE < SDI.UPDATE_DATE)
+union all 
+-- 当 dwi = 4712 且 sdi update > dwi update.则把end_Date设置为最新SDI的UPDATE
+SELECT   DWI.ID, 																		-- 代理主键
+         DWI.STORE_ID, 																	-- 门店id
+         DWI.BRAND_ID, 																	-- 品牌id
+         DWI.STORE_NAME, 																-- 门店名称
+         DWI.IS_OPEN, 																	-- 是否营业 1-营业，0-打烊
+         DWI.PROVINCE_ID, 																-- 省区域ID
+         DWI.PROVINCE_NAME, 															-- 省
+         DWI.CITY_ID, 																	-- 市区域ID
+         DWI.CITY_NAME, 																-- 市
+         DWI.DISTRICT_ID, 																-- 区区域ID
+         DWI.DISTRICT_NAME, 															-- 区
+         DWI.ADDRESS, 																	-- 详细地址
+         DWI.LONGITUDE, 																-- 门店经度
+         DWI.LATITUDE, 																	-- 门店纬度
+         DWI.CREATE_TIME, 																-- 创建时间
+         SDI.UPDATE_TIME, 																-- 更新时间
+         DWI.STRAT_DATE, 																-- 开始日期
+         SDI.UPDATE_DATE, 																-- 结束日期
+         SDI.UPDATE_DATE AS END_DATE, 													-- 结束日期
+         DWI.DATA_TYPE, 																-- 数据类型
+         DWI.DEL_FLAG, 																	-- 删除标识
+         from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') AS DW_LAST_UPDATE_DATE	-- 数据同步时间
+FROM DWI
+LEFT JOIN SDI
+ON SDI.STORE_ID = DWI.STORE_ID
+WHERE DWI.END_DATE = '4712-12-31' AND DWI.UPDATE_DATE < SDI.UPDATE_DATE
+UNION ALL   
+-- 当 dwi <> 4712 且 sdi update > dwi update.则取旧的DWI的数据
+SELECT 	 DWI.ID, 																		-- 代理主键
+         DWI.STORE_ID, 																	-- 门店id
+         DWI.BRAND_ID, 																	-- 品牌id
+         DWI.STORE_NAME, 																-- 门店名称
+         DWI.IS_OPEN, 																	-- 是否营业 1-营业，0-打烊
+         DWI.PROVINCE_ID, 																-- 省区域ID
+         DWI.PROVINCE_NAME, 															-- 省
+         DWI.CITY_ID, 																	-- 市区域ID
+         DWI.CITY_NAME, 																-- 市
+         DWI.DISTRICT_ID, 																-- 区区域ID
+         DWI.DISTRICT_NAME, 															-- 区
+         DWI.ADDRESS, 																	-- 详细地址
+         DWI.LONGITUDE, 																-- 门店经度
+         DWI.LATITUDE, 																	-- 门店纬度
+         DWI.CREATE_TIME, 																-- 创建时间
+         DWI.UPDATE_TIME, 																-- 更新时间
+         DWI.STRAT_DATE, 																-- 开始日期
+         DWI.UPDATE_DATE, 																-- 结束日期
+         DWI.END_DATE, 																	-- 结束日期
+         DWI.DATA_TYPE, 																-- 数据类型
+         DWI.DEL_FLAG, 																	-- 删除标识
+         from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') AS DW_LAST_UPDATE_DATE	-- 数据同步时间
+FROM DWI
+LEFT JOIN SDI
+ON SDI.STORE_ID = DWI.STORE_ID
+WHERE DWI.END_DATE <> '4712-12-31' AND DWI.UPDATE_DATE < SDI.UPDATE_DATE
+union all 
+-- 当 dwi 存在 sdi 不存在. 		则判断是删除的数据. 
+SELECT 	 DWI.ID, 																		-- 代理主键
+         DWI.STORE_ID, 																	-- 门店id
+         DWI.BRAND_ID, 																	-- 品牌id
+         DWI.STORE_NAME, 																-- 门店名称
+         DWI.IS_OPEN, 																	-- 是否营业 1-营业，0-打烊
+         DWI.PROVINCE_ID, 																-- 省区域ID
+         DWI.PROVINCE_NAME, 															-- 省
+         DWI.CITY_ID, 																	-- 市区域ID
+         DWI.CITY_NAME, 																-- 市
+         DWI.DISTRICT_ID, 																-- 区区域ID
+         DWI.DISTRICT_NAME, 															-- 区
+         DWI.ADDRESS, 																	-- 详细地址
+         DWI.LONGITUDE, 																-- 门店经度
+         DWI.LATITUDE, 																	-- 门店纬度
+         DWI.CREATE_TIME, 																-- 创建时间
+         DWI.UPDATE_TIME, 																-- 更新时间
+         DWI.STRAT_DATE, 																-- 开始日期
+         DWI.UPDATE_DATE, 																-- 结束日期
+         DWI.END_DATE, 																	-- 结束日期
+         DWI.DATA_TYPE, 																-- 数据类型
+		 'Y' AS DEL_FLAG, 																-- 删除标识
+		 from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') AS DW_LAST_UPDATE_DATE	-- 数据同步时间
+FROM DWI
+LEFT JOIN SDI
+ON SDI.STORE_ID = DWI.STORE_ID
+WHERE SDI.STORE_ID IS NULL
+union all
+-- 当sdi = dwi 且 dwi.update_date = sdi.update_date 不变
+SELECT 	 DWI.ID, 																		-- 代理主键
+         DWI.STORE_ID, 																	-- 门店id
+         DWI.BRAND_ID, 																	-- 品牌id
+         DWI.STORE_NAME, 																-- 门店名称
+         DWI.IS_OPEN, 																	-- 是否营业 1-营业，0-打烊
+         DWI.PROVINCE_ID, 																-- 省区域ID
+         DWI.PROVINCE_NAME, 															-- 省
+         DWI.CITY_ID, 																	-- 市区域ID
+         DWI.CITY_NAME, 																-- 市
+         DWI.DISTRICT_ID, 																-- 区区域ID
+         DWI.DISTRICT_NAME, 															-- 区
+         DWI.ADDRESS, 																	-- 详细地址
+         DWI.LONGITUDE, 																-- 门店经度
+         DWI.LATITUDE, 																	-- 门店纬度
+         DWI.CREATE_TIME, 																-- 创建时间
+         DWI.UPDATE_TIME, 																-- 更新时间
+         DWI.STRAT_DATE, 																-- 开始日期
+         DWI.UPDATE_DATE, 																-- 结束日期
+         DWI.END_DATE, 																	-- 结束日期
+         DWI.DATA_TYPE, 																-- 数据类型
+         DWI.DEL_FLAG, 																	-- 删除标识
+         from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') AS DW_LAST_UPDATE_DATE	-- 数据同步时间
+FROM DWI
+LEFT JOIN SDI
+ON SDI.STORE_ID = DWI.STORE_ID
+AND DWI.UPDATE_DATE = SDI.UPDATE_DATE

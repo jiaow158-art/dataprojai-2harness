@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_AMBV2_ZZT_XSSR_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "1+N业绩底表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

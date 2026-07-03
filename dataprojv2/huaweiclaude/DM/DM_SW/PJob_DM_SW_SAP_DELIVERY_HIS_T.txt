@@ -1,0 +1,180 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/04/26 15:30:58 GMT+08:00
+-- 获取SAP历史发货数据接口
+-- update from chenzhiyong 放开运中、大区、渠道编码
+-- update from chenzhiyong 渠道编码按业务提供的关系修改，不用sap的渠道编码
+-- UPDATE FROM CHENZHIYONG 20230601 运中名称用外挂表
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with dm_otd_sales_forecast_stat_data as(
+	SELECT t1.stat_month ,            -- 预测年月
+		   t1.operation_center_code , -- 运中编码
+		   t1.operation_center_name, -- 运中名称
+		   t1.area_code ,			  -- 大区编码
+		   t1.area_name ,			  -- 大区名称
+		   t1.def_channnel as channel_name, -- 渠道名称
+		   t1.material_num,					-- 渠道名称
+		   sum(t1.actual_billed_qty) as actual_billed_qty,
+		   sum(t1.actual_billed_amt) as actual_billed_amt
+	FROM DM_sw.dm_otd_sales_forecast_fact_t t1
+	where ((t1.operation_center_code is not null and t1.operation_center_code <> '' and t1.def_channnel='经销') or t1.def_channnel<>'经销')
+	and t1.stat_month <= substring('${PERIOD_ID_D}',1,7)
+	and t1.stat_month >= substring(add_months('${PERIOD_ID_D}',-11),1,7)
+	GROUP BY t1.stat_month ,
+			 t1.operation_center_code ,
+		     t1.operation_center_name ,
+		     t1.area_code ,
+		     t1.area_name ,
+		     t1.def_channnel,
+		     t1.material_num
+),
+dim_data as(   -- 数据发散  '2022-01-01' 发散的开始时间可以调整,因为最小的预测日期为20230101，近12个月，也就是20220101
+  select SUBSTRING(day_dt,1,7) as stat_month
+  from DM.dm_dim_date_d T
+  where day_dt between substring(add_months('${PERIOD_ID_D}',-11),1,7) and '${PERIOD_ID_D}' -- date_sub(from_unixtime(unix_timestamp(),'yyyy-MM-dd'),1)
+  group by SUBSTRING(day_dt,1,7)
+),
+dm_otd_sales_forecast_fact_data as(
+	SELECT t1.stat_month,
+	       t2.operation_center_code,
+		   t2.operation_center_name,
+		   t2.area_code,
+		   t2.area_name,
+	       t2.channel_name,
+	       t2.material_num,
+	       nvl(t3.actual_billed_qty,0) as actual_billed_qty,
+	       nvl(t3.actual_billed_amt,0) as actual_billed_amt
+	FROM dim_data t1
+	left join(
+		select distinct 
+		       operation_center_code,
+		       operation_center_name,
+		       area_code,
+		       area_name,
+		       channel_name,
+		       material_num
+		from dm_otd_sales_forecast_stat_data
+	) t2
+	on 1 = 1
+	left join dm_otd_sales_forecast_stat_data t3
+	on t1.stat_month = t3.stat_month
+	and nvl(t2.operation_center_code,'ISNULL') = nvl(t3.operation_center_code,'ISNULL')
+	and nvl(t2.operation_center_name,'ISNULL') = nvl(t3.operation_center_name,'ISNULL')
+	and nvl(t2.area_code,'ISNULL') = nvl(t3.area_code,'ISNULL')
+	and nvl(t2.area_name,'ISNULL') = nvl(t3.area_name,'ISNULL')
+	and nvl(t2.channel_name,'ISNULL') = nvl(t3.channel_name,'ISNULL')
+	and nvl(t2.material_num,'ISNULL') = nvl(t3.material_num,'ISNULL')
+),
+material_sales_data as(   -- 物料销售数据
+   SELECT T1.material_num,
+	   T1.material_name,
+	   t2.prod_line_name ,    -- 营销大类
+	   t2.second_level_name   -- 营销小类
+	FROM DWIMD.dwi_md_data_material_general_t t1
+	left join DWIMD.DWI_MD_PRODUCT_LEVEL_APS_T t2
+	on case when NVL(t1.product_level3_code,'NULL') <> NVL(t2.prod_level_code,'NULL') then t1.product_level2_code = t2.prod_level_code 
+	else t1.product_level3_code = t2.prod_level_code end
+),
+SAP_DELIVERY_HIS_DATA AS(
+	select t1.operation_center_code,  -- 运中
+		   t1.operation_center_name,
+		   t1.area_code,     -- 大区
+		   t1.area_name,
+		   case when t1.channel_name = '经销' then '01'
+            when t1.channel_name = '展厅' then '02'
+		    when t1.channel_name = '艺耐' then '03'
+		 	when t1.channel_name = '电商' then '07'  
+		 	when t1.channel_name = '内部交易' then '11'
+		 	when t1.channel_name = 'OEM' then '05'
+		 	when t1.channel_name = '国贸' then '09'
+		 	when t1.channel_name = '自营工程'  then '04'
+		 	when t1.channel_name = '经销工程'  then '06'
+		  	when t1.channel_name = '家装' then '08'
+		    when t1.channel_name = '流通' then '10'
+		   end  channel_num,  -- 渠道编码
+	       t1.channel_name, -- 渠道名称
+	       t1.material_num,  -- 物料编码
+	       t3.material_name,  -- 物料名称
+	       t3.prod_line_name as sales_big_type_name,     -- 营销大类
+	       t3.second_level_name as sales_small_type_name,  -- 营销小类
+	       case when substring(max(t1.stat_month),6,1) = '0' then concat(substring(max(t1.stat_month),7,1),'月')
+	            else concat(substring(max(t1.stat_month),6,2),'月') end as start_month, -- 开始月份
+	       ceil((sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0) else 0 end )
+	            -  max(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0) else 0 end )
+	            -  min(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0) else 0 end ))/10
+		   ) as mon_avg_12_pickup_qty, -- 近12个月月均提货数
+		   ceil((sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-5),1,7) and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0) else 0 end ))/6
+		   ) as mon_avg6_pickup_qty, -- 近6个月月均提货数
+		   ceil((sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-2),1,7) and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0) else 0 end ))/3
+		   ) as mon_avg3_pickup_qty, -- 近3个月月均提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-11),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_12m_pickup_qty, -- 过去第12个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-10),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end )as last_11m_pickup_qty, -- 过去第11个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-9),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_10m_pickup_qty, -- 过去第10个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-8),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_9m_pickup_qty, -- 过去第9个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-7),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_8m_pickup_qty, -- 过去第8个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-6),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_7m_pickup_qty, -- 过去第7个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-5),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_6m_pickup_qty, -- 过去第6个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-4),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end )as last_5m_pickup_qty, -- 过去第5个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-3),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_4m_pickup_qty, -- 过去第4个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-2),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_3m_pickup_qty, -- 过去第3个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',-1),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_2m_pickup_qty, -- 过去第2个月提货数
+		   sum(case when t1.stat_month = substring(add_months('${PERIOD_ID_D}',0),1,7)  then  nvl(t1.actual_billed_qty,0) else 0 end ) as last_1m_pickup_qty, -- 过去第1个月提货数
+		   sum(case when t1.stat_month between concat(substring('${PERIOD_ID_D}',1,4),'-01') and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_qty,0)  else 0 end ) as ytd_pickup_qty,   -- 年累计数量
+		   sum(case when t1.stat_month between concat(substring('${PERIOD_ID_D}',1,4),'-01') and substring('${PERIOD_ID_D}',1,7) then  nvl(t1.actual_billed_amt,0)  else 0 end ) as ytd_pickup_amt
+	from dm_otd_sales_forecast_fact_data t1
+	LEFT JOIN material_sales_data t3   -- 物料
+	on t1.material_num =  t3.material_num
+	group by t1.operation_center_code,  -- 运中
+		   t1.operation_center_name,
+		   t1.area_code,     -- 大区
+		   t1.area_name,
+	       t1.channel_name, -- 渠道名称
+	       t1.material_num,  -- 物料编码
+	       t3.material_name,  -- 物料名称
+	       t3.prod_line_name ,     -- 营销大类
+	       t3.second_level_name 
+)
+--alter table DM_SW.DM_SW_SAP_DELIVERY_HIS_T add columns (ytd_pickup_qty decimal(38,10))
+--alter table DM_SW.DM_SW_SAP_DELIVERY_HIS_T add columns (ytd_pickup_amt decimal(38,10))
+INSERT OVERWRITE TABLE DM_SW.DM_SW_SAP_DELIVERY_HIS_T PARTITION(STAT_MONTH)
+select CONCAT(replace(substring(add_months('${PERIOD_ID_D}',1),1,7),'-',''),ROW_NUMBER() OVER()) SEQ_NO, -- 数据同步ID
+       t1.operation_center_code,
+	   t1.operation_center_name , -- 运中
+	   t1.area_code,
+	   t1.area_name, -- 大区
+	   t1.channel_num as channel_code,
+	   t1.channel_name, -- 渠道
+	   t1.material_num, -- 物料编码
+	   t1.material_name, -- 物料名称
+	   t1.sales_big_type_name,     -- 营销大类
+       t1.sales_small_type_name,  -- 营销小类
+       t1.start_month, -- 开始月份
+       t1.mon_avg_12_pickup_qty, -- 近12个月月均发货数
+       t1.mon_avg6_pickup_qty, -- 近6个月月均发货数
+       t1.mon_avg3_pickup_qty, -- 近3个月月均发货数
+       t1.last_12m_pickup_qty, -- 过去第12个月提货数
+       t1.last_11m_pickup_qty, -- 过去第11个月提货数
+       t1.last_10m_pickup_qty, -- 过去第10个月提货数
+       t1.last_9m_pickup_qty, -- 过去第9个月提货数
+       t1.last_8m_pickup_qty, -- 过去第8个月提货数
+       t1.last_7m_pickup_qty, -- 过去第7个月提货数
+       t1.last_6m_pickup_qty, -- 过去第6个月提货数
+       t1.last_5m_pickup_qty, -- 过去第5个月提货数
+       t1.last_4m_pickup_qty, -- 过去第4个月提货数
+       t1.last_3m_pickup_qty, -- 过去第3个月提货数
+       t1.last_2m_pickup_qty, -- 过去第2个月提货数
+       t1.last_1m_pickup_qty, -- 过去第1个月提货数
+       current_timestamp() as dw_last_update_date,  -- 数据同步时间 
+       t1.ytd_pickup_qty,  -- 年累计
+       t1.ytd_pickup_amt,
+       substring(add_months('${PERIOD_ID_D}',1),1,7) as stat_month -- 日期 t1.stat_month  concat(t1.stat_month,'-01')
+from SAP_DELIVERY_HIS_DATA t1 ;

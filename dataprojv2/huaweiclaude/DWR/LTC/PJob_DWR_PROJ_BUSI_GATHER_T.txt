@@ -1,0 +1,578 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/07/16 14:21:45 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+WITH TMP AS (
+SELECT 
+ BUSI_CODE  --商机编号
+,BUSI_NAME  --商机名称 
+,CUST_NUM  --经销商客编
+,CUST_NAME --经销商名称
+,CUST_COMP_CODE --经销商/子公司客编
+,CUST_COMP_NAME --经销商/子公司客编名称
+,ERP_TYPE_CODE -- 企业类型
+,ERP_TYPE_NAME -- 企业类型名称
+,EMP_NUM  --业务员工号
+,EMP_NAME  --业务员名称
+,BUSI_OWNER_CODE --商机负责人工号
+,BUSI_OWNER_NAME --商机负责人名称
+,BUSI_FOLLOWER --商机跟进人
+,BUSI_BELONG_CODE -- 商机归属方代码
+,BUSI_BELONG_NAME -- 商机归属方名称
+,SALES_AREA_CODE --	销售区域（编码）
+,SALES_AREA_NAME --	销售区域
+,SALES_DEPT_CODE --	销售部门（编码）
+,SALES_DEPT_NAME --	销售部门
+,SALES_GRP_CODE --	销售组编码
+,SALES_GRP_NAME --	销售组名称
+,SALES_ORG --销售组织
+-- ,CHANNEL_CODE  --销售渠道
+,SUBSTR(SALES_ORG,1,2)||'00' AS COMP_CODE --公司代码
+,WBS_CODE --WBS号
+,DEPT_CODE	--事业部编码
+,DEPT_NAME -- 事业部名称
+,DEVEL_ORG_NAME	--建设单位全称
+,CONST_ORG_NAME --施工单位全称
+,DESIGN_ORG_NAME --设计单位全称
+,ADDRESS --详细地址
+,PROVINCE_NAME --	省名称
+,CITY_NAME  --市名称
+,REGION_NAME -- 区名称
+,BUSI_TYPE_NAME --	业务类型名称
+,BUSI_STAGE_NAME --	商机阶段名称
+,PROJ_MAJOR_CATE_NAME --工程大类名称
+,PROJ_SUB_CATE_NAME --工程小类名称
+,BUSI_SOURCE_NAME --	商机来源名称
+,SOURCE_ORG_NAME  --	来源单位名称
+,IS_SPEC_PROJ --	是否特殊工程
+,IS_BRO_BUSI  -- 	是否兄弟商机
+,QUTO_BUSI --	引用商机
+,IS_LONG_PROJ -- 	是否长周期项目
+,IS_XA -- 	是否雄安
+,IS_FREE_BUSI --	是否免费商机
+,IS_REPET_BUSI --	是否重复商机
+,RELAT_REPET_BUSI -- 关联重复商机
+,STATE_VALUE_END_DATE --	阶段有效结束日期
+,STATE_VALUE_START_DATE	--阶段有效开始日期
+,STATE_STAUS_NAME -- 阶段状态名称（系统预设）
+,STATE_VALUE_DAYS	--阶段有效天数
+,PROJ_NATURE_NAME  --	项目性质名称
+,PROD_CATE_NAME --产品品类名称
+,SOURCE_CLUE_NAME  --源线索名称
+,BUSI_REP_STATUS_NAME --	商机报备状态名称
+,BUILD_AREA --	建筑面积/改造面积（平方米）
+,PREDICT_PUR_AMT--预计采购金额(万元)
+,BUSI_SUCC_DATE --	报备成功日期
+,BUSI_SUM_AMT -- 	报备费总金额
+,BUSI_ADD_FEE_AMT --	报备费附加费用
+,BUSI_PAY_STYLE_NAME -- 	报备费缴纳方式名称
+,BUSI_FEE_STATUS_NAME   --报备费状态名称
+,BUSI_PAY_END_DATE --报备费缴费截止时间
+,COST_BUSI_AMT--报备费（成本中心）
+,CREDIT_BUSI_AMT--报备费（客户可用信贷）
+,BANK_BUSI_AMT--报备费（银行流水）
+,PUR_WAY_NAME --采购方式名称
+,PUR_SCALE_NAME --采购规模名称
+,BID_MODE_NAME--竞价方式名称
+,IS_TAKE_BID_GRT  --是否已交投标保证金
+,IS_NEED_PRI_REVIEW --是否需要价审
+,PROJ_PAYER_CODE	--项目付款方
+,PROJ_PAYER_NAME	--项目付款方全称
+,BTR_RESULT_NAME 	--报价或投标或入库结果反馈名称 
+,SIGN_ORG_NAME--签约单位全称
+,IS_SIGN_ORG_SAME--签约单位是否与付款单位一致
+,SIGN_WAY_NAME--签约/入库方式名称
+,SIGN_VALUE_START_DATE--签约有效开始日期
+,SIGN_VALUE_END_DATE--签约有效结束日期
+,APPLY_WAY_CODE --供货方式名称 
+,APPLY_STAUS_NAME --供货状态名称  
+,IS_DELAY_APPLY --是否延迟供货
+,PREDICT_APPLY_FIN_DATE--预计供货完成日期
+,RENEW_STAUS_NAME --续签状态名称
+,S01_TRAN_TIME--S0-S1转化时间
+,S12_TRAN_TIME--S1-S2转化时间
+,S23_TRAN_TIME --S2-S3转化时间
+,S34_TRAN_TIME--S3-S4转化时间
+,S45_TRAN_TIME--S4-S5转化时间
+,SX_TRAN_TIME--SX转化时间
+,PAR_BUSI_CODE-- 母商机编码
+,PAR_BUSI_NAME	--母商机名称
+,CUS_Y_SIGN_AMT	--经销商年度签约业绩（万元）
+,IS_SHARE_TACTIC	--是否共享战略
+-- ,BELONG_TACTIC_CUST_ID--所属战略客户ID
+,BELONG_TACTIC_CUST_CODE--所属战略客户客编编码
+,BELONG_TACTIC_CUST_NAME--所属战略客户客编编码名称
+,IS_CHAIN--是否连锁
+,CHAIN_TYPE_NAME  --连锁类型名称 
+,TACTIC_STYLE_NAME --战略类型名称
+,CUST_TYPE_NAME --客户类型名称
+,BELONG_ROLE_NAME --所属角色名称
+,SECOND_ROLE_NAME --二级角色名称
+,CUS_LEV_NAME -- 客户级别名称
+,TACTIC_CUS_LEV_NAME -- 战略客户级别名称
+,CUS_STAR_LEV_NAME -- 客户星级名称
+,EXPAND_STAUS_NAME -- 开拓状态名称
+,OPE_STAUS_NAME -- 运营状态名称
+,UP_ORG_NAME--上级单位名称
+,CUST_RISK_LEV_NAME --客户风险等级名称
+,USER_GROUP_NAME 	--用户群体名称
+,CREATE_DATE --	商机创建时间
+,'CRM' AS DATA_SOURCE --数据来源
+,IS_NOT_BI_EXC  --是否不纳入BI计算
+,BUSI_BELONG_FLAG --商机归属方类型
+,BUSI_EXP_USE --商机预估用量
+,IS_BX	--是否包销
+,CHECKED_MATTER_NAME --'核心事项完成打钩名称'
+,PROJ_PROGRESS_NAME --'项目具体进度名称'
+,SUPP_ITEM_NAME --'所需支持事项打钩名称'
+,SUPP_DETAIL --所需支持详细说明'
+,TM_SIGN_TIME --预计签约时间'
+,TM_DELV_TIME --预计供货时间'
+,TAIL_CREATE_TIME --跟踪创建时间'
+,TAIL_RECORD_TYPE_CODE --跟进数据类型编码
+,TAIL_RECORD_TYPE_NAME --跟进数据类型名称
+FROM DWRLTC.DWR_LTC_CRM_OPPORTUNITY_T A
+WHERE BUSI_TYPE_NAME <> '其他事业部商机'  AND BUSI_TYPE_NAME <> '' AND IS_NOT_BI_EXC <> '是'
+UNION ALL 
+SELECT 
+ BUSI_CODE  --商机编号
+,BUSI_NAME  --商机名称
+,DLR_CODE   --经销商客户编码
+,DLR_NAME   --经销商客户名称
+,DLR_CODE AS CUST_COMP_CODE --经销商/子公司客编
+,DLR_NAME AS CUST_COMP_NAME --经销商/子公司客编名称
+,SALE_STRTG_TYPE_CODE --销售战略类型编码
+,SALE_STRTG_TYPE_NAME --销售战略类型描述
+,CASE WHEN DIV_NAME = '生态新材事业部' THEN APLY_EMP_NUM ELSE FACTORY_SALE_EMP_NUM END AS EMP_NUM--厂家业务员编号
+,CASE WHEN DIV_NAME = '生态新材事业部' THEN APLY_EMP_NAME ELSE FACTORY_SALE_EMP_NAME END AS EMP_NAME--厂家业务员名称
+,APLY_EMP_NUM AS BUSI_OWNER_CODE --商机负责人工号
+,APLY_EMP_NAME AS BUSI_OWNER_NAME --商机负责人名称
+,TRKR_EMP_NAME --商机跟进人
+,'' AS BUSI_BELONG_CODE -- 商机归属方代码
+,'' AS BUSI_BELONG_NAME -- 商机归属方名称
+,'' AS SALES_AREA_CODE --	销售区域（编码）
+,'' AS SALES_AREA_NAME --	销售区域
+,SALE_DEPT_CODE --销售部门
+,SALE_DEPT_NAME --销售部门描述
+,SALE_GRP_CODE --销售组
+,SALE_GRP_NAME --销售组描述
+,SALE_ORG_CODE --销售组织编码
+,CO_CODE --公司代码
+,WBS_NUM --WBS号
+,DIV_CODE --事业部编码
+,DIV_NAME --事业部描述
+,BLDG_SIDE_NAME --建设方（甲方）
+,CNSTR_SIDE_NAME --施工方（乙方）
+,'' AS DESIGN_ORG_NAME --设计单位全称
+,ADDR --详细地址
+,PROV_NAME --省份
+,CITY_NAME --城市
+,CNTY_NAME --县/区
+,BUSI_TYPE_NAME --商机类别描述
+,BUSI_STAGE --	商机阶段名称 
+,ENGR_BIG_CAT_NAME --工程大类名称
+,ENGR_SMALL_CAT_NAME --工程小类名称
+,BUSI_SRC_NAME --	商机来源名称
+,'' AS SOURCE_ORG_NAME  --	来源单位名称
+,IS_SPEC_NAME --	是否特殊工程
+,IS_BRO_BUSI_NAME  -- 	是否兄弟商机
+,BRO_BUSI_CODE --	引用商机(兄弟商机)
+,'' AS IS_LONG_PROJ -- 	是否长周期项目
+,IS_XN_NAME -- 	是否雄安
+,'' AS IS_FREE_BUSI --	是否免费商机
+,'' AS IS_REPET_BUSI --	是否重复商机
+,'' AS RELAT_REPET_BUSI -- 关联重复商机
+,EFF_DATE --	阶段有效结束日期
+,'' AS STATE_VALUE_START_DATE	--阶段有效开始日期
+,STAGE_ST_NAME -- 阶段状态名称（系统预设）
+,0 AS STATE_VALUE_DAYS	--阶段有效天数
+,'' AS PROJ_NATURE_NAME  --	项目性质名称
+,MATERIAL_CAT_NAME --产品品类名称
+,'' AS SOURCE_CLUE_NAME  --源线索名称
+,APPR_ST_NAME --	商机报备状态名称
+,0 AS BUILD_AREA --	建筑面积/改造面积（平方米）
+,EID_AMT--预计采购金额(万元)
+,'' AS BUSI_SUCC_DATE --	报备成功日期
+,0 AS BUSI_SUM_AMT -- 	报备费总金额
+,0 AS BUSI_ADD_FEE_AMT --	报备费附加费用
+,RPT_PAY_METH_NAME AS BUSI_PAY_STYLE_NAME -- 	报备费缴纳方式名称
+,RPT_COST_ST_NAME   --报备费状态名称
+,'' AS BUSI_PAY_END_DATE --报备费缴费截止时间
+,0 AS COST_BUSI_AMT--报备费（成本中心）
+,0 AS CREDIT_BUSI_AMT--报备费（客户可用信贷）
+,0 AS BANK_BUSI_AMT--报备费（银行流水）
+,EXPTD_COOP_TYPE_NAME --预计合作类型描述
+,'' AS PUR_SCALE_NAME --采购规模名称
+,'' AS BID_MODE_NAME--竞价方式名称
+,'' AS IS_TAKE_BID_GRT  --是否已交投标保证金
+,'' AS IS_NEED_PRI_REVIEW --是否需要价审
+,CUST_NUM AS PROJ_PAYER_CODE	--项目付款方
+,CUST_NAME AS PROJ_PAYER_NAME	--项目付款方全称
+,'' AS BTR_RESULT_NAME 	--报价或投标或入库结果反馈名称 
+,'' AS SIGN_ORG_NAME--签约单位全称
+,'' AS IS_SIGN_ORG_SAME--签约单位是否与付款单位一致
+,'' AS SIGN_WAY_NAME--签约/入库方式名称
+,'' AS SIGN_VALUE_START_DATE--签约有效开始日期
+,'' AS SIGN_VALUE_END_DATE--签约有效结束日期
+,'' AS APPLY_WAY_CODE --供货方式名称 
+,'' AS APPLY_STAUS_NAME --供货状态名称  
+,'' AS IS_DELAY_APPLY --是否延迟供货
+,'' AS PREDICT_APPLY_FIN_DATE--预计供货完成日期
+,'' AS RENEW_STAUS_NAME --续签状态名称
+,'' AS S01_TRAN_TIME--S0-S1转化时间
+,'' AS S12_TRAN_TIME--S1-S2转化时间
+,'' AS S23_TRAN_TIME --S2-S3转化时间
+,'' AS S34_TRAN_TIME--S3-S4转化时间
+,'' AS S45_TRAN_TIME--S4-S5转化时间
+,'' AS SX_TRAN_TIME--SX转化时间
+,STRTG_BUSI_CODE-- 母商机编码(战略商机编号)
+,STRTG_BUSI_NAME	--母商机名称(战略商机名称)
+,0 AS CUS_Y_SIGN_AMT	--经销商年度签约业绩（万元）
+,'' AS IS_SHARE_TACTIC	--是否共享战略
+-- ,BELONG_TACTIC_CUST_ID--所属战略客户ID
+,STRTG_CUST_ID--所属战略客户客编编码
+,STRTG_CUST_NAME--所属战略客户名称
+,IS_CHN_NAME--是否连锁网点描述
+,CHAIN_TYPE_NAME  --连锁类型名称 
+,STRTG_TYPE_NAME --战略类型名称
+,'' AS CUST_TYPE_NAME --客户类型名称
+,'' AS BELONG_ROLE_NAME --所属角色名称
+,'' AS SECOND_ROLE_NAME --二级角色名称
+,'' AS CUS_LEV_NAME -- 客户级别名称
+,'' AS TACTIC_CUS_LEV_NAME -- 战略客户级别名称
+,'' AS CUS_STAR_LEV_NAME -- 客户星级名称
+,'' AS EXPAND_STAUS_NAME -- 开拓状态名称
+,'' AS OPE_STAUS_NAME -- 运营状态名称
+,'' AS UP_ORG_NAME--上级单位名称
+,'' AS CUST_RISK_LEV_NAME --客户风险等级名称
+,'' AS USER_GROUP_NAME 	--用户群体名称
+,APLY_DATE --申请日期
+,'LTC' AS DATA_SOURCE --数据来源
+,'' AS IS_NOT_BI_EXC  --是否不纳入BI计算
+,CASE WHEN SALE_STRTG_TYPE_CODE = 'DEALER_STRATEGY' THEN '经销商' 
+      WHEN SALE_STRTG_TYPE_CODE = 'DIRECT_SALES_STRATEGY' THEN '自营' ELSE NULL END AS BUSI_BELONG_FLAG --商机归属方类型
+,'' AS BUSI_EXP_USE --商机预估用量
+,'' AS IS_BX	--是否包销
+,'' AS CHECKED_MATTER_NAME --'核心事项完成打钩名称'
+,'' AS PROJ_PROGRESS_NAME --'项目具体进度名称'
+,'' AS SUPP_ITEM_NAME --'所需支持事项打钩名称'
+,'' AS SUPP_DETAIL --所需支持详细说明'
+,'' AS TM_SIGN_TIME --预计签约时间'
+,'' AS TM_DELV_TIME --预计供货时间'
+,'' AS TAIL_CREATE_TIME --跟踪创建时间'
+,'' AS TAIL_RECORD_TYPE_CODE --跟进数据类型编码
+,'' AS TAIL_RECORD_TYPE_NAME --跟进数据类型名称
+FROM DWRLTC.DWR_BO_BUSI_INFO_F 
+WHERE DIV_CODE <> 'CERAMIC_TILE_DIVISION'  AND DIV_CODE <> '' --排除瓷砖事业部
+UNION ALL 
+SELECT 
+ T.SJH AS BUSI_CODE  --商机编号
+,T.XMMC AS BUSI_NAME  --商机名称
+,T.KHBM AS DLR_CODE   --经销商客户编码
+,T1.NAME_1 AS DLR_NAME   --经销商客户名称
+,T.KHBM AS CUST_COMP_CODE --经销商/子公司客编
+,T1.NAME_1 AS CUST_COMP_NAME --经销商/子公司客编名称
+,'' AS SALE_STRTG_TYPE_CODE --销售战略类型编码
+,'' AS SALE_STRTG_TYPE_NAME --销售战略类型描述
+,T.YWYGH AS FACTORY_SALE_EMP_NUM --厂家业务员编号
+,T.YWY AS FACTORY_SALE_EMP_NAME --厂家业务员名称
+,'' AS BUSI_OWNER_CODE --商机负责人工号
+,'' AS BUSI_OWNER_NAME --商机负责人名称
+,T.XMGJR AS TRKR_EMP_NAME --商机跟进人
+,'' AS BUSI_BELONG_CODE -- 商机归属方代码
+,'' AS BUSI_BELONG_NAME -- 商机归属方名称
+,'' AS SALES_AREA_CODE --	销售区域（编码）
+,'' AS SALES_AREA_NAME --	销售区域
+,T.XSBM AS SALE_DEPT_CODE --销售部门
+,T.XSBMMS AS SALE_DEPT_NAME --销售部门描述
+,T.XSZ AS SALE_GRP_CODE --销售组
+,T.XSZMS AS SALE_GRP_NAME --销售组描述
+,T.ZVKORG AS SALE_ORG_CODE --销售组织编码
+,T.ZVTWEG AS CO_CODE --公司代码
+,T.ZWBS AS WBS_NUM --WBS号
+,'' AS DIV_CODE --事业部编码
+,T.SYB AS DIV_NAME --事业部描述
+,T.XMJSF AS BLDG_SIDE_NAME --建设方（甲方）
+,T.XMSGF AS CNSTR_SIDE_NAME --施工方（乙方）
+,'' AS DESIGN_ORG_NAME --设计单位全称
+,T.XMDZ AS ADDR --详细地址
+,T.SHENG AS PROV_NAME --省份
+,T.SHI AS CITY_NAME --城市
+,T.QU AS CNTY_NAME --县/区
+,CASE WHEN T.GCLB LIKE '%单体%' THEN '单体' 
+      WHEN T.GCLB LIKE '%战略集采%' THEN '战略集采'
+      WHEN T.GCLB LIKE '%战略%' AND T.GCLB NOT LIKE '%集采%' THEN '战略子项目' ELSE '' END AS BUSI_TYPE_NAME --商机类别描述
+,T.SJJD AS BUSI_STAGE --	商机阶段名称 
+,T.SJLX AS ENGR_BIG_CAT_NAME --工程大类名称
+,T.XMLX AS ENGR_SMALL_CAT_NAME --工程小类名称
+,T.SJLY2 AS BUSI_SRC_NAME --	商机来源名称
+,'' AS SOURCE_ORG_NAME  --	来源单位名称
+,CASE WHEN T.ZIF_SP_PRJ = 'N' THEN '否'  
+      WHEN T.ZIF_SP_PRJ = 'Y' THEN '否' ELSE '' END ASIS_SPEC_NAME --	是否特殊工程
+,CASE WHEN T.SFXDSJ = 'N' THEN '否'  
+      WHEN T.SFXDSJ = 'Y' THEN '否' ELSE '' END AS IS_BRO_BUSI_NAME  -- 	是否兄弟商机
+,T.YYSJ AS BRO_BUSI_CODE --	引用商机(兄弟商机)
+,'' AS IS_LONG_PROJ -- 	是否长周期项目
+,CASE WHEN T.SFXAXQSJ = 'N' THEN '否'  
+      WHEN T.SFXAXQSJ = 'Y' THEN '否' ELSE '' END AS IS_XN_NAME -- 	是否雄安
+,'' AS IS_FREE_BUSI --	是否免费商机
+,'' AS IS_REPET_BUSI --	是否重复商机
+,'' AS RELAT_REPET_BUSI -- 关联重复商机
+,SUBSTR(T.SJYXQ,1,4)||'-'||SUBSTR(T.SJYXQ,5,2)||'-'||SUBSTR(T.SJYXQ,7,2) AS EFF_DATE --	阶段有效结束日期
+,'' AS STATE_VALUE_START_DATE	--阶段有效开始日期
+,'' ASSTAGE_ST_NAME -- 阶段状态名称（系统预设）
+,0 AS STATE_VALUE_DAYS	--阶段有效天数
+,'' AS PROJ_NATURE_NAME  --	项目性质名称
+,T.CPPL AS MATERIAL_CAT_NAME --产品品类名称
+,'' AS SOURCE_CLUE_NAME  --源线索名称
+,'' AS APPR_ST_NAME --	商机报备状态名称
+,0 AS BUILD_AREA --	建筑面积/改造面积（平方米）
+,0 AS EID_AMT--预计采购金额(万元)
+,'' AS BUSI_SUCC_DATE --	报备成功日期
+,0 AS BUSI_SUM_AMT -- 	报备费总金额
+,0 AS BUSI_ADD_FEE_AMT --	报备费附加费用
+,'' AS BUSI_PAY_STYLE_NAME -- 	报备费缴纳方式名称
+,'' AS RPT_COST_ST_NAME   --报备费状态名称
+,'' AS BUSI_PAY_END_DATE --报备费缴费截止时间
+,0 AS COST_BUSI_AMT--报备费（成本中心）
+,0 AS CREDIT_BUSI_AMT--报备费（客户可用信贷）
+,0 AS BANK_BUSI_AMT--报备费（银行流水）
+,'' AS EXPTD_COOP_TYPE_NAME --预计合作类型描述
+,T.CGMS AS PUR_SCALE_NAME --采购规模名称
+,'' AS BID_MODE_NAME--竞价方式名称
+,'' AS IS_TAKE_BID_GRT  --是否已交投标保证金
+,'' AS IS_NEED_PRI_REVIEW --是否需要价审
+,'' AS PROJ_PAYER_CODE	--项目付款方
+,'' AS PROJ_PAYER_NAME	--项目付款方全称
+,'' AS BTR_RESULT_NAME 	--报价或投标或入库结果反馈名称 
+,'' AS SIGN_ORG_NAME--签约单位全称
+,'' AS IS_SIGN_ORG_SAME--签约单位是否与付款单位一致
+,'' AS SIGN_WAY_NAME--签约/入库方式名称
+,'' AS SIGN_VALUE_START_DATE--签约有效开始日期
+,'' AS SIGN_VALUE_END_DATE--签约有效结束日期
+,'' AS APPLY_WAY_CODE --供货方式名称 
+,'' AS APPLY_STAUS_NAME --供货状态名称  
+,'' AS IS_DELAY_APPLY --是否延迟供货
+,'' AS PREDICT_APPLY_FIN_DATE--预计供货完成日期
+,'' AS RENEW_STAUS_NAME --续签状态名称
+,'' AS S01_TRAN_TIME--S0-S1转化时间
+,'' AS S12_TRAN_TIME--S1-S2转化时间
+,'' AS S23_TRAN_TIME --S2-S3转化时间
+,'' AS S34_TRAN_TIME--S3-S4转化时间
+,'' AS S45_TRAN_TIME--S4-S5转化时间
+,'' AS SX_TRAN_TIME--SX转化时间
+,T.ZLSJH AS STRTG_BUSI_CODE-- 母商机编码(战略商机编号)
+,T.ZLSJMC AS STRTG_BUSI_NAME	--母商机名称(战略商机名称)
+,0 AS CUS_Y_SIGN_AMT	--经销商年度签约业绩（万元）
+,'' AS IS_SHARE_TACTIC	--是否共享战略
+-- ,BELONG_TACTIC_CUST_ID--所属战略客户ID
+,T.ZSRZLKH AS STRTG_CUST_ID--所属战略客户客编编码
+,'' AS STRTG_CUST_NAME--所属战略客户名称
+,CASE WHEN T.ZSFLSWD = 'N' THEN '否'  
+      WHEN T.ZSFLSWD = 'Y' THEN '否' ELSE '' END IS_CHN_NAME--是否连锁网点描述
+,'' AS CHAIN_TYPE_NAME  --连锁类型名称 
+,'' AS STRTG_TYPE_NAME --战略类型名称
+,'' AS CUST_TYPE_NAME --客户类型名称
+,'' AS BELONG_ROLE_NAME --所属角色名称
+,'' AS SECOND_ROLE_NAME --二级角色名称
+,'' AS CUS_LEV_NAME -- 客户级别名称
+,'' AS TACTIC_CUS_LEV_NAME -- 战略客户级别名称
+,'' AS CUS_STAR_LEV_NAME -- 客户星级名称
+,'' AS EXPAND_STAUS_NAME -- 开拓状态名称
+,'' AS OPE_STAUS_NAME -- 运营状态名称
+,'' AS UP_ORG_NAME--上级单位名称
+,'' AS CUST_RISK_LEV_NAME --客户风险等级名称
+,'' AS USER_GROUP_NAME 	--用户群体名称
+,SUBSTR(T.SQRQ,1,4)||'-'||SUBSTR(T.SQRQ,5,2)||'-'||SUBSTR(T.SQRQ,7,2) AS APLY_DATE --申请日期
+,'SAP' AS DATA_SOURCE --数据来源
+,'' AS IS_NOT_BI_EXC  --是否不纳入BI计算
+,'' AS BUSI_BELONG_FLAG --商机归属方类型
+,'' AS BUSI_EXP_USE --商机预估用量
+,'' AS IS_BX	--是否包销
+,'' AS CHECKED_MATTER_NAME --'核心事项完成打钩名称'
+,'' AS PROJ_PROGRESS_NAME --'项目具体进度名称'
+,'' AS SUPP_ITEM_NAME --'所需支持事项打钩名称'
+,'' AS SUPP_DETAIL --所需支持详细说明'
+,'' AS TM_SIGN_TIME --预计签约时间'
+,'' AS TM_DELV_TIME --预计供货时间'
+,'' AS TAIL_CREATE_TIME --跟踪创建时间'
+,'' AS TAIL_RECORD_TYPE_CODE --跟进数据类型编码
+,'' AS TAIL_RECORD_TYPE_NAME --跟进数据类型名称
+FROM SDI.SDI_ZSD_SJXX_1001 T
+LEFT JOIN DWRDIM.DWR_DIM_CUST_GENERAL_D T1
+ON T.KHBM = T1.CUST_NUM 
+AND T1.END_DATE = '4712-12-31'
+AND T1.DEL_FLAG = 'N'
+WHERE T.SJH NOT IN (SELECT BUSI_CODE FROM DWRLTC.DWR_BO_BUSI_INFO_F WHERE DIV_CODE <> 'CERAMIC_TILE_DIVISION'  AND DIV_CODE <> '' 
+UNION ALL SELECT BUSI_CODE FROM DWRLTC.DWR_LTC_CRM_OPPORTUNITY_T WHERE BUSI_TYPE_NAME <> '其他事业部商机'  AND BUSI_TYPE_NAME <> '' AND IS_NOT_BI_EXC <> '是') 
+)
+INSERT OVERWRITE TABLE DWRLTC.DWR_PROJ_BUSI_GATHER_T    
+SELECT 
+ T.BUSI_CODE  --商机编号
+,T.BUSI_NAME  --商机名称 
+,T.CUST_NUM  --经销商客编
+,T.CUST_NAME --经销商名称
+,T.CUST_COMP_CODE --经销商/子公司客编
+,T.CUST_COMP_NAME --经销商/子公司客编名称
+,T.ERP_TYPE_CODE -- 企业类型
+,T.ERP_TYPE_NAME -- 企业类型名称
+,T.EMP_NUM  --业务员工号
+,T.EMP_NAME  --业务员名称
+,T.BUSI_OWNER_CODE --商机负责人工号
+,T.BUSI_OWNER_NAME --商机负责人名称
+,T.BUSI_FOLLOWER --商机跟进人
+,T.BUSI_BELONG_CODE -- 商机归属方代码
+,T.BUSI_BELONG_NAME -- 商机归属方名称
+,T.SALES_AREA_CODE --	销售区域（编码）
+,T.SALES_AREA_NAME --	销售区域
+,T.SALES_DEPT_CODE --	销售部门（编码）
+,T.SALES_DEPT_NAME --	销售部门
+,T.SALES_GRP_CODE --	销售组编码
+,T.SALES_GRP_NAME --	销售组名称
+,T.SALES_ORG --销售组织
+,T.COMP_CODE --公司代码
+,T.WBS_CODE --WBS号
+,CASE WHEN T.DEPT_CODE IS NULL OR T.DEPT_CODE = '' THEN T2.NODE_NAME2 ELSE T.DEPT_CODE END AS DEPT_CODE--事业部编码
+,CASE WHEN T.DEPT_NAME IS NULL OR T.DEPT_NAME = '' THEN T2.NODE_DESC2 ELSE T.DEPT_NAME END AS DEPT_NAME--事业部名称
+,T.DEVEL_ORG_NAME	--建设单位全称
+,T.CONST_ORG_NAME --施工单位全称
+,T.DESIGN_ORG_NAME --设计单位全称
+,T.ADDRESS --详细地址
+,T.PROVINCE_NAME --	省名称
+,T.CITY_NAME  --市名称
+,T.REGION_NAME -- 区名称
+,T.BUSI_TYPE_NAME --	业务类型名称
+,T.BUSI_STAGE_NAME --	商机阶段名称
+,T.PROJ_MAJOR_CATE_NAME --工程大类名称
+,T.PROJ_SUB_CATE_NAME --工程小类名称
+,T.BUSI_SOURCE_NAME --	商机来源名称
+,T.SOURCE_ORG_NAME  --	来源单位名称
+,T.IS_SPEC_PROJ --	是否特殊工程
+,T.IS_BRO_BUSI  -- 	是否兄弟商机
+,T.QUTO_BUSI --	引用商机
+,T.IS_LONG_PROJ -- 	是否长周期项目
+,T.IS_XA -- 	是否雄安
+,T.IS_FREE_BUSI --	是否免费商机
+,T.IS_REPET_BUSI --	是否重复商机
+,T.RELAT_REPET_BUSI -- 关联重复商机
+,T.STATE_VALUE_END_DATE --	阶段有效结束日期
+,T.STATE_VALUE_START_DATE	--阶段有效开始日期
+,T.STATE_STAUS_NAME -- 阶段状态名称（系统预设）
+,T.STATE_VALUE_DAYS	--阶段有效天数
+,T.PROJ_NATURE_NAME  --	项目性质名称
+,T.PROD_CATE_NAME --产品品类名称
+,T.SOURCE_CLUE_NAME  --源线索名称
+,T.BUSI_REP_STATUS_NAME --	商机报备状态名称
+,T.BUILD_AREA --	建筑面积/改造面积（平方米）
+,T.PREDICT_PUR_AMT--预计采购金额(万元)
+,T.BUSI_SUCC_DATE --	报备成功日期
+,T.BUSI_SUM_AMT -- 	报备费总金额
+,T.BUSI_ADD_FEE_AMT --	报备费附加费用
+,T.BUSI_PAY_STYLE_NAME -- 	报备费缴纳方式名称
+,T.BUSI_FEE_STATUS_NAME   --报备费状态名称
+,T.BUSI_PAY_END_DATE --报备费缴费截止时间
+,T.COST_BUSI_AMT--报备费（成本中心）
+,T.CREDIT_BUSI_AMT--报备费（客户可用信贷）
+,T.BANK_BUSI_AMT--报备费（银行流水）
+,T.PUR_WAY_NAME --采购方式名称
+,T.PUR_SCALE_NAME --采购规模名称
+,T.BID_MODE_NAME--竞价方式名称
+,T.IS_TAKE_BID_GRT  --是否已交投标保证金
+,T.IS_NEED_PRI_REVIEW --是否需要价审
+,T.PROJ_PAYER_CODE	--项目付款方
+,T.PROJ_PAYER_NAME	--项目付款方全称
+,T.BTR_RESULT_NAME 	--报价或投标或入库结果反馈名称 
+,T.SIGN_ORG_NAME--签约单位全称
+,T.IS_SIGN_ORG_SAME--签约单位是否与付款单位一致
+,T.SIGN_WAY_NAME--签约/入库方式名称
+,T.SIGN_VALUE_START_DATE--签约有效开始日期
+,T.SIGN_VALUE_END_DATE--签约有效结束日期
+,T.APPLY_WAY_CODE --供货方式名称 
+,T.APPLY_STAUS_NAME --供货状态名称  
+,T.IS_DELAY_APPLY --是否延迟供货
+,T.PREDICT_APPLY_FIN_DATE--预计供货完成日期
+,T.RENEW_STAUS_NAME --续签状态名称
+,T.S01_TRAN_TIME--S0-S1转化时间
+,T.S12_TRAN_TIME--S1-S2转化时间
+,T.S23_TRAN_TIME --S2-S3转化时间
+,T.S34_TRAN_TIME--S3-S4转化时间
+,T.S45_TRAN_TIME--S4-S5转化时间
+,T.SX_TRAN_TIME--SX转化时间
+,T.PAR_BUSI_CODE-- 母商机编码
+,T.PAR_BUSI_NAME	--母商机名称
+,T.CUS_Y_SIGN_AMT	--经销商年度签约业绩（万元）
+,T.IS_SHARE_TACTIC	--是否共享战略
+,T.BELONG_TACTIC_CUST_CODE--所属战略客户客编编码
+,T.BELONG_TACTIC_CUST_NAME--所属战略客户客编编码名称
+,T.IS_CHAIN--是否连锁
+,T.CHAIN_TYPE_NAME  --连锁类型名称 
+,T.TACTIC_STYLE_NAME --战略类型名称
+,T.CUST_TYPE_NAME --客户类型名称
+,T.BELONG_ROLE_NAME --所属角色名称
+,T.SECOND_ROLE_NAME --二级角色名称
+,T.CUS_LEV_NAME -- 客户级别名称
+,T.TACTIC_CUS_LEV_NAME -- 战略客户级别名称
+,T.CUS_STAR_LEV_NAME -- 客户星级名称
+,T.EXPAND_STAUS_NAME -- 开拓状态名称
+,T.OPE_STAUS_NAME -- 运营状态名称
+,T.UP_ORG_NAME--上级单位名称
+,T.CUST_RISK_LEV_NAME --客户风险等级名称
+,T1.REC_CRT_DATE  --工程渠道建档时间
+,T.USER_GROUP_NAME 	--用户群体名称
+,T.CREATE_DATE --	商机创建时间
+,T.DATA_SOURCE --数据来源
+,T2.NODE_NAME1 AS BUSI_1_LEV_CODE --商机一级节点描述
+,T2.NODE_NAME2 AS BUSI_2_LEV_CODE --商机二级节点描述
+,T2.NODE_NAME3 AS BUSI_3_LEV_CODE --商机三级节点描述
+,T2.NODE_NAME4 AS BUSI_4_LEV_CODE --商机四级节点描述
+,T2.NODE_NAME5 AS BUSI_5_LEV_CODE --商机五级节点描述
+,T2.NODE_NAME6 AS BUSI_6_LEV_CODE --商机六级节点描述
+,T2.NODE_NAME7 AS BUSI_7_LEV_CODE --商机七级节点描述 
+,T2.NODE_NAME8 AS BUSI_8_LEV_CODE --商机八级节点描述
+,T2.NODE_NAME9 AS BUSI_9_LEV_CODE --商机九级节点描述
+,T2.NODE_DESC1 AS BUSI_1_LEV_DESC --商机一级节点描述
+,T2.NODE_DESC2 AS BUSI_2_LEV_DESC --商机二级节点描述
+,T2.NODE_DESC3 AS BUSI_3_LEV_DESC --商机三级节点描述
+,T2.NODE_DESC4 AS BUSI_4_LEV_DESC --商机四级节点描述
+,T2.NODE_DESC5 AS BUSI_5_LEV_DESC --商机五级节点描述
+,T2.NODE_DESC6 AS BUSI_6_LEV_DESC --商机六级节点描述
+,T2.NODE_DESC7 AS BUSI_7_LEV_DESC --商机七级节点描述 
+,T2.NODE_DESC8 AS BUSI_8_LEV_DESC --商机八级节点描述
+,T2.NODE_DESC9 AS BUSI_9_LEV_DESC --商机九级节点描述
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+,T.IS_NOT_BI_EXC  --是否不纳入BI计算
+,T1.PARENT_CUST_NUM AS PAR_CUST_NUM --母客编(主档)
+,T3.NAME_1 AS PAR_CUST_NAME --母客编名称(主档)
+,T.BUSI_BELONG_FLAG --商机归属方类型
+,T.BUSI_EXP_USE --商机预估用量
+,T.IS_BX	--是否包销
+,T.CHECKED_MATTER_NAME --'核心事项完成打钩名称'
+,T.PROJ_PROGRESS_NAME --'项目具体进度名称'
+,T.SUPP_ITEM_NAME --'所需支持事项打钩名称'
+,T.SUPP_DETAIL --所需支持详细说明'
+,T.TM_SIGN_TIME --预计签约时间'
+,T.TM_DELV_TIME --预计供货时间'
+,T.TAIL_CREATE_TIME --跟踪创建时间'
+,T.TAIL_RECORD_TYPE_CODE --跟进数据类型编码
+,T.TAIL_RECORD_TYPE_NAME --跟进数据类型名称
+FROM TMP T
+LEFT JOIN DWRDIM.DWR_DIM_CUST_SALES_AREA_D T1 
+ON T.SALES_ORG = T1.SALES_ORG_CODE
+AND T.CUST_NUM = T1.CUST_NUM
+AND T1.DISTRIBUTION_CHNL_CODE = '06'
+AND T1.END_DATE = '4712-12-31'
+AND T1.DEL_FLAG = 'N'
+LEFT JOIN DM.DM_RPT_SALES_GROUP_T T2 
+ON T.SALES_GRP_CODE = T2.NODE_NAME9
+LEFT JOIN DWRDIM.DWR_DIM_CUST_GENERAL_D T3
+ON T1.PARENT_CUST_NUM = T3.CUST_NUM 
+AND T3.END_DATE = '4712-12-31'
+AND T3.DEL_FLAG = 'N'
+WHERE T.BUSI_CODE <> 'D20190803002'   -- 20251024,应HJY要求，因其省市区乱码，剔除商机D20190803002
+
+
+

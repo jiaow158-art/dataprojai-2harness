@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F",
+    "type": "DWSSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "应收商票资金成本",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

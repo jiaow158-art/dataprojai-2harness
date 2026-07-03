@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_CUST_COMP_CODE_TMP",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/CUST",
+    "description": "客户主数据（公司代码）临时表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SW_OUT_IN_RATE_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "产销平衡率",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

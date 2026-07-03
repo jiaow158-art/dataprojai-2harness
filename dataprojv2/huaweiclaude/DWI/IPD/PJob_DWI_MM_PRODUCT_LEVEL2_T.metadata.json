@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MM_PRODUCT_LEVEL2_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/IPD",
+    "description": "产品层级2",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

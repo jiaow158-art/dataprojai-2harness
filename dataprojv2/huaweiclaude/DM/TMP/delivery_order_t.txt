@@ -1,0 +1,125 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/04/12 15:46:53 GMT+08:00
+-- ******************************************************************** --
+--订单和提货单关系：VBAP-VBELN = LIPS-VGBEL AND VBAP-POSNR = LIPS-VGPOS
+--提货单和发票关系：VBRP-VGBEL = LIPS-VBELN AND VBRP-VGPOS = LIPS-POSNR
+--提货单：发货数量LIPS-LFIMG,发货日期:LIKP-WADAT_IST
+--开票：开票日期:vbrk-FKDAT,开票数量：vbrp-FKIMG,发票金额：VBRP-NETWR
+--交货单号  交货日期    交货数量    开票日期  开票数量 开票金额   +  上面的维度  
+set hive.exec.dynamic.partition=true;  
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.max.dynamic.partitions.pernode=10000;
+set hive.exec.max.dynamic.partitions=100000;
+set hive.exec.max.created.files=1000000;
+
+WITH LIPS_TMP AS (
+SELECT 
+ T1.POSNR                -- 行
+,T1.VBELN                 -- 交货单
+,T1.PSTYV                 -- 交货项目类别
+,T2.VTEXT                --描述
+,T1.MATNR                 -- 物料编码
+,T1.LGORT                 -- 库存地点
+,T1.LFIMG                 -- 发货数量
+,T1.VGBEL                -- 来源
+,T1.VGPOS                 -- 来源项目号
+FROM sdi.sdi_lips_1001 T1 LEFT JOIN (SELECT PSTYV,VTEXT FROM sdi.sdi_tvapt_1001 WHERE SPRAS = '1' AND MANDT = '800' GROUP BY PSTYV,VTEXT) T2 ON T1.PSTYV =T2.PSTYV
+)
+
+,LIKP_TMP AS (
+SELECT 
+ T1.VBELN             -- 单号
+,T1.LFART                 -- 交货类型
+,T2.VTEXT                --描述
+,T1.WADAT_IST         -- 交货日期
+,T1.KUNAG                  --售达方
+FROM sdi.sdi_LIKP_1001 T1 
+LEFT JOIN  (SELECT LFART,VTEXT from sdi.sdi_TVLKT_1001 where SPRAS = '1'AND MANDT = '800'  group by LFART,VTEXT) T2 ON T1.LFART =T2.LFART
+)
+
+--,VBAK_TMP AS (
+--SELECT
+-- T1.VBELN 
+--,T1.VBELN_GRP 
+--,T1.VBELN_OSS 
+--,T1.OSS_VBELN 
+--,T1.AUDAT                 -- 凭证日期
+--,T1.ERDAT                -- 创建日期
+--,T1.ERZET                 -- 时间
+--,T1.ERNAM                 -- 创建人
+--,T1.AUART                 -- 销售凭证类型
+--,T2.BEZEI                -- 销售凭证描述
+--,T1.NETWR                 -- 净值
+--,T1.VKORG                 -- 销售机构
+--,T1.VTWEG                 -- 分销渠道
+--,T1.AUGRU                 -- 订货原因
+--,T1.FAKSK                 -- 开票冻结
+--,T1.WAERK                 -- 凭证货币 
+--,T1.SPART                 -- 产品组
+--,T1.VKGRP                 -- 销售组 
+--,T1.VKBUR                 -- 销售办事处 
+--,T1.VSBED                 -- 装运条件 
+--,T1.FKARA                 -- 订单相关开票类
+--,T1.IHREZ 
+--,T1.KUNNR                 -- 售达方
+--,T1.TAXK1 
+--FROM VBAK t1 
+--LEFT JOIN (SELECT AUART ,BEZEI FROM TVAKT WHERE MANDT='800' AND SPRAS = '1' GROUP BY AUART ,BEZEI) T2 ON T1.AUART= T2.AUART
+--)
+
+--
+--create table default.delivery_order_t(
+--VBELN  		string	comment "交货单号",
+--POSNR		STRING	COMMENT "行",
+--LFART		STRING	COMMENT "交货类型",
+--VTEXT		STRING	comment	"交货类型描述",
+--PSTYV		string  comment "交货项目类别",
+--VTEXT1		string  comment "交货项目类别描述",
+--WADAT_IST	string  comment "交货日期",
+--KUNAG		string	comment "售达方",
+--MATNR		string	comment "物料编码",
+--LGORT		string	comment "库存地点",
+--LFIMG		decimal(38,10) 	comment "发货数量",
+--VGBEL		string	comment "参考凭证",
+--VGPOS		string	comment "参考项目号",
+--FKIMG		decimal(38,10)	comment "开票数量",
+--NETWR		decimal(38,10)	comment "开票金额",
+--FKDAT		string	comment "开票日期"
+--)partitioned by   (months string )
+
+
+insert overwrite table default.delivery_order_t
+SELECT 
+ T1.VBELN            	 -- 单号
+,T2.POSNR                -- 行
+,T1.LFART                -- 交货类型
+,T1.VTEXT                -- 描述
+,T2.PSTYV                -- 交货项目类别
+,T2.VTEXT                -- 描述
+,T1.WADAT_IST         	 -- 交货日期
+,T1.KUNAG                  -- 售达方
+,T2.MATNR                 -- 物料编码
+,T2.LGORT                 -- 库存地点
+,T2.LFIMG                 -- 发货数量
+,T2.VGBEL                -- 来源
+,T2.VGPOS                 -- 来源项目号
+,'' FKIMG                -- 开票数量
+,'' NETWR                 -- 开票金额
+,'' FKDAT                -- 开票日期
+--,T5.MATKL 
+--,T5.PRDHA
+
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE 
+,'' posnr_vbrp
+,'' VBELN_vbrp
+,'' MWSBP_vbrp
+,substr(WADAT_IST,1,6) months
+FROM LIKP_TMP T1 
+JOIN LIPS_TMP T2 ON T1.VBELN  = T2.VBELN
+-- JOIN sdi.sdi_vbrp_1001 t3         ON T1.VBELN = T3.VGBEL AND  t3.VGPOS = t2.POSNR
+-- JOIN sdi.sdi_vbrk_1001 T4          ON T3.VBELN  = T4.VBELN 
+--JOIN MARA T5         ON T2.MATNR = T5.MATNR
+
+

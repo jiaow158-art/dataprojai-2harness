@@ -1,0 +1,36 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/06/19 09:34:38 GMT+08:00
+-- description: 基地日均产量目标表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from zhz 20250822 新增产线
+-- ******************************************************************** --
+
+insert overwrite table DM.DM_PAM_PRODUCTION_TARGET_MAINTENANCE_TABLE_T
+select 
+site as site_code,
+site_describe as site_desc,
+work_shop as work_shop_code,
+work_shop_desc,
+product_line,
+product_line_desc,
+effective_start_date as start_date,
+effective_end_date as end_date,
+creater_id,
+creater,
+create_time,
+updater_id,
+updater,
+update_time,
+site_id,
+work_shop_id,
+product_line_id,
+delete_flag,
+specification,
+daily_average_production,
+product_line_a,
+current_timestamp as dw_last_update_date
+from SDI.SDI_DP_PRODUCTION_TARGET_MAINTENANCE_TABLE_1006
+where delete_flag = 1 

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GENERAL_LEDGER_ACCOUNT_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "科目表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

@@ -1,0 +1,358 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/07/03 17:30:16 GMT+08:00
+-- description:江西盘点数
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--CREATE TABLE DWIOTD.DWI_PAM_COST_JX_INV_PD_T AS
+WITH PC_QC_UUID_DATA as( -- 期初UUID数据 坯仓期初数
+	select qs.factory_code,
+	       qs.prod_date, 
+	       qs.qc_uuid
+	from (
+	    select qs.factory AS factory_code,
+			      qs.operationtime AS prod_date, 
+			      max(qs.uuid)  qc_uuid
+		  from SDI.sdi_qis_inventory_status_1011 qs   -- 盘点状态
+		  where qs.delstatus <> '9'
+		  and  qs.link = '5'  -- 坯仓
+		  GROUP BY qs.factory,
+		           qs.operationtime
+	) qs 
+	JOIN (
+	   SELECT FACTORY AS factory_code,
+	   		  max(substring(t.INVDATE,1,10)) AS prod_date
+	   FROM SDI.SDI_QIS_MUDINVENTORY_1011 t -- stg.stg_qis_mudinventory_1011 t  -- 泥坯盘点明细表
+	   GROUP BY FACTORY,substring(t.INVDATE,1,10) 
+	)t2
+	ON qs.factory_code = t2.factory_code
+	AND qs.prod_date = t2.prod_date
+),
+qis_mudinventory_data as(
+	SELECT
+	    T2.prod_date,
+		mi.factory AS factory_code,
+		mi.mudtype productnp,
+		'' productgc,
+		sum(mi.cnt) pc_qc_qty
+	FROM SDI.SDI_QIS_MUDINVENTORY_1011 mi --stg.stg_qis_mudinventory_1011 mi
+	LEFT JOIN PC_QC_UUID_DATA T2
+	ON mi.FACTORY = T2.factory_code
+	AND mi.INVENTORYID = T2.qc_uuid
+	WHERE mi.status = '0'
+	GROUP BY T2.prod_date,
+		mi.factory,
+		mi.mudtype
+),
+PC_QC_DATA_01 as(
+	SELECT wy.prod_date,
+	    wy.factory_code,
+		d.dictname,
+		wy.productnp,
+		wy.productgc,
+		sum(pc_qc_qty) AS pc_qc_qty
+	FROM qis_mudinventory_data wy
+	LEFT JOIN SDI.SDI_QIS_MUD_1011 m 
+	ON m.status <> '9'
+	AND m.mudid = wy.productnp
+	LEFT JOIN SDI.SDI_DP_DICTIONARY_1011 d 
+	ON d.status <> '9'
+	AND d.dictcode = m.category
+	WHERE (wy.productnp IS NOT NULL
+			OR wy.productgc IS NOT NULL)
+	AND d.dictname NOT IN ('花芯','水箱盖')
+	GROUP BY wy.prod_date,
+	    wy.factory_code,
+		d.dictname,
+		wy.productnp,
+		wy.productgc
+),
+PC_QC_DATA_02 as(
+	SELECT t.PROD_DATE, 
+	       t.factory_code,
+	       CASE WHEN t.PRODUCTGC IS NULL THEN t1.MODELID ELSE t.PRODUCTGC END AS material_num,
+	       sum(t.pc_qc_qty) AS pc_qc_qty
+	FROM PC_QC_DATA_01 t
+	LEFT JOIN (
+		  SELECT t.MUDID,t.MODELID
+			FROM (
+				SELECT p.*,
+				       ROW_number() over(PARTITION BY MUDID ORDER BY UUID asc) rn
+				FROM SDI.SDI_PRODUCTMODEL_1011 p 
+			) t
+			WHERE rn = 1
+		)t1
+	ON t.PRODUCTNP = t1.MUDID
+	GROUP BY t.PROD_DATE, 
+	         t.factory_code,
+	         CASE WHEN t.PRODUCTGC IS NULL THEN t1.MODELID ELSE t.PRODUCTGC END
+),
+-- 喷釉期初数
+PY_QC_UUID_DATA as( -- 期初UUID数据
+	 select qs.factory_code,
+	        qs.prod_date, 
+	        qs.qc_uuid
+	 from (
+	     select qs.factory AS factory_code,
+	      qs.operationtime AS prod_date, 
+	      max(qs.uuid)  qc_uuid
+	  from SDI.sdi_qis_inventory_status_1011 qs 
+	  where qs.delstatus <> '9'
+	  and  qs.link = '6' --喷釉
+	  GROUP BY qs.factory,
+	           qs.operationtime
+	 ) qs 
+	 JOIN (
+	    SELECT FACTORY AS factory_code,
+	        max(substring(t.INVDATE,1,10)) AS prod_date
+	    FROM SDI.SDI_QIS_GLAZEINVENTORY_1011 t --STG.STG_QIS_GLAZEINVENTORY_1011 t  -- 釉坯仓盘点
+	    GROUP BY FACTORY,substring(t.INVDATE,1,10) 
+	 )t2
+	 ON qs.factory_code = t2.factory_code
+	 AND qs.prod_date = t2.prod_date
+),
+T_TMP_MES_STATISTICS_SCRBB as(
+	SELECT T2.prod_date,
+		GI.FACTORY,
+		GI.MUDTYPE PRODUCTNP,
+		CASE
+			WHEN GI.PRODUCTGC = '盘点泥坯无釉坯' THEN ''
+			ELSE GI.PRODUCTGC
+		END PRODUCTGC,
+		'' PRODUCTCP,
+		SUM(CASE WHEN GI.TYPE = '0' THEN GI.CNT ELSE 0 END) sy_qc_qty, -- 釉坯期初数
+		sum(CASE WHEN gi.type = '1' THEN gi.cnt ELSE 0 END) sy_np_qc_qty --泥坯期初数	
+	FROM SDI.SDI_QIS_GLAZEINVENTORY_1011 GI -- STG.STG_QIS_GLAZEINVENTORY_1011 GI
+	LEFT JOIN SDI.SDI_PRODUCTMODEL_1011 P 
+	ON P.STATUS <> '9'
+	AND P.MODELID = GI.PRODUCTGC
+	LEFT JOIN PY_QC_UUID_DATA T2
+	ON GI.FACTORY = T2.factory_code
+	AND GI.INVENTORYID = T2.qc_uuid
+	WHERE GI.STATUS <> '9'
+	GROUP BY T2.prod_date,
+			GI.FACTORY,
+			GI.MUDTYPE,
+			GI.PRODUCTGC
+),
+py_qc_data as(
+	SELECT wy.prod_date,
+	    wy.FACTORY AS factory_code,
+		d.dictname,
+		wy.productnp,
+		wy.productgc,
+		sum(sy_qc_qty) sy_qc_qty,
+		sum(sy_np_qc_qty) AS sy_np_qc_qty
+	FROM T_TMP_MES_STATISTICS_SCRBB wy
+	LEFT JOIN SDI.SDI_QIS_MUD_1011 m 
+	ON m.status <> '9'
+	AND m.mudid = wy.productnp
+	LEFT JOIN SDI.SDI_DP_DICTIONARY_1011 d 
+	ON d.status <> '9'
+	AND d.dictcode = m.category
+	WHERE (wy.productnp IS NOT NULL
+			OR wy.productgc IS NOT NULL
+			OR wy.productcp IS NOT NULL)
+	AND d.dictname NOT IN ('花芯','水箱盖')
+	GROUP BY wy.prod_date,
+	   wy.FACTORY,
+		d.dictname,
+		wy.productnp,
+		wy.productgc
+),
+py_qc_data_01 as(
+	SELECT t.PROD_DATE,
+	       t.factory_code,
+	       t.DICTNAME,
+	       t.PRODUCTNP,
+	       CASE WHEN PRODUCTGC IS NULL THEN 
+	        max(PRODUCTGC) over(PARTITION BY PROD_DATE,factory_code,DICTNAME,PRODUCTNP)
+	       ELSE PRODUCTGC end AS PRODUCTGC,
+	       t.SY_QC_QTY,
+	       t.SY_NP_QC_QTY
+	FROM py_qc_data t
+),
+py_qc_data_02 as(
+	SELECT t.PROD_DATE, 
+	       t.factory_code,
+		   --DICTNAME, 
+		   PRODUCTNP, 
+		   CASE WHEN t.PRODUCTGC IS NOT NULL AND t.PRODUCTGC <> '' THEN t.PRODUCTGC ELSE t1.MODELID END AS  material_num,
+		   sum(t.SY_QC_QTY) AS SY_QC_QTY,
+		   sum(t.SY_NP_QC_QTY) AS SY_NP_QC_QTY
+	FROM py_qc_data_01 t
+	LEFT JOIN (
+	  SELECT t.MUDID,t.MODELID
+		FROM (
+			SELECT p.*,
+			       ROW_number() over(PARTITION BY MUDID ORDER BY UUID asc) rn
+			FROM SDI.SDI_PRODUCTMODEL_1011 p 
+		) t
+		WHERE rn = 1
+	)t1
+	ON t.PRODUCTNP = t1.MUDID
+	GROUP BY t.PROD_DATE, 
+	         t.factory_code,
+	         --DICTNAME, 
+	         PRODUCTNP, 
+	         CASE WHEN t.PRODUCTGC IS NOT NULL AND t.PRODUCTGC <> '' THEN t.PRODUCTGC ELSE t1.MODELID END
+),
+SC_QC_UUID_DATA as( -- 期初UUID数据
+	select qs.factory_code,
+	        qs.prod_date, 
+	        qs.qc_uuid
+	 from (
+	     select qs.factory AS factory_code,
+	      qs.operationtime AS prod_date, 
+	      max(qs.uuid)  qc_uuid
+	  from SDI.sdi_qis_inventory_status_1011 qs 
+	  where qs.delstatus <> '9'
+	  and  qs.link = '7' --烧成
+	  GROUP BY qs.factory,
+	           qs.operationtime
+	 ) qs 
+	 JOIN (
+	    SELECT FACTORY AS factory_code,
+	        max(substring(t.INVDATE,1,10)) AS prod_date
+	    FROM SDI.SDI_QIS_YLINVENTORY_1011 t --STG.STG_QIS_YLINVENTORY_1011 t  -- 窑炉盘点
+	    GROUP BY FACTORY,substring(t.INVDATE,1,10) 
+	 )t2
+	 ON qs.factory_code = t2.factory_code
+	 AND qs.prod_date = t2.prod_date
+),
+qis_ylinventory_data as(
+	SELECT T2.prod_date,
+		yi.factory AS factory_code,
+		p.mudid productnp,
+		yi.pmodel productgc,
+		sum(yi.pronum) sc_qc_qty
+	FROM SDI.SDI_QIS_YLINVENTORY_1011 yi --STG.STG_QIS_YLINVENTORY_1011 yi
+	LEFT JOIN SDI.SDI_PRODUCTMODEL_1011 p 
+	ON p.status <> '9'
+	AND p.modelid = yi.pmodel
+	LEFT JOIN SC_QC_UUID_DATA T2
+	ON yi.FACTORY = T2.factory_code
+	AND yi.INVENTORYID = T2.qc_uuid
+	GROUP BY T2.prod_date,
+		yi.factory,
+		p.mudid,
+		yi.pmodel
+),
+sc_qc_data as(
+	SELECT wy.prod_date,
+	    wy.factory_code,
+		--d.dictname,
+		--wy.productnp,
+		wy.productgc AS material_num,
+		sum(sc_qc_qty) AS sc_qc_qty
+	FROM qis_ylinventory_data wy
+	LEFT JOIN sdi.sdi_qis_mud_1011 m 
+	ON	m.status <> '9'
+	AND m.mudid = wy.productnp
+	LEFT JOIN sdi.sdi_dp_dictionary_1011 d 
+	ON d.status <> '9'
+	AND d.dictcode = m.category
+	WHERE (wy.productnp IS NOT NULL
+			OR wy.productgc IS NOT NULL)
+	   AND d.dictname NOT IN ('花芯','水箱盖')
+	GROUP BY wy.prod_date,
+		    wy.factory_code,
+			--d.dictname,
+			--wy.productnp,
+			wy.productgc
+),
+jx_qc_data as(
+SELECT substring(t1.PROD_DATE,1,7) AS PROD_DATE, 
+       t1.factory_code,
+	   t1.material_num,
+	   sum(t1.pc_qc_qty) AS pc_qc_qty,
+	   SUM(t1.SY_QC_QTY) AS SY_QC_QTY,
+	   sum(t1.SY_NP_QC_QTY) AS SY_NP_QC_QTY,
+	   sum(t1.sc_qc_qty) AS sc_qc_qty
+from(
+    SELECT t1.PROD_DATE, 
+	       t1.factory_code,
+		   t1.material_num,
+		   t1.pc_qc_qty,
+		   0 AS SY_QC_QTY, 
+		   0 AS SY_NP_QC_QTY,
+		   0 AS sc_qc_qty
+	FROM PC_QC_DATA_02 t1
+    UNION ALL 
+	SELECT t1.PROD_DATE, 
+	       t1.factory_code,
+		   t1.material_num,
+		   0 AS pc_qc_qty,
+		   t1.SY_QC_QTY,
+		   t1.SY_NP_QC_QTY,
+		   0 AS sc_qc_qty
+	FROM py_qc_data_02 t1
+	UNION ALL
+	SELECT t2.PROD_DATE, 
+	       t2.factory_code,
+		   t2.material_num,
+		   0 AS pc_qc_qty,
+		   0 AS SY_QC_QTY,
+		   0 AS SY_NP_QC_QTY,
+		   t2.sc_qc_qty
+	FROM sc_qc_data t2
+)t1
+GROUP BY substring(t1.PROD_DATE,1,7), 
+         t1.factory_code,
+	     t1.material_num
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_PAM_COST_JX_INV_PD_T
+SELECT t1.PROD_DATE,    -- 月份
+       t1.FACTORY_CODE,  -- 工厂编码
+       --t1.MATERIAL_NUM,   -- 物料编码
+       t2.material_num,
+       SUM(t1.PC_QC_QTY) AS PC_QC_QTY,  -- 期初坯仓数
+       SUM(t1.SY_QC_QTY) AS SY_QC_QTY,   -- 期初喷釉数
+       SUM(t1.SY_NP_QC_QTY) AS SY_NP_QC_QTY,  -- 期初泥坯数
+       SUM(t1.SC_QC_QTY) AS SC_QC_QTY,  -- 期初烧成数
+       SUM(t1.PC_PD_QTY) AS PC_PD_QTY,  -- 盘点坯仓数
+       SUM(t1.SY_PD_QTY) AS SY_PD_QTY,   -- 盘点喷釉数
+       SUM(t1.SY_NP_PD_QTY) AS SY_NP_PD_QTY,  -- 盘点泥坯数
+       SUM(t1.SC_PD_QTY) AS SC_PD_QTY,   -- 盘点烧成数
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE  -- 数据同步时间
+FROM(
+    SELECT --t1.PROD_DATE, 
+           SUBSTRING(ADD_MONTHS(CONCAT(t1.PROD_DATE,'-01'),1),1,7) AS PROD_DATE, -- 期初时间
+           t1.FACTORY_CODE, 
+           t1.MATERIAL_NUM, 
+           t1.PC_QC_QTY, 
+           t1.SY_QC_QTY, 
+           t1.SY_NP_QC_QTY, 
+           t1.SC_QC_QTY,
+           0 AS PC_PD_QTY, 
+           0 AS SY_PD_QTY, 
+           0 AS SY_NP_PD_QTY, 
+           0 AS SC_PD_QTY
+    FROM jx_qc_data t1
+    WHERE t1.PROD_DATE IS NOT null
+    --WHERE t1.prod_date = '2023-04'
+    UNION ALL
+    SELECT t1.PROD_DATE, 
+           t1.FACTORY_CODE, 
+           t1.MATERIAL_NUM, 
+           0 AS PC_QC_QTY, 
+           0 AS SY_QC_QTY, 
+           0 AS SY_NP_QC_QTY, 
+           0 AS SC_QC_QTY,
+           t1.PC_QC_QTY AS PC_PD_QTY, 
+           t1.SY_QC_QTY AS SY_PD_QTY, 
+           t1.SY_NP_QC_QTY AS SY_NP_PD_QTY, 
+           t1.SC_QC_QTY AS SC_PD_QTY
+    FROM jx_qc_data t1
+    --WHERE t1.prod_date = '2023-05'
+)t1
+left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t2 -- 生产BOM关系数据
+on t1.FACTORY_CODE = t2.factory_code
+and t1.MATERIAL_NUM = t2.small_material_num
+GROUP BY t1.PROD_DATE, 
+         t1.FACTORY_CODE, 
+         --t1.MATERIAL_NUM 
+         t2.material_num
+;

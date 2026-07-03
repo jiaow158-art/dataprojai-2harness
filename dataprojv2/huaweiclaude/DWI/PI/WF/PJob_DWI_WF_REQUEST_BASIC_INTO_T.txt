@@ -1,0 +1,61 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- TABLE DESC:工作流请求基本信息表（DWI）
+-- create time: chenzhiyong 20220310
+-- ******************************************************************** --
+insert overwrite table dwipi.dwi_wf_request_basic_into_t
+select
+  requestid  
+  ,workflowid  
+  ,lastnodeid  
+  ,lastnodetype  
+  ,currentnodeid  
+  ,currentnodetype  
+  ,status  
+  ,passedgroups  
+  ,totalgroups  
+  ,requestname  
+  ,creater  
+  ,createdate  
+  ,createtime  
+  ,lastoperator  
+  ,lastoperatedate  
+  ,lastoperatetime  
+  ,deleted  
+  ,creatertype  
+  ,lastoperatortype  
+  ,nodepasstime  
+  ,nodelefttime  
+  ,docids  
+  ,crmids  
+  ,hrmids_temp  
+  ,prjids  
+  ,cptids  
+  ,requestlevel  
+  ,requestmark 
+  ,messagetype  
+  ,mainrequestid  
+  ,currentstatus  
+  ,laststatus  
+  ,ismultiprint  
+  ,chatstype  
+  ,ecology_pinyin_search  
+  ,hrmids 
+  ,requestnamenew  
+  ,formsignaturemd5  
+  ,dataaggregated  
+  ,seclevel  
+  ,secdocid  
+  ,remindtypes  
+  ,lastfeedbackdate  
+  ,lastfeedbacktime  
+  ,lastfeedbackoperator  
+  ,requestnamehtmlnew  
+  ,secvalidity  
+  ,secenckey  
+  ,seccrc  
+  ,del_flag 
+  ,dw_last_update_date
+FROM SDI.sdi_workflow_requestbase_1004 
+where del_flag = 'N';

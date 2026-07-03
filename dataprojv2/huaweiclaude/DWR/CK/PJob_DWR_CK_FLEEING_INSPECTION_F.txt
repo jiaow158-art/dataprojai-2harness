@@ -1,0 +1,42 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/03/29 13:39:12 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWROTD.DWR_CK_FLEEING_INSPECTION_F
+SELECT ID
+      ,BARCODE AS BAR_CODE
+      ,`LEVEL` AS BAR_LEVEL
+      ,PRODUCT_CODE AS MATERIAL_CODE
+      ,PRODUCT_NAME AS MATERIAL_NAME
+      ,HOUSE_CODE AS WAREHOUSE_CODE
+      ,HOUSE_NAME AS WAREHOUSE_NAME
+      ,OUT_BILL_ID
+      ,OUT_TIME
+      ,OUT_CUSTOMER_CODE
+      ,OUT_CUSTOMER_NAME
+      ,OUT_CUSTOMER_ADDREE
+      ,OUT_CITY_CODE
+      ,CHECK_ADDRESS
+      ,CHECK_CITY_CODE
+      ,CHECK_USER_ID
+      ,CHECK_USER_NAME
+      ,STATUS
+	  ,CASE WHEN STATUS = '0' THEN '疑似'
+	        WHEN STATUS = '1' THEN '窜货'
+			WHEN STATUS = '2' THEN '窜货消除'			
+			 END AS STATUS_NAME
+      ,EXAMINE_ID
+      ,EXAMINE_NAME
+      ,EXAMINE_TIME
+      ,CREATE_USER_ID
+      ,CREATE_USER_NAME
+      ,UPDATE_USER_ID
+      ,UPDATE_USER_NAME
+      ,UPDATE_TIME
+      ,CREATE_TIME
+      ,CHECK_TIME
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM SDI.SDI_PDM_FLEEING_INSPECTION_1040
+ WHERE FLAG = 1
+;

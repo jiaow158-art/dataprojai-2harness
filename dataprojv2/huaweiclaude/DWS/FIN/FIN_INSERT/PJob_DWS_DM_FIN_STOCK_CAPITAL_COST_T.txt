@@ -1,0 +1,434 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- 库存资金成本
+-- create time: 2022/11/28 17:12:23 GMT+08:00
+-- update：2023/05/24 guzhengfeng 将数据先写入中间表，减少CPU使用率
+-- update：2023/05/24 guzhengfeng 更新逻辑
+-- update：2023/06/25 guzhengfeng 更新逻辑
+-- update：2023/07/07 guzhengfeng 更新资金成本取数逻辑
+-- update：2023/07/10 guzhengfeng 1、新增事业部描述字段；2、累计资金成本修改分组累计的分组
+-- update：2023/07/11 guzhengfeng 1、通过动态传参条件限制只取近2年的数据；2、累计资金成本每一年单独计算月累计，不跨年累计
+-- update：2023/07/19 guzhengfeng 新增销售组编码字段 SALES_GROUP_CODE
+-- update：2023/07/27 guzhengfeng 修改资金成本取数逻辑：若（期初余额+期末余额）为0，则资金成本为0，否则为[（期初余额+期末余额）/2-2020年12月余额]*4%/12
+-- update：2023/07/28 guzhengfeng 插入目标表的数据去重
+-- update：2023/07/29 guzhengfeng 据财务要求，资金成本计算逻辑暂时取消判断：（期初余额（用于判断）+期末余额（用于判断））为0，则资金成本为0 。（逻辑保留，可能2024年启用）
+-- update：2023/08/04 guzhengfeng 1、销售组编码逻辑修改，区分全资、非全资公司；2、补齐数据的子公司大区
+-- update：2023/08/07 guzhengfeng 将数据先写入中间表，减少CPU使用率
+-- update：2023/12/05 zhz限制enddate 
+-- ******************************************************************** --
+-- 删除中间表数据
+TRUNCATE TABLE DM.DM_FIN_STOCK_CAPITAL_M1_T;
+-- 数据插入中间表
+INSERT INTO DM.DM_FIN_STOCK_CAPITAL_M1_T
+--WITH STOCK_CAPITAL_COST AS
+--(
+SELECT
+    T1.BUSINESS_DEPARTMENT		 	AS BUSINESS_DEPARTMENT				-- 事业部
+    ,T1.BUSINESS_DEPARTMENT_DESC	AS BUSINESS_DEPARTMENT_DESC		    -- 事业部描述
+    ,M.MONTH_ID		 	            AS MONTH							-- 日历月
+    ,T1.COMP_CODE	 	            AS COMP_CODE						-- 公司代码
+    ,T1.FACTORY_CODE		 	    AS FACTORY_CODE						-- 工厂
+    ,T1.MATERIAL_CODE		        AS MATERIAL_CODE					-- 物料编码
+    ,T1.MATERIAL_NAME	            AS MATERIAL_NAME					-- 物料描述
+    ,T1.BATCH		 	            AS BATCH							-- 批次
+    ,T1.STOCK_LOCATION		        AS STOCK_LOCATION					-- 库存地点
+    ,T1.STOCK_TYPE		            AS STOCK_TYPE						-- 库存类别
+    ,T1.ZDPZGSDQ
+FROM 
+(
+SELECT MONTH_ID FROM dm.dm_dim_date_d 
+WHERE MONTH_ID <= '${PERIOD_ID_M}' AND MONTH_ID >= (to_number('${PERIOD_ID_Y}') - 1)||'01'  GROUP BY MONTH_ID --ORDER BY MONTH_ID
+) M
+LEFT JOIN
+(
+SELECT
+    T.ZDPSYB		 	AS BUSINESS_DEPARTMENT				-- 事业部
+    ,T.ZDPSYB___T       AS BUSINESS_DEPARTMENT_DESC			-- 事业部描述
+    ,T.CALMONTH		 	AS MONTH							-- 日历月
+    ,T.COMP_CODE	 	AS COMP_CODE						-- 公司代码
+    ,T.PLANT		 	AS FACTORY_CODE						-- 工厂
+    ,T.MATERIAL		 	AS MATERIAL_CODE					-- 物料编码
+    ,T.MATERIAL___T	 	AS MATERIAL_NAME					-- 物料描述
+    ,T.BATCH		 	AS BATCH							-- 批次
+    ,T.STOR_LOC		 	AS STOCK_LOCATION					-- 库存地点
+    ,T.STOCKCAT		 	AS STOCK_TYPE						-- 库存类别
+    ,T.ZDPZGSDQ
+FROM 
+    DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023 T
+WHERE (T.STOCKCAT IS NULL OR T.STOCKCAT <> 'K')
+AND T.CALMONTH <= '${PERIOD_ID_M}' AND T.CALMONTH >= (to_number('${PERIOD_ID_Y}') - 1)||'01'
+) 
+T1
+ON 1 = 1
+GROUP BY
+    T1.BUSINESS_DEPARTMENT		 					-- 事业部
+    ,T1.BUSINESS_DEPARTMENT_DESC			        -- 事业部描述
+    ,M.MONTH_ID		 	            				-- 日历月
+    ,T1.COMP_CODE	 	            				-- 公司代码
+    ,T1.FACTORY_CODE		 	    				-- 工厂
+    ,T1.MATERIAL_CODE		        			    -- 物料编码
+    ,T1.MATERIAL_NAME	            				-- 物料描述
+    ,T1.BATCH		 	            				-- 批次
+    ,T1.STOCK_LOCATION		        				-- 库存地点
+    ,T1.STOCK_TYPE		            				-- 库存类别
+    ,T1.ZDPZGSDQ
+--)
+--,
+;
+
+-- 删除目标表数据
+TRUNCATE TABLE DM.DM_FIN_STOCK_CAPITAL_COST_T;
+WITH STOCK_CAPITAL_COST1 AS (
+SELECT
+    T.BUSINESS_DEPARTMENT		 	AS BUSINESS_DEPARTMENT				-- 事业部
+    ,T.BUSINESS_DEPARTMENT_DESC	    AS BUSINESS_DEPARTMENT_DESC		    -- 事业部描述
+    ,T.MONTH		 	            AS MONTH							-- 日历月
+    ,T.COMP_CODE	 	            AS COMP_CODE						-- 公司代码
+    ,T.FACTORY_CODE		 	        AS FACTORY_CODE						-- 工厂
+    ,T.MATERIAL_CODE		        AS MATERIAL_CODE					-- 物料编码
+    ,T.MATERIAL_NAME	            AS MATERIAL_NAME					-- 物料描述
+    ,T.BATCH		 	            AS BATCH							-- 批次
+    ,T.STOCK_LOCATION		        AS STOCK_LOCATION					-- 库存地点
+    ,T.STOCK_TYPE		            AS STOCK_TYPE						-- 库存类别
+    ,T.ZDPZGSDQ
+    ,T1.ZSJKCJE	                    AS ZSJKCJE					        -- 当期余额
+FROM 
+    DM.DM_FIN_STOCK_CAPITAL_M1_T T
+LEFT JOIN 
+(
+SELECT
+    T.ZDPSYB		 	AS BUSINESS_DEPARTMENT				-- 事业部
+    ,T.ZDPSYB___T       AS BUSINESS_DEPARTMENT_DESC			-- 事业部描述
+    ,T.CALMONTH		 	AS MONTH							-- 日历月
+    ,T.COMP_CODE	 	AS COMP_CODE						-- 公司代码
+    ,T.PLANT		 	AS FACTORY_CODE						-- 工厂
+    ,T.MATERIAL		 	AS MATERIAL_CODE					-- 物料编码
+    ,T.MATERIAL___T	 	AS MATERIAL_NAME					-- 物料描述
+    ,T.BATCH		 	AS BATCH							-- 批次
+    ,T.STOR_LOC		 	AS STOCK_LOCATION					-- 库存地点
+    ,T.STOCKCAT		 	AS STOCK_TYPE						-- 库存类别
+    ,T.ZDPZGSDQ         
+    ,T.ZSJKCJE	 	    AS ZSJKCJE					        -- 当期余额
+FROM 
+    DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023 T
+WHERE (T.STOCKCAT IS NULL OR T.STOCKCAT <> 'K')
+AND T.CALMONTH <= '${PERIOD_ID_M}' AND T.CALMONTH >= (to_number('${PERIOD_ID_Y}') - 1)||'01'
+) T1
+ON  NVL(T.BUSINESS_DEPARTMENT,'NULL') = NVL(T1.BUSINESS_DEPARTMENT,'NULL')
+AND NVL(T.BUSINESS_DEPARTMENT_DESC,'NULL') = NVL(T1.BUSINESS_DEPARTMENT_DESC,'NULL')
+AND NVL(T.MONTH,'NULL') = NVL(T1.MONTH,'NULL')
+AND NVL(T.COMP_CODE,'NULL') = NVL(T1.COMP_CODE,'NULL')
+AND NVL(T.FACTORY_CODE,'NULL') = NVL(T1.FACTORY_CODE,'NULL')
+AND NVL(T.MATERIAL_CODE,'NULL') = NVL(T1.MATERIAL_CODE,'NULL')
+AND NVL(T.MATERIAL_NAME,'NULL') = NVL(T1.MATERIAL_NAME,'NULL')
+AND NVL(T.BATCH,'NULL') = NVL(T1.BATCH,'NULL')
+AND NVL(T.STOCK_LOCATION,'NULL') = NVL(T1.STOCK_LOCATION,'NULL')
+AND NVL(T.STOCK_TYPE,'NULL') = NVL(T1.STOCK_TYPE,'NULL')
+AND NVL(T.ZDPZGSDQ,'NULL') = NVL(T1.ZDPZGSDQ,'NULL')
+)
+,
+STOCK_CAPITAL_COST2 AS (
+SELECT 
+    T1.BUSINESS_DEPARTMENT                  AS BUSINESS_DEPARTMENT				-- 事业部 
+    ,T1.BUSINESS_DEPARTMENT_DESC	        AS BUSINESS_DEPARTMENT_DESC		    -- 事业部描述
+    ,T1.MONTH                               AS MONTH							-- 日历月 
+    ,T1.COMP_CODE                           AS COMP_CODE						-- 公司代码
+    ,T1.FACTORY_CODE                        AS FACTORY_CODE						-- 工厂
+    ,T1.MATERIAL_CODE                       AS MATERIAL_CODE					-- 物料编码
+    ,T1.MATERIAL_NAME                       AS MATERIAL_NAME					-- 物料描述
+    ,T1.BATCH                               AS BATCH							-- 批次
+    ,T1.STOCK_LOCATION                      AS STOCK_LOCATION					-- 库存地点
+    ,T1.STOCK_TYPE                          AS STOCK_TYPE						-- 库存类别
+    ,T1.ZDPZGSDQ
+    ,NVL(T1.CLOSING_BALANCE,0)              AS CLOSING_BALANCE					-- 期末余额
+    ,LAG(T1.CLOSING_BALANCE)OVER(PARTITION BY T1.BUSINESS_DEPARTMENT,T1.BUSINESS_DEPARTMENT_DESC,T1.COMP_CODE,T1.FACTORY_CODE,T1.MATERIAL_CODE,T1.MATERIAL_NAME,T1.BATCH,T1.STOCK_LOCATION,T1.STOCK_TYPE,T1.ZDPZGSDQ ORDER BY T1.MONTH     ASC )
+    					                    AS CLOSING_BALANCE_LAST_MONTH		-- 期初余额
+    ,COALESCE(T3.CLOSING_BALANCE_J,0)       AS CLOSING_BALANCE_J			    -- 期末余额（用于判断）
+    ,LAG(COALESCE(T3.CLOSING_BALANCE_J,0))OVER(PARTITION BY T1.BUSINESS_DEPARTMENT,T1.BUSINESS_DEPARTMENT_DESC,T1.COMP_CODE,T1.FACTORY_CODE,T1.MATERIAL_CODE,T1.MATERIAL_NAME,T1.BATCH,T1.STOCK_LOCATION,T1.STOCK_TYPE,T1.ZDPZGSDQ ORDER BY T1.MONTH     ASC )
+    					                    AS CLOSING_BALANCE_LAST_MONTH_J		-- 期初余额（用于判断）   
+    ,COALESCE(T2.CLOSING_BALANCE_202012,0)  AS CLOSING_BALANCE_202012			-- 2020年12月余额
+FROM 
+    (SELECT 
+        T.BUSINESS_DEPARTMENT          AS BUSINESS_DEPARTMENT			-- 事业部
+        ,T.BUSINESS_DEPARTMENT_DESC	   AS BUSINESS_DEPARTMENT_DESC		-- 事业部描述
+        ,T.MONTH                       AS MONTH							-- 日历月 
+        ,T.COMP_CODE                   AS COMP_CODE						-- 公司代码
+        ,T.FACTORY_CODE                AS FACTORY_CODE					-- 工厂
+        ,T.MATERIAL_CODE               AS MATERIAL_CODE					-- 物料编码
+        ,T.MATERIAL_NAME               AS MATERIAL_NAME					-- 物料描述
+        ,T.BATCH                       AS BATCH							-- 批次
+        ,T.STOCK_LOCATION              AS STOCK_LOCATION				-- 库存地点
+        ,T.STOCK_TYPE                  AS STOCK_TYPE					-- 库存类别
+        ,T.ZDPZGSDQ
+        ,SUM(T.ZSJKCJE)                AS CLOSING_BALANCE				-- 期末余额
+    FROM 
+        STOCK_CAPITAL_COST1 T
+    GROUP BY
+        T.BUSINESS_DEPARTMENT
+        ,T.BUSINESS_DEPARTMENT_DESC
+        ,T.MONTH
+        ,T.COMP_CODE
+        ,T.FACTORY_CODE
+        ,T.MATERIAL_CODE
+        ,T.MATERIAL_NAME
+        ,T.BATCH
+        ,T.STOCK_LOCATION
+        ,T.STOCK_TYPE
+        ,T.ZDPZGSDQ
+        ) T1
+LEFT JOIN 
+(
+    SELECT
+        T.ZDPSYB		 	AS BUSINESS_DEPARTMENT				-- 事业部
+        ,T.ZDPSYB___T       AS BUSINESS_DEPARTMENT_DESC			-- 事业部描述
+        ,T.COMP_CODE	 	AS COMP_CODE						-- 公司代码
+        ,T.PLANT		 	AS FACTORY_CODE						-- 工厂
+        ,T.MATERIAL		 	AS MATERIAL_CODE					-- 物料编码
+        ,T.MATERIAL___T	 	AS MATERIAL_NAME					-- 物料描述
+        ,T.BATCH		 	AS BATCH							-- 批次
+        ,T.STOR_LOC		 	AS STOCK_LOCATION					-- 库存地点
+        ,T.STOCKCAT		 	AS STOCK_TYPE						-- 库存类别
+        ,T.ZDPZGSDQ
+        ,SUM(T.ZSJKCJE)	 	AS CLOSING_BALANCE_202012			-- 2020年12月余额
+    FROM 
+        DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023 T
+    WHERE (T.STOCKCAT IS NULL OR T.STOCKCAT <> 'K')
+    AND T.CALMONTH = '202012' 
+        GROUP BY
+        T.ZDPSYB
+        ,T.ZDPSYB___T
+        ,T.COMP_CODE
+        ,T.PLANT
+        ,T.MATERIAL
+        ,T.MATERIAL___T
+        ,T.BATCH
+        ,T.STOR_LOC
+        ,T.STOCKCAT
+        ,T.ZDPZGSDQ
+) T2
+ON  NVL(T2.BUSINESS_DEPARTMENT,'NULL') = NVL(T1.BUSINESS_DEPARTMENT,'NULL')
+AND NVL(T2.BUSINESS_DEPARTMENT_DESC,'NULL') = NVL(T1.BUSINESS_DEPARTMENT_DESC,'NULL')
+AND NVL(T2.COMP_CODE,'NULL') = NVL(T1.COMP_CODE,'NULL')
+AND NVL(T2.FACTORY_CODE,'NULL') = NVL(T1.FACTORY_CODE,'NULL')
+AND NVL(T2.MATERIAL_CODE,'NULL') = NVL(T1.MATERIAL_CODE,'NULL')
+AND NVL(T2.MATERIAL_NAME,'NULL') = NVL(T1.MATERIAL_NAME,'NULL')
+AND NVL(T2.BATCH,'NULL') = NVL(T1.BATCH,'NULL')
+AND NVL(T2.STOCK_LOCATION,'NULL') = NVL(T1.STOCK_LOCATION,'NULL')
+AND NVL(T2.STOCK_TYPE,'NULL') = NVL(T1.STOCK_TYPE,'NULL')
+AND NVL(T2.ZDPZGSDQ,'NULL') = NVL(T1.ZDPZGSDQ,'NULL')
+
+LEFT JOIN
+    (SELECT 
+        T.MONTH                       AS MONTH							-- 日历月 
+        ,T.FACTORY_CODE                AS FACTORY_CODE					-- 工厂
+        ,T.MATERIAL_CODE               AS MATERIAL_CODE					-- 物料编码
+        ,SUM(T.ZSJKCJE)                AS CLOSING_BALANCE_J				-- 期末余额（用于判断）
+    FROM 
+        STOCK_CAPITAL_COST1 T
+    GROUP BY
+        T.MONTH
+        ,T.FACTORY_CODE
+        ,T.MATERIAL_CODE
+    ) T3
+ON  NVL(T3.MONTH,'NULL') = NVL(T1.MONTH,'NULL')
+AND NVL(T3.FACTORY_CODE,'NULL') = NVL(T1.FACTORY_CODE,'NULL')
+AND NVL(T3.MATERIAL_CODE,'NULL') = NVL(T1.MATERIAL_CODE,'NULL')
+
+)
+,
+-- 计算资金成本：若（期初余额+期末余额）为0，则资金成本为0，否则为,[（期初余额+期末余额）/2-2020年12月余额]*4%/12
+STOCK_CAPITAL_COST3 AS (
+SELECT
+    T.BUSINESS_DEPARTMENT									-- 事业部
+    ,T.BUSINESS_DEPARTMENT_DESC			                    -- 事业部描述
+    ,T.MONTH												-- 日历月
+    ,T.COMP_CODE											-- 公司代码
+    ,T.FACTORY_CODE											-- 工厂
+    ,T.MATERIAL_CODE										-- 物料编码
+    ,T.MATERIAL_NAME										-- 物料描述
+    ,T.BATCH												-- 批次
+    ,T.STOCK_LOCATION										-- 库存地点
+    ,T.STOCK_TYPE											-- 库存类别
+    ,T.ZDPZGSDQ
+    ,T.CLOSING_BALANCE_202012								-- 2020年12月余额
+    ,T.CLOSING_BALANCE_LAST_MONTH							-- 期初余额
+    ,T.CLOSING_BALANCE										-- 期末余额
+/*
+    ,CASE WHEN NVL(T.CLOSING_BALANCE_LAST_MONTH_J,0) + NVL(T.CLOSING_BALANCE_J,0) = 0 THEN 0
+        ELSE ((NVL(T.CLOSING_BALANCE_LAST_MONTH,0) + NVL(T.CLOSING_BALANCE,0))/2 - T.CLOSING_BALANCE_202012) * 0.04 / 12 
+    END                 AS CAPITAL_COST						-- 资金成本	
+*/
+    ,((NVL(T.CLOSING_BALANCE_LAST_MONTH,0) + NVL(T.CLOSING_BALANCE,0))/2 - T.CLOSING_BALANCE_202012) * 0.04 / 12
+                        AS CAPITAL_COST						-- 资金成本
+FROM 
+    STOCK_CAPITAL_COST2 T
+)
+,
+STOCK_CAPITAL_COST4 AS (
+SELECT 
+    T.BUSINESS_DEPARTMENT									-- 事业部
+    ,T.BUSINESS_DEPARTMENT_DESC			                    -- 事业部描述
+    ,T.MONTH												-- 日历月
+    ,T.COMP_CODE											-- 公司代码
+    ,T.FACTORY_CODE											-- 工厂
+    ,T.MATERIAL_CODE										-- 物料编码
+    ,T.MATERIAL_NAME										-- 物料描述
+    ,T.BATCH												-- 批次
+    ,T.STOCK_LOCATION										-- 库存地点
+    ,T.STOCK_TYPE											-- 库存类别
+    ,T.ZDPZGSDQ
+    ,T.CLOSING_BALANCE_202012								-- 2020年12月余额
+    ,T.CLOSING_BALANCE_LAST_MONTH							-- 期初余额
+    ,T.CLOSING_BALANCE										-- 期末余额
+    ,T.CAPITAL_COST											-- 资金成本	
+    ,SUM(NVL(T.CAPITAL_COST,0))OVER(PARTITION BY T.BUSINESS_DEPARTMENT,T.BUSINESS_DEPARTMENT_DESC,T.COMP_CODE,T.FACTORY_CODE,T.MATERIAL_CODE,T.MATERIAL_NAME,T.BATCH,T.STOCK_LOCATION,T.STOCK_TYPE,T.ZDPZGSDQ ORDER BY T.MONTH) 
+						    AS CAPITAL_COST_SUM				-- 累计资金成本
+FROM 
+    STOCK_CAPITAL_COST3 T
+WHERE T.MONTH <= (to_number('${PERIOD_ID_Y}') - 1)||'12' AND T.MONTH >= (to_number('${PERIOD_ID_Y}') - 1)||'01'
+
+UNION ALL
+
+SELECT 
+    T.BUSINESS_DEPARTMENT									-- 事业部
+    ,T.BUSINESS_DEPARTMENT_DESC			                    -- 事业部描述
+    ,T.MONTH												-- 日历月
+    ,T.COMP_CODE											-- 公司代码
+    ,T.FACTORY_CODE											-- 工厂
+    ,T.MATERIAL_CODE										-- 物料编码
+    ,T.MATERIAL_NAME										-- 物料描述
+    ,T.BATCH												-- 批次
+    ,T.STOCK_LOCATION										-- 库存地点
+    ,T.STOCK_TYPE											-- 库存类别
+    ,T.ZDPZGSDQ
+    ,T.CLOSING_BALANCE_202012								-- 2020年12月余额
+    ,T.CLOSING_BALANCE_LAST_MONTH							-- 期初余额
+    ,T.CLOSING_BALANCE										-- 期末余额
+    ,T.CAPITAL_COST											-- 资金成本	
+    ,SUM(NVL(T.CAPITAL_COST,0))OVER(PARTITION BY T.BUSINESS_DEPARTMENT,T.BUSINESS_DEPARTMENT_DESC,T.COMP_CODE,T.FACTORY_CODE,T.MATERIAL_CODE,T.MATERIAL_NAME,T.BATCH,T.STOCK_LOCATION,T.STOCK_TYPE,T.ZDPZGSDQ ORDER BY T.MONTH) 
+						    AS CAPITAL_COST_SUM				-- 累计资金成本
+FROM 
+    STOCK_CAPITAL_COST3 T
+WHERE T.MONTH <= '${PERIOD_ID_M}' AND T.MONTH >= '${PERIOD_ID_Y}'||'01'
+)
+-- 数据插入目标表
+INSERT INTO DM.DM_FIN_STOCK_CAPITAL_COST_T(
+    business_department
+    ,month
+    ,comp_code
+    ,factory_code
+    ,material_code
+    ,material_name
+    ,batch
+    ,stock_location
+    ,stock_type
+    ,closing_balance_202012
+    ,closing_balance_last_month
+    ,closing_balance
+    ,capital_cost
+    ,capital_cost_sum
+    ,dw_last_update_date
+    ,business_department_desc
+    ,sales_group_code
+)
+
+SELECT
+    T.BUSINESS_DEPARTMENT									-- 事业部
+    ,T.MONTH												-- 日历月
+    ,T.COMP_CODE											-- 公司代码
+    ,T.FACTORY_CODE											-- 工厂
+    ,T.MATERIAL_CODE										-- 物料编码
+    ,T.MATERIAL_NAME										-- 物料描述
+    ,T.BATCH												-- 批次
+    ,T.STOCK_LOCATION										-- 库存地点
+    ,T.STOCK_TYPE											-- 库存类别
+    ,NVL(T.CLOSING_BALANCE_202012,0)						-- 2020年12月余额
+    ,NVL(T.CLOSING_BALANCE_LAST_MONTH,0)					-- 期初余额
+    ,NVL(T.CLOSING_BALANCE,0)								-- 期末余额
+    ,NVL(T.CAPITAL_COST,0)									-- 资金成本	
+    ,NVL(T.CAPITAL_COST_SUM,0)				                -- 累计资金成本
+	,CURRENT_TIMESTAMP()	AS DW_LAST_UPDATE_DATE			-- 数据同步时间	
+	,T.BUSINESS_DEPARTMENT_DESC			                    -- 事业部描述
+	,CASE WHEN T.COMP_CODE IS NOT NULL AND U.COMP_TYPE = '非全资' THEN U.SALES_GRP
+	    ELSE CASE WHEN T.BUSINESS_DEPARTMENT = '11000010' THEN 'R4R'
+	              WHEN T.BUSINESS_DEPARTMENT = '11000003' THEN CASE WHEN T.ZDPZGSDQ = '33000014' THEN 'RR5'
+	                                                                WHEN T.ZDPZGSDQ = '33000033' THEN 'R8R'
+	                                                                WHEN T.ZDPZGSDQ IN('33000018','33000001')  THEN 'RY9'
+	                                                                WHEN T.ZDPZGSDQ = '33000016'  THEN 'P76'
+	                                                                WHEN T.ZDPZGSDQ = '33000019'  THEN 'R6D'
+	                                                               ELSE ''
+	                                                            END
+	              WHEN T.BUSINESS_DEPARTMENT = '11000002' THEN CASE WHEN U.SALES_GRP IS NULL THEN 'R2T' ELSE U.SALES_GRP END
+	              WHEN T.BUSINESS_DEPARTMENT = '11000001' THEN CASE WHEN U.SALES_GRP IS NULL THEN 'R40' ELSE U.SALES_GRP END
+	            ELSE 'NULL'
+	           END
+	   END SALES_GROUP_CODE                                 -- 销售组编码
+FROM 
+    STOCK_CAPITAL_COST4 T
+LEFT JOIN UPLOAD.UPLOAD_DIVISION_COMP_T U
+ON T.COMP_CODE = U.COMP_CODE AND U.END_DATE = '9999-12-31'
+AND T.BUSINESS_DEPARTMENT = U.DIVISION_CODE
+/*
+WHERE T.COMP_CODE = '1300' AND T.BUSINESS_DEPARTMENT = '11000003'
+and T.MATERIAL_CODE = 'AP75DBHZ9_A'
+and T.BATCH = '0B02213B60' 
+and T.STOCK_LOCATION = 'GFZ'
+
+LEFT JOIN (
+SELECT
+    T.ZDPSYB		 	AS BUSINESS_DEPARTMENT				-- 事业部
+    ,T.ZDPSYB___T       AS BUSINESS_DEPARTMENT_DESC			-- 事业部描述
+    ,T.CALMONTH		 	AS MONTH							-- 日历月
+    ,T.COMP_CODE	 	AS COMP_CODE						-- 公司代码
+    ,T.PLANT		 	AS FACTORY_CODE						-- 工厂
+    ,T.MATERIAL		 	AS MATERIAL_CODE					-- 物料编码
+    ,T.MATERIAL___T	 	AS MATERIAL_NAME					-- 物料描述
+    ,T.BATCH		 	AS BATCH							-- 批次
+    ,T.STOR_LOC		 	AS STOCK_LOCATION					-- 库存地点
+    ,T.STOCKCAT		 	AS STOCK_TYPE						-- 库存类别
+    ,T.ZDPZGSDQ                                             -- 子公司大区
+FROM 
+    DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023 T
+WHERE (T.STOCKCAT IS NULL OR T.STOCKCAT <> 'K')
+AND T.CALMONTH <= '${PERIOD_ID_M}' AND T.CALMONTH >= (to_number('${PERIOD_ID_Y}') - 1)||'01'
+) D
+ON NVL(T.BUSINESS_DEPARTMENT,'NULL') = NVL(D.BUSINESS_DEPARTMENT,'NULL')
+AND NVL(T.MONTH,'NULL') = NVL(D.MONTH,'NULL')
+AND NVL(T.COMP_CODE,'NULL') = NVL(D.COMP_CODE,'NULL')
+AND NVL(T.FACTORY_CODE,'NULL') = NVL(D.FACTORY_CODE,'NULL')
+AND NVL(T.MATERIAL_CODE,'NULL') = NVL(D.MATERIAL_CODE,'NULL')
+AND NVL(T.BATCH,'NULL') = NVL(D.BATCH,'NULL')
+AND NVL(T.STOCK_LOCATION,'NULL') = NVL(D.STOCK_LOCATION,'NULL')
+AND NVL(T.STOCK_TYPE,'NULL') = NVL(D.STOCK_TYPE,'NULL')
+*/
+GROUP BY
+    T.BUSINESS_DEPARTMENT									-- 事业部
+    ,T.MONTH												-- 日历月
+    ,T.COMP_CODE											-- 公司代码
+    ,T.FACTORY_CODE											-- 工厂
+    ,T.MATERIAL_CODE										-- 物料编码
+    ,T.MATERIAL_NAME										-- 物料描述
+    ,T.BATCH												-- 批次
+    ,T.STOCK_LOCATION										-- 库存地点
+    ,T.STOCK_TYPE											-- 库存类别
+    ,NVL(T.CLOSING_BALANCE_202012,0)						-- 2020年12月余额
+    ,NVL(T.CLOSING_BALANCE_LAST_MONTH,0)					-- 期初余额
+    ,NVL(T.CLOSING_BALANCE,0)								-- 期末余额
+    ,NVL(T.CAPITAL_COST,0)									-- 资金成本	
+    ,NVL(T.CAPITAL_COST_SUM,0)				                -- 累计资金成本
+	,T.BUSINESS_DEPARTMENT_DESC			                    -- 事业部描述
+	,CASE WHEN T.COMP_CODE IS NOT NULL AND U.COMP_TYPE = '非全资' THEN U.SALES_GRP
+	    ELSE CASE WHEN T.BUSINESS_DEPARTMENT = '11000010' THEN 'R4R'
+	              WHEN T.BUSINESS_DEPARTMENT = '11000003' THEN CASE WHEN T.ZDPZGSDQ = '33000014' THEN 'RR5'
+	                                                                WHEN T.ZDPZGSDQ = '33000033' THEN 'R8R'
+	                                                                WHEN T.ZDPZGSDQ IN('33000018','33000001')  THEN 'RY9'
+	                                                                WHEN T.ZDPZGSDQ = '33000016'  THEN 'P76'
+	                                                                WHEN T.ZDPZGSDQ = '33000019'  THEN 'R6D'
+	                                                               ELSE ''
+	                                                            END
+	              WHEN T.BUSINESS_DEPARTMENT = '11000002' THEN CASE WHEN U.SALES_GRP IS NULL THEN 'R2T' ELSE U.SALES_GRP END
+	              WHEN T.BUSINESS_DEPARTMENT = '11000001' THEN CASE WHEN U.SALES_GRP IS NULL THEN 'R40' ELSE U.SALES_GRP END
+	            ELSE 'NULL'
+	           END
+	   END

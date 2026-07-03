@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_SALE_GRP_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/BW_RPT",
+    "description": "BW销售组架构表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

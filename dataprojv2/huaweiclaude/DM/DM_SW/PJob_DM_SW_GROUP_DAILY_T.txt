@@ -1,0 +1,381 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/23 08:59:24 GMT+08:00
+-- update from huangwenbin 2025-06-24 增加字段：昨日业绩
+-- update from huangwenbin 2025-06-30 增加卫浴国际营销数据
+-- update from huangwenbin 2025-07-02 更新统计逻辑：剔除卫浴国际营销的数据
+-- update from huangwenbin 2025-07-07 逻辑更新：业绩加上R2T，预算不统计R2T
+-- update from huangwenbin 2025-07-09 逻辑更新：预算统计R2T
+-- update from huangwenbin 2025-07-10 新增字段：旧整合渠道1编码、旧整合渠道1名称
+-- update from huangwenbin 2026-04-01 预算逻辑调整：剔除销售组代码为R2T且管理渠道非"GD06"
+-- ******************************************************************** --
+DELETE FROM DM_SW.DM_SW_GROUP_DAILY_T
+ WHERE STAT_DATE = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM-dd')
+;
+
+WITH BUDGET_BASE AS ( --预算业绩
+SELECT A.SALE_GRP_NAME AS SALE_GRP_CODE
+      ,A.PROD_CHANNEL_NAME AS OLD_INTEGRATE_CHANNEL_CODE
+      ,D.CHANNEL_NAME AS OLD_INTEGRATE_CHANNEL_T
+	  ,CASE WHEN A.PROD_CHANNEL_NAME = 'GD99' THEN 'GD03'
+            ELSE A.PROD_CHANNEL_NAME
+	         END AS INTEGRATE_CHANNEL_CODE
+      ,CASE WHEN A.PROD_CHANNEL_NAME = 'GD99' THEN '工程渠道'
+            ELSE D.CHANNEL_NAME
+	         END AS INTEGRATE_CHANNEL_T
+      ,B.NODE_NAME9
+      ,B.NODE_NAME2
+      ,B.NODE_DESC2
+      ,B.NODE_NAME3
+      ,B.NODE_DESC3
+      ,B.NODE_NAME4
+      ,B.NODE_DESC4
+      ,B.NODE_NAME5
+      ,B.NODE_DESC5
+      ,B.NODE_NAME6
+      ,B.NODE_DESC6	  
+      ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS MONTH_BUDGET_ACHIEVEMENT --当月预算业绩
+	  ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') >= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+	             AND TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS ACC_BUDGET_ACHIEVEMENT --当年累计预算业绩
+	  ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') >= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+	             AND TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-12') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS YEAR_BUDGET_ACHIEVEMENT --全年预算业绩	  
+	  ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') = TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEAR','yyyy-MM') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS LY_MONTH_BUDGET_ACHIEVEMENT --去年当月预算业绩
+	  ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') >= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEAR','yyyy-01')
+	             AND TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') <= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEAR','yyyy-MM') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS LY_ACC_BUDGET_ACHIEVEMENT --去年累计预算业绩
+	  ,SUM(CASE WHEN TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') >= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEAR','yyyy-01')
+	             AND TO_CHAR(TO_DATE(A.STAT_MONTH),'yyyy-MM') <= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEAR','yyyy-12') 
+	            THEN A.PROD_IT_AMT1
+				ELSE 0
+				 END) / 10000 AS LY_YEAR_BUDGET_ACHIEVEMENT --去年预算业绩
+  FROM UPLOAD.UPLOAD_ACHIEVEMENT_BUDGET_T A
+  JOIN DM.DM_RPT_SALES_GROUP_T B
+    ON A.SALE_GRP_NAME = B.NODE_NAME9
+  LEFT JOIN DM.DM_DIM_INTEGRATE_CHANNEL_D D
+    ON A.PROD_CHANNEL_NAME = D.CHANNEL_CODE
+   AND D.CHANNEL_TYPE = '整合渠道1'
+ WHERE B.NODE_NAME2 = 'H11000002'
+ --剔除销售组代码为R2T，管理渠道非"GD06"
+   AND CASE WHEN A.SALE_GRP_NAME = 'R2T' AND COALESCE(A.PROD_CHANNEL_NAME,'$$$') = 'GD06' THEN 1
+            WHEN A.SALE_GRP_NAME = 'R2T' THEN 0
+			ELSE 1
+			 END = 1
+ GROUP BY A.SALE_GRP_NAME
+      ,A.PROD_CHANNEL_NAME
+      ,D.CHANNEL_NAME
+	  ,CASE WHEN A.PROD_CHANNEL_NAME = 'GD99' THEN 'GD03'
+            ELSE A.PROD_CHANNEL_NAME
+	         END
+      ,CASE WHEN A.PROD_CHANNEL_NAME = 'GD99' THEN '工程渠道'
+            ELSE D.CHANNEL_NAME
+	         END
+      ,B.NODE_NAME9
+      ,B.NODE_NAME2
+      ,B.NODE_DESC2
+      ,B.NODE_NAME3
+      ,B.NODE_DESC3
+      ,B.NODE_NAME4
+      ,B.NODE_DESC4
+      ,B.NODE_NAME5
+      ,B.NODE_DESC5
+      ,B.NODE_NAME6
+      ,B.NODE_DESC6  
+),BASE AS( --业绩、成本、收入
+SELECT  A.NODE_NAME9 AS SALE_GRP_CODE
+       ,A.INTEGRATE_CHANNEL AS OLD_INTEGRATE_CHANNEL_CODE
+       ,D.CHANNEL_NAME AS OLD_INTEGRATE_CHANNEL_T
+	   ,CASE WHEN A.INTEGRATE_CHANNEL = 'GD99' THEN 'GD03'
+             ELSE A.INTEGRATE_CHANNEL
+	          END AS INTEGRATE_CHANNEL_CODE
+       ,CASE WHEN A.INTEGRATE_CHANNEL = 'GD99' THEN '工程渠道'
+             ELSE D.CHANNEL_NAME
+	          END AS INTEGRATE_CHANNEL_T
+       ,A.NODE_NAME9
+       ,A.NODE_NAME2
+       ,A.NODE_DESC2
+       ,A.NODE_NAME3
+       ,A.NODE_DESC3
+       ,A.NODE_NAME4
+       ,A.NODE_DESC4
+       ,A.NODE_NAME5
+       ,A.NODE_DESC5
+       ,A.NODE_NAME6
+       ,A.NODE_DESC6
+       ,SUM(CASE WHEN CALDAY = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 DAY_ACHIEVEMENT --日业绩
+	   ,SUM(CASE WHEN CALDAY = TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 DAY','yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 LAST_DAY_ACHIEVEMENT --昨日业绩
+       ,SUM(CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 MONTH_ACHIEVEMENT --月累计业绩
+       ,SUM(CASE WHEN CALMONTH BETWEEN TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+	              AND TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 YEAR_ACHIEVEMENT --年累计业绩
+       ,SUM(CASE WHEN CALDAY = TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 LAST_YEAR_DAY_ACHIEVEMENT --去年同期日业绩
+       ,SUM(CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 LAST_YEAR_MONTH_ACHIEVEMENT --去年同期月累计业绩
+       ,SUM(CASE WHEN CALMONTH BETWEEN TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyy-01')
+	              AND TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyyMMdd')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 LAST_YEAR_ACHIEVEMENT --去年同期年累计业绩
+	   ,SUM(CASE WHEN CALDAY = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN NOTAX
+                 ELSE 0 END) / 10000 DAY_NOTAX --日不含税收入 
+       ,SUM(CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN NOTAX
+                 ELSE 0 END) / 10000 MONTH_NOTAX --月累计不含税收入
+       ,SUM(CASE WHEN CALMONTH BETWEEN TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+	              AND TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN NOTAX
+                 ELSE 0 END) / 10000 YEAR_NOTAX --年累计不含税收入				 
+	   ,SUM(CASE WHEN CALDAY = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN SALESCOST
+                 ELSE 0 END) / 10000 DAY_SALESCOST --日销售成本
+       ,SUM(CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN SALESCOST
+                 ELSE 0 END) / 10000 MONTH_SALESCOST --月累计销售成本	 
+       ,SUM(CASE WHEN CALMONTH BETWEEN TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+	              AND TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                  AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                 THEN (CASE WHEN CALMONTH BETWEEN TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-01')
+				             AND TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 MONTHS','yyyy-MM')
+                             AND LEFT(CALMONTH, 4) = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy')
+                             AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                            THEN A_SALES_COST
+                            ELSE 0 END --截止到上个月末的实际A成本
+					 + CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM')
+                             AND CALDAY <= TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyyMMdd')
+                            THEN SALESCOST
+                            ELSE 0 END --当月销售成本
+                       )
+                 ELSE 0 END) / 10000 YEAR_SALESCOST --年累计销售成本
+       ,SUM(CASE WHEN CALMONTH = TO_CHAR(TO_DATE('${PERIOD_ID_D}') - INTERVAL '1 YEARS','yyyy-MM')
+                 THEN AMBPERFORMANCE
+                 ELSE 0 END) / 10000 LAST_YEAR_ALL_MONTH_ACHIEVEMENT --去年同期整月累计业绩
+  FROM DM.DM_FIN_GROUP_DAILY_DETAIL A
+  LEFT JOIN DM.DM_DIM_INTEGRATE_CHANNEL_D D
+    ON A.INTEGRATE_CHANNEL = D.CHANNEL_CODE
+   AND D.CHANNEL_TYPE = '整合渠道1'
+ WHERE A.NODE_NAME2 IN('H11000002')
+ GROUP BY A.NODE_NAME9
+       ,A.INTEGRATE_CHANNEL
+       ,D.CHANNEL_NAME
+       ,A.NODE_NAME9
+       ,A.NODE_NAME2
+       ,A.NODE_DESC2
+       ,A.NODE_NAME3
+       ,A.NODE_DESC3
+       ,A.NODE_NAME4
+       ,A.NODE_DESC4
+       ,A.NODE_NAME5
+       ,A.NODE_DESC5
+       ,A.NODE_NAME6
+       ,A.NODE_DESC6
+       ,CASE WHEN A.INTEGRATE_CHANNEL = 'GD99' THEN 'GD03'
+             ELSE A.INTEGRATE_CHANNEL
+	          END
+       ,CASE WHEN A.INTEGRATE_CHANNEL = 'GD99' THEN '工程渠道'
+             ELSE D.CHANNEL_NAME
+	          END   
+),BASE_RESULT AS(
+SELECT  SALE_GRP_CODE
+       ,INTEGRATE_CHANNEL_CODE
+       ,INTEGRATE_CHANNEL_T
+	   ,OLD_INTEGRATE_CHANNEL_CODE
+       ,OLD_INTEGRATE_CHANNEL_T
+       ,NODE_NAME9
+       ,NODE_NAME2
+       ,NODE_DESC2
+       ,NODE_NAME3
+       ,NODE_DESC3
+       ,NODE_NAME4
+       ,NODE_DESC4
+       ,NODE_NAME5
+       ,NODE_DESC5
+       ,NODE_NAME6
+       ,NODE_DESC6
+       ,DAY_ACHIEVEMENT --日业绩
+	   ,LAST_DAY_ACHIEVEMENT --昨日业绩
+       ,MONTH_ACHIEVEMENT --月累计业绩
+       ,YEAR_ACHIEVEMENT --年累计业绩
+       ,LAST_YEAR_DAY_ACHIEVEMENT --去年同期日业绩
+       ,LAST_YEAR_MONTH_ACHIEVEMENT --去年同期月累计业绩
+       ,LAST_YEAR_ACHIEVEMENT --去年同期年累计业绩
+	   ,DAY_NOTAX --日不含税收入 
+       ,MONTH_NOTAX --月累计不含税收入
+       ,YEAR_NOTAX --年累计不含税收入				 
+	   ,DAY_SALESCOST --日销售成本
+       ,MONTH_SALESCOST --月累计销售成本	 
+       ,YEAR_SALESCOST --年累计销售成本
+       ,LAST_YEAR_ALL_MONTH_ACHIEVEMENT --去年同期整月累计业绩
+	   ,0 AS MONTH_BUDGET_ACHIEVEMENT --当月预算业绩
+	   ,0 AS ACC_BUDGET_ACHIEVEMENT --当年累计预算业绩
+	   ,0 AS YEAR_BUDGET_ACHIEVEMENT --全年预算业绩	  
+	   ,0 AS LY_MONTH_BUDGET_ACHIEVEMENT --去年当月预算业绩
+	   ,0 AS LY_ACC_BUDGET_ACHIEVEMENT --去年累计预算业绩
+	   ,0 AS LY_YEAR_BUDGET_ACHIEVEMENT --去年预算业绩
+  FROM BASE
+  
+ UNION ALL
+ 
+SELECT  SALE_GRP_CODE
+       ,INTEGRATE_CHANNEL_CODE
+       ,INTEGRATE_CHANNEL_T
+	   ,OLD_INTEGRATE_CHANNEL_CODE
+       ,OLD_INTEGRATE_CHANNEL_T	   
+       ,NODE_NAME9
+       ,NODE_NAME2
+       ,NODE_DESC2
+       ,NODE_NAME3
+       ,NODE_DESC3
+       ,NODE_NAME4
+       ,NODE_DESC4
+       ,NODE_NAME5
+       ,NODE_DESC5
+       ,NODE_NAME6
+       ,NODE_DESC6
+       ,0 AS DAY_ACHIEVEMENT --日业绩
+	   ,0 AS LAST_DAY_ACHIEVEMENT --昨日业绩
+       ,0 AS MONTH_ACHIEVEMENT --月累计业绩
+       ,0 AS YEAR_ACHIEVEMENT --年累计业绩
+       ,0 AS LAST_YEAR_DAY_ACHIEVEMENT --去年同期日业绩
+       ,0 AS LAST_YEAR_MONTH_ACHIEVEMENT --去年同期月累计业绩
+       ,0 AS LAST_YEAR_ACHIEVEMENT --去年同期年累计业绩
+	   ,0 AS DAY_NOTAX --日不含税收入 
+       ,0 AS MONTH_NOTAX --月累计不含税收入
+       ,0 AS YEAR_NOTAX --年累计不含税收入				 
+	   ,0 AS DAY_SALESCOST --日销售成本
+       ,0 AS MONTH_SALESCOST --月累计销售成本	 
+       ,0 AS YEAR_SALESCOST --年累计销售成本
+       ,0 AS LAST_YEAR_ALL_MONTH_ACHIEVEMENT --去年同期整月累计业绩
+	   ,MONTH_BUDGET_ACHIEVEMENT --当月预算业绩
+	   ,ACC_BUDGET_ACHIEVEMENT --当年累计预算业绩
+	   ,YEAR_BUDGET_ACHIEVEMENT --全年预算业绩	  
+	   ,LY_MONTH_BUDGET_ACHIEVEMENT --去年当月预算业绩
+	   ,LY_ACC_BUDGET_ACHIEVEMENT --去年累计预算业绩
+	   ,LY_YEAR_BUDGET_ACHIEVEMENT --去年预算业绩
+  FROM BUDGET_BASE
+)
+INSERT INTO DM_SW.DM_SW_GROUP_DAILY_T(
+        STAT_DATE --统计日期
+       ,SALE_GRP_CODE --销售组编码
+       ,INTEGRATE_CHANNEL_CODE --整合渠道1编码
+       ,INTEGRATE_CHANNEL_NAME --整合渠道1名称
+	   ,OLD_INTEGRATE_CHANNEL_CODE --旧整合渠道1编码
+       ,OLD_INTEGRATE_CHANNEL_NAME --旧整合渠道1名称
+       ,NODE_NAME9 --9级节点名称
+       ,NODE_NAME2 --2级节点名称
+       ,NODE_DESC2 --2级节点描述
+       ,NODE_NAME3 --3级节点名称
+       ,NODE_DESC3 --3级节点描述
+       ,NODE_NAME4 --4级节点名称
+       ,NODE_DESC4 --4级节点描述
+       ,NODE_NAME5 --5级节点名称
+       ,NODE_DESC5 --5级节点描述
+       ,NODE_NAME6 --6级节点名称
+       ,NODE_DESC6 --6级节点描述
+       ,DAY_ACHIEVEMENT --日业绩
+	   ,LAST_DAY_ACHIEVEMENT --昨日业绩
+       ,MONTH_ACHIEVEMENT --月累计业绩
+       ,YEAR_ACHIEVEMENT --年累计业绩
+       ,LAST_YEAR_DAY_ACHIEVEMENT --去年同期日业绩
+       ,LAST_YEAR_MONTH_ACHIEVEMENT --去年同期月累计业绩
+       ,LAST_YEAR_ACHIEVEMENT --去年同期年累计业绩
+	   ,DAY_NOTAX --日不含税收入 
+       ,MONTH_NOTAX --月累计不含税收入
+       ,YEAR_NOTAX --年累计不含税收入				 
+	   ,DAY_SALE_COST --日销售成本
+       ,MONTH_SALE_COST --月累计销售成本	 
+       ,YEAR_SALE_COST --年累计销售成本
+       ,LAST_YEAR_ALL_MONTH_ACHIEVEMENT --去年同期整月累计业绩
+	   ,MONTH_BUDGET_ACHIEVEMENT --当月预算业绩
+	   ,ACC_BUDGET_ACHIEVEMENT --当年累计预算业绩
+	   ,YEAR_BUDGET_ACHIEVEMENT --全年预算业绩	  
+	   ,LY_MONTH_BUDGET_ACHIEVEMENT --去年当月预算业绩
+	   ,LY_ACC_BUDGET_ACHIEVEMENT --去年累计预算业绩
+	   ,LY_YEAR_BUDGET_ACHIEVEMENT --去年预算业绩
+	   ,DW_LAST_UPDATE_DATE --DW数据同步时间
+)
+SELECT  TO_CHAR(TO_DATE('${PERIOD_ID_D}'),'yyyy-MM-dd') AS STAT_DATE --统计日期
+       ,SALE_GRP_CODE --销售组编码
+       ,INTEGRATE_CHANNEL_CODE --整合渠道1编码
+       ,INTEGRATE_CHANNEL_T AS INTEGRATE_CHANNEL_NAME --整合渠道1名称
+	   ,OLD_INTEGRATE_CHANNEL_CODE --旧整合渠道1编码
+       ,OLD_INTEGRATE_CHANNEL_T AS OLD_INTEGRATE_CHANNEL_NAME --旧整合渠道1名称
+       ,NODE_NAME9 --9级节点名称
+       ,NODE_NAME2 --2级节点名称
+       ,NODE_DESC2 --2级节点描述
+       ,NODE_NAME3 --3级节点名称
+       ,NODE_DESC3 --3级节点描述
+       ,NODE_NAME4 --4级节点名称
+       ,NODE_DESC4 --4级节点描述
+       ,NODE_NAME5 --5级节点名称
+       ,NODE_DESC5 --5级节点描述
+       ,NODE_NAME6 --6级节点名称
+       ,NODE_DESC6 --6级节点描述
+       ,SUM(DAY_ACHIEVEMENT) AS DAY_ACHIEVEMENT --日业绩
+	   ,SUM(LAST_DAY_ACHIEVEMENT) AS LAST_DAY_ACHIEVEMENT --昨日业绩
+       ,SUM(MONTH_ACHIEVEMENT) AS MONTH_ACHIEVEMENT --月累计业绩
+       ,SUM(YEAR_ACHIEVEMENT) AS YEAR_ACHIEVEMENT --年累计业绩
+       ,SUM(LAST_YEAR_DAY_ACHIEVEMENT) AS LAST_YEAR_DAY_ACHIEVEMENT --去年同期日业绩
+       ,SUM(LAST_YEAR_MONTH_ACHIEVEMENT) AS LAST_YEAR_MONTH_ACHIEVEMENT --去年同期月累计业绩
+       ,SUM(LAST_YEAR_ACHIEVEMENT) AS LAST_YEAR_ACHIEVEMENT --去年同期年累计业绩
+	   ,SUM(DAY_NOTAX) AS DAY_NOTAX --日不含税收入 
+       ,SUM(MONTH_NOTAX) AS MONTH_NOTAX --月累计不含税收入
+       ,SUM(YEAR_NOTAX) AS YEAR_NOTAX --年累计不含税收入				 
+	   ,SUM(DAY_SALESCOST) AS DAY_SALE_COST --日销售成本
+       ,SUM(MONTH_SALESCOST) AS MONTH_SALE_COST --月累计销售成本	 
+       ,SUM(YEAR_SALESCOST) AS YEAR_SALE_COST --年累计销售成本
+       ,SUM(LAST_YEAR_ALL_MONTH_ACHIEVEMENT) AS LAST_YEAR_ALL_MONTH_ACHIEVEMENT --去年同期整月累计业绩
+	   ,SUM(MONTH_BUDGET_ACHIEVEMENT) AS MONTH_BUDGET_ACHIEVEMENT --当月预算业绩
+	   ,SUM(ACC_BUDGET_ACHIEVEMENT) AS ACC_BUDGET_ACHIEVEMENT --当年累计预算业绩
+	   ,SUM(YEAR_BUDGET_ACHIEVEMENT) AS YEAR_BUDGET_ACHIEVEMENT --全年预算业绩	  
+	   ,SUM(LY_MONTH_BUDGET_ACHIEVEMENT) AS LY_MONTH_BUDGET_ACHIEVEMENT --去年当月预算业绩
+	   ,SUM(LY_ACC_BUDGET_ACHIEVEMENT) AS LY_ACC_BUDGET_ACHIEVEMENT --去年累计预算业绩
+	   ,SUM(LY_YEAR_BUDGET_ACHIEVEMENT) AS LY_YEAR_BUDGET_ACHIEVEMENT --去年预算业绩
+	   ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM BASE_RESULT
+ GROUP BY SALE_GRP_CODE
+       ,INTEGRATE_CHANNEL_CODE
+       ,INTEGRATE_CHANNEL_T
+	   ,OLD_INTEGRATE_CHANNEL_CODE --旧整合渠道1编码
+       ,OLD_INTEGRATE_CHANNEL_T --旧整合渠道1名称
+       ,NODE_NAME9
+       ,NODE_NAME2
+       ,NODE_DESC2
+       ,NODE_NAME3
+       ,NODE_DESC3
+       ,NODE_NAME4
+       ,NODE_DESC4
+       ,NODE_NAME5
+       ,NODE_DESC5
+       ,NODE_NAME6
+       ,NODE_DESC6;

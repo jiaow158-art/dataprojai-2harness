@@ -1,0 +1,1218 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2026/04/14 08:46:31 GMT+08:00
+-- update from huangwenbin 2026-05-21 新增字段：销区名称
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_MOS_CUST_ORDER_STAT_T;
+
+WITH T1 AS(
+--首次创建时间+留资
+SELECT SUBSTR(FST_CREATE_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(FST_CREATE_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+	  ,LARGE_AREA_NAME --销区名称
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(FST_CREATE_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(FST_CREATE_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--首次创建时间+加微 
+SELECT SUBSTR(FST_CREATE_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(FST_CREATE_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称	  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(FST_CREATE_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(FST_CREATE_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--交定日期+留资 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称	  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--交定日期+加微  
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+
+ UNION ALL
+--交定日期+交定  
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交定' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已交定','交易成功')
+
+ UNION ALL
+--小定日期+交定 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交定' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已交定','交易成功')
+   
+ UNION ALL
+--大定日期+交定 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交定' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已交定','交易成功')
+   
+ UNION ALL
+--交定日期+交易成功 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交易成功' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('交易成功')
+   
+ UNION ALL
+--交易成功日期+留资  
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--交易成功日期+加微 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额	
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--交易成功日期+交定 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交定' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已交定','交易成功')
+   
+ UNION ALL
+--交易成功日期+交易成功 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交易成功' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,COALESCE(ORDER_AMT,0) AS ORDER_AMT --订单金额
+	  ,COALESCE(SALE_AMT,0) AS SALE_AMT --销售总金额
+	  ,COALESCE(RECV_AMT,0) AS RECV_AMT --收款总金额	  
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('交易成功')
+   
+ UNION ALL
+--小定日期+交易成功 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交易成功' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('交易成功')
+   
+ UNION ALL
+--大定日期+交易成功 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'交易成功' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('交易成功')
+   
+ UNION ALL
+--小定日期+确图 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'确图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--大定日期+确图 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'确图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交定日期+确图 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'确图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交易成功日期+确图 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'确图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--确图日期+确图 
+SELECT SUBSTR(SURE_PLOT_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(SURE_PLOT_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'确图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(SURE_PLOT_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(SURE_PLOT_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--小定日期+出图 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--大定日期+出图 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交定日期+出图 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交易成功日期+出图 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--确图日期+出图 
+SELECT SUBSTR(SURE_PLOT_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(SURE_PLOT_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(SURE_PLOT_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(SURE_PLOT_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+
+ UNION ALL
+--出图日期+出图 
+SELECT SUBSTR(EXAM_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(EXAM_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'出图' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(EXAM_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(EXAM_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--小定日期+量尺 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--大定日期+量尺 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交定日期+量尺 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--交易成功日期+量尺 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--确图日期+量尺 
+SELECT SUBSTR(SURE_PLOT_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(SURE_PLOT_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(SURE_PLOT_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(SURE_PLOT_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--出图日期+量尺 
+SELECT SUBSTR(EXAM_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(EXAM_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(EXAM_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(EXAM_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--量尺日期+量尺 
+SELECT SUBSTR(MEAS_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(MEAS_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'量尺' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(MEAS_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(MEAS_TIME,1,10) < CURRENT_DATE
+   AND (DSGN_ST_NAME IN('已量尺','已出图','已确图')
+    OR ORDER_ST_NAME IN('交易成功'))
+   
+ UNION ALL
+--小定日期+留资 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--大定日期+留资 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--交定日期+留资 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--交易成功日期+留资 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--确图日期+留资 
+SELECT SUBSTR(SURE_PLOT_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(SURE_PLOT_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(SURE_PLOT_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(SURE_PLOT_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--出图日期+留资 
+SELECT SUBSTR(EXAM_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(EXAM_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(EXAM_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(EXAM_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--量尺日期+留资 
+SELECT SUBSTR(MEAS_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(MEAS_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'留资' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(MEAS_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(MEAS_TIME,1,10) < CURRENT_DATE 
+   AND ORDER_ST_NAME IN('已留资','已交定','交易成功')
+   
+ UNION ALL
+--小定日期+加微 
+SELECT SUBSTR(LITL_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(LITL_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(LITL_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(LITL_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--大定日期+加微 
+SELECT SUBSTR(BIG_DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(BIG_DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(BIG_DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(BIG_DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--交定日期+加微 
+SELECT SUBSTR(DEP_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(DEP_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(DEP_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(DEP_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--交易成功日期+加微 
+SELECT SUBSTR(TILE_FIN_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(TILE_FIN_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(TILE_FIN_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(TILE_FIN_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--确图日期+加微 
+SELECT SUBSTR(SURE_PLOT_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(SURE_PLOT_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(SURE_PLOT_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(SURE_PLOT_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--出图日期+加微 
+SELECT SUBSTR(EXAM_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(EXAM_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(EXAM_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(EXAM_TIME,1,10) < CURRENT_DATE
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+   
+ UNION ALL
+--量尺日期+加微 
+SELECT SUBSTR(MEAS_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(MEAS_TIME,1,10) AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称 
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,'加微' AS DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,0 AS ORDER_AMT --订单金额
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+      ,LARGE_AREA_NAME --销区名称		  
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T
+ WHERE SUBSTR(MEAS_TIME,1,10) >= '2025-01-01'
+   AND SUBSTR(MEAS_TIME,1,10) < CURRENT_DATE 
+   AND ORDER_ST_NAME IN('已加微','已留资','已交定','交易成功')
+)
+INSERT INTO DM.DM_MOS_CUST_ORDER_STAT_T
+(
+       STAT_MONTH --统计月份
+      ,STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,LARGE_AREA_NAME --销区名称
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,ORDER_AMT --订单金额
+	  ,SALE_AMT --销售总金额
+	  ,RECV_AMT --收款总金额	  
+	  ,DW_LAST_UPDATE_DATE --DW数据同步时间
+)
+SELECT DISTINCT STAT_MONTH --统计月份
+      ,STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+	  ,LARGE_AREA_NAME --销区名称
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,DMT_SRC_NAME --客户来源
+	  ,IS_NOT_MEAS_NAME --是否测未定
+	  ,DATA_TYPE --数据类型
+      ,CUST_ID --客户ID
+	  ,CUST_NAME --客户名称
+      ,CUST_PHONE_NUM --手机号
+	  ,ORDER_AMT --订单金额
+	  ,SALE_AMT --销售总金额
+	  ,RECV_AMT --收款总金额	  
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM T1

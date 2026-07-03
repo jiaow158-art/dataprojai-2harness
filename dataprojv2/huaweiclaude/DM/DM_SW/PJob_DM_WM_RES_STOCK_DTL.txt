@@ -1,0 +1,111 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/11/22 18:31:20 GMT+08:00
+-- ******************************************************************** --
+--alter table DM_SW.DM_WM_RES_STOCK_DTL add columns (require_date string comment '客户交期');
+--alter table DM_SW.DM_WM_RES_STOCK_DTL add columns (promise_date string comment '承诺交期');
+
+insert overwrite table DM_SW.DM_WM_RES_STOCK_DTL
+SELECT A.sal_vch_num AS SALES_ORDER_NUM,
+	  A.sal_vch_item_num AS SALES_ORDER_ITEM_NUM,
+	  A.cust_num ,
+	  A.cust_name ,
+	  A.material_num ,
+	  mat.material_name ,
+	  A.sales_org_code ,
+	  A.factory_code,
+	  A.inv_location ,
+	  substring(A.res_stock_date,1,10) as res_stock_date,
+	  A.total_sku_confirm_qty ,
+	  A.unit_VOLUM as busi_volume,
+	  A.unit_price,
+	  A.total_sku_confirm_qty*A.unit_VOLUM  as total_res_stock_volume,
+	  A.total_sku_confirm_qty*A.unit_price as total_res_stock_amt,
+	  datediff(current_date(),  A.res_stock_date) as res_stock_days,
+	  a.distribution_channel_code,
+	  org.lev2_code as org_lev2_code,
+      org.lev2_name as org_lev2_name,
+      org.lev3_code as org_lev3_code,
+      org.lev3_name as org_lev3_name,
+	  org.lev4_code as org_lev4_code,
+	  org.lev4_name as org_lev4_name,
+	  org.lev5_code as org_lev5_code,
+	  org.lev5_name as org_lev5_name,
+	  'SALES' as ORDER_SOURCE,
+	  A.creator_id,
+	  CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+	  A.require_date,
+	  A.promise_date,
+	  A.creator_name, --新增
+	  VBAP.ARKTX as item_desc,  -- 新增订单行描述
+	  null as max_res_stock_date
+	  ,vbap.POSNR_CD -- 拆单源行号
+      ,vbap.POSNR_ZCD -- 拆单总行
+FROM dwrotd.dwr_wm_stock_res_from_sales A 
+JOIN  dwimd.dwi_md_data_material_general_t mat on  A.material_num = mat.material_num 
+left join dwrdim.dwr_dim_cust_sales_area_d carea 
+on a.cust_num  = carea.cust_num  and a.distribution_channel_code  = carea.distribution_chnl_code 
+and a.sales_org_code  = carea.sales_org_code and  carea.product_group = '00' and carea.end_date ='4712-12-31'
+left join dm.dm_rpt_sale_grp_t  org On carea.sales_group_code  = org.sale_grp
+left join sdi.sdi_vbap_1001 vbap On vbap.vbeln  = a.sal_vch_num and vbap.posnr = a.sal_vch_item_num
+WHERE A.factory_code LIKE '3%'
+AND mat.matl_group_code  in('3000010','4000010')
+and A.total_sku_confirm_qty > 0
+union all 
+SELECT A.purchase_order_num ,
+	  A.purchase_order_item_num ,
+	  A.cust_num ,
+	  A.cust_name ,
+	  A.material_num ,
+	  mat.material_name ,
+	  A.sales_org_code ,
+	  A.stockout_FACTORY_CODE ,
+	  A.inv_location ,
+	  A.BEDAT as res_stock_date,
+	  A.res_stock_qty,
+	  A.unit_VOLUM as busi_volume ,
+	  COST.unit_price*0.31 as unit_price,
+	  A.res_stock_qty*A.unit_VOLUM AS total_res_stock_volume,
+	  A.res_stock_qty*COST.unit_price*0.31 as total_res_stock_amt,
+	   datediff(current_date(),  A.BEDAT) as res_stock_days,
+	'' distribution_channel_code,
+	'' as org_lev2_code,
+   org.short_objid_name_t3 as org_lev2_name,
+   '' as org_lev3_code,
+   org.short_objid_name_t4 as org_lev3_name,
+   '' as org_lev4_code,
+   org.short_objid_name_t5 as org_lev4_name,
+   '' as org_lev5_code,
+   org.short_objid_name_t6 as org_lev5_name,
+   'PURCHASE' AS ORDER_SOURCE,
+   A.creator_id ,
+   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+   null as require_date,
+   null as promise_date,
+   zhr.nachn as creator_name,
+   A.item_desc,
+   A.max_res_stock_date --订单行最后的更新日期
+   ,null as POSNR_CD -- 拆单源行号
+   ,null as POSNR_ZCD -- 拆单总行
+FROM dwrotd.dwr_wm_stock_res_from_purchase A 
+JOIN  dwimd.dwi_md_data_material_general_t mat on  A.material_num = mat.material_num 
+LEFT JOIN dm_sw.dm_material_cost cost ON A.material_num  =  cost.material_num 
+left join DWIMD.DWI_ORG_PERNR_STRUCTURE_INFO_T org On A.creator_id  = org.employee_code
+left join (select distinct pernr,nachn from sdi.sdi_pa0002_1001) zhr on zhr.pernr = A.creator_id 
+  WHERE A.stockout_factory_code LIKE '3%'
+AND mat.matl_group_code  in('3000010','4000010')
+and A.res_stock_qty > 0
+and not
+(
+	(
+	INV_LOCATION in ('GR','GR90','GD','GD90','GT','GT90','GQ','GA','GO','GK','GB','GZ','GF','GX')
+	and stockout_FACTORY_CODE in ('3220','3320','3520','3620','3720','3820')
+	)
+	and
+	(
+	stockin_LOCATION in ('GR','GR90','GD','GD90','GT','GT90','GQ','GA','GO','GK','GB','GZ','GF','GX','GG','GP')
+	and stockin_factory_code in ('3220','3320','3520','3620','3720','3820')
+	)
+)
+;

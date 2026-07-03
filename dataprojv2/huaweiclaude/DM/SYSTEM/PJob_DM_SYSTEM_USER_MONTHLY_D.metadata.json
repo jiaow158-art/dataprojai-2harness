@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SYSTEM_USER_MONTHLY_D",
+    "type": "HiveSQL",
+    "directory": "/DM/SYSTEM",
+    "description": "各系统月活跃统计表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

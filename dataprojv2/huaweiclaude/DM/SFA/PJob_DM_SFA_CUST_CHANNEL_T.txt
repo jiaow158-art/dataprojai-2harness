@@ -1,0 +1,219 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/02/24 09:45:53 GMT+08:00
+-- description:sfa经销商主档销售维度表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from zhz 20240709 排除家装数
+-- update from zhz 20240819 新增销售组名称、销售部门编码、销售部门名称、销售地区编码、销售地区名称
+-- ******************************************************************** --
+-- ------------------------因为接口新建完后不能实时更新data_id,因此每次执行变更对比前先更新data_id---------------------------------------------
+---TASK_API_TO_DWS_CUS_ID_T_REPE--调度重新跑拉取id数据
+-- insert overwrite into dm.dm_sfa_cust_mes_main_t 
+-- select 
+-- 	 a.cust_num
+-- 	,a.cust_name
+-- 	,a.ctr_object_person_name 
+-- 	,a.address_name
+-- 	,a.legal_person_name
+-- 	,a.rec_crt_date
+-- 	,a.create_date
+-- 	,a.phone_1
+-- 	,b.data_id
+-- 	,a.dw_last_update_date
+-- 	,a.t_update_date
+-- 	,a.update_date
+-- 	,a.is_collaborate
+-- 	,a.owner
+-- 	,a.owner_id
+-- 	,a.ctr_object_person_id
+-- 	,a.is_share_cust
+-- from dm.dm_sfa_cust_mes_main_t a
+-- left join api_log.api_to_dws_cus_id  b
+-- on a.cust_num = lpad(b.cust_code,10,0) ;
+-- ------------------------------------------------------------------------------
+insert overwrite into DM.DM_SFA_CUST_CHANNEL_T --2024-04-17初始化
+with tmp_table as (
+select 
+ a.cust_num as cust_num
+,b.data_id as CUST_ID
+,a.sales_org_code as sales_org
+,a.distribution_chnl_code as sales_channel
+,d."_id" as channel_id
+,a.sales_group_code as sales_grp
+,a.cust_group_code as cust_level --客户等级
+,e."_id" as level_id
+,case when a.cust_sale_frozen is null and a.cust_delivery_frozen_code is null and a.cust_order_frozen_code is null 
+and a.cust_invc_frozen_code is null then '0' else '1' end as is_freeze --0：否,1：是
+,b.rec_crt_date as t_create_time
+,b.create_date  as create_date
+,EXTRACT(EPOCH FROM (a.rec_crt_date)) * 1000  as t_update_time
+,substr(a.rec_crt_date,1,10) as update_date --初始化修改时间为创建时间
+,c.src_emp_num as sales_man
+,case when c2.user_id is null then 'FSUID_0038FBDA010A42F8B1A43C1ADC04546B' else c2.user_id end as man_id --负责人id
+,a.parent_cust_num 
+,b1.data_id as parent_id 
+,current_timestamp as dw_last_update_date
+,f.data_id as data_id 
+,case when a.CUST_GROUP_7 is not null then 0 else 1 end as is_cooper  --是否合作
+,case when g.cust_num is not null then 1 else 0 end as is_channel_owner --是否渠道负责人
+,f.man_id as sfa_owner --sfa负责人
+,case when c1.employee_id is null then '1008' else c1.employee_id end as sap_owner --sap负责人
+,substr(a.sales_office_code,1,4) as sales_dept_code
+,a.sales_office_name as sales_dept_name
+,a.sale_region_code as sales_region_code
+,a.sale_region_name as sales_region_name
+,a.sales_group_name as sales_grp_name
+from dwrdim.dwr_dim_cust_sales_area_d2 a
+join dm.dm_sfa_cust_mes_main_t b
+on a.cust_num = b.cust_num
+left join dm.dm_sfa_cust_mes_main_t b1
+on lpad(a.parent_cust_num,10,0) = b1.cust_num
+left join (select row_number() over(partition by cust_num,sales_org_code,distribution_chnl_code order by partner_counter desc) as RN ,* 
+from DWRDIM.DWR_DIM_CUST_PARTNER_D 
+where end_date = '4712-12-31' and del_flag = 'N' and partner_func_code = 'VE') c
+on a.cust_num = c.cust_num and a.sales_org_code = c.sales_org_code and a.distribution_chnl_code = c.distribution_chnl_code and c.rn = 1 
+left join api_log.dws_sfa_org_employee_info_t c1
+on c.src_emp_num = c1.employee_number
+left join api_log.api_to_dws_people_information c2
+on c1.employee_id = c2."_id"
+left join api_log.api_sfa_data_dict_id d --分销渠道
+on d.field_vsc3g__c = '5' and d.field_wmkus__c = a.distribution_chnl_code
+left join api_log.api_sfa_data_dict_id e  --客户等级
+on e.field_vsc3g__c = '4' and e.field_wmkus__c = a.cust_group_code
+left join api_log.api_to_dws_cust_channel_id f 
+on a.cust_num = f.cust_num and d."_id" = f.channel_id and a.sales_org_code = f.sales_org
+left join (select row_number() over(partition by cust_num,sales_org_code order by partner_counter desc ) as RN,*  --判断是否零售渠道负责人
+from DWRDIM.DWR_DIM_CUST_PARTNER_D  --优先取11个大区零售业务员
+where end_date = '4712-12-31' and del_flag = 'N'  and partner_func_code = 'VE' 
+and sale_region_code in ('S00001','S00003','S00004','S00005','S00006','S00008','S00009','S00010','S00011','S00014','B00018') AND distribution_chnl_code = '01') g 
+on a.cust_num = g.cust_num and a.sales_org_code = g.sales_org_code and a.distribution_chnl_code = g.distribution_chnl_code and g.rn = 1
+where a.end_date = '4712-12-31' and a.del_flag = 'N' and a.cust_num <> 'NOT EXISTS' and a.sales_group_code in (select node_name9 from dm.dm_rpt_sales_group_t where node_name2 = 'H11000001') 
+and (select count(1) from api_log.api_sfa_data_dict_id) > 50 --数据字典表不为空
+and (select count(1) from api_log.api_to_dws_people_information) > 200 --人员表不为空
+and a.distribution_chnl_code <> '08' --排除家装
+--and b.data_id is not null 
+)
+
+,update_table as 
+(
+select distinct 
+ t1.sales_org
+,t1.sales_channel
+,t1.cust_num
+,t1.t_create_time
+,t1.create_date
+,t1.t_update_time
+,t1.update_date
+,t1.data_id 
+,t1.CUST_ID
+,t1.parent_id
+,t1.man_id
+,case when t1.sfa_owner <> t1.sap_owner then 'Y'  --sfa跟sap对比负责人差异
+      when  concat(t1.CUST_ID,t1.sales_grp,t1.cust_level,t1.is_freeze,t1.sales_man,t1.parent_cust_num,t1.is_cooper,t1.is_channel_owner,t1.man_id,t1.sales_dept_code,t1.sales_region_code,t1.sales_grp_name,t1.sales_dept_name,t1.sales_region_name) = 
+	        concat(t2.CUST_ID,t2.sales_grp,t2.cust_level,t2.is_freeze,t2.sales_man,t2.parent_cust_num,t2.is_cooper,t2.is_channel_owner,t2.man_id,t2.sales_dept_code,t2.sales_region_code,t2.sales_grp_name,t2.sales_dept_name,t2.sales_region_name) 
+	  then 'N' else 'Y' end as update_flag
+from tmp_table t1
+left join dm.dm_sfa_cust_channel_t t2 on t1.sales_org = t2.sales_org 
+	and t1.sales_channel = t2.sales_channel and t1.cust_num = t2.cust_num
+)
+
+,result_table as (
+-- 新增/修改数据
+select 
+ t1.cust_num
+,t1.CUST_ID
+,t1.sales_org
+,t1.sales_channel
+,t1.channel_id
+,t1.sales_grp
+,t1.cust_level
+,t1.level_id
+,t1.is_freeze 
+,case when t2.update_flag is null then substr(cast(extract(epoch from current_timestamp) * 1000 as text),1,13) else cast(t2.t_create_time as text) end as t_create_time
+,case when t2.update_flag is null then current_date() else t2.create_date end  as create_date
+,substr(cast(extract(epoch from current_timestamp) * 1000 as text),1,13) as t_update_time
+,current_date() as update_date
+,t1.sales_man
+,t1.man_id
+,t1.parent_cust_num 
+,t1.parent_id 
+,current_timestamp as dw_last_update_date
+,t1.data_id
+,cast(t1.is_cooper as text) as is_cooper
+,cast(t1.is_channel_owner as text) as is_channel_owner
+,t1.sales_dept_code
+,t1.sales_dept_name
+,t1.sales_region_code
+,t1.sales_region_name
+,t1.sales_grp_name
+,t2.update_flag
+from tmp_table t1
+left join update_table t2 on t1.sales_org = t2.sales_org and t1.sales_channel = t2.sales_channel and t1.cust_num = t2.cust_num
+where t2.update_flag is null or t2.update_flag = 'Y'
+
+union all 
+
+-- 原数据
+select 
+ t1.cust_num
+,t2.CUST_ID
+,t1.sales_org
+,t1.sales_channel
+,t1.channel_id
+,t1.sales_grp
+,t1.cust_level
+,t1.level_id
+,t1.is_freeze 
+,cast(t1.t_create_time as text) as t_create_time
+,t1.create_date as create_date
+,cast(t1.t_update_time as text) as  t_update_time
+,t1.update_date as update_date
+,t1.sales_man
+,t2.man_id
+,t1.parent_cust_num 
+,t2.parent_id 
+,current_timestamp as dw_last_update_date
+,t2.data_id
+,cast(t1.is_cooper as text) as is_cooper
+,cast(t1.is_channel_owner as text) as is_channel_owner
+,t1.sales_dept_code
+,t1.sales_dept_name
+,t1.sales_region_code
+,t1.sales_region_name
+,t1.sales_grp_name
+,t2.update_flag
+from dm.dm_sfa_cust_channel_t t1
+left join update_table t2 on t1.sales_org = t2.sales_org and t1.sales_channel = t2.sales_channel and t1.cust_num = t2.cust_num
+where t2.update_flag = 'N'
+)
+
+select distinct
+ cust_num
+,CUST_ID
+,sales_org
+,sales_channel
+,channel_id
+,sales_grp
+,cust_level
+,level_id
+,is_freeze 
+,t_create_time
+,create_date
+,t_update_time
+,update_date
+,sales_man
+,man_id
+,parent_cust_num 
+,parent_id 
+,dw_last_update_date
+,data_id
+,is_cooper
+,is_channel_owner
+,sales_dept_code
+,sales_dept_name
+,sales_region_code
+,sales_region_name
+,sales_grp_name
+from result_table 

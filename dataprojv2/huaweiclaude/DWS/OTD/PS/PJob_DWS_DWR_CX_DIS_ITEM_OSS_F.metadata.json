@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_CX_DIS_ITEM_OSS_F",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/PS",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

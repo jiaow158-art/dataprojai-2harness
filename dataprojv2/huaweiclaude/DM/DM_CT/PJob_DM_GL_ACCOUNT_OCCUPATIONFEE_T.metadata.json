@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_GL_ACCOUNT_OCCUPATIONFEE_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "占用资金成本",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

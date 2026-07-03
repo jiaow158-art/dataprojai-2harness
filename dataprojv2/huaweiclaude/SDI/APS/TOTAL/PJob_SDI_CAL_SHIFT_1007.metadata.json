@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_CAL_SHIFT_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/TOTAL",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

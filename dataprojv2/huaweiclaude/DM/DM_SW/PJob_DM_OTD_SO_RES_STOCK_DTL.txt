@@ -1,0 +1,123 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- update qyj 20240619 新增工厂、外协标识字段
+-- create time: 2023/09/18 15:39:20 GMT+08:00
+-- ******************************************************************** --
+WITH MAT AS
+(
+select 
+t1.material_num
+,t1.material_name
+,LENGTH_1--长度
+,WIDTH--宽度
+,DIMENSION--规格
+,matl_group_code
+,external_matl_group_code
+,WIDTH*LENGTH_1/1000/1000 as product_area -- 面积
+, product_level2_code as lve2_code
+, product_level2_code as  lve3_code
+,t1.RESERVED_FIELD_1
+,t1.RESERVED_FIELD_3
+from dwimd.dwi_md_data_material_general_t t1
+ WHERE t1.group_num='800'
+),
+aps_demand as (
+SELECT t1.SAP_LINE_NO ,
+       t1.WBS_LINE_NO,
+       SUM(t1.NET_DEMAND_QTY) AS NET_DEMAND_QTY,
+       SUM(t1.ACTUAL_NET_DEMAND_QTY) AS ACTUAL_NET_DEMAND_QTY,
+       MAX(t1.demand_delivery_date) as DEMAND_DELIVERY_DATE,
+       min(t1.plant_code) as plant_code,
+       max(t1.self_foreign_flag) as self_foreign_flag
+       --t1.WBS_REMAIN_QTY,
+       --t1.SAP_ORDER_QTY,
+       --t1.SAP_CONFIRM_QTY
+FROM sdi.sdi_sale_order_1007  t0
+JOIN sdi.sdi_SALE_ORDER_DTL_1007 t1 
+ON t1.SALE_ORDER_ID = t0.ID 
+WHERE t1.INV_ORG_ID =1 
+AND t1.IS_PHANTOM =0
+AND t0.ORDER_TYPE != '零售销售订单'
+--AND t1.sap_line_no ='1111471450000050'
+--AND t1.ACTUAL_NET_DEMAND_QTY>0
+--AND t1.CALCULATION_FLAG=0
+--AND t1.DETAIL_STATE = 0
+GROUP BY t1.SAP_LINE_NO, t1.WBS_LINE_NO
+)
+,
+VBEP AS (
+SELECT VBELN
+		        ,POSNR
+				,edatu    -- 留货日期
+				,BMENG    -- 留货数
+				,plart
+            FROM SDI.SDI_VBEP_1001
+		   WHERE DEL_FLAG = 'N'
+		   and BMENG>0
+),
+q_stock as (
+select mat_pspnr
+      ,matnr
+	  ,werks
+	  ,BUDAT
+	  ,sum(case when h.shkzg = 'S' then  1 * coalesce(h.menge,0)
+                when h.shkzg = 'H' then -1 * coalesce(h.menge,0)
+                else 0
+	             end) as zxmkc --已转入的项目库存
+from SDI.SDI_MATDOC_1001 h
+where bwart IN('411','415')
+and sobkz = 'Q'
+AND H.DEL_FLAG = 'N'
+group by
+       mat_pspnr
+      ,matnr
+	  ,werks
+	  ,BUDAT
+),
+mid as (
+SELECT t1.vbeln,t1.posnr,t1.matnr,t0.edatu as res_stock_date, t0.BMENG as res_stock_qty,replace(substr(t2.DEMAND_DELIVERY_DATE,1,10),'-','') as bstdk,t1.erdat,
+    t2.plant_code,
+    t2.self_foreign_flag,
+    t1.znka,--KA类型
+    t1.znka_type,--客户产品类型
+    t1.znka_kunnr--KA客户
+from VBEP t0 
+join  dm.dm_otd_sales_order_det_t  t1 On t0.VBELN = t1.VBELN and t0.POSNR = t1.POSNR
+join aps_demand t2 On concat(t1.vbeln,t1.POSNR) = t2.SAP_LINE_NO
+where 1=1 
+and t0.BMENG<>0
+--AND t1.MATKL IN('1000010')   -- 瓷砖
+--and t1.EXTWG IN('10010','10030','10080')  
+--and substr(t1.WERKS,1,2) in('12','13','15','16','17','18','19','72','75','77','79','8A')  
+--and substr(t1.LGORT,1,2) not in('00','BC')  and t1.LGORT<>'GFZ'
+--and substr(t1.VBELN,1,3) not in ('113')
+union all 
+SELECT t1.zjhd, t1.zjhdid,t1.matnr, t0.BUDAT as res_stock_date, t0.zxmkc as res_stock_qty,replace(substr(t2.DEMAND_DELIVERY_DATE,1,10),'-','')  as BSTDK,t1.zcjrq,
+    t2.plant_code,
+    t2.self_foreign_flag,
+    t1.znka,
+	t1.znka_type,
+	t1.znka_kunnr
+FROM q_stock  t0
+join dm.dm_otd_wbs_plan_order_det_t t1  On t0.mat_pspnr = t1.pspnr and t0.matnr = t1.matnr and t0.werks = t1.werks
+join  aps_demand t2 On t1.zjhdid = t2.WBS_LINE_NO
+where   t0.zxmkc<>0
+--AND t1.matkl = '1000010'
+--AND t1.EXTWG IN('10010','10030','10080')  
+--and substr(t1.WERKS,1,2) in('12','13','15','16','17','18','19','72','75','77','79','8A')  
+)
+INSERT OVERWRITE TABLE dm.dm_otd_so_res_stock_dtl
+select  t0.vbeln,t0.posnr,t0.matnr,t0.res_stock_date, t0.res_stock_qty,t0.BSTDK,
+     t1.product_area,
+    current_date()  as dw_last_update_date,
+    t0.erdat,
+    t0.plant_code,
+    t0.self_foreign_flag,
+    t0.znka,
+	t0.znka_type,
+	t0.znka_kunnr
+from mid  t0 
+join mat t1 On t0.matnr = t1.material_num;
+
+

@@ -1,0 +1,117 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/07/27 09:15:21 GMT+08:00
+-- description:卫浴客户提货数
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from chenzhiyong 20230822 新增在途金额
+-- update from chenzhiyong 20230823 RTM客户只取提货日期大于等于RTM上线时间
+-- update from chenzhiyong 20230823 4号为定稿日(跑数日)
+-- update from chenzhiyong 20230828 去掉提货单重复数据
+-- update from chenzhiyong 20230829 修改提货单逻辑（已提货单头、行、客户、物料分组，取凭证日期最早的）
+-- update from chenzhiyong 20230918 当客户数据中原B1客户为Y时，提货数据从20230101开始，为N取RTM的切换时间
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with operation_center_data as(  -- 客户数据
+     select case when length(cust_code) <=6 then concat('0000',cust_code) else cust_code end as cust_code  ,
+	        case when NVL(cast(substring(rtm_online_date,1,10) as string),'2023-01-01')  <= '2023-01-01' then '2023-01-01'
+	        	else  NVL(cast(substring(rtm_online_date,1,10) as string),'2023-01-01')          
+            end as rtm_online_date,
+            abbreviation as cust_short_name,
+            source_b1_flag
+     from sdi.sdi_b1_customer_data_1037
+     where cust_type = 'SW'
+),
+dwr_wm_prodstock_out_in_f_data as(
+	select --t1.period_id_m ,
+		   min(substring(cast(t1.voucher_post_date as string),1,10)) as voucher_post_date,    -- 提货日期
+		   t1.reference_voucher_num , -- 提货凭证
+		   t1.DELIVERY_PROJECT,
+		   t1.cust_num ,  -- 客编编码(关联不上取凭证上的客户)
+		   t1.material_num,         -- 物料
+		   sum(t1.stock_qty) stock_qty
+	from dwrotd.dwr_wm_prodstock_out_in_f t1
+	where t1.period_id_m >=  CASE WHEN substring('${PERIOD_ID_D}',-2) IN ('01','02','03') THEN 
+                               REPLACE(SUBSTRING(ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3),1,7),'-','') -- 传昨天，所在月份1号的前3个月
+                           ELSE
+                    		    REPLACE(SUBSTRING('${PERIOD_ID_D}',1,7),'-','')  -- 传昨天，当月
+                    	   END
+	GROUP BY --t1.period_id_m ,
+			  -- substring(cast(t1.voucher_post_date as string),1,10),    -- 提货日期
+			   t1.reference_voucher_num , -- 提货凭证
+			   t1.DELIVERY_PROJECT,
+			   t1.cust_num ,  -- 客编编码(关联不上取凭证上的客户)
+			   t1.material_num
+),
+pickup_goods_amt_data as(
+	select t1.vbelv ,
+	       t1.posnv ,
+	       sum(t2.subtotal_price_process1) as pickup_goods_amt
+	from sdi.sdi_vbfa_1001 t1   -- 凭证流
+	LEFT JOIN DM.DM_GL_OUT_INVOICE_T t2 -- 发票
+	ON t1.vbeln = t2.bill_voucher_num
+	AND t1.posnn = t2.acc_voucher_line_item_num
+	where t1.vbtyp_n = 'M'
+	and t1.vbelv like '80%'
+	group by t1.vbelv ,
+	         t1.posnv
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_CUST_PICK_DETAIL_F PARTITION(STAT_MONTH)
+select t1.pickup_goods_date,
+	   t1.sap_delivery_num,
+	   t2.cust_code,
+	   t2.cust_short_name,
+	   t1.material_num,
+	   sum(t1.pickup_goods_qty) as pickup_goods_qty,
+	   current_timestamp() as dw_last_update_date,
+	   sum(t1.pickup_goods_amt) as pickup_goods_amt,
+	   SUBSTRING(t1.pickup_goods_date,1,7) AS STAT_MONTH
+from(
+	select t1.voucher_post_date as pickup_goods_date,    -- 提货日期
+		   t1.reference_voucher_num as sap_delivery_num, -- 提货凭证
+		   nvl(t3.zzkunnr,t1.cust_num) as cust_code,  -- 客编编码(关联不上取凭证上的客户)
+		   t1.material_num,         -- 物料
+		   nvl(abs(sum(t1.stock_qty)),0)  pickup_goods_qty ,           -- 提货数量
+		   nvl(abs(sum(t2_1.pickup_goods_amt)),0)  pickup_goods_amt            -- 提货金额
+	from dwr_wm_prodstock_out_in_f_data t1    -- 出入库表
+	left join sdi.sdi_likp_1001 t1_2   -- 提货头
+	on t1.reference_voucher_num = t1_2.vbeln
+	left join sdi.sdi_lips_1001 t2   -- 提货行
+	on t1.reference_voucher_num = t2.vbeln
+	and t1.DELIVERY_PROJECT = t2.posnr 
+	left join pickup_goods_amt_data t2_1
+	on t1.reference_voucher_num = t2_1.vbelv
+	and t1.DELIVERY_PROJECT = t2_1.posnv 
+	left join SDI.SDI_ZSD_ZMKB_1001 t3 -- DWIPI.DWI_WF_ZSD_ZMKB_WY_T t3 -- 字母客编关系表
+	on t1.cust_num = t3.kunnr 
+	and t1_2.vkorg = t3.vkorg
+	and t2.vtweg = t3.vtweg 
+	join operation_center_data t4  -- 客户关系外挂表，只取上了B1的卫浴客户
+	ON nvl(t3.zzkunnr,t1.cust_num) = t4.cust_code
+	join dwimd.dwi_md_data_material_general_t t8
+	on t1.material_num = t8.material_num
+	where t1.reference_voucher_num like '80%' -- 限制80开头的
+	and t8.prod_property_name = '卫浴产品'
+	group by t1.reference_voucher_num,
+			 nvl(t3.zzkunnr,t1.cust_num),
+			 t1.material_num,
+			 t1.voucher_post_date
+	)t1
+	join operation_center_data t2
+	on t1.cust_code = t2.cust_code
+	and t1.pickup_goods_date >= case when t2.source_b1_flag = 'Y' then '2023-01-01'
+	                                 else t2.rtm_online_date end
+	--t2.rtm_online_date
+	group by t1.pickup_goods_date, 
+			 t1.sap_delivery_num,
+			 t2.cust_code,
+			 t2.cust_short_name, 
+			 t1.material_num;

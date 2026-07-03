@@ -1,0 +1,27 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/11/23 10:52:12 GMT+08:00
+-- description:瓷砖工程商机扣费台账
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRLTC.DWR_BO_PROJECT_CHARLEDGER_F
+select t.sjh as BO_NO, -- 商机号
+	   t.DQXSZ AS AREA_NAME, --  区域
+	   CONCAT(substring(t.SJYXQ,1,4),'-', substring(t.SJYXQ,5,2),'-', substring(t.SJYXQ,7,2)) AS BO_VALID_DATE,  -- 商机有效期
+	   t.SJJD AS BO_STAGE, -- 商机阶段
+	   t.XMMC as PROJECT_NAME, -- 项目名称
+	   CONCAT(substring(t.SQRQ,1,4),'-', substring(t.SQRQ,5,2),'-', substring(t.SQRQ,7,2)) as APPLY_DATE, -- 申请日期
+	   t.GCLB as PROJECT_TYPE, -- 工程类别
+	   t.mianji as deliver_tot_area, -- 发货总面积
+	   t.KHBM as customer_code, -- 客户编码
+	   t1.cust_name as customer_name,  -- 客户名称
+	   '' as cust_group_name,  -- 客户组
+	   t.sjlx  as bo_type, -- 商机类型/工程大类
+	   nvl(t.CZYJYL + t.BBYJYL + t.GGYJYL +	t.MDBYJYL + t.YNYJYL + t.LJYJYL + t.FCYJYL + t.JJYJYL + t.FSJGZYJYL,0) as forecast_use_qty, --预计用量
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE 
+from SDI.SDI_ZTSD_SJKF_LOG_1001 t
+join DWRDIM.dwr_dim_cust_general_d t1
+on t.KHBM = t1.cust_num 
+and t1.end_date = '4712-12-31';

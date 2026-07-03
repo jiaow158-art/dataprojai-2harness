@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WT_USER_SHARE_EVENT_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/CS/DEA",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

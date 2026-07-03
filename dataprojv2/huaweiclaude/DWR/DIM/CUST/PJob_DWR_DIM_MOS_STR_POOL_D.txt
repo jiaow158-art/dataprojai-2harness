@@ -1,0 +1,19 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/11 11:03:15 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_MOS_STR_POOL_D
+SELECT  A.ID --ID
+       ,A.CREATER_ID AS CREATE_EMP_ID --创建人ID
+       ,A.CREATER_NAME AS CREATE_EMP_NAME --创建人名称
+       ,A.CREATE_TIME --创建时间
+       ,A.MODIFIER_ID AS UPDATE_EMP_ID --修改人ID
+       ,A.MODIFIER_NAME AS UPDATE_EMP_NAME --修改人名称
+       ,A.MODIFY_TIME AS UPDATE_TIME --修改时间
+       ,A.VERSION AS VERS_NUM --数据版本号
+       ,A.POOL_ID --客户池ID
+       ,A.STORE_ID AS STR_ID --门店ID
+	   ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_SAL_CLIENT_FOLLOW_POOL_STORE_1012 A
+ WHERE CAST(A.DELETE_FLAG AS STRING) = 'FALSE'

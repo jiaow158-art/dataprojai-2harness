@@ -1,0 +1,201 @@
+<h2>深色商务 - 完整页面效果</h2>
+<p class="subtitle">基于现有报告数据模拟完整布局，请关注整体视觉层次和配色</p>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: 瓷砖事业部 业绩分析报告</div>
+  <div class="mockup-body" style="background:#0f0f1a; padding:20px; min-height:700px; font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">
+
+    <!-- Hero Header -->
+    <div style="background:linear-gradient(135deg,#1a1a3e 0%,#2d1b69 50%,#1a1a3e 100%); border-radius:12px; padding:28px 32px; margin-bottom:16px; border:1px solid rgba(102,126,234,0.2); position:relative; overflow:hidden;">
+      <div style="position:absolute; top:-30px; right:-30px; width:120px; height:120px; background:radial-gradient(circle, rgba(118,75,162,0.3), transparent); border-radius:50%;"></div>
+      <div style="position:absolute; bottom:-20px; left:40%; width:80px; height:80px; background:radial-gradient(circle, rgba(102,126,234,0.2), transparent); border-radius:50%;"></div>
+      <div style="font-size:11px; color:rgba(255,255,255,0.5); letter-spacing:3px; text-transform:uppercase; margin-bottom:8px;">Performance Analysis Report</div>
+      <div style="font-size:22px; font-weight:700; color:#fff; margin-bottom:4px;">瓷砖事业部 2026年1-5月业绩分析</div>
+      <div style="font-size:12px; color:rgba(255,255,255,0.4);">数据期间: 2026-01 ~ 2026-05 &nbsp;|&nbsp; 生成时间: 2026-06-10</div>
+    </div>
+
+    <!-- KPI Cards Row -->
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:16px;">
+      <div style="background:linear-gradient(145deg, rgba(102,126,234,0.15), rgba(102,126,234,0.05)); border-radius:10px; padding:20px; border:1px solid rgba(102,126,234,0.15);">
+        <div style="font-size:11px; color:rgba(255,255,255,0.45); letter-spacing:1px; margin-bottom:10px;">累计达成</div>
+        <div style="font-size:26px; font-weight:700; color:#fff;">16.87<span style="font-size:14px; color:rgba(255,255,255,0.6); margin-left:2px;">亿</span></div>
+        <div style="margin-top:8px; font-size:11px; color:#f87171;">↓ vs 预算 -21.9%</div>
+      </div>
+      <div style="background:linear-gradient(145deg, rgba(118,75,162,0.15), rgba(118,75,162,0.05)); border-radius:10px; padding:20px; border:1px solid rgba(118,75,162,0.15);">
+        <div style="font-size:11px; color:rgba(255,255,255,0.45); letter-spacing:1px; margin-bottom:10px;">5月达成</div>
+        <div style="font-size:26px; font-weight:700; color:#fff;">5.05<span style="font-size:14px; color:rgba(255,255,255,0.6); margin-left:2px;">亿</span></div>
+        <div style="margin-top:8px; font-size:11px; color:#f87171;">↓ vs 预算 -25.0%</div>
+      </div>
+      <div style="background:linear-gradient(145deg, rgba(56,189,248,0.12), rgba(56,189,248,0.04)); border-radius:10px; padding:20px; border:1px solid rgba(56,189,248,0.15);">
+        <div style="font-size:11px; color:rgba(255,255,255,0.45); letter-spacing:1px; margin-bottom:10px;">国内营销中心占比</div>
+        <div style="font-size:26px; font-weight:700; color:#fff;">97.3<span style="font-size:14px; color:rgba(255,255,255,0.6); margin-left:2px;">%</span></div>
+        <div style="margin-top:8px; font-size:11px; color:rgba(255,255,255,0.35);">16.41亿 / 16.87亿</div>
+      </div>
+      <div style="background:linear-gradient(145deg, rgba(240,147,251,0.12), rgba(240,147,251,0.04)); border-radius:10px; padding:20px; border:1px solid rgba(240,147,251,0.15);">
+        <div style="font-size:11px; color:rgba(255,255,255,0.45); letter-spacing:1px; margin-bottom:10px;">零售渠道达成</div>
+        <div style="font-size:26px; font-weight:700; color:#fff;">7.22<span style="font-size:14px; color:rgba(255,255,255,0.6); margin-left:2px;">亿</span></div>
+        <div style="margin-top:8px; font-size:11px; color:#f87171;">↓ vs 预算 -27.2%</div>
+      </div>
+    </div>
+
+    <!-- Chart: Full width trend -->
+    <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:20px; margin-bottom:16px; border:1px solid rgba(255,255,255,0.06);">
+      <div style="font-size:13px; font-weight:600; color:rgba(255,255,255,0.85); margin-bottom:4px;">月度达成趋势</div>
+      <div style="font-size:10px; color:rgba(255,255,255,0.3); margin-bottom:16px;">实际达成 vs 预算 vs 去年同期</div>
+      <div style="height:160px; position:relative;">
+        <!-- Simulated line chart -->
+        <svg width="100%" height="160" style="overflow:visible;">
+          <defs>
+            <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.3"/>
+              <stop offset="100%" style="stop-color:#667eea;stop-opacity:0"/>
+            </linearGradient>
+          </defs>
+          <!-- Grid lines -->
+          <line x1="40" y1="10" x2="700" y2="10" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="40" y1="45" x2="700" y2="45" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="40" y1="80" x2="700" y2="80" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="40" y1="115" x2="700" y2="115" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="40" y1="150" x2="700" y2="150" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <!-- Y axis labels -->
+          <text x="35" y="14" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end">7亿</text>
+          <text x="35" y="49" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end">5亿</text>
+          <text x="35" y="84" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end">3亿</text>
+          <text x="35" y="119" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="end">1亿</text>
+          <!-- Area fill -->
+          <path d="M130,90 L280,140 L430,30 L580,35 L680,25 L680,150 L130,150 Z" fill="url(#grad1)"/>
+          <!-- Actual line -->
+          <polyline points="130,90 280,140 430,30 580,35 680,25" fill="none" stroke="#667eea" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- Budget line (dashed) -->
+          <polyline points="130,70 280,130 430,10 580,15 680,5" fill="none" stroke="#91cc75" stroke-width="1.5" stroke-dasharray="6,4" stroke-linecap="round"/>
+          <!-- YoY line (dotted) -->
+          <polyline points="130,120 280,100 430,20 580,18 680,22" fill="none" stroke="#fac858" stroke-width="1.5" stroke-dasharray="2,4" stroke-linecap="round"/>
+          <!-- Data points -->
+          <circle cx="130" cy="90" r="4" fill="#667eea" stroke="#0f0f1a" stroke-width="2"/>
+          <circle cx="280" cy="140" r="4" fill="#667eea" stroke="#0f0f1a" stroke-width="2"/>
+          <circle cx="430" cy="30" r="4" fill="#667eea" stroke="#0f0f1a" stroke-width="2"/>
+          <circle cx="580" cy="35" r="4" fill="#667eea" stroke="#0f0f1a" stroke-width="2"/>
+          <circle cx="680" cy="25" r="4" fill="#667eea" stroke="#0f0f1a" stroke-width="2"/>
+          <!-- X axis labels -->
+          <text x="130" y="165" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="middle">1月</text>
+          <text x="280" y="165" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="middle">2月</text>
+          <text x="430" y="165" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="middle">3月</text>
+          <text x="580" y="165" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="middle">4月</text>
+          <text x="680" y="165" fill="rgba(255,255,255,0.4)" font-size="9" text-anchor="middle">5月</text>
+        </svg>
+        <!-- Legend -->
+        <div style="position:absolute; top:0; right:0; display:flex; gap:16px; font-size:10px; color:rgba(255,255,255,0.5);">
+          <span><span style="display:inline-block;width:16px;height:2px;background:#667eea;vertical-align:middle;margin-right:4px;"></span>实际达成</span>
+          <span><span style="display:inline-block;width:16px;height:2px;background:#91cc75;vertical-align:middle;margin-right:4px;border-top:1px dashed #91cc75;"></span>预算</span>
+          <span><span style="display:inline-block;width:16px;height:0;border-top:2px dotted #fac858;vertical-align:middle;margin-right:4px;"></span>去年同期</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Two half-width charts -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+      <!-- Bar chart -->
+      <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:20px; border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:13px; font-weight:600; color:rgba(255,255,255,0.85); margin-bottom:16px;">渠道达成 vs 预算</div>
+        <div style="display:flex; align-items:flex-end; gap:20px; height:100px; padding:0 20px;">
+          <div style="display:flex; gap:4px; align-items:flex-end; flex:1;">
+            <div style="flex:1; background:linear-gradient(180deg,#667eea,#764ba2); border-radius:4px 4px 0 0; height:72%; position:relative;">
+              <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:8px;color:rgba(255,255,255,0.6);white-space:nowrap;">7.22亿</div>
+            </div>
+            <div style="flex:1; background:rgba(145,204,117,0.4); border-radius:4px 4px 0 0; height:99%;"></div>
+          </div>
+          <div style="display:flex; gap:4px; align-items:flex-end; flex:1;">
+            <div style="flex:1; background:linear-gradient(180deg,#667eea,#764ba2); border-radius:4px 4px 0 0; height:70%;"></div>
+            <div style="flex:1; background:rgba(145,204,117,0.4); border-radius:4px 4px 0 0; height:82%;"></div>
+          </div>
+          <div style="display:flex; gap:4px; align-items:flex-end; flex:1;">
+            <div style="flex:1; background:linear-gradient(180deg,#667eea,#764ba2); border-radius:4px 4px 0 0; height:22%;"></div>
+            <div style="flex:1; background:rgba(145,204,117,0.4); border-radius:4px 4px 0 0; height:32%;"></div>
+          </div>
+        </div>
+        <div style="display:flex; gap:20px; padding:6px 20px 0; font-size:9px; color:rgba(255,255,255,0.4);">
+          <div style="flex:2; text-align:center;">零售</div>
+          <div style="flex:2; text-align:center;">工程</div>
+          <div style="flex:2; text-align:center;">整装</div>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:10px; font-size:9px; color:rgba(255,255,255,0.4); justify-content:center;">
+          <span><span style="display:inline-block;width:8px;height:8px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>实际</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:rgba(145,204,117,0.4);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>预算</span>
+        </div>
+      </div>
+
+      <!-- Pie chart -->
+      <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:20px; border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:13px; font-weight:600; color:rgba(255,255,255,0.85); margin-bottom:16px;">品类构成</div>
+        <div style="display:flex; align-items:center; gap:20px;">
+          <svg width="120" height="120" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="48" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="20"/>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#667eea" stroke-width="20" stroke-dasharray="150 302" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#764ba2" stroke-width="20" stroke-dasharray="97 302" stroke-dashoffset="-150" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#f093fb" stroke-width="20" stroke-dasharray="27 302" stroke-dashoffset="-247" transform="rotate(-90 60 60)"/>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#38bdf8" stroke-width="20" stroke-dasharray="28 302" stroke-dashoffset="-274" transform="rotate(-90 60 60)"/>
+            <text x="60" y="56" text-anchor="middle" fill="rgba(255,255,255,0.85)" font-size="14" font-weight="700">4品类</text>
+            <text x="60" y="70" text-anchor="middle" fill="rgba(255,255,255,0.35)" font-size="8">16.41亿</text>
+          </svg>
+          <div style="font-size:10px; color:rgba(255,255,255,0.6); line-height:2.2;">
+            <div><span style="display:inline-block;width:8px;height:8px;background:#667eea;border-radius:2px;margin-right:6px;"></span>抛釉砖 49.7%</div>
+            <div><span style="display:inline-block;width:8px;height:8px;background:#764ba2;border-radius:2px;margin-right:6px;"></span>仿古砖 32.0%</div>
+            <div><span style="display:inline-block;width:8px;height:8px;background:#f093fb;border-radius:2px;margin-right:6px;"></span>精瓷中板 8.7%</div>
+            <div><span style="display:inline-block;width:8px;height:8px;background:#38bdf8;border-radius:2px;margin-right:6px;"></span>瓷片 3.5%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:20px; border:1px solid rgba(255,255,255,0.06); margin-bottom:16px;">
+      <div style="font-size:13px; font-weight:600; color:rgba(255,255,255,0.85); margin-bottom:16px;">多维汇总明细</div>
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+            <th style="padding:8px 12px; text-align:left; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">维度</th>
+            <th style="padding:8px 12px; text-align:left; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">分类</th>
+            <th style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">达成额</th>
+            <th style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">预算</th>
+            <th style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">偏差</th>
+            <th style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.4); font-weight:500; font-size:10px;">占比</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.5);">渠道</td>
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.85);">零售 GD01</td>
+            <td style="padding:8px 12px; text-align:right; color:#667eea; font-variant-numeric:tabular-nums;">7.22亿</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6); font-variant-numeric:tabular-nums;">9.92亿</td>
+            <td style="padding:8px 12px; text-align:right; color:#f87171;">-27.2%</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6);">44.0%</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.015);">
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.5);">渠道</td>
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.85);">工程 GD03</td>
+            <td style="padding:8px 12px; text-align:right; color:#667eea; font-variant-numeric:tabular-nums;">6.95亿</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6); font-variant-numeric:tabular-nums;">8.19亿</td>
+            <td style="padding:8px 12px; text-align:right; color:#f87171;">-15.1%</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6);">42.4%</td>
+          </tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.5);">渠道</td>
+            <td style="padding:8px 12px; color:rgba(255,255,255,0.85);">整装 GD02</td>
+            <td style="padding:8px 12px; text-align:right; color:#667eea; font-variant-numeric:tabular-nums;">2.24亿</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6); font-variant-numeric:tabular-nums;">3.19亿</td>
+            <td style="padding:8px 12px; text-align:right; color:#f87171;">-29.7%</td>
+            <td style="padding:8px 12px; text-align:right; color:rgba(255,255,255,0.6);">13.6%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Trace Footer -->
+    <div style="background:rgba(255,255,255,0.02); border-radius:8px; padding:14px 20px; border:1px solid rgba(255,255,255,0.04); font-size:10px; color:rgba(255,255,255,0.3); display:flex; gap:16px; flex-wrap:wrap;">
+      <span>数据表: <span style="background:rgba(102,126,234,0.15); padding:2px 6px; border-radius:3px; color:rgba(255,255,255,0.5);">dm.dm_fin_operations_mix_sum_t</span></span>
+      <span>更新: 2026-06-09</span>
+      <span>Skill: sales-performance-analyst</span>
+    </div>
+
+  </div>
+</div>

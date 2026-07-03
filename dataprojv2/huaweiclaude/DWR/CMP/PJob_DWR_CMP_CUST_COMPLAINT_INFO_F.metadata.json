@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CMP_CUST_COMPLAINT_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CMP",
+    "description": "客诉基础信息表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

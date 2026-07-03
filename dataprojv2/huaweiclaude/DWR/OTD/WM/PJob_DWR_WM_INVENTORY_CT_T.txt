@@ -1,0 +1,75 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/09/21 13:51:25 GMT+08:00
+-- description:瓷砖库存月表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with dim_date as(
+	select distinct day_mend_dt 
+	from dm.dm_dim_date_d
+	where day_dt >= add_months(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01') ,-1)  -- 正常调度使用
+	--where day_dt >= '2022-01-01' -- 初始化数据从20220101开始 '2022-01-01'
+	and day_dt < CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01')   -- 传昨天，小于当月1号
+	union all
+	select '${PERIOD_ID_D}'  -- 传昨天
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_INVENTORY_CT_T PARTITION (period_id_m)
+SELECT 
+	T1.data_source_falg,
+	T1.day_dt,
+	T1.customer_code,
+	T1.customer_name,
+	T1.sales_org_name,
+	T1.material_num,
+	T1.material_name,
+	T1.menu_desc_name,
+	T1.big_value_flag,
+	T1.dimension,
+	T1.unit_area_qty,
+	T1.qc_qty,
+	T1.qc_area_qty,
+	T1.qc_amt,
+	T1.qm_qty,
+	T1.qm_area_qty,
+	T1.qm_amt,
+	T1.qj_instock_qty,
+	T1.qj_instock_area_qty,
+	T1.bq_instock_amt,
+	T1.qj_other_instock_qty,
+	T1.qj_other_instock_area_qty,
+	T1.qj_other_instock_amt,
+	T1.qj_pp_del_qty,
+	T1.qj_pp_del_area_qty,
+	T1.qj_pp_del_amt,
+	T1.qj_sale_return_qty,
+	T1.qj_sale_return_area_qty,
+	T1.qj_sale_return_amt,
+	T1.qj_outstock_qty,
+	T1.qj_outstock_area_qty,
+	T1.bq_outstock_amt,
+	T1.qj_sale_outstock_qty,
+	T1.qj_sale_outstock_area_qty,
+	T1.qj_sale_outstock_amt,
+	T1.qj_other_outstock_qty,
+	T1.qj_other_outstock_area_qty,
+	T1.qj_other_outstock_amt,
+	T1.qj_happen_qty,
+	T1.qj_happen_area_qty,
+	T1.bq_happen_amt,
+	T1.last_instock_date,
+	T1.user_flag,
+	T1.dw_last_update_date,
+	substring(t1.period_id_d,1,7) as period_id_m
+FROM DWROTD.DWR_WM_INVENTORY_CT_T_D T1
+join dim_date T2
+on t1.period_id_d = t2.day_mend_dt;

@@ -1,0 +1,98 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2023/11/28 15:30:05 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+CREATE TABLE IF NOT EXISTS  DM.DM_OTD_NO_DELIVER_ORDER_DTL (
+    WBS_LINE_NO String  COMMENT 'Wbs行号',
+    order_num String COMMENT 'SAP单号',
+    order_item_num String COMMENT 'Sap行号',
+    material_num String COMMENT '物料编码',
+    prod_category  String COMMENT '品类',
+    dimesion String COMMENT '规格',
+    factory_code String COMMENT '下单工厂',
+    PRODUCT_AREA String COMMENT '基地',
+    InHouseOutsourcedFlag String COMMENT '自制外协标识',
+    sale_lev3 String COMMENT '销售组织层级3',
+    sale_lev4 String COMMENT '销售组织层级4',
+    sale_lev5 String COMMENT '销售组织层级5',
+    sale_lev6 String COMMENT '销售组织层级6',
+    SALE_GROUP String COMMENT '销售组',
+    SALE_ORG String COMMENT '销售组织',
+    SALE_DEPT String COMMENT '销售部门',
+    pernrname String COMMENT '计划单创建人',
+    cust_name String COMMENT '客户名称',
+    CHANEL_CODE String COMMENT '渠道',
+    ORDER_TIME String COMMENT '订单下单时间',
+    expect_date String COMMENT '客户交期',
+    nodeliver_qty_aps  DECIMAL(38,10) COMMENT '未交付数量',
+    unit_area  DECIMAL(38,10) COMMENT '单位面积',
+    nodeliver_area_aps DECIMAL(38,10) COMMENT '未交付面积',
+    del_flag	string	,
+    dw_last_update_date	timestamp
+);
+insert OVERWRITE table dm.dm_otd_no_deliver_order_dtl
+SELECT
+	S1.WBS_LINE_NO AS WBS_LINE_NO, --- Wbs行号
+	S1.SAP_CODE AS order_num,--SAP单号
+	S1.SAP_LINE_NO AS order_item_num,--Sap行号
+	S3.CODE AS material_num,--物料编码
+	S3.CATEGORY AS prod_category,--品类
+	S3.SPECIFICATION_MODEL AS dimesion,--规格
+	S1.PLANT_CODE AS  factory_code,--下单工厂
+	S5.CODE AS PRODUCT_AREA,--基地
+	S1.SELF_FOREIGN_FLAG AS InHouseOutsourcedFlag,--自制外协标识
+	S7.lev3_name AS sale_lev3,--销售组织层级3
+	S7.lev4_name AS sale_lev4,--销售组织层级4
+	S7.lev5_name AS sale_lev5,--销售组织层级5
+	S7.lev6_name AS sale_lev6,--销售组织层级6
+	S2.SALE_GROUP AS SALE_GROUP,--销售组
+	S2.SALE_ORG AS SALE_ORG,--销售组织
+	S2.SALE_DEPT AS SALE_DEPT,--销售部门
+	S6.pernrname AS pernrname,--计划单创建人
+	S4.NAME AS  cust_name,--客户名称
+	S2.CHANEL_CODE,--渠道
+	S1.ORDER_TIME AS ORDER_TIME,--订单下单时间
+	S1.DEMAND_DELIVERY_DATE AS expect_date,--客户交期
+	S1.ACTUAL_NET_DEMAND_QTY AS nodeliver_qty_aps,--未交付数量
+	S3.AREA AS unit_area,--单位面积
+	S1.ACTUAL_NET_DEMAND_QTY * S3.AREA AS nodeliver_area_aps,--未交付面积
+    'N' AS DEL_FLAG,
+    current_timestamp() as DW_LAST_UPDATE_DATE
+FROM
+	SDI.SDI_SALE_ORDER_DTL_1007 S1
+	INNER JOIN SDI.SDI_SALE_ORDER_1007 S2 ON S1.SALE_ORDER_ID = S2.ID
+	AND S2.INV_ORG_ID = 1
+	AND S2.IS_PHANTOM = 0
+	INNER JOIN SDI.SDI_ITEM_1007 S3 ON S1.ITEM_ID = S3.ID
+	AND S3.INV_ORG_ID = 1
+	AND S3.IS_PHANTOM = 0
+	INNER JOIN SDI.SDI_CSM_CUSTOMER_1007 S4 ON S2.CUSTOMER_ID = S4.ID
+	AND S4.INV_ORG_ID = 1
+	AND S4.IS_PHANTOM = 0
+	LEFT JOIN SDI.SDI_RES_ENTERPRISE_1007 S5 ON S1.PRODUCT_AREA_ID = S5.ID
+	AND S5.IS_PHANTOM = 0
+	LEFT JOIN SDI.sdi_zpst005_1001 S6
+	ON S1.WBS_LINE_NO = S6.zjhdid
+	LEFT JOIN DM.DM_RPT_SALE_GRP_T  S7
+	ON S2.SALE_GROUP = S7.sale_grp
+WHERE
+	S1.INV_ORG_ID = 1
+	AND S1.IS_PHANTOM = 0
+	AND S1.IS_PHANTOM = 0
+	AND S2.ORDER_TYPE != '零售销售订单'
+	AND S1.ACTUAL_NET_DEMAND_QTY > 0
+	AND S1.CALCULATION_FLAG = 0
+	AND S1.DETAIL_STATE = 0
+	AND S1.ORDER_PROGRESS_STATE IN (6, 7, 8, 9, 10, 11)
+               
+
+
+
+
+
+
+

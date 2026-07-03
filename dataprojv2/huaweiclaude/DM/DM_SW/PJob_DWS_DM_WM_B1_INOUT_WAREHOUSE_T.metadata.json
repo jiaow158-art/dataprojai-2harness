@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_WM_B1_INOUT_WAREHOUSE_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

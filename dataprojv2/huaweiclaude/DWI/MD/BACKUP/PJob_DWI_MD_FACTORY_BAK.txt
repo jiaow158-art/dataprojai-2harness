@@ -1,0 +1,53 @@
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.max.dynamic.partitions = 1000;
+alter table  dwimd.dwi_md_factory_bak drop if exists partition (PERIOD_ID_D < '${stat_dtl}');
+ insert overwrite table dwimd.dwi_md_factory_bak partition(PERIOD_ID_D)
+ select 
+      t1.factory_id
+	 ,t1.group_num
+	 ,t1.factory_code
+	 ,t1.cost_object_control_flag
+	 ,t1.act_cost_update_active_flag
+	 ,t1.address_id
+	 ,t1.region_code
+	 ,t1.lang_code
+	 ,t1.factory_calendar_code
+	 ,t1.postal_code
+	 ,t1.city_name
+	 ,t1.prod_group
+	 ,t1.cntry_region_code
+     ,t1.name_2
+     ,t1.factory_name
+     ,t1.pur_org
+     ,t1.receive_points
+     ,t1.sale_org_code
+     ,t1.active_plan_flag
+     ,t1.street_house_num
+     ,t1.first_reminder_days
+     ,t1.second_reminder_days
+     ,t1.third_reminder_days
+     ,t1.cust_num
+     ,t1.value_range_code
+     ,t1.first_reminder_text_name
+     ,t1.second_reminder_text_name
+     ,t1.third_reminder_text_name
+     ,t1.distribution_channel_code
+     ,t1.work_cost
+     ,t1.name_composition
+     ,t1.po_tolerance_days
+     ,t1.diff_code
+     ,t1.src_supplier_num
+     ,t1.supplier_or_creditor_id
+     ,t1.cust_id
+     ,t1.supplier_or_creditor_name
+     ,t1.cust_name
+     ,t1.del_flag					 	
+     ,t1.dw_last_update_date		 
+     ,t1.start_date					 
+     ,t1.end_date			
+     ,t1.supplier_or_creditor_num	
+     ,t1.src_cust_num	 
+	 ,cast (substr(current_timestamp,1,10) as string) as PERIOD_ID_D
+  from dwimd.dwi_md_factory_t t1;
+  

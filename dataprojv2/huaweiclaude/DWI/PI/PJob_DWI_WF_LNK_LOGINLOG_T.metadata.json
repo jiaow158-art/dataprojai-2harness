@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WF_LNK_LOGINLOG_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/PI",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

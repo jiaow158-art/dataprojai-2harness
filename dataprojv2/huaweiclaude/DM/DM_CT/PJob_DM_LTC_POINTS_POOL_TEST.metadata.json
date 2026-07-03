@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_POINTS_POOL_TEST",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

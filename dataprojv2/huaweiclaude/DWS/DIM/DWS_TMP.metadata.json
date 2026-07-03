@@ -1,0 +1,8 @@
+{
+    "name": "DWS_TMP",
+    "type": "DWSSQL",
+    "directory": "/DWS/DIM",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

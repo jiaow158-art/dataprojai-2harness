@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CS_ENGIN_P_ORDER_HEADER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS",
+    "description": "订单头",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrcs"
+}

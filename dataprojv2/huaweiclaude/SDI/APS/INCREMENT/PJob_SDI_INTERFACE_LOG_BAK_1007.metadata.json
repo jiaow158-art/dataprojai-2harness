@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_INTERFACE_LOG_BAK_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/INCREMENT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,813 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2025/02/25 09:48:11 GMT+08:00
+-- description:非战略订单交付周期
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+WITH T1 AS(
+SELECT
+ a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,b.VKORG
+,b.VTWEG
+,b.VKBUR
+,b.KUNNR
+,b.KNKLI
+,b.VKGRP
+,b.ERDAT --订单日期
+,b.AUDAT --订单日期
+,a.CMPRE aS NETPR
+,a.KZWI6 AS NETWR
+,b.LFGSK
+,b.JHDDLX --计划订单类型
+,c.BZIRK --营销大区
+,i.BZTXT as BZIRK_TXT --营销大区名称
+,b.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,c.IHREZ
+,case when coalesce(b.SUBMI,'') <> '' then b.SUBMI
+      when k.CONFIRM_DATE_COUNT > 0 then '计划'
+      else '现货'
+       end as SUBMI --备货类型
+,c.BSTKD --客户参考
+,b.OSS_CREATER AS LAST_NAME
+,b.SFZDJF --是否整单交付
+,b.ERNAM
+,case when coalesce(j.BSTDK,'') in('','00000000') then c.BSTDK
+      else j.BSTDK
+       end BSTDK --客户需求交货日期
+,d.DEF_DL_DATE --默认交期
+,d.CONFIRM_DATE
+,d.CZJHDH
+,d.ZCQMC
+,d.ZCQBM
+,d.TSYQMX
+,coalesce(f.MENGE,0) as MENGE --交货数量
+,a.id_item
+,m.cppc_period --产品排产周期
+,m.unit_area
+,m.YL06
+,b.ihrez as vbak_ihrez
+FROM SDI.SDI_VBAP_1001 a
+INNER JOIN SDI.SDI_VBAK_1001 b
+ON a.VBELN = b.VBELN
+LEFT JOIN SDI.SDI_VBKD_1001 c
+ON a.VBELN = c.VBELN
+AND cast(c.POSNR as DECIMAL) = 0
+left join SDI.SDI_ZOSS_SO_EXT_INFO_1001 d
+on a.VBELN = d.VBELN
+and a.POSNR = d.POSNR
+AND D.DEL_FLAG = 'N'
+/*left join T0 e
+on a.VBELN = e.VBELN
+and a.POSNR = e.POSNR*/
+left join(
+          SELECT VBELV as VBELN,POSNV as POSNR,SUM(RFMNG) as MENGE 
+            FROM SDI.SDI_VBFA_1001
+           WHERE VBTYP_N = 'J'
+		     AND DEL_FLAG = 'N'
+           group by VBELV,POSNV
+         ) f
+on a.VBELN = f.VBELN
+and a.POSNR = f.POSNR
+left join SDI.SDI_T171T_1001 i
+on c.BZIRK = i.BZIRK
+and I.SPRAS = '1'
+AND I.DEL_FLAG = 'N'
+left join SDI.SDI_VBKD_1001 j
+ON a.VBELN = j.VBELN
+and a.POSNR = j.POSNR
+AND j.DEL_FLAG = 'N'
+left join(
+          SELECT VBELN,COUNT(1) as CONFIRM_DATE_COUNT 
+		  FROM SDI.SDI_ZOSS_SO_EXT_INFO_1001 
+		  WHERE coalesce(CONFIRM_DATE,'') <> '00000000'
+		    AND DEL_FLAG = 'N'
+		  group by VBELN
+         ) k
+on a.VBELN = k.VBELN
+left join (select d.*     
+               ,d.laeng * d.breit/1000/1000 as unit_area 	
+               ,case when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A001' and d.GROES in('600X600','800X800') then 25
+                  when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A001' and d.GROES in('1200X600') then 45
+	              when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A002' then 45
+	              when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A001' and d.GROES = '800X800' then 30
+	              when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A001' and d.GROES = '1200X600' then 45
+	              when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A002' then 45
+	              when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A001' and d.GROES in('600X600','1200X600','800X800') then 15
+	              when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A001' and d.GROES in('900X600','900X900') then 25
+	              when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A002' then 25
+	              when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A001' and d.GROES in('1500X750','1800X900') then 15
+	              when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A001' and d.GROES in('2700X1000','2600X800','2400X800','2400X1200') then 25
+	              when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A002' then 35
+	              when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES = '600X600' then 15
+	              when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES = '900X600' then 25
+	              when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES in('900X900','800X800','600X100','1200X196','1200X200','600X150','200X200','600X300','1200X600','600X298','1500X750','900X146','900X150') then 25
+	              when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A002' then 25
+	              when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('300X300','600X300') then 10
+	              when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('800X400','800X300') then 15
+	              when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('300X100','1200X400','900X300','400X400','200X50','300X75') then 25
+	              when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A002' then 25
+	              when substr(d.PRDHA,1,7) = '1004057' and d.WLGG in ('A001','A002') then 25
+	              else 30
+	               end as cppc_period --产品排产周期 
+        from SDI.SDI_mara_1001 AS d
+	   WHERE DEL_FLAG = 'N'
+		) m ON a.matnr = m.matnr
+WHERE b.AUART IN('ZA01','ZA02','ZA03','ZA06','ZA09')
+AND c.BZIRK IN('S00001','S00002','S00003','S00004','S00005','S00006','S00007','S00008','S00009','S00010','S00011','S00012','S00013','S00014','S00015','S00016','S00017','B00018','B00004') --营销大区名称
+AND a.MATKL IN('1000010') --物料组
+and a.EXTWG = '10010' --外部物料组
+and substr(a.WERKS,1,2) in('12','13','15','16','17','18','19','75','77','79','8A','7D','72') --工厂
+and substr(a.LGORT,1,2) not in('00') --库存地点
+and COALESCE(a.LGORT,'') NOT IN('GFZ','BC','7F21')   --库存地点  update by fangjie 7F21为中心仓
+and coalesce(a.ABGRU,'') in('') --拒绝原因
+and substr(a.VBELN,1,3) not in('113') --销售单号
+--and a.WERKS not like '%80' --工厂
+--and m.YL06 <> 'B' --合格品
+AND A.DEL_FLAG = 'N'
+AND B.DEL_FLAG = 'N'
+AND C.DEL_FLAG = 'N'
+)
+,t2 as(
+SELECT distinct a.BSTDK,a.VBELN,b.POSNR,b.id_item
+FROM SDI.SDI_VBKD_1001 a
+inner join (SELECT VBELN,id_item,MIN(POSNR) POSNR
+              from SDI.SDI_vbap_1001
+			 WHERE DEL_FLAG = 'N'
+		     group by VBELN,id_item
+		    ) b
+on a.VBELN = b.VBELN
+and a.POSNR = b.POSNR
+WHERE a.BSTDK <> ''
+AND A.DEL_FLAG = 'N'
+),t3 as(
+SELECT distinct a.id_item,a.VBELN,b.MATNR,a.POSNR
+FROM SDI.SDI_vbap_1001 a 
+inner join(SELECT VBELN,MATNR,MIN(POSNR) as POSNR
+             from SDI.SDI_vbap_1001
+			WHERE DEL_FLAG = 'N'
+            group by VBELN,MATNR) b
+on a.POSNR = b.POSNR
+and a.VBELN = b.VBELN
+WHERE A.DEL_FLAG = 'N'
+),t4 as(
+SELECT distinct a.ZBSTDK as BSTDK,a.VBELN,b.MATNR
+FROM SDI.SDI_ZOSS_SO_EXT_INFO_1001 a
+inner join t3 b
+on a.VBELN = b.VBELN
+and a.ID_ITEM = b.id_item 
+AND a.ZBSTDK <> ''
+WHERE A.DEL_FLAG = 'N'
+),t5 as(
+select 
+a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,a.VKORG
+,a.VTWEG
+,a.VKBUR
+,a.KUNNR
+,a.KNKLI
+,a.VKGRP
+,a.ERDAT
+,a.AUDAT --订单日期
+,a.NETPR
+,a.NETWR
+,a.LFGSK
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,a.IHREZ
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME
+,a.SFZDJF --是否整单交付
+,a.ERNAM
+,a.cppc_period --产品排产周期
+,a.unit_area
+,a.YL06
+,case when coalesce(a.BSTDK,'') in('','00000000') and coalesce(b.BSTDK,'') not in('','00000000') then b.BSTDK
+      when coalesce(a.BSTDK,'') in('','00000000') and coalesce(c.BSTDK,'') not in('','00000000') then c.BSTDK
+      when coalesce(a.BSTDK,'') in('','00000000') and coalesce(a.DEF_DL_DATE,'') not in('','00000000') then a.DEF_DL_DATE
+	  when coalesce(a.BSTDK,'') in('','00000000') then substr(REPLACE(cast(DATE_ADD(from_unixtime(unix_timestamp(a.AUDAT,'yyyyMMdd'),'yyyy-MM-dd'),cppc_period) as string),'-',''),1,8)
+	  else a.BSTDK
+       end BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE
+,a.CZJHDH
+,a.ZCQMC
+,a.ZCQBM
+,a.TSYQMX
+,a.MENGE --交货数量
+,a.id_item
+,e.name1 --客编名称
+,case when a.submi='' or (a.submi='现货' and a.vbak_ihrez='零售销售订单' ) then '是'
+      when a.submi='现货' and  a.vbak_ihrez='零售计划订单' then '否'
+      when a.submi='计划' and (a.jhddlx is null or a.jhddlx='') then '是'
+      when a.submi='现货' and a.jhddlx<>'零售销售订单' and zc.kunnr is not null then '否'
+	  else  
+	      case when  a.SUBMI = '现货' then '是' else '否' end 
+	   end is_xh --是否为现货 is_xh --是否为现货
+,substr(d.PRDHA,1,4) as PRDHA --产品层次	   
+from t1 a
+left join t2 b
+on a.VBELN = b.VBELN
+and a.id_item = b.id_item
+left join t4 c
+on a.MATNR = c.MATNR
+and a.VBELN = c.VBELN
+left join SDI.SDI_MARA_1001 d
+on a.MATNR = d.MATNR
+AND D.DEL_FLAG = 'N'
+left join (
+SELECT DISTINCT kunnr,name1
+FROM SDI.SDI_kna1_1001
+WHERE DEL_FLAG = 'N'
+) e
+on a.kunnr = e.kunnr
+left join sdi.sdi_ZCUSLIST2_1001 zc ON zc.kunnr = a.kunnr
+),
+t5_0 as (
+select 
+a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,a.VKORG
+,a.VTWEG
+,a.VKBUR
+,a.KUNNR
+,a.KNKLI
+,a.VKGRP
+,a.ERDAT
+,a.AUDAT --订单日期
+,a.NETPR
+,a.NETWR
+,a.LFGSK
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,a.IHREZ
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME
+,a.SFZDJF --是否整单交付
+,a.ERNAM
+,a.cppc_period --产品排产周期
+,a.unit_area
+,a.YL06
+,case when a.SFZDJF = 'Y' then b.last_BSTDK
+      else a.BSTDK end as BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE
+,a.CZJHDH
+,a.ZCQMC
+,a.ZCQBM
+,a.TSYQMX
+,a.MENGE --交货数量
+,a.id_item
+,a.name1 --客编名称
+,a.is_xh --是否为现货
+,a.PRDHA --产品层次
+,case when a.SFZDJF = 'Y' then b.last_BSTDK
+      else a.BSTDK
+	   end as last_BSTDK --整单最晚客户需求日期
+from t5 a
+left join(select VBELN,max(BSTDK) as last_BSTDK
+            from t5
+		   group by VBELN
+         ) b
+on a.VBELN = b.VBELN
+)
+,
+ vbep AS( -- 留货
+SELECT
+      a.VBELN
+	 ,a.POSNR
+	 ,sum(e.BMENG) as VMENG
+	 ,min(case when a.KWMENG <= e.VMENG then e.edatu end) as edatu
+	 ,min(case when e.VMENG > 0 then e.edatu end) as edatu1
+	 ,sum(case when e.edatu<=a.BSTDK then e.BMENG end ) as zj_qty
+FROM t5_0 a
+inner join(
+          SELECT VBELN
+		        ,POSNR
+				,edatu
+				,BMENG
+		        ,SUM(BMENG) OVER(PARTITION BY VBELN,POSNR ORDER BY edatu rows between unbounded preceding and current row) as VMENG
+            FROM SDI.SDI_VBEP_1001
+		   WHERE DEL_FLAG = 'N'
+         ) e
+on a.VBELN = e.VBELN
+and a.POSNR = e.POSNR
+group by
+      a.VBELN
+	 ,a.POSNR
+),
+t6 as(
+select
+a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,a.VKORG
+,a.VTWEG
+,a.VKBUR
+,a.KUNNR
+,a.KNKLI
+,a.VKGRP
+,a.ERDAT
+,a.AUDAT --订单日期
+,a.NETPR
+,a.NETWR
+,a.LFGSK
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,a.IHREZ
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME
+,a.SFZDJF --是否整单交付
+,a.ERNAM
+,a.BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE
+,a.CZJHDH
+,a.ZCQMC
+,a.ZCQBM
+,a.TSYQMX
+,coalesce(e.VMENG,0) as VMENG --确认数量
+,case when coalesce(e.VMENG,0) >= coalesce(a.MENGE,0) then a.KWMENG - e.VMENG
+      else a.KWMENG - a.MENGE
+	   end as WQRSL --订单未确认数量*/
+,case when coalesce(e.VMENG,0) = 0 and a.MENGE>=a.KWMENG then a.audat
+      when coalesce(e.VMENG,0) = 0 then ''
+      else coalesce(e.edatu,e.edatu1)
+	   end as FIRST_CONFIRM_DATE
+,case when coalesce(e.VMENG,0) = 0 and a.MENGE>=a.KWMENG then a.audat else e.edatu end  as confirm_complete_date   --交付完毕日期
+,case when coalesce(e.VMENG,0) = 0 and a.MENGE>=a.KWMENG then a.KWMENG  else e.zj_qty end AS ZJ_QTY   -- 交期内交付数量
+,a.MENGE --交货数量
+,a.id_item
+,a.is_xh --是否为现货
+,a.PRDHA --产品层次
+,a.cppc_period --产品排产周期
+,a.unit_area
+,a.YL06
+,a.name1 --客编名称
+,a.last_BSTDK --整单最晚客户需求日期
+,case when a.BSTKD like '%包销%' then 90
+	  when a.SUBMI = '现货' and  coalesce(a.CZJHDH,'') ='' and   coalesce(a.JHDDLX,'') IN('战略工程计划订单','单体工程批量销售订单','工程样板间销售订单','工程补货销售订单') then 60
+	  when a.SUBMI = '现货' and  coalesce(a.CZJHDH,'') ='' and   coalesce(a.JHDDLX,'') IN('零售计划订单','门店装修计划订单') then 15
+	  when a.SUBMI = '现货' and  coalesce(a.CZJHDH,'') ='' and   coalesce(a.JHDDLX,'') IN('零售销售订单','特惠品销售订单','') then 7
+	  when a.SUBMI = '现货' and coalesce(a.CZJHDH,'') <> '' then 7
+	  when a.SUBMI = '计划' and  coalesce(a.JHDDLX,'') IN('战略工程计划订单','单体工程批量销售订单','工程样板间销售订单','工程补货销售订单','') then 60
+	  when a.SUBMI = '计划' and  coalesce(a.JHDDLX,'') IN('零售计划订单','门店装修计划订单') then 15
+	  when a.SUBMI = '计划' and  coalesce(a.JHDDLX,'') IN('零售销售订单','特惠品销售订单','') then 7
+	  when coalesce(a.JHDDLX,'') = '' then 7
+       end /*+
+       CASE WHEN A.BZIRK = 'B00018' AND A.ARKTX LIKE '%转仓%' AND SUBSTR(WERKS,1,2) = '13' THEN   3
+      WHEN A.BZIRK = 'B00018' AND A.ARKTX LIKE '%转仓%' THEN  15
+	  ELSE 0
+	   END */  as kz_date --控制天数	  
+from t5_0 a
+left join (select distinct product_code from SDI.SDI_ZOSS_ORD_QUTY_X_1001 c where DEL_FLAG = 'N') c
+on a.MATNR = c.product_code
+left join vbep e
+on a.VBELN = e.VBELN
+and a.POSNR = e.POSNR
+
+),
+t7_01 as(
+select 
+a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,a.VKORG
+,a.VTWEG
+,a.VKBUR
+,a.KUNNR
+,a.KNKLI
+,a.VKGRP
+,a.ERDAT
+,a.AUDAT --订单日期
+,a.NETPR
+,a.NETWR
+,a.LFGSK
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,a.IHREZ
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME
+,a.SFZDJF --是否整单交付
+,a.ERNAM
+,a.BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE
+,a.CZJHDH
+,a.ZCQMC
+,a.ZCQBM
+,a.TSYQMX
+,a.VMENG --确认数量
+,a.MENGE --交货数量
+,a.WQRSL --订单未确认数量
+,a.confirm_complete_date   --交付完毕日期
+,a.zj_qty  -- 交期内交付数量
+/*,a.MENGEF --已出库数量
+,a.MENGEFH
+,a.thdat --最晚提货日期*/
+,a.id_item
+,a.FIRST_CONFIRM_DATE --首次确认数量日期
+,a.is_xh --是否为现货
+,a.PRDHA --产品层次
+,a.last_BSTDK --整单最晚客户需求日期
+,a.kz_date --控制天数
+,a.cppc_period --产品排产周期
+,a.unit_area -- 单位面积
+,a.YL06
+,a.name1 --客编名称
+,replace(DATE_ADD(from_unixtime(unix_timestamp(case when is_xh='是' then a.confirm_complete_date else greatest(a.confirm_complete_date,a.BSTDK) end
+                                        ,'yyyyMMdd'),'yyyy-MM-dd'),a.kz_date),'-','') as yt_date  -- 应提日期
+FROM T6 A)
+,vbfa as ( -- 提货
+SELECT A.VBELV AS VBELN
+		        ,A.POSNV AS POSNR
+		        --,A.erdat
+				,SUM(case when A.VBTYP_N in('R') then A.RFMNG else 0 end) -sum(case when A.VBTYP_N in('h') then A.RFMNG  else 0 end)  AS MENGEF
+				,sum(case when A.VBTYP_N in('h') then A.RFMNG else 0 end)  AS MENGEFH
+				,max(CASE WHEN A.VBTYP_N in('R') THEN A.erdat END) AS THDAT --最晚提货日期
+				,SUM(CASE WHEN  A.VBTYP_N in('R') AND A.ERDAT<=B.yt_date THEN A.RFMNG ELSE 0 END ) -SUM(CASE WHEN  A.VBTYP_N in('h') AND A.ERDAT<=B.yt_date THEN A.RFMNG ELSE 0 END )  as zt_qty -- 应提日期内提货日期
+            FROM SDI.SDI_VBFA_1001 A 
+            JOIN t7_01 B ON a.VBELV = B.VBELN and a.POSNV = B.POSNR
+           WHERE A.VBTYP_N in('R','h')
+		     AND A.DEL_FLAG = 'N'
+           GROUP BY A.VBELV,A.POSNV
+)
+
+,t7 as(
+select 
+a.VBELN --销售单号
+,a.POSNR
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG
+,a.MEINS
+,a.KWMENG --订单数量
+,a.KBMENG
+,a.MWSBP
+,a.ARKTX
+,a.PSTYV
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR
+,a.VKORG
+,a.VTWEG
+,a.VKBUR
+,a.KUNNR
+,a.KNKLI
+,a.VKGRP
+,a.ERDAT
+,a.AUDAT --订单日期
+,a.NETPR
+,a.NETWR
+,a.LFGSK
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1
+,a.MVGR2
+,a.IHREZ
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME
+,a.SFZDJF --是否整单交付
+,a.ERNAM
+,a.BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE
+,a.CZJHDH
+,a.ZCQMC
+,a.ZCQBM
+,a.TSYQMX
+,a.VMENG --确认数量
+,a.MENGE --交货数量
+,a.WQRSL --订单未确认数量
+,a.confirm_complete_date   --交付完毕日期
+,a.zj_qty  -- 交期内交付数量
+,coalesce(b.MENGEF,0) as MENGEF --已出库数量
+,b.mengefh
+,b.thdat --最晚提货日期
+,a.yt_date  -- 应提日期
+,case when coalesce(b.MENGEF,0) >= a.KWMENG then b.thdat end as th_complete_date  -- 提货完毕日期
+,b.zt_qty  -- 应提日期内提货数量
+,a.id_item
+,a.FIRST_CONFIRM_DATE --首次确认数量日期
+,a.is_xh --是否为现货
+,a.PRDHA --产品层次
+,a.last_BSTDK --整单最晚客户需求日期
+,a.kz_date --控制天数
+,a.cppc_period --产品排产周期
+,a.unit_area -- 单位面积
+,a.YL06
+,a.name1 --客编名称
+,case when a.is_xh = '是' then '是'
+      when coalesce(a.confirm_complete_date,'') = '' and a.BSTDK <= substr(replace(CURRENT_DATE - interval 1 days,'-',''),1,8) then '否'
+	  when coalesce(a.confirm_complete_date,'') = '' and a.BSTDK > substr(replace(CURRENT_DATE - interval 1 days,'-',''),1,8) then '待定'
+	  when coalesce(a.confirm_complete_date,'') <> '' and a.confirm_complete_date > a.BSTDK then '否'
+	  when coalesce(a.confirm_complete_date,'') <> '' and a.confirm_complete_date <= a.BSTDK and a.WQRSL <= 0 then '是'
+	  when coalesce(a.confirm_complete_date,'') <> '' and a.confirm_complete_date <= a.BSTDK and a.WQRSL > 0 then '否'
+	   end as is_hzj --行准交','不准交	 	   
+,case when coalesce(b.MENGEF,0) < a.KWMENG and coalesce(a.confirm_complete_date,'') = '' then '待定'   -- 未交满
+      when a.BZIRK in('B00018','B00004') and (a.name1 like '%客编%' or a.name1 = '深圳东鹏陶瓷有限公司') then '待定'  -- 不在考核范围
+	  when coalesce(b.MENGEF,0) < a.KWMENG and coalesce(a.confirm_complete_date,'') <> ''
+	   and substr(replace(CURRENT_DATE - interval 1 days,'-',''),1,8) >= a.yt_date then '否'    -- 交满逾期未提完
+	  when coalesce(b.MENGEF,0) < a.KWMENG and coalesce(a.confirm_complete_date,'') <> ''              
+	   and substr(replace(CURRENT_DATE - interval 1 days,'-',''),1,8) < a.yt_date then '待定'   -- 交满未逾期未提完
+	  when coalesce(b.MENGEF,0) >= a.KWMENG and b.thdat> a.yt_date  then '否'     -- 逾期提货
+	  when coalesce(b.MENGEF,0) >= a.KWMENG and b.thdat<=a.yt_date then '是'      -- 未逾期提货
+	   end as is_hzt--行准提','不准提  
+from t7_01 a
+left join vbfa b ON a.vbeln = b.vbeln and a.posnr  = b.posnr
+),t8 as(
+select 
+a.VBELN --销售单号
+,a.POSNR --销售凭证项目
+,a.MATNR --物料编码
+,a.WERKS --工厂
+,a.LGORT --库存地点
+,a.CHARG --批次
+,a.MEINS --基本计量单位
+,a.KWMENG --订单数量
+,a.KBMENG --以销售单位表示的累计确认数量
+,a.MWSBP --以凭证货币计的税额
+,a.ARKTX --销售订单项目的短文本
+,a.PSTYV --销售凭证项目类别
+,a.ABGRU --拒绝原因
+,a.PS_PSP_PNR --工作分解结构元素 (WBS 元素)
+,a.VKORG --销售组织
+,a.VTWEG --分销渠道
+,a.VKBUR --销售办事处
+,a.KUNNR --客户编码
+,a.name1 --客编名称
+,a.KNKLI --带有贷方限额参考的客户帐户号
+,a.VKGRP --销售组
+,a.ERDAT --记录建立日期
+,a.AUDAT --订单日期
+,a.NETPR --项目信贷价格
+,a.NETWR --从条件定价过程小计6
+,a.LFGSK --所有项目的总体交货状态
+,a.JHDDLX --计划订单类型
+,a.BZIRK --营销大区
+,a.BZIRK_TXT --营销大区名称
+,a.AUART --订单类型
+,a.MVGR1 --物料组1
+,a.MVGR2 --物料组2
+,a.IHREZ --您的参考
+,a.SUBMI --备货类型
+,a.BSTKD --客户参考
+,a.LAST_NAME --OSS订单创建人
+,a.SFZDJF --是否整单交付
+,a.ERNAM --创建对象的人员名称
+,a.BSTDK --客户需求交货日期
+,a.DEF_DL_DATE --默认交期
+,a.CONFIRM_DATE --确认日期
+,a.CZJHDH --参照计划单号
+,a.ZCQMC --产区名称
+,a.ZCQBM --产区编码
+,a.TSYQMX --特殊要求明细
+,a.VMENG --确认数量
+,a.MENGE --交货数量
+,a.WQRSL --订单未确认数量
+,a.MENGEF --已出库数量
+,a.MENGEFH
+,a.thdat --最晚提货日期
+,a.confirm_complete_date
+,case when is_hzj ='是' then  a.KWMENG else a.zj_qty end as zj_qty
+,a.yt_date
+,a.th_complete_date 
+,case when is_hzt ='是' then  a.KWMENG else a.zt_qty end as zt_qty
+,a.id_item --OSS行Id
+,a.FIRST_CONFIRM_DATE --首次确认数量日期
+,a.is_xh --是否为现货
+,a.PRDHA --产品层次
+,a.last_BSTDK --整单最晚客户需求日期
+,a.kz_date --控制天数
+,a.cppc_period --产品排产周期
+,a.unit_area -- 单位面积
+,a.YL06
+,a.is_hzj --行准交/不准交
+,a.is_hzt--行准提/不准提
+,case when c.VBELN is not null then '否'
+      when b.VBELN is not null then '待定'
+	  when a.is_hzj = '是' and b.VBELN is null and c.VBELN is null then '是'
+	   end as is_zdzj--整单准交/不准交
+,case when e.VBELN is not null then '否'
+      when d.VBELN is not null then '待定'
+	  when a.is_hzt = '是' and d.VBELN is null and e.VBELN is null then '是'
+	   end as is_zdzt--整单准提/不准提
+,case when a.SFZDJF = 'Y' and c.VBELN is not null then '否'
+      when a.SFZDJF = 'Y' and b.VBELN is not null then '待定'
+	  when a.SFZDJF = 'Y' and a.is_hzj = '是' and b.VBELN is null and c.VBELN is null then '是'
+	  else a.is_hzj	   
+	   end as is_zdjfzj -- 整单交付准交/不准交
+,case when a.SFZDJF = 'Y' and e.VBELN is not null then '否'
+      when a.SFZDJF = 'Y' and d.VBELN is not null then '待定'
+	  when a.SFZDJF = 'Y' and a.is_hzt = '是' and d.VBELN is null and e.VBELN is null then '是'
+	  else a.is_hzt
+	   end as is_zdjfzt --整单交付准提/不准提
+,CASE WHEN a.BZIRK='B00018' THEN F.node_desc5 else a.BZIRK_txt end as department
+,current_timestamp as DW_LAST_UPDATE_DATE
+,D2.sale_region_name -- 销售地区名称
+,CASE WHEN a.BZIRK='B00018' THEN F.node_desc5 else D2.sales_office_name end as sales_office_name -- 销售办事处
+from t7 a
+left join(select VBELN
+            from t7
+		   where is_hzj = '待定'
+		   group by VBELN
+		 ) b
+on a.VBELN = b.VBELN
+left join(select VBELN
+            from t7
+		   where is_hzj = '否'
+		   group by VBELN
+         ) c
+on a.VBELN = c.VBELN
+left join(select VBELN
+            from t7
+		   where is_hzt = '待定'
+		   group by VBELN
+         ) d
+on a.VBELN = d.VBELN
+left join(select VBELN
+            from t7
+		   where is_hzt = '否'
+		   group by VBELN
+         ) e
+on a.VBELN = e.VBELN
+LEFT JOIN dm.dm_rpt_sales_group_t F ON A.VKGRP = F.NODE_NAME9
+LEFT JOIN DWRDIM.DWR_DIM_CUST_SALES_AREA_D2 D2 ON a.vkorg =  D2.sales_org_code and a.vtweg = D2.distribution_chnl_code and a.kunnr = D2.CUST_NUM
+	and D2.end_date = '4712-12-31'
+)
+INSERT OVERWRITE TABLE DM.DM_SO_FZL_ORDER_T PARTITION(STAT_MONTH)
+select DISTINCT
+vbeln
+,posnr
+,matnr
+,werks
+,lgort
+,charg
+,meins
+,kwmeng
+,kbmeng
+,mwsbp
+,arktx
+,pstyv
+,abgru
+,ps_psp_pnr
+,vkorg
+,vtweg
+,vkbur
+,kunnr
+,name1
+,knkli
+,vkgrp
+,erdat
+,audat
+,netpr
+,netwr
+,lfgsk
+,jhddlx
+,bzirk
+,bzirk_txt
+,auart
+,mvgr1
+,mvgr2
+,ihrez
+,submi
+,bstkd
+,last_name
+,sfzdjf
+,ernam
+,bstdk
+,def_dl_date
+,confirm_date
+,czjhdh
+,zcqmc
+,zcqbm
+,tsyqmx
+,vmeng
+,menge
+,wqrsl
+,mengef
+,mengefh
+,thdat
+,id_item
+,first_confirm_date
+,is_xh
+,prdha
+,last_bstdk
+,kz_date
+,cppc_period
+,is_hzj
+,is_hzt
+,is_zdzj
+,is_zdzt
+,is_zdjfzj
+,is_zdjfzt
+, substr(from_unixtime(unix_timestamp(yt_date ,'yyyyMMdd'),'yyyy-MM-dd'),1,7) as  tj_month
+,dw_last_update_date
+,confirm_complete_date
+,zj_qty
+,yt_date
+,th_complete_date 
+,zt_qty
+,unit_area
+,YL06
+,department
+,sale_region_name
+,sales_office_name
+,REPLACE(SUBSTR(CURRENT_DATE - interval 1 days,1,7),'-','') as stat_month
+from t8
+;

@@ -1,0 +1,95 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2023/12/15 14:21:24 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+CREATE TABLE IF NOT EXISTS   DWRFIN.DWR_GL_POINTSDETAIL_COLLECT_F (
+  comp_code string COMMENT '公司代码',
+  calmonth string COMMENT '年份/月份',
+  customer string COMMENT '客户编码',
+  salesorg string COMMENT '销售组织',
+  distr_chan string COMMENT '渠道',
+  zjflx string COMMENT '积分类型',
+  zjfms string COMMENT '积分类型描述',
+  zjfbglx string COMMENT '积分变更类型',
+  zjfbglxms string COMMENT '积分变更类型描述',
+  wbsid string COMMENT 'WBS号',
+  wbs_description string COMMENT 'WBS描述',
+  pointsvalue DECIMAL(38,10) COMMENT '积分金额',
+  pointscategory string COMMENT '管理口径积分分类',
+  usepointsbusinessscope string COMMENT '管理口径使用积分业务范围',
+  sales_group_code string COMMENT '销售组（主档）',
+  sales_group_code_wbs string COMMENT '销售组（主档+WBS）',
+  sale_group string COMMENT '销售组（实际）',
+  rc_account string COMMENT '总账科目',
+  rc_account_description string COMMENT '总账科目描述',
+  last_update_date timestamp COMMENT '最后更新时间',
+  del_flag string COMMENT '删除标识'
+)
+PARTITIONED BY (period_id_m string);
+INSERT OVERWRITE TABLE  DWRFIN.DWR_GL_POINTSDETAIL_COLLECT_F 
+(SELECT
+	comp_code,
+	calmonth,
+	customer,
+	salesorg,
+	distr_chan,
+	zjflx,
+	zjfms,
+	zjfbglx,
+	zjfbglxms,
+	wbsid,
+	wbs_description,
+	SUM(pointsvalue) AS pointsvalue,
+	pointscategory,--
+	usepointsbusinessscope,
+	sales_group_code,--
+	sales_group_code_wbs,
+	sale_group,
+	rc_account,
+	rc_account_description,
+     CURRENT_TIMESTAMP AS last_update_date,
+	'N' AS del_flag,
+	period_id_m
+FROM
+	DWRFIN.DWR_GL_POINTS_DETAIL_F
+	GROUP BY 
+	comp_code,
+	calmonth,
+	customer,
+	salesorg,
+	distr_chan,
+	zjflx,
+	zjfms,
+	zjfbglx,
+	zjfbglxms,
+	wbsid,
+	wbs_description,
+	pointscategory,--
+	usepointsbusinessscope,
+	sales_group_code,--
+	sales_group_code_wbs,
+	sale_group,
+	rc_account,
+	rc_account_description,
+	last_update_date,
+	del_flag,
+	period_id_m
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+

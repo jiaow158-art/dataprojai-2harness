@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_QMS_CORR_ORDER_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/QMS",
+    "description": "纠正预防单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

@@ -1,0 +1,136 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/12/05 14:56:50 GMT+08:00
+-- 瓷砖库存结构分析
+-- ******************************************************************** --
+delete from dm.dm_otd_wm_stock_stat_month_t where month_date>='${PERIOD_ID_M}';
+
+insert into dm.dm_otd_wm_stock_stat_month_t
+with mat as (
+select t1.material_num,t1.product_level2_name  as cat,t1.dimension,
+        t1.def_prod_channel  as prod_channel ,
+        t1.width * t1.length_1/1000/1000 as area,
+        t2.matl_group1_code
+  from dwimd.dwi_md_data_material_general_t t1 
+  left join (select material_num,max(matl_group1_code) as matl_group1_code from dwimd.dwi_md_data_material_sales_t group by material_num) t2 on t1.material_num  = t2.material_num  
+  where matl_group_code ='1000010'
+	and external_matl_group_code in('10010','10080')
+    and t1.product_level2_code  like '1%'
+    and t1.product_level2_code  not in('1011','1012','1013','1014','1016')
+	and matl_type_code='FERT'),
+mid1 as(
+select 
+       a.material_num ,a.batch_num, a.inv_location ,a.factory_werks_code ,a.factory_werks_name ,a.move_type ,
+       a.supplier_or_creditor_id,   a.supplier_or_creditor_acct,  a.supplier_or_creditor_name,
+       row_number() over(partition by  a.material_num ,a.batch_num order by a.voucher_post_date,a.material_vch_no_mblnr  asc) rn
+ from  dwrotd.dwr_wm_prodstock_out_in_f a  
+ join mat t1 on a.material_num  = t1.material_num 
+ ),
+ tmp as(
+select batch_start,factory_type,product_factory_code ,belong_area_name,
+case when  b.factory_type='外协' then 'OEM'
+                      when  b.product_factory_code like '12%' then '山东基地'
+                      when b.product_factory_code like '13%' then '清远基地'
+                      when b.product_factory_code like '15%' then '江西基地'
+                      when b.product_factory_code like '16%' then '湖南基地'
+                      when b.product_factory_code like '17%' then '华盛昌基地'
+                      when b.product_factory_code like '18%' then '重庆基地'
+                      when b.product_factory_code like '19%' then '山西基地' 
+                   end factory,
+           product_area_code,product_area_name,
+row_number () over(partition by batch_start order by case when coalesce(factory_type,' ')=' ' then 1 else 0 end ) rn
+from DWRDIM.DWR_DIM_PRODUCT_AREA_D b
+),
+batch_area as(
+select a.material_num ,a.batch_num, a.inv_location ,a.factory_werks_code ,a.factory_werks_name ,a.move_type ,
+     case when inv_location like 'BE%' OR  inv_location like 'YX%' then 'OEM' 
+            when factory_werks_code like '12%' then '山东基地'
+            when factory_werks_code like '13%' then '清远基地'
+            when factory_werks_code like '15%' then '江西基地'
+            when factory_werks_code like '16%' then '湖南基地'
+            when factory_werks_code like '17%' then '华盛昌基地'
+            when factory_werks_code like '18%' then '重庆基地'
+            when factory_werks_code like '19%' then '山西基地'
+            when factory_werks_code in('7520','7560','7580','7920','7980','7960','8A20','8A80','8A60','7720','7760','7780','7220','7260','7280') 
+              then 'OEM' 
+            when b.batch_start is not null  then b.factory
+            when c.batch_start is not null  then case when c.batch_start in('0B','AB') then '清远基地' when  c.batch_start in('0Y') then '华盛昌基地' else c.factory end else 
+            'OEM' end as factory,
+     coalesce(b.product_area_code,c.product_area_code) as product_area_code,
+     coalesce(b.product_area_name,c.product_area_name) as product_area_name,
+     a.supplier_or_creditor_id,   a.supplier_or_creditor_acct,  a.supplier_or_creditor_name
+            from  mid1 as a
+            left join tmp b on substr(a.batch_num,1,3) = b.batch_start and b.rn=1
+            left join tmp c on substr(a.batch_num,1,2) = c.batch_start and c.rn=1
+            where 1=1
+            and a.rn=1
+            )
+select t1.month_date,   -- 月份
+         t2.prod_channel, -- 产品渠道
+         t2.cat,  -- 产品品类
+         t2.dimension,  -- 规格
+         CASE WHEN  (substr(t4.BATCH_IN_TIME,1,1) = '0' OR t4.BATCH_IN_TIME IS NULL) THEN '2年以上'
+            WHEN  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=6  then '半年以内'
+            when  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=12 then '7-12个月'
+            when  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=24 then '1-2年'
+            else '2年以上'  end as stock_age_seg,   -- 库龄段
+          case when  
+              t1.goods_move_stock_type_sid IN('01','02','07') 
+              and CASE WHEN t1.batch_num  LIKE '%888888' or t1.batch_num LIKE '%999999' THEN 0-- 虚拟入库批次不计算
+                       WHEN t1.factory_werks_code LIKE '%80' THEN 1   -- 80全算
+                       WHEN (C1.PROMOTION_REASON_CODE IS NOT NULL and  month_date>=replace(substr(T4.FIRST_PROMOTE_DATE,1,7),'-','')) THEN 1
+	               ELSE 0 END =1
+	          and  case when t1.factory_werks_code  LIKE '%80' and t4.clearance_reason_code='QC19' then  '清仓小堆头' 
+		     when (C1.PROMOTION_REASON_CODE ='AC05'  and (t1.special_stock_flag_2='Q_T148T' or t1.inv_location in('GCCA','GCTA','GCSA','BJ01','GCQA','GCPA','GCSD')) ) then '超一年定制(战略保存部分)'
+		     else C1.REJECTS_TYPE end not in('超一年ABC','超一年定制(战略保存部分)')
+                then '不良品' 
+              when t2.matl_group1_code in('A','B','C') then '主菜单'
+              else '定制品' end  as stock_type  ,   -- 库存分类
+          sum(t1.stock_qty) as stock_qty,   -- 库存数量
+          sum(t1.stock_qty* t2.area) as stock_area,  -- 库存面积
+		  current_timestamp() as dw_last_update_date, -- 数据同步时间
+		  t5.factory as display_factory,
+          t5.product_area_code,t5.product_area_name,
+          t5.supplier_or_creditor_acct,  t5.supplier_or_creditor_name,
+          t1.inv_location
+from (select  month_date,material_num,batch_num,inv_location,factory_werks_code,goods_move_stock_type_sid,special_stock_flag_2,sum(stock_qty) as stock_qty
+      from dwrotd.dwr_wm_all_type_stock_month_t 
+      where month_date>='${PERIOD_ID_M}'
+       and stock_qty <>0
+      group by month_date,material_num,batch_num,inv_location,factory_werks_code,goods_move_stock_type_sid,special_stock_flag_2
+     ) t1
+join mat t2 on t1.material_num  = t2.material_num 
+LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T t4
+  ON t1.MATERIAL_NUM = t4.MATERIAL_NUM
+ AND t1.BATCH_NUM = t4.BATCH_NUM  
+ LEFT JOIN UPLOAD.UPLOAD_REJECTS_DEFINITION_T c1
+  ON t4.PROMOTE_REASON_CODE = c1.PROMOTION_REASON_CODE
+LEFT JOIN batch_area T5 ON  t1.MATERIAL_NUM = t5.MATERIAL_NUM
+ AND t1.BATCH_NUM = t5.BATCH_NUM    
+group by t1.month_date, 
+         t2.prod_channel,
+         t2.cat,
+         t2.dimension,
+         CASE WHEN  (substr(t4.BATCH_IN_TIME,1,1) = '0' OR t4.BATCH_IN_TIME IS NULL) THEN '2年以上'
+            WHEN  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=6  then '半年以内'
+            when  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=12 then '7-12个月'
+            when  date_month_cz.months_between(last_day(to_date(t1.month_date ,'yyyyMMdd'))+1,to_date(t4.BATCH_IN_TIME,'yyyy-MM-dd'))<=24 then '1-2年'
+            else '2年以上'  end, -- as stock_age_seg
+         case when  
+              t1.goods_move_stock_type_sid IN('01','02','07') 
+              and CASE WHEN t1.batch_num  LIKE '%888888' or t1.batch_num LIKE '%999999' THEN 0-- 虚拟入库批次不计算
+                       WHEN t1.factory_werks_code LIKE '%80' THEN 1   -- 80全算
+                       WHEN (c1.PROMOTION_REASON_CODE IS NOT NULL and  month_date>=replace(substr(t4.FIRST_PROMOTE_DATE,1,7),'-','')) THEN 1
+	               ELSE 0 END =1
+	          and  case when t1.factory_werks_code  LIKE '%80' and t4.clearance_reason_code='QC19' then  '清仓小堆头' 
+		     when (C1.PROMOTION_REASON_CODE ='AC05'  and (t1.special_stock_flag_2='Q_T148T' or t1.inv_location in('GCCA','GCTA','GCSA','BJ01','GCQA','GCPA','GCSD')) ) then '超一年定制(战略保存部分)'
+		     else C1.REJECTS_TYPE end not in('超一年ABC','超一年定制(战略保存部分)')
+                then '不良品' 
+              when t2.matl_group1_code in('A','B','C') then '主菜单'
+              else '定制品' end ,
+       t5.factory,
+       t5.product_area_code,t5.product_area_name,
+       t5.supplier_or_creditor_acct,  t5.supplier_or_creditor_name,
+       t1.inv_location
+         ;

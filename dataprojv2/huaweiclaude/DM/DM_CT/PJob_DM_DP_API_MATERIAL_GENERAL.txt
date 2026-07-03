@@ -1,0 +1,146 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/10/16 09:40:54 GMT+08:00
+-- description:需求预测项目：物料数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+with ep_price1 as 
+(
+select 
+	t1.matnr
+	,t2.KBETR/t2.KPEIN/(t3.length_1*t3.width/1000000) as area_ep_price
+from sdi.sdi_a963_1001 t1
+JOIN SDI.sdi_konp_1001 t2 on t1.knumh = t2.knumh  -- 条件记录号
+	and t1.kschl = t2.kschl  
+left join dwimd.dwi_md_data_material_general_t t3 on t1.matnr = t3.material_num
+where t1.mandt = '800' -- 集团
+and t1.kschl = 'PR00' -- 条件类型
+and t1.konda in ('ZA') -- 客户价格组
+and REPLACE(CAST('${PERIOD_ID_D}' AS STRING),'-','') BETWEEN t1.datab  and t1.datbi 
+and t2.kopos = '01' -- 条件的序列号
+and t1.kappl = 'V' 
+)
+
+,ep_price2 as 
+(
+select  
+	t1.matnr
+	,max(case when t1.vtweg  IN('01') then  t2.KBETR/t2.KPEIN end ) as area_01_price
+	,max(case when t1.vtweg  IN('06') then  t2.KBETR/t2.KPEIN end ) as area_06_price
+from sdi.sdi_a941_1001 t1
+ JOIN SDI.sdi_konp_1001 t2
+        on t1.knumh = t2.knumh  -- 条件记录号
+        and t1.kschl = t2.kschl  
+        where t1.mandt = '800' -- 集团
+        and t1.kschl = 'PR00' -- 条件类型
+        and t1.konda in ('ZA') -- 客户价格组
+        and t1.vkorg = 1000
+        and t1.vtweg  IN('01','06')
+        and REPLACE(CAST('${PERIOD_ID_D}' AS STRING),'-','') BETWEEN t1.datab  and t1.datbi 
+        group by t1.matnr
+)
+
+,other_material as 
+(
+select 
+	dp_cate
+	,dp_dimension
+	,fin_cate
+	,fin_dimension
+	,row_number() over(partition by dp_cate,dp_dimension order by fin_cate,fin_dimension) as rk
+from sdi.sdi_czdp_basic_cate_1045
+where 1=1
+and delete_flag = 0
+)
+
+ 
+,A as (
+select t1.material_num,   -- 物料编码
+       t1.material_name,  -- 物料名称
+       t2.matl_group1_code ,   -- 产品属性
+       -- 系列：没有在系统维护，在主菜单功能导入
+       coalesce(case when t1.prod_property IN('A0001', 'A0002', 'C0002') then   -- 只针对 产品所有权 =瓷砖产品、梦之家产品、ART+ 定义
+         case when t1.tow_lev_channel_code in('A003','A004') then '世界印象'   -- 二级渠道=art+/iw
+               WHEN t1.product_level2_code IN ('1001') THEN '玻化砖'   --产品层次2=玻化砖
+               WHEN t1.product_level2_code IN ('1006', '1007', '1104') THEN '抛釉砖'  -- 产品层次2=晶理石/晶玉瓷/抛釉、晶玉配套
+               WHEN t1.product_level2_code = '1003' AND t1.dimension = '1500X750' OR t1.dimension = '1800X900' THEN '大板'  -- 产品层次2=岩板且规格=1500X750或者1800X900
+               WHEN t1.product_level2_code = '1003' AND (t1.dimension != '1500X750' AND t1.dimension != '1800X900') THEN '超大板' -- 产品层次2=岩板且规格≠1500X750或者1800X900
+               WHEN t1.product_level2_code IN ('1002', '1103') THEN '瓷片'  -- 产品层次2=瓷片/瓷片配套
+               WHEN t1.product_level2_code = '1017' THEN '精瓷中板'   -- 产品层次2=精瓷中板
+               WHEN t1.product_level2_code IN ('1004', '1102') THEN '仿古砖'  -- 产品层次2=仿古砖/仿古砖配套
+               WHEN t1.product_level2_code = '1018' THEN '景观砖'  -- 产品层次2=景观砖
+               ELSE  '其他瓷砖' END 
+              END,'其他品类') as fin_cate,   -- 财务品类
+       if(coalesce(t1.dimension,'NAL') in ('','NAL'),'其他规格',t1.dimension) as  dimension,  -- 财务规格
+       t1.reserved_field1_name as reserved_field1_name,-- 产品渠道名称
+       concat_ws(',',collect_list(distinct case when t4.distribution_channel_code = '06' then 'GD03' 
+											when t4.distribution_channel_code = '08' then 'GD02' else 'GD01' end) ) as integrate_channel
+from dwimd.dwi_md_data_material_general_t t1  
+left join (select t.material_num,
+             t.matl_group1_code,
+             row_number() over(partition by  t.material_num order by t.distribution_channel_code,t.sales_org_code) as rn 
+      from dwimd.dwi_md_data_material_sales_t t 
+      ) t2 ON t1.material_num = t2.material_num and t2.rn=1
+left join DWIMD.DWI_MD_DATA_MATERIAL_SALES_T t4 on t1.material_num = t4.material_num
+where 1=1
+and  t1.prod_property IN('A0001', 'A0002', 'C0002')
+-- and t1.external_matl_group_code IN('10010','10030','10080')
+--and t1.external_matl_group_code IN('10010')
+--and t1.matl_group_code IN('1000010')
+and t1.matl_type_code = 'FERT'
+group by 
+	t1.material_num,
+	t1.material_name,
+	t2.matl_group1_code ,  
+    coalesce(case when t1.prod_property IN('A0001', 'A0002', 'C0002') then   -- 只针对 产品所有权 =瓷砖产品、梦之家产品、ART+ 定义
+         case when t1.tow_lev_channel_code in('A003','A004') then '世界印象'   -- 二级渠道=art+/iw
+               WHEN t1.product_level2_code IN ('1001') THEN '玻化砖'   --产品层次2=玻化砖
+               WHEN t1.product_level2_code IN ('1006', '1007', '1104') THEN '抛釉砖'  -- 产品层次2=晶理石/晶玉瓷/抛釉、晶玉配套
+               WHEN t1.product_level2_code = '1003' AND t1.dimension = '1500X750' OR t1.dimension = '1800X900' THEN '大板'  -- 产品层次2=岩板且规格=1500X750或者1800X900
+               WHEN t1.product_level2_code = '1003' AND (t1.dimension != '1500X750' AND t1.dimension != '1800X900') THEN '超大板' -- 产品层次2=岩板且规格≠1500X750或者1800X900
+               WHEN t1.product_level2_code IN ('1002', '1103') THEN '瓷片'  -- 产品层次2=瓷片/瓷片配套
+               WHEN t1.product_level2_code = '1017' THEN '精瓷中板'   -- 产品层次2=精瓷中板
+               WHEN t1.product_level2_code IN ('1004', '1102') THEN '仿古砖'  -- 产品层次2=仿古砖/仿古砖配套
+               WHEN t1.product_level2_code = '1018' THEN '景观砖'  -- 产品层次2=景观砖
+               ELSE  '其他瓷砖' END 
+              END,'其他品类'),
+	t1.dimension,
+	t1.reserved_field1_name
+	
+union all 
+
+select 
+	concat(dp_cate,dp_dimension,'-未知型号') as material_num
+	,concat(dp_cate,dp_dimension,'-未知型号') as material_name
+	, null as matl_group1_code
+	,dp_cate
+	,fin_dimension as dimension
+	,null as reserved_field1_name
+	,'GD03' as integrate_channel
+from other_material
+where 1=1
+and rk = 1
+group by concat(dp_cate,dp_dimension,'-未知型号'),dp_cate,fin_dimension
+)
+
+INSERT OVERWRITE TABLE dm.dm_dp_api_material_general
+select 
+	material_num,
+	material_name,
+	matl_group1_code ,  
+	fin_cate,
+	dimension,
+	reserved_field1_name,
+	integrate_channel,
+	current_timestamp() as dw_last_update_date,
+	case 
+    	when COALESCE(t2.area_ep_price,area_01_price,area_06_price) = 0 then null
+    	else COALESCE(t2.area_ep_price,area_01_price,area_06_price)
+	end  as area_ep_price
+from A t1
+left join ep_price1 t2 on t1.material_num =  t2.matnr
+left join ep_price2 t3 on t1.material_num =  t3.matnr
+where 1=1
+and fin_cate not in ('1+N产品','其他品类')

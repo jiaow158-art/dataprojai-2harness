@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_VCH_HIS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/PUR",
+    "description": "SAP采购凭证历史表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

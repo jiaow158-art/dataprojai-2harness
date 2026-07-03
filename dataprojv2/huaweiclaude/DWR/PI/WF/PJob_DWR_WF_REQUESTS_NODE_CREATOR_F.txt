@@ -1,0 +1,66 @@
+ -- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- TABLE DESC:工作流请求节点操作人信息表（DWR）
+-- create time: chenzhiyong 20220310
+-- ******************************************************************** --
+ 
+ insert overwrite table dwrpi.dwr_wf_requests_node_creator_f
+ select 
+ t1.emp_num
+ ,t2.EMPLOYEE_ID
+ ,t1.request_code
+ ,t1.OA_EMPLOYEE_ID
+ ,t1.oa_groupid
+ ,t1.wf_code
+ ,t1.wf_type
+ ,t1.isremark_tmp
+ ,t1.user_type_code
+ ,t1.operation_node_code
+ ,t1.agent_record
+ ,t1.agent_operating_type
+ ,t1.creator_display_order
+ ,t1.receive_date
+ ,t1.receive_time
+ ,t1.examine_flag
+ ,t1.is_end_flag
+ ,t1.creator_last_record
+ ,t1.current_node_id
+ ,t1.operate_date
+ ,t1.operate_time
+ ,t1.group_detail_id
+ ,t1.is_timeout_reminded
+ ,t1.is_timeout_processed
+ ,t1.wf_remind_user
+ ,t1.wf_user_type
+ ,t1.preisremark_tmp
+ ,t1.is_return_creator
+ ,t1.need_feedback
+ ,t1.used_wfsave_type
+ ,t1.is_reminded_csh
+ ,t1.wf_reminded_user_csh
+ ,t1.wf_user_type_csh
+ ,t1.wf_saved_recordid
+ ,t1.used_record_opinion_flag
+ ,t1.last_reminded_timeout
+ ,t1.op_date_time
+ ,t1.wf_asyn_processing_state
+ ,t1.actual_creator
+ ,t1.is_return_node
+ ,t1.operation_type
+ ,t1.before_change_operation_type
+ ,t1.timeout_dealwith
+ ,t1.over_work_time
+ ,t1.opinion_consult_is_out
+ ,t1.opinion_consult_record_id
+ ,t1.opinion_consult_level
+ ,t1.view_date
+ ,t1.view_time
+ ,t1.is_multilevel_consult_state
+ ,t1.first_view_date
+ ,t1.first_view_time
+ ,t1.del_flag
+ ,CURRENT_TIMESTAMP() AS dw_last_update_date
+ from dwipi.dwi_wf_requests_node_creator_t  t1 
+ left join dwimd.dwi_md_employee_basic_info_t  t2 
+ on t1.emp_num  = t2.emp_num  and t2.end_date  = '4712-12-31' and t2.del_flag ='N';

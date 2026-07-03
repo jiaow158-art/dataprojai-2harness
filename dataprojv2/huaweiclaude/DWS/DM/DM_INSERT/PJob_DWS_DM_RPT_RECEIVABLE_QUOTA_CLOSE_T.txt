@@ -1,0 +1,56 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：应收余额报表（定版）
+-- create time: 2022/09/29 15:53:10 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM dm.dm_rpt_receivable_quota_close_t
+ WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))
+ ;
+insert into dm.dm_rpt_receivable_quota_close_t
+  SELECT EDITION_DATE, /*定版日期*/
+         COMP_CODE, /*公司代码*/
+         COMP_CODE___T, /*公司描述*/
+         DEBITOR, /*客户编码*/
+         DEBITOR___T, /*客户描述*/
+         WBS_ELEMT, /*WBS编号*/
+         WBS_ELEMT___T, /*WBS描述*/
+         SALES_GRP, /*销售组*/
+         SALES_GRP___T, /*销售组描述*/
+		 ZYSYE, /*应收余额*/
+		 ZYQ, /*逾期余额*/
+		 ZDQYJ, /*截至日到期预警*/
+         CURRENT_TIMESTAMP() 		AS DW_LAST_UPDATE_DATE /*数据同步时间*/,
+         ZAF_YQ_RV_Z/*2020年后逾期RV正数*/,
+         ZBF_YQ_RV_Z/*2020年前逾期RV正数*/,
+         ZAF_YQ_NRV/*2020年后逾期非RV*/,
+         ZBF_YQ_NRV/*2020年前逾期非RV*/,
+         ZAF_YQ_RV_Z_1_90/*2020后 1-90天逾期RV正数*/,
+         ZAF_YQ_RV_Z_91_275/*2020后 91-275天逾期RV正数*/,
+         ZAF_YQ_RV_Z_276_720/*2020后 276-720天逾期RV正数*/,
+         ZAF_YQ_RV_Z_721_1440/*2020后 721-1440天逾期RV正数*/,
+         ZAF_YQ_RV_Z_1440/*2020后 1440天以上逾期RV正数*/,
+         ZYQ_NRV_1_90/*1-90天逾期非RV*/,
+         ZYQ_NRV_91_275/*91-275天逾期非RV*/,
+         ZYQ_NRV_276_720/*276-720天逾期非RV*/,
+         ZYQ_NRV_721_1440/*721-1440天逾期非RV*/,
+         ZYQ_NRV_1440/*1440天以上逾期非RV*/,
+         ZBF_YQ_RV_Z_1_90/*2020前 1-90天逾期RV正数*/,
+         ZBF_YQ_RV_Z_91_275/*2020前 91-275天逾期RV正数*/,
+         ZBF_YQ_RV_Z_276_720/*2020前 276-720天逾期RV正数*/,
+         ZBF_YQ_RV_Z_721_1440/*2020前 721-1440天逾期RV正数*/,
+         ZBF_YQ_RV_Z_1440/*2020前 1440天以上逾期RV正数*/,
+         ZAF_WYQ/*2020年后未逾期应收*/,
+         ZBF_WYQ/*2020年前未逾期应收*/,
+         ZWYQ_1/*1年内未逾期应收*/,
+         ZWYQ_1_2/*1-2年未逾期应收*/,
+         ZWYQ_2_3/*2-3年未逾期应收*/,
+         ZWYQ_3_4/*3-4年未逾期应收*/,
+         ZWYQ_4/*4年以上未逾期应收*/,
+		 ZWYQ_1_90/*1-90天未逾期应收*/,
+		 ZWYQ_91_275/*91-275天未逾期应收*/,
+		 ZWYQ_276_720/*276-720天未逾期应收*/,
+		 ZWYQ_721_1440/*721-1440天未逾期应收*/,
+		 ZWYQ_1440/*1440天以上未逾期应收*/
+    FROM DM.DM_RPT_RECEIVABLE_QUOTA_T
+   WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))

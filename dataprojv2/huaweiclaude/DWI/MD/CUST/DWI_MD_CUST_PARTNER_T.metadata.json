@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_CUST_PARTNER_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/CUST",
+    "description": "客户主数据（销售区域）",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,83 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/06/27 15:45:16 GMT+08:00
+-- description:基地生产天数
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from zhz 20250724 增加湖南生产天数外因时间减免
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with tmp as (
+select  
+ b.day_dt as start_date
+,a.site_code
+,a.work_shop_code
+,a.product_line_code
+,day(date_add(b.day_dt,1)) as prod_day
+,substr(date_add(b.day_dt,1),1,7) AS period_id_m
+,case when d.material_value is null or d.material_value = '' or a.site_code = '1600' then 1 else d.material_value end AS EMPTY_KILN_VALUE --空窑系数
+,sum(nvl(c.stop_kinl_min,0)) over(partition by a.product_line_code,substr(date_add(b.day_dt,1),1,7) order by b.day_dt) as stop_kinl_min --空窑时间(分钟)
+from DWRDIM.DWR_DIM_PAM_PRODUCT_LINE_D a 
+left join (select day_dt from dm.dm_dim_date_d where day_dt >= CONCAT(SUBSTR(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+and day_dt <= substr(date_add(current_date,-1),1,10)) b on 1=1 
+left join dwrotd.dwr_pam_base_ext_stop_kiln_t c
+on a.site_code = c.site_code
+and a.work_shop_code = c.work_shop_code
+and (case when a.site_code = '1300' then a.product_line_code = c.product_line_code else 1=1 end) --除清远外，其他基地按车间维护外因
+and b.day_dt = c.shift_date
+left join dm.dm_pam_base_new_production_line_info_t  d --空窑系数表
+on a.site_code = d.site_code
+and a.work_shop_code = d.work_shop_code
+and a.product_line_code = d.product_line_code
+and b.day_dt between d.effective_start_date and d.effective_end_date
+and d.item_type = '空窑系数'
+where (a.site_code = '1300' and a.product_line_code like '0B%_CX%')  or a.site_code = '1600'
+)
+,tmp1 as (
+select 
+ b.day_dt 
+,a.site_code
+,a.work_shop_code
+,a.product_line_code
+,count(distinct a.shift_date) as prod_day
+,substr(date_add(b.day_dt,1),1,7) AS period_id_m
+from DWROTD.DWR_PAM_BASE_PRESS_WORK_F a
+join (select day_dt from dm.dm_dim_date_d where day_dt >= CONCAT(SUBSTR(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+and day_dt <= substr(date_add(current_date,-1),1,10)) b on 1=1
+where date_add(a.shift_date,1) >=concat(substr(date_add(b.day_dt,1),1,7),'-01') and  date_add(a.shift_date,1) <= date_add(b.day_dt,1)  --从上月最后一天截止到当月倒数第二天为其生产天数
+and a.production_num <> 0 and a.site_code not in ('1300','1600')
+group by 
+ b.day_dt
+,a.site_code
+,a.work_shop_code
+,a.product_line_code
+)
+insert overwrite table dm.dm_pam_base_prod_date_s partition(period_id_m)
+select 
+ start_date
+,site_code
+,work_shop_code
+,product_line_code
+,(prod_day * 1440 - stop_kinl_min / EMPTY_KILN_VALUE) / 1440 as prod_day  
+,current_timestamp () AS DW_LAST_UPDATE_DATE -- '最后更新时间'
+,period_id_m
+from tmp
+union all 
+select 
+ day_dt  as start_date
+,site_code
+,work_shop_code
+,product_line_code
+,prod_day
+,current_timestamp () AS DW_LAST_UPDATE_DATE -- '最后更新时间'
+,period_id_m
+from tmp1

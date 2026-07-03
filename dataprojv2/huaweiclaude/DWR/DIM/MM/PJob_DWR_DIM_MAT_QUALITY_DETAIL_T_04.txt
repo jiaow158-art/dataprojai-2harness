@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/02/17 17:12:07 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+insert overwrite table DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_04
+SELECT 
+    g.material_num, -- 物料编号
+    g.material_name, -- 物料名称
+    s.sales_org_code, -- 销售组织代码
+    s.distribution_channel_code, -- 分销渠道代码
+    c.assess_type, -- 评估类型
+    c.value_range, -- 价值范围
+    g.matl_type_code, --物料类型编码
+    g.matl_type_name, --物料类型编码
+    g.prod_property, -- 产品所有权 
+    g.prod_property_name, --产品所有权名称
+    s.matl_subj_set_group_code, -- 物料科目设置组代码
+    c.ASSESS_CLASS_CODE, -- 评估类代码
+    g.matl_group_code, --物料组
+    g.product_group_name, --物料组名称
+    -- 归类标识：根据产品属性和物料类型对产品进行分类
+    CASE 
+        WHEN g.prod_property IN ('A0001', 'A0002', 'C0001', 'C0002', 'C0003', 'C0004', 'C0006')  THEN '瓷砖(产成品)'
+        WHEN g.prod_property = 'B0001' THEN '卫浴(产成品)'
+        WHEN g.prod_property = 'D0001' THEN '生态新材(产成品)'
+        WHEN g.prod_property = 'E0001' THEN '国贸(产成品)'
+        WHEN g.prod_property = '' AND g.matl_type_code IN ('ROH','VERP') AND c.VALUE_RANGE IN ('1200','1300','1350','1500','1550','1600','1650','1700','1750','1800','1850','1900','1950','7220','7320','7920','7A20','7D00','7D50','8120','8820') THEN '瓷砖(原材料)'
+        WHEN g.prod_property = '' AND g.matl_type_code IN ('ROH','VERP') AND c.VALUE_RANGE IN ('3200','3320','3500','3602','3603','3606','3620','3700','3820','3920','3A20') 
+        THEN '卫浴(原材料)'
+        ELSE '其他' 
+    END AS flag,    
+    1 AS subj_sum_count,
+    -- 科目设置组错误行数：参考表 KTGRM 不为空且科目设置组代码不一致的记录数
+    CASE WHEN d.KTGRM IS NOT NULL AND s.matl_subj_set_group_code <> d.KTGRM THEN 1 ELSE 0 END AS subj_error_count,
+    CURRENT_TIMESTAMP()	AS DW_LAST_UPDATE_DATE			-- 数据同步时间
+FROM (
+    SELECT 
+        material_num,
+        sales_org_code,
+        distribution_channel_code,
+        matl_subj_set_group_code
+    FROM 
+        dwimd.dwi_md_data_material_sales_t
+    WHERE 
+        end_date = '4712-12-31' AND del_flag = 'N'
+
+) s 
+-- 关联销售数据，条件为物料编号相同且销售数据有效
+LEFT JOIN dwimd.dwi_md_data_material_general_t g  
+ON g.material_num = s.material_num
+-- 关联物料评估数据，条件为物料编号相同且数据有效
+LEFT JOIN (
+    SELECT 
+        material_num,
+        assess_type,
+        value_range,
+        ASSESS_CLASS_CODE
+    FROM 
+        dwimd.dwi_md_material_acct_t
+    WHERE 
+        end_date = '4712-12-31' AND del_flag = 'N'
+
+) c ON g.material_num = c.material_num
+-- 关联科目设置参考表，条件为评估类代码相同
+LEFT JOIN sdi.sdi_zmmt017_1001 d 
+ON c.ASSESS_CLASS_CODE = d.BKLAS
+where x_dstrb_c_mm_status_code <> 'GG';

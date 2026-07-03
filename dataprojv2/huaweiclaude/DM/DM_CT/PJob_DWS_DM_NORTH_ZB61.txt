@@ -1,0 +1,160 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/07/09 15:26:19 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:PJob_DWS_DM_NORTH_ZB61
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--准时交付率（整装绿灯产品）ZB61
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB61';
+with zjl_base as (
+select 
+tj_month --统计月份
+,count(
+distinct 
+case when is_zdjfzj = '是'
+then 
+			case when SFZDJF = 'Y' 
+			then VBELN		
+			else concat(VBELN,POSNR)
+			end 
+else null 
+end 
+) order_cnt_fzl
+,0 as order_cnt_zl
+,count(
+distinct 
+case when is_zdjfzj in  ('是','否') 
+then
+			case when SFZDJF = 'Y' 
+			then VBELN		
+			else concat(VBELN,POSNR)
+			end 
+else null 
+end 
+) order_cnt_fzl2
+,0 as order_cnt_zl2
+from dm.DM_SO_FZL_ORDER_ZJ_PRE_T a
+where 
+ bstdk <= replace(SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10),'-','')
+ and grelight_material_flag = '是'
+group by tj_month
+union all
+select 
+tj_month --统计月份
+, 0 as order_cnt_fzl
+,count(
+distinct 
+case when is_zdjfzj = '是'
+then 
+		case when SFZDJF = '是' then zjhd
+		else concat(zjhd,zjhdid)
+		end
+else null 
+end 		
+		) as order_cnt_zl
+, 0 as order_cnt_zl2
+,count(
+distinct 
+case when is_zdjfzj IN ('是','否')
+then 
+		case when SFZDJF = '是' then zjhd
+		else concat(zjhd,zjhdid)
+		end
+else null 
+end 		
+		) as order_cnt_zl2
+from dm.DM_SO_ZL_ORDER_ZJ_PRE_T
+where 
+bstdk <= replace(SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10),'-','')
+ and grelight_material_flag = '是'
+group by tj_month
+)
+,zjl_base2 as (
+select
+tj_month as calmonth
+,sum(order_cnt_fzl + order_cnt_zl) as order_cnt
+,sum(order_cnt_fzl2 + order_cnt_zl2)as order_cnt2
+from 
+zjl_base
+group by 
+tj_month
+)
+,TT2 as (
+select 
+calmonth,
+'ZB61' as zb_code,
+order_cnt/order_cnt2 as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+zjl_base2
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB61' as zb_code,
+0 as 当月实绩,
+SUM(order_cnt)/SUM(order_cnt2) as 累计实绩,
+0 as 季度累计实绩
+from 
+zjl_base2
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB61' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM(order_cnt)/SUM(order_cnt2)  as 季度累计实绩
+from 
+zjl_base2
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) *100 as CM_STAT_AMT,
+sum(累计实绩) *100  as ACC_STAT_AMT,
+sum(季度累计实绩) *100 as QTR_TGT_AMT
+from 
+TT2
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+

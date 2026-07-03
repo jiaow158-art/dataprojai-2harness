@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_PX_CUST_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "鹏霄瓷砖客户销售汇总表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

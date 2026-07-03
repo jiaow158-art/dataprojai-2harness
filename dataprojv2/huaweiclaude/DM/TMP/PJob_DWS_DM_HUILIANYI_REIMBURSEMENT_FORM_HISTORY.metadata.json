@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_HUILIANYI_REIMBURSEMENT_FORM_HISTORY",
+    "type": "DWSSQL",
+    "directory": "/DM/TMP",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

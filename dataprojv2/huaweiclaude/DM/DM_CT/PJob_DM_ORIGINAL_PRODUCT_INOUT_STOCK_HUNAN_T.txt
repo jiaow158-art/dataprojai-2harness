@@ -1,0 +1,211 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- 湖南基地原材料进销存
+-- create time: 
+-- ******************************************************************** --
+-- SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+---- 设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with mat as (
+select t1.material_num,t1.material_name,t1.product_level2_name  ,t1.dimension,
+        t1.width * t1.length_1/1000/1000 as product_area,
+        t1.product_brand_code,t1.product_brand_name,
+        t1.product_place_code,t1.product_place_name
+from dwimd.dwi_md_data_material_general_t t1 
+)
+,
+mbew as (
+select MATNR,BWKEY,VERPR,PEINH,lfgja,lfmon from sdi.sdi_mbewh_1001
+union all  
+select MATNR,BWKEY,VERPR,PEINH,lfgja,lfmon from sdi.sdi_mbew_1001
+)
+,zq_move_avgprice_cmmax as  
+(
+select 
+    t1.MATNR
+    ,t1.BWKEY
+    ,max(t1.VERPR/t1.PEINH) as avgprice --本月库存单价
+from mbew t1
+join (select MATNR,BWKEY,max(concat(lfgja,lfmon)) lfgm from mbew where concat(lfgja,lfmon) <= replace(substr('${PERIOD_ID_D}',1,7),'-','') group by MATNR,BWKEY) t2
+on t1.MATNR = t2.MATNR and t1.BWKEY = t2.BWKEY and concat(t1.lfgja,t1.lfmon) = t2.lfgm
+group by t1.MATNR,t1.BWKEY
+)
+/*,zq_move_avgprice_lmmax as  
+(
+select 
+    t1.MATNR
+    ,t1.BWKEY
+    ,max(t1.VERPR/t1.PEINH) as avgprice --本月库存单价
+from sdi.sdi_mbewh_1001 t1
+join (select MATNR,BWKEY,max(concat(lfgja,lfmon)) lfgm from sdi.sdi_mbewh_1001 where concat(lfgja,lfmon) < replace(substr('${PERIOD_ID_D}',1,7),'-','') group by MATNR,BWKEY) t2
+on t1.MATNR = t2.MATNR and t1.BWKEY = t2.BWKEY and concat(t1.lfgja,t1.lfmon) = t2.lfgm
+group by t1.MATNR,t1.BWKEY
+)*/
+,month_stock as
+(
+select 
+plant as factory_werks_code--工厂
+,material as material_num--物料
+,batch as batch_num --批次
+,sum(case when  calmonth = replace(substr('${PERIOD_ID_D}',1,7),'-','') then quantity else 0 end) as stock_qty_month_end --本月库存
+,sum(case when  calmonth = replace(substr('${PERIOD_ID_D}',1,7),'-','') then zsjkcje else 0 end) as stock_amt_month_end --本月库存金额
+
+,sum(case when  calmonth = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,7),'-01'),1),1,7),'-','') then quantity else 0 end) as stock_qty_month_start --月初库存
+,sum(case when  calmonth = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,7),'-01'),1),1,7),'-','') then zsjkcje else 0 end) as stock_amt_month_start --月初库存金额
+
+,sum(case when  calmonth = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,4),'-01-01'),1),1,7),'-','') then quantity else 0 end) as stock_qty_year_start --年初库存
+,sum(case when  calmonth = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,4),'-01-01'),1),1,7),'-','') then zsjkcje else 0 end) as stock_amt_year_start --年初库存金额
+FROM DM.dm_rpt_zzt_kcmx_t
+where calmonth >= replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,4),'-01-01'),1),1,7),'-','')
+and plant in ('1600','1650')
+group by plant,material,batch
+)
+,in_out_data AS 
+(
+select 
+factory_werks_code --工厂代码
+,material_num --物料名称
+,batch_merge as batch_num --批次
+,gl_account_no --总账科目
+,cost_center --成本中心
+,cost_center_name --成本中心名称
+,sum(case when factory_werks_code in ('1600')  and inv_location in ('TB','T101','T401','T501','T701','T801')  
+    and move_type in ('131','132','101','102','161','511','995')
+        then stock_qty else 0 end) in_stock_qty--入库数量
+,sum(case when factory_werks_code in ('1600')  and inv_location in ('TB','T101','T401','T501','T701','T801')  
+    and move_type in ('131','132','101','102','161','511','995')
+        then STOCK_SYMBOL_AMT else 0 end) in_stock_amt--入库金额 LC_AMT
+        
+,sum(case when factory_werks_code in ('1600','1650')  and inv_location in ('TB','T101','T401','T501','T601','T701','T801','JG01','X101','X102','X103','X104','X105','X201','X202','X203','X204','X401','X601','X602','X501')
+    and move_type in ('261','262','Z13','Z14','Z15','Z16','241','242','951','952','601') 
+	then stock_qty else 0 end) out_stock_qty--出库数量
+,sum(case when factory_werks_code in ('1600','1650')  and inv_location in ('TB','T101','T401','T501','T601','T701','T801','JG01','X101','X102','X103','X104','X105','X201','X202','X203','X204','X401','X601','X602','X501')
+    and move_type in ('261','262','Z13','Z14','Z15','Z16','241','242','951','952','601') 
+	then STOCK_SYMBOL_AMT else 0 end) out_stock_amt--出库金额 LC_AMT
+	
+,move_type --物料移动类型
+from dwrotd.DWR_WM_PRODSTOCK_OUT_IN_F
+where substr(VOUCHER_POST_DATE,1,7) = substr('${PERIOD_ID_D}',1,7)
+-- and substring(material_num,-2,2) in ('_A','_B')
+-- and inv_location in ('GCTA','TA','HNDY')
+-- and ((factory_werks_code >= 1600 and factory_werks_code <= 1680) or factory_werks_code in ('7220','7580','7720','8A20','8A80'))
+and factory_werks_code in ('1600','1650')
+and inv_location in ('TB','T101','T401','T501','T601','T701','T801','JG01','X101','X102','X103','X104','X105','X201','X202','X203','X204','X401','X601','X602','X501')  
+group by factory_werks_code,material_num,batch_merge,gl_account_no,cost_center,cost_center_name,move_type
+)
+,total_data as
+(
+SELECT 
+t1.factory_werks_code
+,t1.material_num
+,t1.stock_qty_month_end--本月库存
+,t1.stock_qty_month_start --月初库存
+,t1.stock_qty_year_start --年初库存
+,0 as in_stock_qty
+,0 as out_stock_qty
+,t1.batch_num
+,null as gl_account_no
+,null as cost_center
+,null as cost_center_name
+,null as move_type
+,t1.stock_amt_month_end --本月库存金额
+,t1.stock_amt_month_start --月初库存金额
+,0 as in_stock_amt --入库金额
+,0 as out_stock_amt --出库金额
+from month_stock t1
+union all 
+SELECT 
+factory_werks_code
+,material_num
+,0 as stock_qty_month_end
+,0 as stock_qty_month_start
+,0 as stock_qty_year_start
+,in_stock_qty --入库数量
+,out_stock_qty --出库数量
+,batch_num
+,null as gl_account_no
+,null as cost_center
+,null as cost_center_name
+,move_type
+,0 as stock_amt_month_end --本月库存金额
+,0 as stock_amt_month_start --月初库存金额
+,in_stock_amt --入库金额
+,out_stock_amt --出库金额
+from in_out_data--进出库存才有对应的移动平均单价
+)
+,total_data_sum as  
+(
+SELECT 
+factory_werks_code
+,material_num
+,sum(stock_qty_month_end) stock_qty_month_end
+,sum(stock_qty_month_start) stock_qty_month_start
+,sum(stock_qty_year_start) stock_qty_year_start
+,sum(in_stock_qty) in_stock_qty
+,sum(out_stock_qty) out_stock_qty
+,batch_num
+,gl_account_no
+,cost_center
+,cost_center_name
+,move_type
+,sum(stock_amt_month_end) as stock_amt_month_end
+,sum(stock_amt_month_start) as stock_amt_month_start
+,sum(in_stock_amt) as in_stock_amt
+,sum(out_stock_amt) as out_stock_amt
+from total_data
+group by 
+factory_werks_code
+,material_num
+,batch_num
+,gl_account_no
+,cost_center
+,cost_center_name
+,move_type
+)
+INSERT OVERWRITE TABLE DM.DM_ORIGINAL_PRODUCT_INOUT_STOCK_HUNAN_T partition (start_month)
+select 
+t1.factory_werks_code --工厂编码
+,'' factory_werks_name --工厂名称
+,t2.product_level2_name --品类
+,t2.product_brand_code --系列代码
+,t2.product_brand_name --系列名称
+,t2.product_place_code --产品工艺代码
+,t2.product_place_name --产品工艺名称
+,t2.dimension dimension_--产品规格
+,t1.material_num --物料编码
+,t2.material_name --物料名称
+,t1.in_stock_qty in_stock_qty
+,t1.in_stock_qty*t2.product_area in_stock_area
+,t1.out_stock_qty out_stock_qty
+,t1.out_stock_qty*t2.product_area out_stock_area
+,t1.stock_qty_month_end stock_qty_month_end --月初库存
+,t1.stock_qty_month_end*t2.product_area stock_area_month_end
+,t1.stock_qty_month_start stock_qty_month_start --本月库存
+,t1.stock_qty_month_start*t2.product_area stock_area_month_start
+,current_timestamp() as dw_last_update_date --最后更新时间
+,case 
+	when substring(t1.material_num,-2,2) = '_A' then '优等'
+	when substring(t1.material_num,-2,2) = '_B' then '一级'
+	else '其他'
+end material_rank --物料等级
+,t1.batch_num --批次
+,t1.gl_account_no --总账科目
+,t1.cost_center --成本中心
+,t1.cost_center_name --成本中心名称
+,t3.avgprice --移动平均价格
+,t1.move_type --移动类型
+,t1.stock_amt_month_end --本月库存金额
+,t1.stock_amt_month_start--月初库存金额
+,t1.in_stock_amt --入库金额
+,t1.out_stock_amt --出库金额
+,substr('${PERIOD_ID_D}',1,7) start_month
+from total_data_sum t1
+left join mat t2 on t1.material_num = t2.material_num
+left join zq_move_avgprice_cmmax t3 on t1.material_num = t3.MATNR and t1.factory_werks_code = t3.BWKEY

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_ANALYSE_TABLE",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTHER",
+    "description": "DWS表清理脏数据后收集统计信息",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

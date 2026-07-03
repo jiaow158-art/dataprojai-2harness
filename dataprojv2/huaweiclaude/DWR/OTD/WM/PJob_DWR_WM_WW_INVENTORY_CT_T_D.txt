@@ -1,0 +1,114 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2023/08/01 16:04:21 GMT+08:00
+-- update from chenzhiyong 20230906 修改计划库存逻辑，当为负号，数值是负数，取正数
+-- update from chenzhiyong 20230926 优化代码，新增客户分区
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+--CREATE TABLE DWROTD.DWR_WM_WW_INVENTORY_CT_T_D AS
+with dim_date as (    -- 日期维度,发散维度用
+	select day_dt 
+	     from dm.dm_dim_date_d 
+	  where  day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) 
+	    --and day_dt >= date_sub('${PERIOD_ID_D}',1) -- 传昨天
+	    and day_dt >= '2018-12-30' -- 万维库存最早的日期
+),
+dim_date_01 as (    -- 跑数用
+	select day_dt 
+	     from dm.dm_dim_date_d 
+	  where  day_dt <='${PERIOD_ID_D}'  -- 传昨天  -- 库存跑2022-01-01
+	    and day_dt >= date_sub('${PERIOD_ID_D}',3)	-- 传昨天(3天前) --'2022-02-01'  -- 库存跑2022-01-01
+),
+TMP_DATA01 AS(
+	SELECT substring(T.doc_date,1,10) as doc_date,
+		   T.dealer_code,
+		   T.dealer_name,
+		   T.doc_type,
+		   T.material_num,
+		   T.material_name,
+		   SUM(T.material_qty) AS material_qty
+	FROM DWIOTD.DWI_WM_WW_INVENTORY_DETAIL_T T
+	group by substring(T.doc_date,1,10),
+			 T.dealer_code,
+			 T.dealer_name,
+			 T.doc_type,
+			 T.material_num,
+			 T.material_name
+),
+tmp_data01_01 as(  -- 发散数据
+    select t1.day_dt as doc_date,
+    	   T2.dealer_code,
+		   T2.dealer_name,
+		   T2.doc_type,
+		   T2.material_num,
+		   T2.material_name,
+		   nvl(t3.material_qty,0) as material_qty
+    from dim_date t1
+    left join (select distinct dealer_code,
+							   dealer_name,
+							   doc_type,
+							   material_num,
+							   material_name
+				FROM TMP_DATA01) t2
+	on 1 = 1
+	left join TMP_DATA01 t3
+	on t1.day_dt = t3.doc_date
+	and t2.dealer_code = t3.dealer_code
+	and t2.dealer_name = t3.dealer_name
+	and t2.doc_type = t3.doc_type
+	and t2.material_num = t3.material_num
+	and t2.material_name = t3.material_name
+),
+TMP_DATA02 AS(
+	SELECT t1.day_dt as doc_date,
+		   case when t.doc_date < t1.day_dt then 'QC'
+	            when t.doc_date between t1.day_dt and t1.day_dt then 'QJ'
+	       else 'QM' end as data_type,
+	       dealer_code, 
+	       dealer_name,  
+	       material_num, 
+	       material_name,
+	       case when doc_type = '-' then -cast(material_qty as float)  -- concat(doc_type,material_qty)
+	       		else material_qty end transaction_qty,
+	       case when doc_type = '-' then material_qty
+	       		else 0 end transaction_out_qty,
+	       case when doc_type = '+' then material_qty		
+	            else 0 end transaction_in_qty
+	FROM tmp_data01_01 t
+	left join dim_date_01 t1
+	on 1 = 1
+	where t1.day_dt <= '${PERIOD_ID_D}'
+),
+TMP_DATA03 AS(
+	SELECT doc_date,
+		   dealer_code, 
+	   	   dealer_name,  
+	       material_num, 
+	       material_name,
+	       sum(case when  data_type='QC' THEN transaction_qty else 0 end ) as before_Qty,  -- 期初数量
+	       sum(case when  data_type='QJ' THEN transaction_in_qty else 0 end ) as in_qty,   -- 本期入库
+		   sum(case when  data_type='QJ' THEN transaction_out_qty else 0 end) as out_qty,  -- 本期出库
+		   sum(case when  data_type='QJ' THEN transaction_qty else 0 end ) as remain_qty,  -- 期间发生
+		   sum(case when  data_type='QC' THEN transaction_qty else 0 end ) + 
+		   sum(case when  data_type='QJ' THEN transaction_qty else 0 end ) as end_qty -- 期末数量
+	FROM TMP_DATA02 T
+	GROUP BY doc_date,
+			 dealer_code, 
+	       	 dealer_name,  
+	         material_num, 
+	         material_name
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_WW_INVENTORY_CT_T_D PARTITION(PERIOD_ID_D,P_CUSTOMER_CODE)
+SELECT T.*,
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   t.doc_date as PERIOD_ID_D,
+	   t.dealer_code as P_CUSTOMER_CODE
+FROM TMP_DATA03 T;

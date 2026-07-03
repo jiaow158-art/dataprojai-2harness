@@ -1,0 +1,25 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/06/21 17:40:39 GMT+08:00
+-- description:卫浴基地制造成本，来源外挂表，基地标准产值损指标
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+WITH DIM_DATE AS(
+	SELECT SUBSTRING(T.day_dt,1,7) STAT_MONTH
+	FROM DM.DM_DIM_DATE_D T
+	WHERE SUBSTRING(T.day_dt,1,7) BETWEEN '2022-06' AND substring('${PERIOD_ID_D}',1,7)  --传昨天所在的月份
+	GROUP BY SUBSTRING(T.day_dt,1,7)
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_PAM_BASE_STANDARD_VALUE_T
+SELECT T1.STAT_MONTH,
+       factory_code, 
+       material_num, 
+       base_spi_rate, 
+       base_comp_hg_rate,
+       current_timestamp() as dw_last_update_date 
+FROM DIM_DATE T1
+LEFT JOIN SDI.SDI_PAM_BASE_STANDARD_VALUE_1037 T2
+ON 1 = 1
+where T2.del_flag = 'N';

@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/02/14 13:54:31 GMT+08:00
+-- desc：销售订单头表
+-- ******************************************************************** --
+set hive.exec.dynamic.partition.mode=nonstrict;
+insert overwrite TABLE DWROTD.DWR_SO_SALES_ORDER_HEADER_F partition(PERIOD_ID_M)
+select 
+ t1.VBELN		    SALES_VOUCHER_CODE				-- 销售凭证
+,t1.ERNAM		    CREATE_BY						-- 创建者
+,case when t1.ERDAT = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.ERDAT,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			CREATE_DATE	    				-- 创建日期
+,case when t1.AEDAT = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.AEDAT,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			LAST_UPDATE_DATE				-- 最后更改的日期	
+,case when t1.ANGDT = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.ANGDT,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			QUOTE_VALID_START_DATE			-- 报价有效期自
+,case when t1.BNDDT = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.BNDDT,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			QUOTE_VALID_END_DATE			-- 报价有效期至
+,case when t1.VDATU = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.VDATU,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			DELIVERY_PLANNING_DATE			-- 计划交货日期
+,case when t1.AUDAT = '00000000' then '1900-01-01'	else from_unixtime(unix_timestamp(t1.AUDAT,'yyyymmdd'),'yyyy-mm-dd') 
+	end 			VOUCHER_DATE					-- 凭证日期
+,t1.VBTYP		    SAL_DIS_VOUCHER_TYPE_CODE		-- SD凭证类别
+,a.DDTEXT 	        SAL_DIS_VOUCHER_TYPE_DESC		-- SD凭证类别描述
+,t1.AUART		    SALES_VOUCHER_TYPE_CODE			-- 销售凭证类型
+,b.BEZEI  		    SALES_VOUCHER_TYPE_DESC			-- 销售凭证类型描述
+,t1.SUBMI		    SPOT_OR_PLAN_SD					-- 汇总号(SD)(现货or计划)
+,t1.NETWR		    WHOLE_DOCU_EXCLU_TAX_AMT		-- 净值
+,t1.WAERK		    BILLING_CURRENCY				-- 货币
+,t1.VKORG		    SALES_ORGANIZATION_CODE			-- 销售组织
+,c.VTEXT   		    SALES_ORGANIZATION_DESC			-- 销售组织描述
+,t1.VTWEG		    DISTRIBUTION_CHANNEL_CODE		-- 分销渠道
+,d.VTEXT   	 	    DISTRIBUTION_CHANNEL_DESC		-- 分销渠道描述
+,t1.SPART		    PRODUCT_GROUP_CODE				-- 产品组
+,t1.VKGRP		    SALES_GROUP_CODE				-- 销售组
+,t1.VKBUR		    SALES_DEPT						-- 销售部门
+,t1.KNUMV		    VOUCHER_TERM_CODE				-- 条件记录凭证
+,t1.BSARK		    PURCHASE_ORDER_SOURCE			-- 采购订单来源
+,t1.BSTNK		    PURCHASE_ORDER_REMARKS			-- 采购订单备注信息
+,t1.IHREZ		    PURCHASE_ORDER_TYPE				-- 采购订单类型
+,t1.TELF1		    CUST_PHONE						-- 售达方电话
+,t1.KUNNR		    CUST_CODE						-- 售达方编号
+,t1.PS_PSP_PNR	    WBS_ELEMENT						-- 工作分解结构要素(WBS号)
+,t1.KKBER		    CREDIT_CONTROL_SCOPE			-- 信用控制范围
+,t1.KNKLI		    CREDIT_REF_CUST_ACC_CODE		-- 带有贷方限额参考的客户帐户号(付款方)
+,t1.CTLPC		    CREDIT_RISK_TYPE_CODE			-- 信贷管理: 风险种类(用于信贷检查) 
+,e.rtext 			CREDIT_RISK_TYPE_DESC			-- 信贷管理: 风险种类（信贷检查的方式）描述
+,t1.ZQCYY		    FOUR_SYMBOLS_CODE				-- 四符编码
+,t1.ZAPPROVER	    APPROVED_BY						-- 审批人
+,t1.DH			    ENGINEER_REPORT_CODE			-- 工程报表单号
+,t1.PLAN_N		    REQUEST_PLAN_CODE				-- 需求计划号
+,t1.VBELN_OSS	    OSS_ORDER_CODE					-- OSS单号
+,t1.ID_OSS		    OSS_ORDER_HEADER_ID				-- OSS订单头Id
+,t1.OSS_VBELN	    QUOTE_CODE						-- 报价单号
+,t1.OSS_CREATER	    OSS_ORDER_CREATE_BY				-- OSS订单创建人
+,t1.JHDDLX		    PLAN_ORDER_TYPE					-- 计划订单类型
+,t1.SFZDJF		    WHOLE_DELIVERY_FLAG				-- 是否整单交付
+,t1.JGGYDD		    PROCESS_TECHNIQUE_ORDER_CODE	-- 加工工艺订单
+,t1.DDYT		    ORDER_PURPOSE					-- 订单用途
+,t1.VBELN_WW	    WW_ORDER_CODE					-- 万维单号
+,t1.ID_WW		    WW_ORDER_HEADER_ID				-- 万维订单头ID
+,case when t1.AUDAT = '00000000' then '1900-01'	else from_unixtime(unix_timestamp(t1.AUDAT,'yyyymm'),'yyyy-mm') 
+	end  			PERIOD_ID_M 					-- 分区（月）
+,current_timestamp() DW_LAST_UPDATE_DATE			-- 数据同步时间
+from sdi.sdi_vbak_1001  t1 
+ LEFT JOIN ( SELECT  DOMVALUE_L,DDTEXT FROM sdi.sdi_dd07t_1001 WHERE DOMNAME = 'VBTYPL' AND DDLANGUAGE = '1' ) a ON t1.VBTYP = a.DOMVALUE_L   
+ LEFT JOIN sdi.sdi_tvakt_1001   b ON t1.AUART  = b.AUART  AND t1.MANDT = b.MANDT  AND b.SPRAS ='1'
+ LEFT JOIN sdi.sdi_tvkot_1001   c ON t1.VKORG  = c.VKORG  AND t1.MANDT = c.MANDT  AND c.SPRAS ='1'  
+ LEFT JOIN sdi.sdi_tvtwt_1001   d ON t1.VTWEG  = d.VTWEG  AND t1.MANDT = d.MANDT  AND d.SPRAS ='1'   
+ left join sdi.sdi_t691t_1001   e on t1.KKBER  = e.KKBER  and t1.ctlpc = e.ctlpc  and t1.mandt = e.mandt  and e.spras ='1' 
+

@@ -1,0 +1,8 @@
+{
+    "name": "DWS_code_duibi_test_t",
+    "type": "DWSSQL",
+    "directory": "/",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

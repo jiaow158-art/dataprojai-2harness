@@ -1,0 +1,33 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/02/14 11:21:06 GMT+08:00
+-- desc：订单总头(包含瓷砖以及卫浴)
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_ORDER_ALL_BUSINESS_F
+SELECT
+	 T.id
+	,T.datalevel
+	,T.order_no
+	,T.creation_date
+	,T.created_by
+	,T.last_update_date
+	,T.last_updated_by
+	,T.last_update_login
+	,T.delete_flag
+	,T.version_num
+	,T.sale_org_code
+	,T.sale_channel_code
+	,T.account_number
+	,T.order_number
+	,T.business_type
+	,T.status
+	,T.submit_time
+	,T.sap_number
+	,T.order_type
+	,T.account_name
+	,T.sap_lt_number
+	,T.del_flag
+	,current_timestamp() as DW_LAST_UPDATE_DATE
+FROM SDI.SDI_S_ORDER_ALL_BUSINESS_1029 T
+;

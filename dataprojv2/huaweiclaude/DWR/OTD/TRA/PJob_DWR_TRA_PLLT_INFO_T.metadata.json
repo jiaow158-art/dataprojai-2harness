@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_TRA_PLLT_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/TRA",
+    "description": "托盘出入库单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

@@ -1,0 +1,56 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/09/22 10:01:28 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_CNSTR_INFO_F
+SELECT
+       A.ID	
+      ,B.ID AS ORDER_ID --订单ID
+      ,A.ORDER_CODE AS ORDER_NUM --订单编码
+      ,B.APPT_TYPE --预约类型（1-新房装修，2-旧房改造）
+      ,B.APPT_TYPE_NAME --预约类型
+      ,B.ORDER_STATUS --订单状态
+	  ,B.ORDER_STATUS_NAME --订单状态名称
+      ,B.STAGE_ID --订单阶段ID
+	  ,B.STAGE_NAME --订单阶段名称	  
+      ,A.DECORATOR_ID AS DECOR_ID --师傅ID
+      ,A.DECORATOR_NAME AS DECOR_NAME --师傅姓名
+      ,A.ASSIGN_TIME --指派时间
+      ,A.SIGN_TIME	--签收时间
+      ,A.STATUS AS CNSTR_STATUS --状态
+      ,A.PROJECT_START_TIME AS START_TIME --师傅开工时间
+      ,A.PROJECT_END_TIME AS END_TIME --师傅完工时间
+      ,A.DETAILS AS DETAIL --施工详情
+      ,A.REMARK	--备注信息
+      ,A.CREATE_BY AS CREATE_ID --创建人	  
+      ,A.CREATE_TIME --创建时间
+      ,A.CREATE_NAME --创建人名称
+      ,A.UPDATE_BY AS UPDATE_ID --更新人	  
+      ,A.UPDATE_TIME --更新时间
+      ,A.UPDATE_NAME --更新人名称
+      ,A.TYPE AS EMP_TYPE --人员类型：1-销售顾问；2-师傅
+	  ,CASE WHEN A.TYPE = 1 THEN '销售顾问'
+	        WHEN A.TYPE = 2 THEN '师傅'
+			 END AS EMP_TYPE_NAME --人员类型名称
+      ,A.EVALUATE_SCORE AS EVALU_SCORE --评价评分
+      ,A.EVALUATE_CONTENT AS EVALU_CONTENT --评价内容1
+      ,A.EVALUATE_TIME AS EVALU_TIME --评价时间
+      ,A.EVALUATE_MEMBER_ID AS EVALU_CUST_ID --评价客户ID
+	  ,B.CUST_NAME AS EVALU_CUST_NAME --评价客户名称
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,B.PROV_NAME --省区域名
+	  ,B.CITY_NAME --市区域名
+	  ,B.DIST_NAME --区区域名
+	  ,B.CMY_NAME --小区名称
+      ,B.ADDR --详细地址
+      ,B.PRVDR_ID --服务商ID
+      ,B.PRVDR_CODE --服务商编码
+      ,B.PRVDR_NAME --服务商名称
+      ,B.CNTC_CODE --合同编码
+  FROM SDI.SDI_HD_ORDER_DECORATOR_REL_1030 A
+ INNER JOIN DWRCS.DWR_CS_ZDJ_ORDER_INFO_F B
+    ON A.ORDER_CODE = B.ORDER_NUM
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.IS_DELETED = 0 

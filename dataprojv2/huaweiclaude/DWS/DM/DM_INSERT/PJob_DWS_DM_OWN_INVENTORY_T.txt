@@ -1,0 +1,134 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/25 13:45:19 GMT+08:00
+-- update from huangwenbin 2025-08-05 将全量更新改成增量更新
+-- ******************************************************************** --
+-- 替换底层逻辑. BW逻辑最后版本号为22/ 如果修改超过10次. 切记确认有没有备份下来 
+
+
+DELETE
+FROM DM.DM_OWN_INVENTORY_T
+WHERE "库存月份" = REPLACE('${P_PERIOD_M}','-','')
+; --where 库存月份 >= replace(substring(add_months(current_date,-1),1,7),'-','');
+INSERT INTO DM.DM_OWN_INVENTORY_T
+select calmonth                                                                          "库存月份"
+     , zprodh3                                                                           "产品层次3"
+     , zprodh3___t                                                                       "产品层次3描述"
+     , material                                                                          "物料编码"
+     , material___t                                                                      "物料编码描述"
+     , plant                                                                             "工厂"
+     , plant___t                                                                         "工厂描述"
+     , stor_loc                                                                          "库存地点"
+     , stor_loc___t                                                                      "库存地点描述"
+     , zww010                                                                            "产区"
+     , batch                                                                             "批次"
+     , zmmm_o017_zbatch_date                                                             "批次入库日期（阿米巴调整)"
+     , sum(case when stockcat <> 'K' or stockcat is null then zsjkcje else 0 end)        "月末库存金额"
+     , sum(case when stockcat <> 'K' or stockcat is null then quantity else 0 end)       "月末库存数量"
+     , 0                                                                                 "产品库存利息"
+     , 0                                                                                 "减值损失-半年内-2020以前-金额"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_6_amt else 0 end)     "减值损失-半年内-2020以后-金额"
+     , 0                                                                                 "减值损失-半年内-2020以前-数量"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_6_qty else 0 end)     "减值损失-半年内-2020以后-数量"
+     , 0                                                                                 "减值损失-半年到一年-2020以前-金额"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_6_12_amt else 0 end)  "减值损失-半年到一年-2020以后-金额"
+     , 0                                                                                 "减值损失-半年到一年-2020以前-数量"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_6_12_qty else 0 end)  "减值损失-半年到一年-2020以后-数量"
+     , 0                                                                                 "减值损失-一年到两年-2020以前-金额"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_12_24_amt else 0 end) "减值损失-一年到两年-2020以后-金额"
+     , 0                                                                                 "减值损失-一年到两年-2020以前-数量"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_12_24_qty else 0 end) "减值损失-半年到一年-2020以后-数量"
+     , 0                                                                                 "减值损失-两年以上-2020以前-金额"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_24_amt else 0 end)    "减值损失-两年以上-2020以后-金额"
+     , 0                                                                                 "减值损失-两年以上-2020以前-数量"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_24_qty else 0 end)    "减值损失-两年以上-2020以后-数量"
+     , sum(case when stockcat <> 'K' or stockcat is null then wbzq_jc_amt else 0 end)    减值损失
+     , sum(case when stockcat = 'K' then zsjkcje else 0 end)                             月末外协寄售金额
+     , sum(case when stockcat = 'K' then quantity else 0 end)                            月末外协寄售数量
+     , sum(case when stockcat = 'K' then wbzq_jc_amt else 0 end)                         "减值损失-外协寄售"
+     , 0                                                                                 "减值损失-半年以内-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-半年内-外协寄售"
+     , sum(case when stockcat = 'K' then wbzq_6_amt else 0 end)                          "库存金额-2020以后-半年内-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-半年内-外协寄售-数量"
+     , sum(case when stockcat = 'K' then wbzq_6_qty else 0 end)                          "库存金额-2020以后-半年内-外协寄售-数量"
+     , 0                                                                                 "减值损失-半年到一年内-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-半年到一年-外协寄售"
+     , sum(case when stockcat = 'K' then wbzq_6_12_amt else 0 end)                       "库存金额-2020以后-半年到一年-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-半年到一年-外协寄售-数量"
+     , sum(case when stockcat = 'K' then wbzq_6_12_qty else 0 end)                       "库存金额-2020以后-半年到一年-外协寄售-数量"
+     , 0                                                                                 "减值损失-一年到两年-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-1年到两年-外协寄售"
+     , sum(case when stockcat = 'K' then wbzq_12_24_amt else 0 end)                      "库存金额-2020以后-1年到两年-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-1年到两年-外协寄售-数量"
+     , sum(case when stockcat = 'K' then wbzq_12_24_qty else 0 end)                      "库存金额-2020以后-1年到两年-外协寄售-数量"
+     , 0                                                                                 "减值损失_两年以上-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-两年以上-外协寄售"
+     , sum(case when stockcat = 'K' then wbzq_24_amt else 0 end)                         "库存金额-2020以后-两年以上-外协寄售"
+     , 0                                                                                 "库存金额-2020以前-两年以上-外协寄售-数量"
+     , sum(case when stockcat = 'K' then wbzq_24_qty else 0 end)                         "库存金额-2020以后-两年以上-外协寄售-数量"
+     , base                                                                              "基地"
+     , storage_classify                                                                  "库位分类"
+     , t2.classify_name                                                                  "分类"
+     , t2.category_name                                                                  "品类"
+     , sum(wbzq_6_amt)                                                                   "1-6个月金额"
+     , sum(wbzq_6_12_amt)                                                                "7-12个月金额"
+     , sum(wbzq_12_24_amt)                                                               "1-2年金额"
+     , sum(wbzq_24_amt)                                                                  "2年以上金额"
+     , sum(zsjkcje)                                                                      "库存总额（含寄售）"
+     , sum(wbzq_6_12_amt + wbzq_12_24_amt + wbzq_24_amt)                                 "库存金额-库龄半年以上"
+     , sum(wbzq_6_qty)                                                                   "1-6个月数量"
+     , sum(wbzq_6_12_qty)                                                                "7-12个月数量"
+     , sum(wbzq_12_24_qty)                                                               "1-2年数量"
+     , sum(wbzq_24_qty)                                                                  "2年以上数量"
+     , sum(quantity)                                                                     "库存总数量（含寄售）"
+     , sum(wbzq_6_12_qty + wbzq_12_24_qty + wbzq_24_qty)                                 "库存数量-库龄半年以上"
+     , 0                                                                                 "2020年以前库存金额"
+     , '0'                                                                               "是否2020年以前"
+     , sum(wbzq_6_12_amt * 0.1)                                                          "跌价金额-7-12个月"
+     , sum(wbzq_12_24_amt * 0.4)                                                         "跌价金额-1-2年"
+     , sum(wbzq_24_amt * 0.7)                                                            "跌价金额-2年以上"
+     , sum((wbzq_6_12_amt * 0.1) + (wbzq_12_24_amt * 0.4) + (wbzq_24_amt * 0.7))         "跌价合计"
+     , next_mon_date                                                                     "下月日期"
+     , time_diff                                                                         "时间差"
+     , 0                                                                                 "库龄（按月倒推库龄段）"
+     , sum(xydj_7_12_amt)                                                                "下月跌价金额-7-12个月"
+     , sum(xydi_12_24_amt)                                                               "下月跌价金额-1-2年"
+     , sum(xydj_24_amt)                                                                  "下月跌价金额-2年以上"
+     , sum(xydj_7_12_amt + xydi_12_24_amt + xydj_24_amt)                                 下月跌价金额合计
+     , sum(xyzjdj_7_12_amt)                                                              "下月增加跌价金额-7-12个月"
+     , sum(xyzjdj_12_24_amt)                                                             "下月增加跌价金额-1-2年"
+     , sum(xyzjdj_24_amt)                                                                "下月增加跌价金额-2年以上"
+     , sum(xyzjdjhj_amt)                                                                 "下月增加跌价金额合计"
+     , current_timestamp
+     , clear_inv_flag                                                                    "清库存标识"
+     , foreign_own                                                                       "外协自产"
+     , product_base                                                                      "生产基地"
+from dm.dm_fin_stock_detail_accage_t_2023 t1
+         left join dm.DM_RPT_PROD_CATEGORY_T t2 on t1.zprodh3 = t2.prod_level3_code
+-- left join DM.DM_RPT_STOCK_PLACE_T as i on t1.stor_loc = i.stock_place_name and i.stock_place_flag = '库存地点不为空' and i.stock_place_name is not null
+-- left join DM.DM_RPT_STOCK_PLACE_T as j on t1.plant = j.factory_code and j.stock_place_flag = '库存地点为空' and j.stock_place_name is null
+where zdpsyb = '11000002'
+and calmonth = REPLACE('${P_PERIOD_M}','-','')
+group by calmonth
+       , zprodh3
+       , zprodh3___t
+       , material
+       , material___t
+       , plant
+       , plant___t
+       , stor_loc
+       , stor_loc___t
+       , zww010
+       , batch
+       , zmmm_o017_zbatch_date
+       , base
+       , storage_classify
+       , t2.classify_name
+       , t2.category_name
+       , next_mon_date
+       , time_diff
+       , clear_inv_flag
+       , foreign_own
+       , product_base;
+

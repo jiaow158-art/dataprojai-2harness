@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_RES_PREPARE_TMP",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "营销系统留备货",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

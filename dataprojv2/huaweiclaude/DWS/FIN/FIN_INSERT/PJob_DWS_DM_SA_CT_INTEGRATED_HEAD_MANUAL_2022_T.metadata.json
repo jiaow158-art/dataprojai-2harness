@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_SA_CT_INTEGRATED_HEAD_MANUAL_2022_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "瓷砖2022手工业绩",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,80 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2024/06/15 11:02:24 GMT+08:00
+-- description: 计算瓷砖库存周转天数
+-- history list:
+-- UPDATE FROM WJH 时间<2026-04-17>改为用dm_fin_stock_detail_accage_t_2023表及算库存金额
+-- ******************************************************************** -- --
+
+delete from  dm.dm_otd_wm_stock_turnover_m where stat_month>= substr(current_date - INTERVAL '3 days',1,7);
+insert into dm.dm_otd_wm_stock_turnover_m
+with t3 as (
+-- 库存金额
+   select  calmonth,
+        sum(zsjkcje) stock_amt 
+        from  dm.dm_fin_stock_detail_accage_t_2023 T 
+    where zdpsyb IN( '11000001','11000003')
+    and matl_type = 'FERT'
+    and t.calmonth>= replace(substr(current_date - INTERVAL '3 days',1,7),'-','')
+    group by calmonth
+),
+t4 as(
+-- 销售成本
+/*
+是否剔除物流成本 ： case when bus_area in ('F000','E000','J000','H000','I000') then '是' else '否' end 
+实际成本合计（剔除物流成本） = IF(是否剔除物流成本=="是",0,成本调整值)+1+N成本+实际成本（对外销售）+跨事业部成本+事业部内部成本+主营业务成本-安装费
+
+*/
+ select calmonth ,
+        sum(
+        case when bus_area in ('F000','E000','J000','H000','I000') then 0 else zcbtzz end 
+        + cost_1n + ext_act_sales_cost + cross_cost + dept_inner_cost + zzyywcb_zz + zzyywcb_azf
+        ) sales_cost
+ from  dm.dm_ambv2_profit_t
+ where  sales_division_1n_code In( '11000001','11000003')
+ and data_source in ('D','S','T')
+ and calmonth >=substr(current_date - INTERVAL '3 days',1,7)
+group by calmonth
+),
+t5 as (
+-- 历史的成本和库存用历史定版的数据
+SELECT t4.calmonth as stat_month,
+        sum(t3.stock_amt) as stock_amt,
+        sum(t4.sales_cost) as sales_cost
+  FROM  t3  
+  join t4 on T3.calmonth  =  replace(t4.calmonth,'-','') 
+  where t4.calmonth >=substr(current_date - INTERVAL '3 days',1,7)
+ GROUP BY t4.calmonth 
+union all   
+select stat_month,   
+       stock_amt,
+       sales_cost
+from dm.dm_otd_wm_stock_turnover_m 
+where stat_month<substr(current_date - INTERVAL '3 days',1,7)
+),
+t6 as (
+SELECT  t5.stat_month ,
+        sum(sum(stock_amt)) over(order by stat_month ROWS BETWEEN 12 PRECEDING AND CURRENT ROW ) as stock_amt_last13m,
+        sum(sum(sales_cost)) over(order by stat_month ROWS BETWEEN 11 PRECEDING AND CURRENT ROW ) as sales_cost_last12m,
+          -- 0 as turnover_times,
+          sum(t5.stock_amt) as stock_amt,
+          sum(t5.sales_cost) as sales_cost
+  FROM  t5  
+ GROUP BY t5.stat_month 
+ )
+ SELECT stat_month,
+        stock_amt_last13m,
+        sales_cost_last12m,
+       case when stock_amt_last13m <> 0 then  sales_cost_last12m/(stock_amt_last13m/13) else 0 end  turnover_times,
+        stock_amt,
+        sales_cost,
+        current_timestamp() as dw_last_update_date 
+ FROM t6
+ where stat_month >=substr(current_date - INTERVAL '3 days',1,7);
+
+ 
+
+ 
+ 
+ 

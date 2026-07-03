@@ -1,0 +1,244 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/11/22 16:30:34 GMT+08:00
+-- ******************************************************************** --
+with tmp as(
+select 
+	CHARG_SID
+	,mat_pspnr--已估价的销售订单库存工作分解结构要素
+    ,matnr--物料编码
+    ,werks--工厂
+    ,min(BUDAT) as BUDAT--过账日期 取第一个
+from sdi.sdi_MATDOC_1001 i
+where bwart IN ('415','411')--转入的项目库存，多批次取最后的时间 转入：'415','411' 转出：'601','652'
+and sobkz = 'Q'
+and DEL_FLAG = 'N'
+group by CHARG_SID,mat_pspnr,matnr,werks
+),
+yt_date as 
+(
+select vbeln,posnr,replace(date_sub(from_unixtime(unix_timestamp(min(createdate), 'yyyyMMdd'), 'yyyy-MM-dd'),1),'-','') as min_createdate
+from SDI.SDI_ZTCOSTBHLH_NEW_1001   -- 23年之前的表不读了
+where substr(createdate,1,6) <=  replace(substring(current_timestamp(),1,7),'-','')
+--and datatypetxt = '留货'
+group by vbeln,posnr
+)
+,trans_money as(
+select 
+	KURST,FCURR,TCURR,
+	99999999- gdatu  as start_time,
+	coalesce(LEAD(99999999- gdatu, 1) OVER (partition by KURST,FCURR,TCURR ORDER BY 99999999- gdatu),47121231) AS end_time,
+	UKURS 
+from sdi.SDI_TCURR_1001
+)
+,tem as 
+(
+SELECT 
+--SUM(COALESCE(A.SKU_CONFIRM_QTY,0)) SKU_CONFIRM_QTY -- VMENG
+	case when COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'Q_T163I' then COALESCE(A.SKU_CONFIRM_QTY,0) else 0 end as SKU_CONFIRM_QTY_PRO --项目留货数
+   ,case when (COALESCE(A.SUBJECT_DISTR_TYPE,'') = '' OR  (COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(A.REQ_TYPE,'') = '01'))
+	then COALESCE(A.SKU_CONFIRM_QTY,0) else 0 end as SKU_CONFIRM_QTY -- VMENG 留货数
+	,A.SKU_CONFIRM_QTY as TOTAL_SKU_CONFIRM_QTY
+    ,A.MATERIAL_ID
+	,A.MATERIAL_NUM
+    --,A.MATERIAL_NAME
+	,A.FACTORY_ID
+	,A.FACTORY_CODE
+	--,A.FACTORY_NAME
+	,A.INV_LOCATION -- LGORT
+	,A.BATCH_NUM -- CHARG
+	,A.SAL_VCH_NUM --销售凭证 VBELN
+	,A.SAL_VCH_ITEM_NUM --销售凭证项目 POSNR
+	,A.WBS_ELEMENT --WBS 要素 PSPEL
+	--,A.CUST_ID
+	,A.CUST_NUM--客户  CUSTOMER KUNNR
+	,qq5.cust_name	
+	,A.SUBJECT_DISTR_TYPE
+	,substring(A.avail_date,1,10) as res_stock_date
+	,qq5.vkorg AS SALES_ORG_CODE
+	,qq5.vtweg AS distribution_channel_code
+	,qq5.ernam as creator_id 
+	,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE 
+	,t3.lev1_name
+	,t3.lev2_name
+	,t3.lev3_name
+	,t3.lev4_name
+	,t3.lev5_name
+	,t3.lev6_name
+	,case when qq5.BSTDK<>'00000000' then concat(substr(qq5.BSTDK,1,4),'-',substr(qq5.BSTDK,5,2),'-',substr(qq5.BSTDK,7,2)) end  as require_date
+	,case when qq5.CNJQ<>'00000000' then concat(substr(qq5.CNJQ,1,4),'-',substr(qq5.CNJQ,5,2),'-',substr(qq5.CNJQ,7,2)) end   as promise_date
+	,qq5.erdat --as create_time 
+	,q2.BEGINKFDATE-- as order_sub_date--销售订单应提时间
+	,coalesce(q4.zzzjh,'') as pj_BSTDK
+	,coalesce(qq5.BSTDK,'') as rp_BSTDK 
+	,qq5.FIRST_CONFIRM_DATE as rp_FIRST_CONFIRM_DATE
+	,coalesce(qq5.kz_date,0) as rp_kz_date
+--	,tmp.BUDAT--留备货时间
+	,coalesce(q4.zzzjh,qq5.BSTDK) as user_delivery_date--q4是工程 q5用户需求交货时间
+	,q4.jjyy as pj_jjyy--拒绝原因
+	,qq5.vkgrp as sale_grp --线组
+	,if( coalesce(qq5.JHDDLX,'') <>'', qq5.JHDDLX, coalesce(q4.ddzt,'') ) as plan_order_type
+	,coalesce((qq5.NETWR+qq5.MWSBP)*tr.ukurs,qq5.NETWR+qq5.MWSBP)/ qq5.KWMENG  as unit_price
+	,zhr.nachn as creator_name
+    ,case 
+        when qq5.vtweg = '06' then 'GD03'
+        -- when  C.werks like '%80' and B.AUART = 'ZA02' then 'GD04' -- 取消特惠品渠道
+        when qq5.vtweg = '08' then 'GD02'
+        else 'GD01' end as zh_channel_code4
+    ,qq5.BSARK as BSARK--采购订单类型
+    ,q4.zjhd --二层WBS号
+    ,q4.zjhdid --三层WBS号
+    -- ,if(coalesce(B.SUBMI,'') <>'',B.SUBMI,q4.spjjyy) as pre_type
+    ,qq5.SUBMI as pre_type
+    ,qq5.VRKME  --单位
+    ,coalesce(qq5.VOLUM/qq5.KWMENG,q3.busi_volume) as unit_VOLUM -- 单位体积
+    ,t3.lev7_name
+    ,qq5.CZJHDH
+    ,qq5.is_xh
+FROM DWIOTD.DWI_SO_SAL_REQ_SAP_T A-- VBBE
+--LEFT JOIN SDI.sdi_vbak_1001 B ON A.sal_vch_num  = B.vbeln 
+left join DM.DM_OTD_SALES_ORDER_DET_T qq5 on A.sal_vch_num = qq5.vbeln and A.sal_vch_item_num = qq5.posnr
+--LEFT JOIN SDI.sdi_vbap_1001 C ON A.sal_vch_num  = C.vbeln and A.SAL_VCH_ITEM_NUM = C.posnr
+--LEFT JOIN SDI.sdi_vbkd_1001 D ON A.sal_vch_num  = D.vbeln and A.SAL_VCH_ITEM_NUM = D.posnr 
+--LEFT JOIN DWRDIM.dwr_dim_cust_general_d cust ON cust.cust_num =A.CUST_NUM  and cust.end_date ='4712-12-31'
+LEFT JOIN dm.dm_rpt_sale_grp_t t3 on qq5.vkgrp = t3.sale_grp
+left join 
+	(select vbeln,posnr,ETENR,BEGINKFDATE  as BEGINKFDATE,
+			ROW_NUMBER() OVER (partition by vbeln,posnr ORDER BY createdate DESC) as rk 
+			from sdi.sdi_ztcostbhlh_wyq_1001
+			--where datatype = 'LH'
+	) q2 
+	on A.sal_vch_num = q2.vbeln and A.sal_vch_item_num = q2.posnr  and q2.rk = 1
+left join dwimd.dwi_md_data_material_general_t q3 on A.material_num = q3.material_num
+left join dm.dm_otd_wbs_plan_order_det_t q4 on A.wbs_element = q4.pspnr
+--left join sdi.sdi_vbkd_1001  as q1 on  A.sal_vch_num = q1.VBELN and q1.POSNR = '000000'
+--left join sdi.sdi_ZTMM011_1001 m011 on m011.vbeln =  A.sal_vch_num and m011.mbdat = A.sal_vch_item_num
+left join trans_money  tr on qq5.waerk = tr.fcurr and tr.start_time <= cast(qq5.PRSDT as int) and cast(qq5.PRSDT as int) < tr.end_time and tr.tcurr = 'RMB'
+left join (select distinct pernr,nachn from sdi.sdi_pa0002_1001) zhr on zhr.pernr = qq5.ERNAM 
+WHERE COALESCE(A.SALES_DIS_VCH_TYPE,'') = 'C_VBTYPL'  -- VBTYP
+AND ( (COALESCE(A.SUBJECT_DISTR_TYPE,'') = '' OR 
+      (COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(A.REQ_TYPE,'') = '01'))  -- KNTTP  bdart
+    OR  COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'Q_T163I'
+    OR COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'E_T163I' )--项目留货数
+AND COALESCE(A.SKU_CONFIRM_QTY,0) > 0
+AND A.del_flag ='N'
+)
+
+insert overwrite table DWROTD.DWR_WM_STOCK_RES_FROM_SALES 
+select 
+--SUM(COALESCE(A.SKU_CONFIRM_QTY,0)) SKU_CONFIRM_QTY -- VMENG
+	te.SKU_CONFIRM_QTY_PRO --项目留货数
+    ,te.SKU_CONFIRM_QTY -- VMENG 留货数
+	,te.TOTAL_SKU_CONFIRM_QTY
+    ,te.MATERIAL_ID
+	,te.MATERIAL_NUM
+    --,A.MATERIAL_NAME
+	,te.FACTORY_ID
+	,te.FACTORY_CODE
+	--,A.FACTORY_NAME
+	,te.INV_LOCATION -- LGORT
+	,te.BATCH_NUM -- CHARG
+	,te.SAL_VCH_NUM --销售凭证 VBELN
+	,te.SAL_VCH_ITEM_NUM --销售凭证项目 POSNR
+	,te.WBS_ELEMENT --WBS 要素 PSPEL
+	--,A.CUST_ID
+	,te.CUST_NUM--客户  CUSTOMER KUNNR
+	,te.CUST_NAME	
+	,te.SUBJECT_DISTR_TYPE
+	,coalesce(from_unixtime(unix_timestamp(tmp.BUDAT, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date) as res_stock_date
+	,te.SALES_ORG_CODE
+	,te.distribution_channel_code
+	,te.creator_id 
+	,te.DW_LAST_UPDATE_DATE 
+	,te.lev1_name
+	,te.lev2_name
+	,te.lev3_name
+	,te.lev4_name
+	,te.lev5_name
+	,te.lev6_name
+	,te.require_date
+	,te.promise_date
+	,te.erdat as create_time  
+	,COALESCE(yd.min_createdate,te.BEGINKFDATE) as order_sub_date--销售订单应提时间
+	,case 
+	    when yd.min_createdate is not null then min_createdate
+	  	when te.BEGINKFDATE is not null then te.BEGINKFDATE --23年
+	     
+	  	when te.lev3_name in ('梦之家事业部','梦之家') then date_format(DATE_ADD(te.res_stock_date,90),'yyyyMMdd')   
+		--销售订单留备货中113*开头订单+订单来源LTC的，按照如下规则（项目库存）
+		when te.pj_jjyy = '' then date_format(date_add(from_unixtime(unix_timestamp(GREATEST(te.pj_BSTDK,coalesce(tmp.BUDAT,te.pj_BSTDK)), 'yyyyMMdd'), 'yyyy-MM-dd'),te.rp_kz_date),'yyyyMMdd')
+		when te.pj_jjyy <> '' then date_format(date_add(from_unixtime(unix_timestamp(coalesce(tmp.BUDAT,te.pj_BSTDK), 'yyyyMMdd'), 'yyyy-MM-dd'),te.rp_kz_date),'yyyyMMdd')
+        --when B.vtweg = '06' then date_format(date_add(from_unixtime(unix_timestamp( te.res_stock_date, 'yyyyMMdd'), 'yyyy-MM-dd'),60),'yyyyMMdd')
+		when te.is_xh ='是' then  date_format(DATE_ADD(te.res_stock_date,te.rp_kz_date),'yyyyMMdd')
+		when te.is_xh = '否'  then  date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),te.rp_kz_date),'yyyyMMdd')
+
+		-- 以下规则不生效
+		--经销/直营/国贸按照如下规则
+		when ( te.lev2_name in ('国际营销中心') or te.lev3_name in ('国际营销系统') or te.lev4_name in ('区域运营中心','直营经营管理板块','国内直营中心','工程市场中心')) and spc.payer_id is null then
+			case 
+				when te.BEGINKFDATE is not null then te.BEGINKFDATE --23年
+				when substring(te.erdat,1,4) <= 2022 and GREATEST(te.rp_BSTDK, te.rp_FIRST_CONFIRM_DATE) is not null --22年
+		        	then replace(DATE_ADD(from_unixtime(unix_timestamp(GREATEST(te.rp_BSTDK, te.rp_FIRST_CONFIRM_DATE), 'yyyyMMdd'), 'yyyy-MM-dd'), CAST(te.rp_kz_date AS INT)),'-','')
+		        --te.plan_order_type 计划订单类型 te.pre_type 备货类型 zoss.CZJHDH 参考计划单(zoss.CZJHDH is null or length(zoss.CZJHDH) <> 10)
+		        when te.plan_order_type = '' and te.pre_type in ('计划') then date_format(DATE_ADD(te.res_stock_date,60),'yyyyMMdd')
+		        when te.plan_order_type = '' and te.pre_type not in ('计划') then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单','门店装修计划订单') and te.pre_type in ('计划') then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),15),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单','门店装修计划订单') and length(te.CZJHDH)=10 then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单','门店装修计划订单') and (length(te.CZJHDH)<>10 or te.CZJHDH is null) then date_format(DATE_ADD(te.res_stock_date,15),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售销售订单','特惠品销售订单') then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd') 
+		        when te.plan_order_type in ('战略工程计划订单','单体工程批量销售订单','工程样板间销售订单','工程补货销售订单') and te.pre_type in ('计划') then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),60),'yyyyMMdd')
+				when te.plan_order_type in ('战略工程计划订单','单体工程批量销售订单','工程样板间销售订单','工程补货销售订单') and length(te.CZJHDH)=10  then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('战略工程计划订单','单体工程批量销售订单','工程样板间销售订单','工程补货销售订单') and (length(te.CZJHDH)<>10 or te.CZJHDH is null) then date_format(DATE_ADD(te.res_stock_date,60),'yyyyMMdd') 
+		        when te.plan_order_type like '%包销%' then date_format(DATE_ADD(te.res_stock_date,90),'yyyyMMdd')
+			end
+			
+		when ( te.lev2_name in ('国际营销中心') or te.lev3_name in ('国际营销系统') or te.lev4_name in ('区域运营中心','直营经营管理板块','国内直营中心','工程市场中心')) and spc.payer_id is not null then
+			case 
+				when te.BEGINKFDATE is not null then te.BEGINKFDATE --23年
+				when substring(te.erdat,1,4) <= 2022 and GREATEST(te.rp_BSTDK, te.rp_FIRST_CONFIRM_DATE) is not null --22年
+		        	then replace(DATE_ADD(from_unixtime(unix_timestamp(GREATEST(te.rp_BSTDK, te.rp_FIRST_CONFIRM_DATE), 'yyyyMMdd'), 'yyyy-MM-dd'), CAST(te.rp_kz_date AS INT)),'-','')
+		        --te.plan_order_type 计划订单类型 te.pre_type 备货类型 zoss.CZJHDH 参考计划单(zoss.CZJHDH is null or length(zoss.CZJHDH) <> 10)
+		        when te.plan_order_type = '' and te.pre_type in ('计划') then date_format(DATE_ADD(te.res_stock_date,60),'yyyyMMdd')
+		        when te.plan_order_type = '' and te.pre_type not in ('计划') then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单') and te.pre_type in ('计划') then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),15),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单') and length(te.CZJHDH)=10 then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售计划订单') and (length(te.CZJHDH)<>10 or te.CZJHDH is null) then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),15),'yyyyMMdd')
+		        when te.plan_order_type in ('优选团购订单','零售销售订单') then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd') 
+		        when te.plan_order_type in ('单体工程批量销售订单','工程样板间销售订单') and te.pre_type in ('计划') then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),60),'yyyyMMdd')
+				when te.plan_order_type in ('单体工程批量销售订单','工程样板间销售订单') and length(te.CZJHDH)=10  then date_format(DATE_ADD(te.res_stock_date,7),'yyyyMMdd')
+		        when te.plan_order_type in ('单体工程批量销售订单','工程样板间销售订单') and (length(te.CZJHDH)<>10 or te.CZJHDH is null) then date_format(DATE_ADD(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),60),'yyyyMMdd')  
+			end
+		when te.lev3_name in ('梦之家事业部','梦之家') then date_format(DATE_ADD(te.res_stock_date,90),'yyyyMMdd')   
+--		when substring(B.erdat,1,4) <= 2022 and GREATEST(q5.BSTDK, q5.FIRST_CONFIRM_DATE) is null
+--		        then date_format(A.avail_date,'yyyyMMdd') --没有拿到的，拿留货时间
+	end as acc_time_date--总应提时间
+	,tmp.BUDAT--留备货时间
+	,te.user_delivery_date
+	,te.pj_jjyy as project_jjyy--拒绝原因
+	,te.sale_grp --线组
+	,te.plan_order_type
+	,te.unit_price
+	,te.creator_name
+    ,te.zh_channel_code4
+    ,te.BSARK --采购订单类型
+    ,te.zjhd --二层WBS号
+    ,te.zjhdid --三层WBS号
+    ,te.pre_type
+    ,te.VRKME  --单位
+    ,te.unit_VOLUM -- 单位体积
+    ,te.lev7_name
+    ,case when te.pj_jjyy = '' then date_format(from_unixtime(unix_timestamp(GREATEST(te.pj_BSTDK,coalesce(tmp.BUDAT,te.pj_BSTDK)), 'yyyyMMdd'), 'yyyy-MM-dd'),'yyyyMMdd')
+		when te.pj_jjyy <> '' then date_format(from_unixtime(unix_timestamp(coalesce(tmp.BUDAT,te.pj_BSTDK), 'yyyyMMdd'), 'yyyy-MM-dd'),'yyyyMMdd')
+    
+		when te.is_xh ='是' then  date_format(te.res_stock_date,'yyyyMMdd')
+		when te.is_xh = '否'  then  date_format(GREATEST(te.res_stock_date,coalesce(from_unixtime(unix_timestamp(te.rp_BSTDK, 'yyyyMMdd'), 'yyyy-MM-dd'),te.res_stock_date)),'yyyyMMdd') --
+		end as cal_start_date  -- 留货开始计算日期
+from tem te
+left join tmp on te.material_num = tmp.matnr
+	and te.factory_code = tmp.werks
+	and te.wbs_element = tmp.mat_pspnr
+	and te.batch_num = tmp.CHARG_SID
+left join (select distinct payer_id from sdi.sdi_sd_forecast_special_custom_t_1037) spc on te.cust_num = spc.payer_id
+--left join sdi.sdi_zoss_so_ext_info_1001 zoss on zoss.vbeln = te.SAL_VCH_NUM and zoss.posnr = te.SAL_VCH_ITEM_NUM
+left join yt_date yd on te.SAL_VCH_NUM = yd.vbeln and te.SAL_VCH_ITEM_NUM = yd.posnr

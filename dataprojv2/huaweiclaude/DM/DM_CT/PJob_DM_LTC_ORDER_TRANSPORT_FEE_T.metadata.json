@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_ORDER_TRANSPORT_FEE_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

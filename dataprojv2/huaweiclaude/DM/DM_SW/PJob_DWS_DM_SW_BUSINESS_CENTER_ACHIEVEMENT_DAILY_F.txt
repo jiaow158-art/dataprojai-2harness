@@ -1,0 +1,459 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/04/16 14:19:23 GMT+08:00
+-- description: 卫浴日报的事实表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_sw_business_center_achievement_daily_f where calday=to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd');
+with emp_num_list as 
+	(
+	select 
+		sales_org_code
+		,cust_num
+		,distribution_chnl_code
+		,STRING_AGG(distinct emp_num, ', ' ORDER BY emp_num) emp_num
+		,STRING_AGG(distinct employee_name, ', ' ORDER BY employee_name) employee_name
+	from dwrdim.dwr_dim_cust_partner_d
+	where 1 = 1
+	 and partner_func_code= 'VE' 
+	and substr(end_date,1,10) = '4712-12-31'
+	group by 
+	sales_org_code
+	,cust_num
+	,distribution_chnl_code
+	),
+	wbs_info as (
+     select wbs_top_level,wbs_top_level_desc,sales_emp,sales_emp_name,max(sales_grp) as sales_grp from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F z 
+     group by wbs_top_level,wbs_top_level_desc,sales_emp,sales_emp_name
+     ),
+     parent_cust_info as (
+     select case when length("ACCOUNT_NUMBER")=6 then '0000'||"ACCOUNT_NUMBER" else  "ACCOUNT_NUMBER" end as "ACCOUNT_NUMBER" ,"SALES_CHANNEL_CODE",max("ACCOUNT_GROUP_CODE") as "ACCOUNT_GROUP_CODE" from 
+      dm.dm_rpt_zmaster_cus_t
+     where "SALES_ORGANIZATION_CODE" like '3%'
+     group by "ACCOUNT_NUMBER","SALES_CHANNEL_CODE"
+     ),
+     data as (
+    --      --营销中心
+    --      select case when b.node_name5 in ('H05230627', 'H05230628', 'H05230629', 'H05230630','H05250102')  then b.node_desc5  
+    --                  when bb.node_name5 in ('H05230627', 'H05230628', 'H05230629', 'H05230630','H05250102') then bb.node_desc5 end as region,
+    --             case
+    --                 when z."ACCOUNT_GROUP_CODE" in ('A0', 'A1' ) then '直营KA'
+    --                 when (z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A4','A6') or (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'A6'))
+    --                     then '工程经销商'
+    --                 when (z."ACCOUNT_GROUP_CODE" in ( 'B0') OR (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'B0'))
+    --                     then '运营中心'
+    --                     end                                                                   business_type,
+    --             sum(case
+    --                     when calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_day,
+    --             sum(case
+    --                     when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+    --                         and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_month,
+    --             sum(case
+    --                     when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+    --                         and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_year,
+    --             sum(case
+    --                     when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM') and
+    --                          (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_last_year_month,
+    --             sum(case
+    --                     when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_last_year_month_zy,
+    --             sum(case
+    --                     when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+    --                         and (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_last_year,
+    --             sum(case
+    --                     when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+    --                         then ambperformance
+    --                     else 0 end) /
+    --             10000                                                                                      achievement_last_year_zn,
+    --             0                                                                                          no_tax_month,
+    --             0                                                                                          no_tax_year,
+    --             0                                                                                          sales_cost_month,
+    --             0                                                                                          sales_cost_year
+    --             , customer, z."NAME"  as customer___t, a.wbs_elemt, a.wbs_elemt___t
+    --             ,COALESCE(zz.sales_emp,dimpar.emp_num) as sales_emp
+    --             ,case
+    --                 when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+    --                 when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+    --                 when z."ACCOUNT_GROUP_CODE" in ('A0') then null end as REGION_PROVINCE_NAME
+    --             ,COALESCE(zz.sales_emp_name,dimpar.employee_name) as sales_emp_name
+    --             ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name) as project_name
+    --             ,a.distr_chan as channel_code
+    --      from dm.dm_ambv2_zzt_xssr_t a
+    --               left join dm.dm_rpt_zmaster_cus_t z
+    --                         on a.customer = z."ACCOUNT_NUMBER"
+    --                             and a.distr_chan = z."SALES_CHANNEL_CODE"
+    --                             and a.salesorg = z."SALES_ORGANIZATION_CODE"
+    --                             and z."PARVW" = 'AG'
+    --               left join parent_cust_info pz on case when length(z."PARENT_ACCNT_NUMBER")=6 then '0000'||z."PARENT_ACCNT_NUMBER" else  z."PARENT_ACCNT_NUMBER" end  =  pz."ACCOUNT_NUMBER" and z."SALES_CHANNEL_CODE" = pz."SALES_CHANNEL_CODE"
+    --               left join wbs_info zz
+    --                         on substr(a.wbs_elemt,1,10) = zz.wbs_top_level and a.wbs_elemt  is not null and zz.sales_grp is not null 
+    --               left join dm.dm_rpt_sales_group_t b on case
+    --                                                          when a.data_source in ('S', 'T')
+    --                                                              then COALESCE(
+    --                                                                  COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+    --                                                                  a.sales_grp)
+    --                                                          else a.sales_grp
+    --                                                          end = b.node_name9
+    --               left join dm.dm_rpt_sales_group_t bb on case
+    --                                                          when a.data_source in ('S', 'T')
+    --                                                              then COALESCE(z."SALES_GROUP_CODE",a.sales_grp)
+    --                                                          else a.sales_grp
+    --                                                          end = bb.node_name9 and a.wbs_elemt  is  null
+    --               left join emp_num_list dimpar on a.salesorg = dimpar.sales_org_code and a.customer = dimpar.cust_num and a.distr_chan = dimpar.distribution_chnl_code
+				--   left join dwrdim.dwr_dim_cust_general_d dimcust on a.customer = dimcust.cust_num and substr(dimcust.end_date,1,10) = '4712-12-31'
+    --      where b.node_name4 in ('H03230643')
+    --       and COALESCE(trading_mode,'NAL') not in ('B','C')
+    --       and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+    --       and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+    --      group by region, business_type
+    --         ,customer, z."NAME" , a.wbs_elemt, a.wbs_elemt___t
+    --         ,COALESCE(zz.sales_emp,dimpar.emp_num)
+    --         ,case
+    --             when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+    --             when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+    --             when z."ACCOUNT_GROUP_CODE" in ('A0') then null end
+    --         ,COALESCE(zz.sales_emp_name,dimpar.employee_name)
+    --         ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name)
+    --         ,a.distr_chan
+         
+    --         union all
+         ------------商用中心
+         select case when b.node_name5 in ('H05230627', 'H05230628', 'H05230629', 'H05230630','H05250102')  then b.node_desc5  
+                     when bb.node_name5 in ('H05230627', 'H05230628', 'H05230629', 'H05230630','H05250102') then bb.node_desc5 end     as    region,
+                case
+                    when z."ACCOUNT_GROUP_CODE" in ('A0', 'A1' ) then '直营KA'
+                    when (z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A4','A6') or (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'A6'))
+                        then '工程经销商'
+                    when (z."ACCOUNT_GROUP_CODE" in ( 'B0') OR (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'B0'))
+                        then '运营中心'
+                        end                                                                            business_type,
+                sum(case
+                        when calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_day,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_month,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_year,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM') and
+                             (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_month,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_month_zy,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year,
+                sum(case
+                         when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_zn,
+                0                           no_tax_month,
+                0                           no_tax_year,
+                0                           sales_cost_month,
+                0                           sales_cost_year
+                ,customer, z."NAME"  as customer___t, a.wbs_elemt, a.wbs_elemt___t
+                ,COALESCE(zz.sales_emp,dimpar.emp_num) as sales_emp
+                ,case
+                    when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+                    when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+                    when z."ACCOUNT_GROUP_CODE" in ('A0') then null end as REGION_PROVINCE_NAME
+                ,COALESCE(zz.sales_emp_name,dimpar.employee_name) as sales_emp_name
+                ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name) as project_name
+                ,a.distr_chan as channel_code
+         from dm.dm_ambv2_zzt_xssr_t a
+                  left join dm.dm_rpt_zmaster_cus_t z
+                            on a.customer = z."ACCOUNT_NUMBER"
+                                and a.distr_chan = z."SALES_CHANNEL_CODE"
+                                and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                                and z."PARVW" = 'AG'
+                  left join parent_cust_info pz on case when length(z."PARENT_ACCNT_NUMBER")=6 then '0000'||z."PARENT_ACCNT_NUMBER" else  z."PARENT_ACCNT_NUMBER" end  =  pz."ACCOUNT_NUMBER" and z."SALES_CHANNEL_CODE" = pz."SALES_CHANNEL_CODE"
+                  left join wbs_info zz
+                            on  substr(a.wbs_elemt,1,10) = zz.wbs_top_level and a.wbs_elemt  is not null and zz.sales_grp is not null 
+                  left join dm.dm_rpt_sales_group_t b on case
+                                                             when a.data_source in ('S', 'T')
+                                                                 then COALESCE(
+                                                                     COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                                     a.sales_grp)
+                                                             else a.sales_grp
+                                                             end = b.node_name9
+                  left join dm.dm_rpt_sales_group_t bb on case
+                                                             when a.data_source in ('S', 'T')
+                                                                 then COALESCE(z."SALES_GROUP_CODE",a.sales_grp)
+                                                             else a.sales_grp
+                                                             end = bb.node_name9 and a.wbs_elemt  is  null
+                  
+				  left join emp_num_list dimpar on a.salesorg = dimpar.sales_org_code and a.customer = dimpar.cust_num and a.distr_chan = dimpar.distribution_chnl_code
+				  left join dwrdim.dwr_dim_cust_general_d dimcust on a.customer = dimcust.cust_num and substr(dimcust.end_date,1,10) = '4712-12-31'
+         where b.node_name4 in ('H03230613')
+           and COALESCE(trading_mode,'NAL') not in ('B','C')
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+           and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by region, business_type
+            ,customer, z."NAME" , a.wbs_elemt, a.wbs_elemt___t
+            ,COALESCE(zz.sales_emp,dimpar.emp_num)
+            ,case
+                when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+                when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+                when z."ACCOUNT_GROUP_CODE" in ('A0') then null end
+            ,COALESCE(zz.sales_emp_name,dimpar.employee_name)
+            ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name)
+            ,a.distr_chan
+         union all
+         --1+N
+         select '1+N'                       region,
+                '1+N'                       business_type,
+                sum(case
+                        when calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_day,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_month,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_year,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM') and
+                             (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_month,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_month_zy,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and (calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd'))
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            then ambperformance
+                        else 0 end) / 10000 achievement_last_year_zn,
+                0                           no_tax_month,
+                0                           no_tax_year,
+                0                           sales_cost_month,
+                0                           sales_cost_year
+                ,customer, z."NAME"  as customer___t, a.wbs_elemt, a.wbs_elemt___t
+                ,COALESCE(zz.sales_emp,dimpar.emp_num) as sales_emp
+                ,case
+                    when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+                    when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+                    when z."ACCOUNT_GROUP_CODE" in ('A0') then null end as REGION_PROVINCE_NAME
+                ,COALESCE(zz.sales_emp_name,dimpar.employee_name) as sales_emp_name
+                ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name) as project_name
+                ,a.distr_chan
+         from dm.dm_ambv2_zzt_xssr_t a
+                  left join dm.dm_rpt_zmaster_cus_t z
+                            on a.customer = z."ACCOUNT_NUMBER"
+                                and a.distr_chan = z."SALES_CHANNEL_CODE"
+                                and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                                and z."PARVW" = 'AG'
+               
+                  left join wbs_info zz
+                            on  substr(a.wbs_elemt,1,10) = zz.wbs_top_level and a.wbs_elemt  is not null and zz.sales_grp is not null 
+                  left join dm.dm_rpt_sales_group_t b on case
+                                                             when a.data_source in ('S', 'T')
+                                                                 then COALESCE(
+                                                                     COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                                     a.sales_grp)
+                                                             else a.sales_grp
+                                                             end = b.node_name9
+                  
+				  left join emp_num_list dimpar on a.salesorg = dimpar.sales_org_code and a.customer = dimpar.cust_num and a.distr_chan = dimpar.distribution_chnl_code
+				  left join dwrdim.dwr_dim_cust_general_d dimcust on a.customer = dimcust.cust_num and substr(dimcust.end_date,1,10) = '4712-12-31'
+         where  node_name4 in ('H03230613')
+        --   and distr_chan = '03'
+           and COALESCE(trading_mode,'NAL') in ('B','C')
+           and node_name2 = 'H11000002'
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+           and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by region, business_type
+            ,customer, z."NAME" , a.wbs_elemt, a.wbs_elemt___t
+            ,COALESCE(zz.sales_emp,dimpar.emp_num)
+            ,case
+                when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+                when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+                when z."ACCOUNT_GROUP_CODE" in ('A0') then null end
+            ,COALESCE(zz.sales_emp_name,dimpar.employee_name)
+            ,COALESCE(zz.wbs_top_level_desc,dimcust.cust_name)
+            ,a.distr_chan
+     )
+    
+    ,data2 as ( --20250428新增未清
+    select 
+        case when b.node_name5 in ('H05230627', 'H05230628', 'H05230629', 'H05230630','H05250102') then b.node_desc5 end as region,
+        case when z."ACCOUNT_GROUP_CODE" in ('A0', 'A1' ) then '直营KA'
+	        when (z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A4','A6') or (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'A6'))
+	            then '工程经销商'
+	        when (z."ACCOUNT_GROUP_CODE" in ( 'B0') OR (z."ACCOUNT_GROUP_CODE"='A7' and coalesce(z."PARENT_ACCNT_NUMBER",' ') =' ' or pz."ACCOUNT_GROUP_CODE"= 'B0'))
+	            then '运营中心' end    as business_type,
+        0 as achievement_day,
+        0 as achievement_month,
+        0 as achievement_year,
+        0 as achievement_last_year_month,
+        0 as achievement_last_year,
+        0 as no_tax_month,
+        0 as no_tax_year,
+        0 as sales_cost_month,
+        0 as sales_cost_year,
+        a.cust_num as customer,
+        a.cust_name as customer___t,
+        null as wbs_elemt,
+        null as wbs_elemt___t,
+        COALESCE(wbs.sales_emp,a.salesman_num) as sales_emp,
+        case
+            when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+            when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+            when z."ACCOUNT_GROUP_CODE" in ('A0') then null end as REGION_PROVINCE_NAME,
+        0 as achievement_last_year_month_zy,
+        0 as achievement_last_year_zn,
+        COALESCE(wbs.sales_emp_name,a.salesman_name) as sales_emp_name,
+        null as project_name,
+	   -- sum(coalesce(order_qty,0) - coalesce(res_stock_qty,0)) as no_deliver_qty,--未留货数量
+	    sum((coalesce(order_qty,0) - coalesce(res_stock_qty,0))*(total_amt/order_qty))/10000 as no_deliver_amt,--未留货金额
+	   -- sum(res_stock_qty - prepare_stock_qty) as res_res_stock_qty,--剩余留货数量
+	    sum((res_stock_qty - prepare_stock_qty)*(total_amt/order_qty))/10000 as res_res_stock_amt,--剩余留货金额
+	   -- sum(prepare_stock_qty - stockout_qty) as res_prepare_stock_qty,--已生成提单未提货数量
+	    sum((prepare_stock_qty - stockout_qty)*(total_amt/order_qty))/10000 as res_prepare_stock_amt --已生成提单未提货金额
+	   -- sum(stockout_qty) as stockout_qty,--交货数量（已生成提单已提货）
+	   -- sum((prepare_stock_qty - stockout_qty)*(total_amt/order_qty))/10000 as stockout_amt--已生成提单已提货金额
+	   ,a.channel_code
+	from  dm_sw.dm_otd_sales_order_det_sw a
+	left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F aa on a.wbs_id = aa.pspnr --
+	left join dm.dm_rpt_sales_group_t b on COALESCE(aa.sales_grp,a.sale_grp) = b.node_name9 
+	left join dm.dm_rpt_zmaster_cus_t z
+                            on a.cust_num = z."ACCOUNT_NUMBER"
+                                and a.channel_code = z."SALES_CHANNEL_CODE"
+                                and a.sales_org_code = z."SALES_ORGANIZATION_CODE"
+                                and z."PARVW" = 'AG'
+    left join parent_cust_info pz on case when length(z."PARENT_ACCNT_NUMBER")=6 then '0000'||z."PARENT_ACCNT_NUMBER" else  z."PARENT_ACCNT_NUMBER" end  =  pz."ACCOUNT_NUMBER" 
+    	and z."SALES_CHANNEL_CODE" = pz."SALES_CHANNEL_CODE"
+    left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbs on a.wbs_id = wbs.pspnr
+	left join dwrdim.dwr_dim_cust_general_d dimcust on a.cust_num = dimcust.cust_num and substr(dimcust.end_date,1,10) = '4712-12-31'
+	where order_qty > stockout_qty 
+-- 	and res_stock_qty > 0--确认数量
+	and a.order_date >= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '12 month', 1, 10)
+	and cancal_code is null
+	and channel_code = '06'
+    and node_name2 = 'H11000001'
+	and (bukrs_vf like '3%' OR bukrs_vf in ('1000','7900','8100','8200','8300','8500','8800','8A00','2100','7A00'))
+	group by 
+		region,
+		business_type,
+		a.cust_num,
+		a.cust_name,
+		COALESCE(wbs.sales_emp,a.salesman_num),
+	    COALESCE(wbs.sales_emp_name,a.salesman_name),
+	    case
+            when z."ACCOUNT_GROUP_CODE" in ('A2', 'A3','A6', 'A7', 'B0') then dimcust.REGION_PROVINCE_NAME
+            when z."ACCOUNT_GROUP_CODE" in ('A4') then '直营单体'
+            when z."ACCOUNT_GROUP_CODE" in ('A0') then null end,
+        a.channel_code
+	        
+    union all 
+    select 
+        region,
+        business_type,
+        achievement_day,
+        achievement_month,
+        achievement_year,
+        achievement_last_year_month,
+        achievement_last_year,
+        no_tax_month,
+        no_tax_year,
+        sales_cost_month,
+        sales_cost_year,
+        customer,
+        customer___t,
+        wbs_elemt,
+        wbs_elemt___t,
+        sales_emp,
+        REGION_PROVINCE_NAME,
+        achievement_last_year_month_zy,
+        achievement_last_year_zn,
+        sales_emp_name,
+        project_name,
+        0 as no_deliver_amt,
+        0 as res_res_stock_amt,
+        0 as res_prepare_stock_amt,
+        channel_code
+    From data
+)
+    insert into dm.dm_sw_business_center_achievement_daily_f
+    select
+        region,
+        business_type,
+        sum(achievement_day) as achievement_day,
+        sum(achievement_month) as achievement_month,
+        sum(achievement_year) as achievement_year,
+        sum(achievement_last_year_month) as achievement_last_year_month,
+        sum(achievement_last_year) as achievement_last_year,
+        sum(no_tax_month) as no_tax_month,
+        sum(no_tax_year) as no_tax_year,
+        sum(sales_cost_month) as sales_cost_month,
+        sum(sales_cost_year) as sales_cost_year,
+        to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd') as calday,
+        current_timestamp() as dw_last_update_date,
+        customer,
+        customer___t,
+        wbs_elemt,
+        wbs_elemt___t,
+        sales_emp,
+        REGION_PROVINCE_NAME,
+        sum(achievement_last_year_month_zy) as achievement_last_year_month_zy,
+        sum( achievement_last_year_zn) as achievement_last_year_zn,
+        sales_emp_name,
+        project_name,
+        sum(no_deliver_amt) as no_deliver_amt,
+        sum(res_res_stock_amt) as res_res_stock_amt,
+        sum(res_prepare_stock_amt) as res_prepare_stock_amt,
+        channel_code
+    from data2
+    group by 
+        region,
+        business_type,
+        customer,
+        customer___t,
+        wbs_elemt,
+        wbs_elemt___t,
+        sales_emp,
+        REGION_PROVINCE_NAME,
+        sales_emp_name,
+        project_name,
+        channel_code

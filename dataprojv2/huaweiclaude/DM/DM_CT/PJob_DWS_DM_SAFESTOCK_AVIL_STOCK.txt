@@ -1,0 +1,31 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/24 13:46:22 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from   dm.dm_safestock_avil_stock ;   
+insert into dm.dm_safestock_avil_stock
+with batch_prod_area as(
+select batch_start,max(product_area_code) product_area_code, 
+       case  max(product_area_code) when 'GD' then '华南'
+                                     when 'SD' then '华北'
+                                      when 'SX' then '西北'
+                                       when 'HN' then '华中'
+                                        when 'JX' then '华东'
+                                         when 'XN' then '西南' end  as prod_area
+from dwrdim.dwr_dim_product_area_d 
+group by  batch_start 
+)
+select material_num ,coalesce(t2.prod_area,t3.prod_area) as prod_area , sum(t.available_inventory_quantity) as available_inventory_quantity
+from dm.dm_wm_all_type_stock_t t      
+left join batch_prod_area t2  on substr(t.batch_num,1,3) =  t2.batch_start 
+left join batch_prod_area t3  on substr(t.batch_num,1,2) =  t3.batch_start 
+where t.inv_location   not in ('BC','GFZ','7F21')
+and  t.inv_location not like '00%'
+and t.factory_werks_code   not like '%80'
+and t.batch_num   not like '%7' 
+and t.batch_num   not like '%9'
+group by material_num ,coalesce(t2.prod_area,t3.prod_area) ;

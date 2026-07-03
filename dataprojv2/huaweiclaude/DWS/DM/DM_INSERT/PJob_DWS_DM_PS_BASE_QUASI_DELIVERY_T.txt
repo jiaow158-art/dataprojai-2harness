@@ -1,0 +1,87 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/31 19:00:35 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_PS_BASE_QUASI_DELIVERY_T;
+INSERT INTO DM.DM_PS_BASE_QUASI_DELIVERY_T(id
+,plan_no
+,product_order_code
+,item_code
+,item_specification_model
+,item_product_property
+,resource_name
+,base
+,require_delivery
+,promise_delivery
+,start_time
+,end_time
+,release_start_time
+,status
+,plan_amount
+,plan_area
+,base_delivery_date
+,reply_delivery
+,zjhs_time
+,finished_amount
+,finished_area
+,clearance_within_time1
+,ontime_quality1_1
+,ontime_area1_1
+,submitted_quantity1
+,submitted_area1
+,submitted_area_rate1
+,sku_delivered1
+,clearance_within_time2
+,ontime_quality2_2
+,ontime_area2_2
+,submitted_quantity2
+,submitted_area2
+,submitted_area_rate2
+,sku_delivered2
+,gd_type
+,dw_last_update_date
+,stat_month
+,CATEGORY
+)
+SELECT
+ id
+,plan_no
+,product_order_code
+,item_code
+,item_specification_model
+,item_product_property
+,resource_name
+,base
+,require_delivery
+,promise_delivery
+,start_time
+,end_time
+,release_start_time
+,status
+,plan_amount
+,plan_area
+,base_delivery_date
+,reply_delivery
+,zjhs_time
+,finished_amount
+,finished_area
+,clearance_within_time1
+,ontime_quality1_1
+,ontime_area1_1
+,submitted_quantity1
+,submitted_area1
+,submitted_area_rate1
+,sku_delivered1
+,clearance_within_time2
+,ontime_quality2_2
+,ontime_area2_2
+,submitted_quantity2
+,submitted_area2
+,submitted_area_rate2
+,sku_delivered2
+,gd_type
+,dw_last_update_date
+,stat_month
+,CATEGORY
+FROM DM.DM_PS_BASE_QUASI_DELIVERY_TMP;

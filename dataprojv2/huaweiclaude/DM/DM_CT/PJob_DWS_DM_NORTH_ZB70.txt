@@ -1,0 +1,76 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 14:53:41 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--共享仓辐射中小经销商收入同比增长率ZB70
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}'  
+and zb_code ='ZB70';
+with AMT as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB70' as  zb_code,
+       case
+           when sum(last_year_month_achievement) = 0 then 0
+           else (sum(month_achievement) -
+                 sum(last_year_month_achievement)) / sum(last_year_month_achievement) end as CM_STAT_AMT,
+       case
+           when sum(last_year_achievement) = 0 then 0
+           else (sum(year_achievement) -
+                 sum(last_year_achievement)) / sum(last_year_achievement) end as ACC_STAT_AMT,
+       case
+           when sum(last_year_quarter_achievement) = 0 then 0
+           else (sum(quarter_achievement) -
+                 sum(last_year_quarter_achievement)) / sum(last_year_quarter_achievement) end  as QTR_TGT_AMT
+from dm.ct_sales_performance_daily_t a
+         join upload.UPLOAD_CT_SHARE_CUSTOMER_REL_1037 c on a.customer = lpad(c.customer_code, 10, '0')
+
+where level2_code = 'H03230618'
+  and integrate_channel_code = 'GD01'
+  and c.is_small_and_medium = '是'
+  and double_count = 0
+  and customer_end_date = '99991231'
+  and   concat(substring(a.calday,1,4),'-',substring(a.calday,5,2),'-',substring(a.calday,7,2)) = case when SUBSTRING('${PERIOD_ID_M}' ,1,7) = substring(current_date,1,7)  
+  then substring(current_date- INTERVAL '1 day',1,10) 
+  else SUBSTR(to_date(concat(SUBSTRING ('${PERIOD_ID_M}' ,1,7) ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day'), 1, 10)  end  
+
+
+
+  )
+  
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+
+
+

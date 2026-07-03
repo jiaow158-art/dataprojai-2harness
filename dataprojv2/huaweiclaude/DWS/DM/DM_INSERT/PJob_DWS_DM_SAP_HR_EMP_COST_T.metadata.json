@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_SAP_HR_EMP_COST_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

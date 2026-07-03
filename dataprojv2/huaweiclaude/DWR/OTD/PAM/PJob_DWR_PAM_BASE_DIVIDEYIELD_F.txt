@@ -1,0 +1,379 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/06/26 14:34:16 GMT+08:00
+-- description:瓷砖各基地分级产量明细表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from zhz 20240710 修改湖南产量升降记录逻辑
+-- update from zhz 20240710 修改湖南优等、一级升降记录逻辑 
+-- update from zhz 20240719 alter table DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F add columns (unit_weight numeric(38, 10) COMMENT '单位重量') cascade 新增单位重量字段
+-- update from zhz 20240724 修改重庆升降级优等品数量逻辑
+-- update from zhz 20241129 alter table DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F add columns (batch_num string COMMENT '批次号') cascade  新增批次字段
+-- update from zhz 20241218 alter table DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F add columns (SHIFT_CODE string COMMENT '班次代码') cascade;新增班次代码
+--                          alter table DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F add columns (GROUP_CODE string COMMENT '班组代码') cascade;新增班组代码
+-- ******************************************************************** --
+
+-- 瓷砖各基地分级产量明细表
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+WITH CQ_DETAIL_DATA01 AS(  -- 重庆明细数据
+	SELECT
+	    SITE,
+	    DELETE_FLAG,
+	    PRODUCT_LINE,
+	    PRODUCT_LINE_NAME PRODUCT_LINE_DESC,
+	    SHIFT_DATE,
+	    PRODUCT_NO,
+	    PRODUCT_MODEL,
+	    SUPERIOR_NUM,
+	    FIRST_RATE_NUM,
+	    SUBSTANDARD_NUM,
+	    WASTE_NUM,
+	    SUPERIOR_NUM + FIRST_RATE_NUM AS NUMBER_QTY,
+	    '分级记录' FORM ,
+	    BATCH AS BATCH_NUM,
+	    SHIFT AS SHIFT_CODE,
+	    TEAM AS GROUP_CODE
+	FROM SDI.SDI_D_GRADE_RECORD_DETAILED_1006 --分级记录明细表（1800）
+	WHERE DELETE_FLAG= 1 
+	AND SITE = '1800'   -- 重庆
+	AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+	UNION ALL
+	SELECT
+	    SITE,
+	    DELETE_FLAG,
+	    RESERVE2 PRODUCT_LINE,
+	    RESERVE1 PRODUCT_LINE_DESC,
+	    DUTY_DATE SHIFT_DATE,
+	    MATERIEL_CODE PRODUCT_NO,
+	    PRODUCT_SPECIFICATIONS PRODUCT_MODEL,
+	    case when ORIGINAL_LEVEL = '优等' then NVL(EXCELLENT_NUM, 0) - NVL(ADJUSTED_NUM,0)
+             else NVL(EXCELLENT_NUM, 0) end as SUPERIOR_NUM,
+	    case when ORIGINAL_LEVEL = '一级' then NVL(FIRST_CLASS_NUM, 0) - NVL(ADJUSTED_NUM,0)
+             else NVL(FIRST_CLASS_NUM, 0) end AS FIRST_RATE_NUM,
+	    case when ORIGINAL_LEVEL = '次品' then NVL(SUBSTANDARD_NUM, 0) - NVL(ADJUSTED_NUM,0)
+             else NVL(SUBSTANDARD_NUM, 0) end  AS SUBSTANDARD_NUM,
+	    case when ORIGINAL_LEVEL = '废品' then NVL(WASTE_NUM, 0) - NVL(ADJUSTED_NUM,0)
+             else NVL(WASTE_NUM, 0) END AS WASTE_NUM,
+	    CASE WHEN ORIGINAL_LEVEL IN ('优等', '一级') THEN NVL( EXCELLENT_NUM, 0 ) + NVL( FIRST_CLASS_NUM, 0 ) - NVL(ADJUSTED_NUM,0)
+	         ELSE NVL( EXCELLENT_NUM, 0 ) + NVL( FIRST_CLASS_NUM, 0 ) END AS NUMBER_QTY,
+	    '产品升降单' FORM,
+	    '' AS BATCH_NUM,
+	    '' AS SHIFT_CODE,
+	    TEAM AS GROUP_CODE
+	FROM SDI.SDI_D_PRODUCT_LIFT_1006 -- 产品升降级记录表（1800）
+	WHERE  delete_flag = 1
+	and site = '1800' -- 重庆
+	AND DUTY_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+),
+CQ_DETAIL_DATA02 AS(
+	SELECT  SITE,
+		    PRODUCT_LINE,
+		    PRODUCT_LINE_DESC,
+		    SHIFT_DATE,
+		    PRODUCT_MODEL,
+		    PRODUCT_NO,
+		    BATCH_NUM,
+		    SHIFT_CODE,
+		    GROUP_CODE,
+		    FORM,
+		    SUM(SUPERIOR_NUM) AS SUPERIOR_NUM, -- 优等
+		    SUM(FIRST_RATE_NUM) AS FIRST_RATE_NUM, -- 一级
+		    SUM(SUBSTANDARD_NUM) AS SUBSTANDARD_NUM, -- 次品
+		    SUM(WASTE_NUM) AS WASTE_NUM, -- 废品
+		    SUM(NUMBER_QTY) AS PRONUM -- 产量
+	FROM CQ_DETAIL_DATA01
+	GROUP BY SITE,
+		     PRODUCT_LINE,
+		     PRODUCT_LINE_DESC,
+		     SHIFT_DATE,
+		     PRODUCT_MODEL,
+		     PRODUCT_NO,
+		     BATCH_NUM,
+		     SHIFT_CODE,
+		     GROUP_CODE,
+		     FORM
+),
+HN_DETAIL_DATA01 AS(  -- 湖南明细数据
+	-- 分级产量（优+一）：分级车间产品下线单记录表 + 湖南产品升降级记录明细表 - 产品破损情况登记表
+	SELECT SITE,
+	       PRODUCT_LINE,
+	       PRODUCT_LINE_DESC,
+	       SHIFT_DATE,
+	       PRODUCT_SPECIFICATION AS AREA,
+	       product_code AS MATERIAL_CODE,
+	       '' AS BATCH_NUM,
+	       SHIFT_CODE,
+	       GROUP_CODE,
+	       '' as FORM,
+	       NVL(SUPERIOR_TOTAL,0) + NVL(STAIR_TOTAL, 0) PRONUM,  --优+一
+	       NVL(SUPERIOR_TOTAL,0)  AS FIRST_rate_qty, -- 优等
+	       NVL(STAIR_TOTAL, 0) AS one_grade_qty, -- 一级
+	       NVL(inferior_quality_product_total,0) AS SECOND_qty, -- 次品数
+	       NVL(waste_total,0) AS waste_qty -- 废品
+	FROM SDI.SDI_DH_PRODUCT_ONLINE_LIST_1006 -- 分级车间产品下线单记录表（1600）
+	WHERE DELETE_FLAG = 1 
+	AND SITE = '1600'  -- 澧县新鹏
+	AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD	
+	UNION ALL
+	SELECT  T1.site,  
+		    T1.product_line, 
+		    T1.product_line_desc ,
+		    T1.shift_date,  
+		    T1.product_specification AS AREA,  
+		    T1.product_code AS MATERIAL_CODE,  
+		    T1.BATCH AS BATCH_NUM,
+		    T1.SHIFT_CODE,
+		    T1.GROUP_CODE,
+		    '' as FORM,
+		    CASE WHEN T1.original_level IN ('优等','一级') and T1.adjusted_level NOT IN ('优等','一级') THEN - adjusted_num 
+	        	 WHEN T1.original_level NOT IN ('优等','一级') and T1.adjusted_level IN ('优等','一级') THEN adjusted_num 
+	         ELSE 0 END AS PRONUM,  --优+一
+	         CASE WHEN T1.original_level IN ('优等') and T1.adjusted_level NOT IN ('优等') THEN - adjusted_num 
+	        	 WHEN T1.original_level NOT IN ('优等') and T1.adjusted_level IN ('优等') THEN adjusted_num 
+	         ELSE 0 END AS FIRST_rate_qty, -- 优等
+		     CASE WHEN T1.original_level IN ('一级') and T1.adjusted_level NOT IN ('一级') THEN - adjusted_num 
+	        	 WHEN T1.original_level NOT IN ('一级') and T1.adjusted_level IN ('一级') THEN adjusted_num 
+	         ELSE 0 END AS one_grade_qty, -- 一级
+		    0 AS SECOND_qty, -- 次品数
+		    0 AS waste_qty -- 废品
+	FROM SDI.SDI_dh_product_lift_1006 T1-- 湖南产品升降级记录明细表
+	WHERE T1.delete_flag = 1
+	AND T1.site = '1600'  -- 澧县新鹏
+	AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD	
+	UNION ALL
+	--破损情况表
+	SELECT  site,
+	        product_line,
+	        product_line_desc ,
+	        shift_date,
+	        product_specification AS AREA,
+	        product_code AS MATERIAL_CODE,
+	        BATCH AS BATCH_NUM,
+	        SHIFT_CODE,
+	        GROUP_CODE,
+	        '' as FORM,
+	        - product_num AS PRONUM,  --优+一
+	        CASE WHEN grade_before_damage IN ('优等')
+                 AND grade_after_damage NOT IN ('优等') THEN - product_num
+                ELSE 0 END AS FIRST_rate_qty, -- 优等
+		    CASE WHEN (grade_before_damage IN ('一级')
+                 AND grade_after_damage NOT IN ('一级')) THEN - product_num
+                ELSE 0 END AS one_grade_qty, -- 一级
+		    0 AS SECOND_qty, -- 次品数
+		    0 AS waste_qty -- 废品
+	from SDI.SDI_dh_product_damage_register_1006 -- 产品破损情况登记表
+	WHERE delete_flag = 1
+	AND site = 1600 -- 澧县新鹏
+	and grade_before_damage  IN ('优等','一级')
+	AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+),
+HN_DETAIL_DATA02 AS(
+	SELECT  SITE,
+		    PRODUCT_LINE,
+		    PRODUCT_LINE_DESC,
+		    SHIFT_DATE,
+		    AREA,
+		    MATERIAL_CODE,
+		    BATCH_NUM,
+		    SHIFT_CODE,
+		    GROUP_CODE,
+		    FORM,
+		    SUM(PRONUM) AS PRONUM, --优+一
+		    SUM(FIRST_rate_qty) AS FIRST_rate_qty, -- 优等
+		    SUM(one_grade_qty) AS one_grade_qty, -- 一级
+		    SUM(SECOND_qty) AS SECOND_qty, -- 次品
+		    SUM(waste_qty) AS waste_qty -- 废品
+	FROM HN_DETAIL_DATA01
+	GROUP BY SITE,
+		     PRODUCT_LINE,
+		     PRODUCT_LINE_DESC,
+		     SHIFT_DATE,
+		     AREA,
+		     MATERIAL_CODE,
+		     BATCH_NUM,
+		     SHIFT_CODE,
+		     GROUP_CODE,
+		     FORM
+),
+FJ_DETAIL_DATA01 AS(
+	SELECT site AS SITE,
+    	   product_line AS PRODUCT_LINE,
+    	   product_line_desc ,
+    	   shift_date ,
+    	   product_specification AS AREA,
+    	   product_code AS MATERIAL_CODE,
+    	   BATCH AS BATCH_NUM,
+    	   SHIFT_CODE,
+    	   GROUP_CODE,
+    	   '' as FORM,
+    	   NVL(optimal_one_cnum,0) + NVL(optimal_two_cnum,0) + NVL(stair_cnum,0) AS PRONUM,  -- 优一 + 优二 + 一级
+    	   NVL(optimal_one_cnum,0) + NVL(optimal_two_cnum,0) AS FIRST_rate_qty, -- 优等 优一 + 优二
+    	   NVL(stair_cnum,0) AS one_grade_qty, -- 一级
+    	   NVL(inferior_quality_product_cnum,0) AS SECOND_qty, -- 次品数
+    	   NVL(waste_cnum,0) AS waste_qty -- 废品
+    FROM SDI.SDI_DP_DATA_FENJI_VITRIFIED_BRICK_DEFECT_1006 -- 玻化砖分级缺陷记录表
+    WHERE delete_flag = 1
+    and site = '1300' -- 清远纳福娜
+    AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+	UNION ALL
+	SELECT SITE,
+	       PRODUCT_LINE,
+	       PRODUCT_LINE_DESC,
+	       SHIFT_DATE,
+	       PRODUCT_SPECIFICATION AS AREA,
+	       product_code AS MATERIAL_CODE,
+	       BATCH AS BATCH_NUM,
+	       SHIFT_CODE,
+	       GROUP_CODE,
+	       '' as FORM,
+	       NVL(SUPERIOR,0) + NVL(STAIR, 0) PRONUM  ,       --优+一
+	       NVL(SUPERIOR,0) AS FIRST_rate_qty, -- 优等
+	       NVL(STAIR, 0) AS one_grade_qty, -- 一级
+	       NVL(inferior_quality_product,0) AS SECOND_qty, -- 次品数
+	       NVL(waste,0) AS waste_qty -- 废品
+	FROM SDI.SDI_DJ_GRADE_DEFECT_1006 -- 分级缺陷记录表（1500）
+	WHERE DELETE_FLAG = 1 
+	AND SITE = '1500' -- 丰城东鹏	
+	AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+	UNION ALL
+	SELECT SITE,
+	       PRODUCT_LINE,
+	       PRODUCT_LINE_DESC,
+	       SHIFT_DATE,
+	       AREA,
+	       MATERIAL_CODE,
+	       BATCH_NUM,
+	       SHIFT_CODE,
+	       GROUP_CODE,
+	       '' as FORM,
+	       PRONUM,  -- 分级产量 优+一
+	       FIRST_rate_qty, -- 优等
+	       one_grade_qty, -- 一级
+	       SECOND_qty, -- 次品数
+	       waste_qty -- 废品
+	FROM HN_DETAIL_DATA02 -- 1600 澧县新鹏
+	UNION ALL
+	SELECT  SITE,
+		    PRODUCT_LINE,
+		    PRODUCT_LINE_DESC,
+		    SHIFT_DATE,
+		    PRODUCT_MODEL AS AREA,
+		    PRODUCT_NO AS MATERIAL_CODE,
+		    BATCH_NUM,
+		    SHIFT_CODE,
+		    GROUP_CODE,
+		    FORM,
+		    PRONUM, -- 产量
+		    SUPERIOR_NUM AS FIRST_rate_qty, -- 优等
+		    FIRST_RATE_NUM AS one_grade_qty, -- 一级
+		    SUBSTANDARD_NUM AS SECOND_qty, -- 次品
+		    WASTE_NUM AS waste_qty -- 废品
+	FROM CQ_DETAIL_DATA02 -- 重庆
+	UNION ALL
+	SELECT SITE,
+	       PRODUCT_LINE,
+	       PRODUCT_LINE_DESC AS PRODUCT_LINE_DESC,
+	       SUBSTRING(CAST(SHIFT_DATE AS STRING),1,10) AS SHIFT_DATE,
+	       SPECIFICATIONS AS AREA,
+	       product_number AS MATERIAL_CODE,
+	       '' AS BATCH_NUM,
+	       SHIFT_CODE,
+	       GROUP_CODE,
+	       '' as FORM,
+	       NVL(GRAND_TOTAL,0) + NVL(TOTAL_LEVEL_I,0) PRONUM ,        --优+一
+	       NVL(GRAND_TOTAL,0) AS FIRST_rate_qty, -- 优等,
+	       NVL(TOTAL_LEVEL_I,0) AS one_grade_qty, -- 一级
+	       NVL(TOTAL_DEFECTIVE_PRODUCTS,0) AS SECOND_qty, -- 次品
+	       NVL(TOTAL_SCRAP,0) AS waste_qty -- 废品
+	FROM SDI.SDI_DS_GRADED_PRODUCTS_1006 -- 山西分级产品下线单主表（1900）
+	WHERE DELETE_FLAG = 1 
+	AND SITE = '1900' -- 山西东鹏新材料
+	AND SUBSTRING(CAST(SHIFT_DATE AS STRING),1,10) >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD
+),
+FJ_DETAIL_DATA02 AS(
+	SELECT t1.SHIFT_DATE AS START_DATE, -- 日期
+		   t1.SITE AS SITE_CODE, -- 基地编码
+	       t1.PRODUCT_LINE AS PRODUCT_LINE_CODE, -- 产线编码
+	       t1.PRODUCT_LINE_DESC AS PRODUCT_LINE_NAME, -- 产线名称
+	       t1.AREA AS PRODUCT_MODEL, -- 规格
+	       t1.MATERIAL_CODE, -- 物料编码
+	       t1.PRONUM AS DIVIDEYIELD_AREA, -- 分级产量(面积)
+	       T1.FIRST_RATE_QTY AS FIRST_RATE_AREA, -- 优等
+		   T1.ONE_GRADE_QTY AS ONE_GRADE_AREA, -- 一级
+		   T1.SECOND_QTY AS SECOND_AREA, -- 次品
+		   T1.WASTE_QTY AS WASTE_AREA, -- 废品
+	       CASE WHEN t2.material_num IS NOT NULL THEN
+	          t2.length_1
+	       ELSE
+		       CASE WHEN regexp_extract(UPPER(t1.AREA),UPPER('X'),0) = UPPER('X') THEN 
+						   split(UPPER(t1.AREA), UPPER('X'))[0]
+						WHEN regexp_extract(UPPER(t1.AREA),UPPER('\\*'),0) = UPPER('*') THEN
+					       split(UPPER(t1.AREA), UPPER('\\*'))[0]
+					ELSE split(UPPER(t1.AREA), UPPER('X'))[0] 
+				END 
+			END
+			AS MATERIAL_LENGTH, -- 长 600X600 按X拆分字段,拆前部分，可能会有*
+			CASE WHEN t2.material_num IS NOT NULL THEN
+				t2.width
+			ELSE
+				CASE WHEN regexp_extract(UPPER(t1.AREA),UPPER('X'),0) = UPPER('X') THEN 
+						   split(UPPER(t1.AREA), UPPER('X'))[1]
+					WHEN regexp_extract(UPPER(t1.AREA),UPPER('\\*'),0) = UPPER('*') THEN
+					       split(UPPER(t1.AREA), UPPER('\\*'))[1]
+					ELSE split(UPPER(t1.AREA), UPPER('X'))[1] 
+				END 
+			END
+			AS MATERIAL_WIDTH, -- 宽 600X600 按X拆分字段，拆前面部分，可能会有*
+			T3.VALS as unit_weight,
+			T1.BATCH_NUM ,
+			T1.SHIFT_CODE,
+			T1.GROUP_CODE,
+			T1.FORM
+	FROM FJ_DETAIL_DATA01 t1
+	LEFT JOIN DWIMD.dwi_md_data_material_general_t t2
+	ON t1.MATERIAL_CODE = t2.material_num 
+	LEFT JOIN (select a.ITEM as material_num,b.VALS from sdi.sdi_m_item_1006 a
+    left join sdi.sdi_m_custom_data_val_1006 b
+    on a.bo = b.bo
+    where b.ATTRIBUTE = 'SINGLEWEIGHT') t3
+    on t1.MATERIAL_CODE = t3.material_num
+	WHERE t1.SHIFT_DATE < CURRENT_DATE() -- 不取当天的产量数据
+	AND t1.SHIFT_DATE <> ''  -- 排除为空的数据
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_DIVIDEYIELD_F PARTITION(PERIOD_ID_M)
+SELECT t1.START_DATE, -- 日期
+	   t1.SITE_CODE, -- 基地编码
+	   T2.work_shop AS WORK_SHOP_CODE, -- 车间编码
+       CASE WHEN T1.SITE_CODE = 1800 THEN -- 重庆
+				T1.PRODUCT_LINE_CODE
+	   ELSE T2.product_line END AS PRODUCT_LINE_CODE, -- 产线编码
+       t1.PRODUCT_MODEL, -- 规格
+       t1.MATERIAL_CODE, -- 物料编码
+       t1.DIVIDEYIELD_AREA, -- 分级产量(面积)
+       T1.FIRST_RATE_AREA, -- 优等
+	   T1.ONE_GRADE_AREA, -- 一级
+	   T1.SECOND_AREA, -- 次品
+	   T1.WASTE_AREA, -- 废品
+       t1.MATERIAL_LENGTH, -- 长 
+	   t1.MATERIAL_WIDTH, -- 宽
+	   CURRENT_TIMESTAMP() AS dw_last_update_date ,
+	   t1.unit_weight, --单位重量,
+	   T1.BATCH_NUM , --批次号
+	   T1.SHIFT_CODE, ---班次代码
+	   T1.GROUP_CODE, --班组代码
+	   T1.FORM,
+	   SUBSTRING(t1.START_DATE,1,7) AS PERIOD_ID_M
+FROM FJ_DETAIL_DATA02 t1
+LEFT JOIN SDI.SDI_DP_PRODUCTION_LINE_MAPPING_1006 T2  -- 产线关系对照表
+ON T1.SITE_CODE = T2.SITE 
+AND T1.PRODUCT_LINE_CODE = T2.fj_product_line 
+AND T2.DELETE_FLAG = 1;

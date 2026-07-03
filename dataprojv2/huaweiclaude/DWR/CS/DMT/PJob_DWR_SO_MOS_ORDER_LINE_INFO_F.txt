@@ -1,0 +1,39 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/11 11:13:18 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWROTD.DWR_SO_MOS_ORDER_LINE_INFO_F
+SELECT  A.ID AS ORDER_ITEM_ID --订单行ID
+       ,A.ORDER_ID --意向订单ID
+       ,A.ORDER_NO AS ORDER_NUM --意向订单编码
+       ,A.DMT_ITEM_ID --DMT商品ID
+       ,A.GOODS_ID AS MATERIAL_ID --商品表ID	   
+       ,COALESCE(A.BARCODE,A.GOODS_CODE) AS MATERIAL_NUM --商品编码
+       ,A.ITEM_NAME AS MATERIAL_NAME --商品名称
+       ,A.CATEGORY_ID AS MATERIAL_CAT_ID --商品类别ID
+       ,A.CATEGORY_NAME AS MATERIAL_CAT_NAME --商品类别名称
+       ,A.PRICE AS PRC --单价
+       ,COALESCE(A.TOTAL_AMOUNT,0) AS TOT_AMT --合计金额
+       ,COALESCE(A.BUY_NUM,0) AS BUY_QTY --购买数量
+       ,A.UNIT --单位
+       ,A.USABLE_FLAG AS IS_USAB_CODE --可用标识（0：不可用 1：可用）
+	   ,CASE WHEN A.USABLE_FLAG = 0 THEN '否'
+	         WHEN A.USABLE_FLAG = 1 THEN '是'
+			  END AS IS_USAB_NAME --可用标识编码
+       ,A.CREATE_TIME --创建时间
+       ,A.CREATER_ID AS CREATE_EMP_ID --创建人ID
+       ,A.CREATER_NAME AS CREATE_EMP_NAME --创建人名称
+       ,A.MODIFY_TIME AS UPDATE_TIME --修改时间
+       ,A.MODIFIER_ID AS UPDATE_EMP_ID --修改人ID
+       ,A.MODIFIER_NAME AS UPDATE_EMP_NAME --修改人名称
+       ,A.USE_SPACE_ID AS SPACE_ID --应用空间ID
+       ,A.WALL_OR_FLOOR AS WAL_FLOOR_TYPE_NAME --是否背景墙
+       ,COALESCE(A.SPACE_AREA,0) AS SPACE_AREA --用砖面积
+       ,COALESCE(A.DELIVERY_NUM,0) AS DELV_QTY --发货数量
+       ,COALESCE(A.RETURN_NUM,0) AS RTN_QTY --退货数量
+       ,A.WAN_WEI_ID AS WW_ITEM_ID --万维行ID
+       ,A.DSS_ITEM_ID --DSS行ID
+	   ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_SAL_INTENTION_ORDER_GOODS_1012 A
+ WHERE A.DELETE_FLAG = 0

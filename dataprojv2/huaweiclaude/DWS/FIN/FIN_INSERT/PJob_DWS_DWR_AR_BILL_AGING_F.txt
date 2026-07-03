@@ -1,0 +1,96 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：应收票据账龄 DWRFIN.DWR_AR_BILL_AGING_F
+-- 需求人：霍碧琪、林威
+-- create time: 2023/04/18 14:09:41 GMT+08:00
+-- update：2023/04/19 guzhengfeng 新增参数PERIOD_ID_D1
+-- update：2023/06/28 guzhengfeng 修改删数逻辑
+-- update：2023/09/11 guzhengfeng 统一传参格式为：yyyy-MM-dd
+-- update：2023/10/11 guzhengfeng 月结1-5号跑上月月底的数据
+-- update：2023/10/25 guzhengfeng 修改删数逻辑
+-- update：2023/10/26 guzhengfeng 新增字段订单组编码so_group_code
+-- update：2023/10/30 guzhengfeng 新增字段应收余额借方合计 receivable_balance_sum
+-- update：2023/11/02 guzhengfeng 修改删数逻辑
+-- update：2023/11/04 ZHANGPENG 月结1-3号跑上月月底的数据
+-- update: 20240524 zhz 新增客户组、销售人员
+-- UPDATE: 20240905 ZHZ 修改月结3号不自动跑上月数
+-- UPDATE: 20250221 wjh 新增自然账龄
+
+-- ******************************************************************** --
+DELETE FROM DWRFIN.DWR_AR_BILL_AGING_F 
+WHERE query_date in (SELECT CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) 
+						END 
+						UNION ALL 
+						SELECT '${PERIOD_ID_D}'
+						UNION ALL 
+						SELECT substr(to_date('${PERIOD_ID_D}','yyyy-MM-dd') - 1,1,10)  
+						);
+INSERT INTO DWRFIN.DWR_AR_BILL_AGING_F
+SELECT
+	query_date
+	,comp_code
+	,cust_code
+	,cust_name
+	,sales_group_master_file
+	,wbs
+	,wbs_sales_group
+	,special_general_ledger
+	,general_ledger_account
+	,currency
+	,local_currency_balance_sum
+	,overdue_receivables
+	,overdue_receivables_1_month
+	,overdue_receivables_1plus_month
+	,overdue_receivables_1_year
+	,overdue_receivables_0_30_day
+	,overdue_receivables_31_60_day
+	,overdue_receivables_61_90_day
+	,overdue_receivables_91_120_day
+	,overdue_receivables_121_150_day
+	,overdue_receivables_151_180_day
+	,overdue_receivables_181_210_day
+	,overdue_receivables_211_240_day
+	,overdue_receivables_241_270_day
+	,overdue_receivables_271_300_day
+	,overdue_receivables_301_330_day
+	,overdue_receivables_331_365_day
+	,overdue_receivables_1_2_year
+	,overdue_receivables_2_3_year
+	,overdue_receivables_3_4_year
+	,overdue_receivables_4p_year
+	,n_overdue_receivables
+	,n_overdue_receivables_1_year
+	,n_overdue_receivables_0_30_day
+	,n_overdue_receivables_31_60_day
+	,n_overdue_receivables_61_90_day
+	,n_overdue_receivables_91_120_day
+	,n_overdue_receivables_121_150_day
+	,n_overdue_receivables_151_180_day
+	,n_overdue_receivables_181_210_day
+	,n_overdue_receivables_211_240_day
+	,n_overdue_receivables_241_270_day
+	,n_overdue_receivables_271_300_day
+	,n_overdue_receivables_301_330_day
+	,n_overdue_receivables_331_365_day
+	,n_overdue_receivables_1_2_year
+	,n_overdue_receivables_2_3_year
+	,n_overdue_receivables_3_4_year
+	,n_overdue_receivables_4p_year
+	,business_department
+	,dw_last_update_date
+	,so_group_code
+	,receivable_balance_sum
+	,cust_grp_code
+	,sales_emp_code
+    ,NATURAL_RECEIVABLES_1_90
+	,NATURAL_RECEIVABLES_91_180
+	,NATURAL_RECEIVABLES_181_275
+	,NATURAL_RECEIVABLES_276_365
+	,NATURAL_RECEIVABLES_366_730
+	,NATURAL_RECEIVABLES_731_1095
+	,NATURAL_RECEIVABLES_1095_1460
+	,NATURAL_RECEIVABLES_1461
+FROM DWRFIN.DWR_AR_BILL_AGING_F_01
+WHERE query_date = CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END
+;

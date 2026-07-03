@@ -1,0 +1,118 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 
+-- ******************************************************************** --
+-- SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+---- 设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with mat as (
+select t1.material_num,t1.material_name,t1.product_level2_name  ,t1.dimension,
+        t1.width * t1.length_1/1000/1000 as product_area,
+        t1.product_brand_code,t1.product_brand_name,
+        t1.product_place_code,t1.product_place_name
+from dwimd.dwi_md_data_material_general_t t1 
+)
+,month_stock as
+(
+select 
+factory_werks_code
+,material_num
+,sum(case when  month_date = replace(substr('${PERIOD_ID_D}',1,7),'-','') then stock_qty else 0 end) as stock_qty_month_end --本月库存
+,sum(case when  month_date = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,7),'-01'),1),1,7),'-','') then stock_qty else 0 end) as stock_qty_month_start --月初库存
+,sum(case when  month_date = replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,4),'-01-01'),1),1,7),'-','') then stock_qty else 0 end) as stock_qty_year_start --年初库存
+from dwrotd.dwr_wm_all_type_stock_month_t
+where month_date >= replace(substr(date_sub(concat(substr('${PERIOD_ID_D}',1,4),'-01-01'),1),1,7),'-','')
+and substring(material_num,-2,2) in ('_A','_B')
+and inv_location in ('SA','SC','JXDY','GCSA')
+and factory_werks_code >= 1500 
+and factory_werks_code <= 1580
+group by  factory_werks_code,material_num
+)
+,in_out_data AS 
+(
+select 
+factory_werks_code --工厂代码
+,material_num --物料名称
+,sum(case when move_type in ('131','132','531','532') and inv_location in ('SA','SC') then stock_qty else 0 end) in_stock_qty--入库数量
+,sum(case when move_type in ('601','602','641','642','643','644','687','927','929','931','932','933','934','951','952') 
+	and inv_location in ('SA','SC','JXDY','GCSA') then stock_qty else 0 end) out_stock_qty--出库数量
+from dwrotd.DWR_WM_PRODSTOCK_OUT_IN_F
+where substr(VOUCHER_POST_DATE,1,7) = substr('${PERIOD_ID_D}',1,7)
+and substring(material_num,-2,2) in ('_A','_B')
+and inv_location in ('SA','SC','JXDY','GCSA')
+and factory_werks_code >= 1500 
+and factory_werks_code <= 1580
+group by factory_werks_code,material_num
+)
+,total_data as
+(
+SELECT 
+factory_werks_code
+,material_num
+,stock_qty_month_end--本月库存
+,stock_qty_month_start --月初库存
+,stock_qty_year_start --年初库存
+,0 as in_stock_qty
+,0 as out_stock_qty
+from month_stock
+union all 
+SELECT 
+factory_werks_code
+,material_num
+,0 as stock_qty_month_end
+,0 as stock_qty_month_start
+,0 as stock_qty_year_start
+,in_stock_qty --入库数量
+,out_stock_qty --出库数量
+from in_out_data
+)
+,total_data_sum as  
+(
+SELECT 
+factory_werks_code
+,material_num
+,sum(stock_qty_month_end) stock_qty_month_end
+,sum(stock_qty_month_start) stock_qty_month_start
+,sum(stock_qty_year_start) stock_qty_year_start
+,sum(in_stock_qty) in_stock_qty
+,sum(out_stock_qty) out_stock_qty
+from total_data
+group by 
+factory_werks_code
+,material_num
+)
+INSERT OVERWRITE TABLE dm.dm_product_inout_stock_t partition (start_month)
+select 
+t1.factory_werks_code --工厂编码
+,'' factory_werks_name --工厂名称
+,t2.product_level2_name --品类
+,t2.product_brand_code --系列代码
+,t2.product_brand_name --系列名称
+,t2.product_place_code --产品工艺代码
+,t2.product_place_name --产品工艺名称
+,t2.dimension dimension_--产品规格
+,t1.material_num --物料编码
+,t2.material_name --物料名称
+,t1.in_stock_qty in_stock_qty
+,t1.in_stock_qty*t2.product_area in_stock_area
+,t1.out_stock_qty out_stock_qty
+,t1.out_stock_qty*t2.product_area out_stock_area
+,t1.stock_qty_month_end stock_qty_month_end --月初库存
+,t1.stock_qty_month_end*t2.product_area stock_area_month_end
+,t1.stock_qty_month_start stock_qty_month_start --本月库存
+,t1.stock_qty_month_start*t2.product_area stock_area_month_start
+,current_timestamp() as dw_last_update_date
+,case 
+	when substring(t1.material_num,-2,2) = '_A' then '优等'
+	when substring(t1.material_num,-2,2) = '_B' then '一级'
+end material_rank
+,substr('${PERIOD_ID_D}',1,7) start_month
+from total_data_sum t1
+left join mat t2 on t1.material_num = t2.material_num

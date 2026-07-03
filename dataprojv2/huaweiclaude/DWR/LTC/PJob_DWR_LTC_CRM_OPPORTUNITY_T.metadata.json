@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_CRM_OPPORTUNITY_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "CRM商机表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

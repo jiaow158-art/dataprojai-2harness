@@ -1,0 +1,57 @@
+DROP TABLE IF  EXISTS  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP;
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP
+(GROUP_NUM                                    VARCHAR(500),                      
+CONDITION_RECORD_NUM                          VARCHAR(500),                      
+CONDITION_SERIAL_NUM                          VARCHAR(500),                      
+CONDITION_AMT                                 DECIMAL(38,10),                    
+CONVERSION_DENOMINATOR                        DECIMAL(38,10),                    
+CONVERSION_MOLECULE                           DECIMAL(38,10),                    
+FIXED_START_DATE                              TIMESTAMP,                         
+BASE_MEASURE_UNIT                             VARCHAR(500),                      
+APPLICATION_PROGRAM_CODE                      VARCHAR(500),                      
+CONDITION_UNIT                                VARCHAR(500),                      
+CONDITION_UNIT_TYPE                           VARCHAR(500),                      
+CONDITION_PRICE_UNIT                          VARCHAR(500),                      
+CONDITION_EXCLUSION_FLAG                      VARCHAR(500),                      
+CONDITION_LOWER_LIMIT                         DECIMAL(38,10),                    
+CONDITION_CALC_TYPE                           VARCHAR(500),                      
+CONDITION_LEVEL_MEASURE_UNIT                  VARCHAR(500),                      
+CONDITION_TYPE                                VARCHAR(500),                      
+CONDITION_CURRENCY_CODE                       VARCHAR(500),                      
+CONDITION_ITEM_DEL_FLAG                       VARCHAR(500),                      
+CONDITION_ITEM_INDEX                          VARCHAR(500),                      
+MATRIX_MAINTENANCE_FALG                       VARCHAR(500),                      
+BASIC_LEVEL_FALG                              VARCHAR(500),                      
+LEVEL_TYPE                                    VARCHAR(500),                      
+SALES_PURCHASE_TAX_CODE                       VARCHAR(500),                      
+DEL_FLAG                                      VARCHAR(500),                      
+DW_LAST_UPDATE_DATE                           TIMESTAMP);                        
+
+ 
+ COMMENT  ON TABLE   DWRFIN.DWR_PRC_PRICE_CONDITION_TMP	                            IS    '定价条件项'; 
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.GROUP_NUM                     IS    '集团';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_RECORD_NUM          IS    '条件记录号';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_SERIAL_NUM          IS    '条件的序列号';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_AMT                 IS    '不存在等级的条件金额或百分比';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONVERSION_DENOMINATOR        IS    '从定价单位到基本单位转换的分母';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONVERSION_MOLECULE           IS    '从条件单位到基准单位转换的分子';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.FIXED_START_DATE              IS    '固定起息日';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.BASE_MEASURE_UNIT             IS    '基本计量单位';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.APPLICATION_PROGRAM_CODE      IS    '应用程序';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_UNIT                IS    '条件单位';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_UNIT_TYPE           IS    '条件单位（货币或百分比）';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_PRICE_UNIT          IS    '条件定价单位';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_EXCLUSION_FLAG      IS    '条件排除指示符';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_LOWER_LIMIT         IS    '条件比率/金额的下限';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_CALC_TYPE           IS    '条件的计算类型';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_LEVEL_MEASURE_UNIT  IS    '条件等级计量单位';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_TYPE                IS    '条件类型';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_CURRENCY_CODE       IS    '条件货币（适用于累计字段）';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_ITEM_DEL_FLAG       IS    '条件项的删除指示符';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.CONDITION_ITEM_INDEX          IS    '条件项目索引';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.MATRIX_MAINTENANCE_FALG       IS    '标识：矩阵维护';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.BASIC_LEVEL_FALG              IS    '等级基础标识';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.LEVEL_TYPE                    IS    '等级类型';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.SALES_PURCHASE_TAX_CODE       IS    '销售税/采购税代码';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.DEL_FLAG                      IS    '删除标识';
+ COMMENT  ON COLUMN  DWRFIN.DWR_PRC_PRICE_CONDITION_TMP.DW_LAST_UPDATE_DATE           IS    'DW最后更新日期';

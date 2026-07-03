@@ -1,0 +1,138 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2022/11/08 09:40:16 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE dm.dm_b1_transit_inventory_t;
+
+with mat as (
+select b.material_num,material_name,
+bath_category_name as category_name
+from dwimd.dwi_md_data_material_general_t as b 
+left join upload.upload_wm_sw_sap_prod_grp_t as k on b.product_level3_code = k.prod_code3 
+)
+,
+ T1 as (
+select B.DOC_MONTH,A.cust_num,A.ext_cust_name,A.material_num 
+from ( select distinct 
+		t.abbreviation as ext_cust_name,y.material as material_num,y.customer as cust_num 
+		from dm.dm_zasd_p001_q066v2_t y 
+		join upload.upload_b1_customer_data_t t on y.customer = LPAD(t.cust_code,10,'0') ) A
+		left join (SELECT DISTINCT SUBSTR(DAY_DT,1,7) AS DOC_MONTH FROM DM.DM_DIM_DATE_D) B on 1=1 
+)
+,
+T2 as (
+	select 
+		SUBSTR(calmonth,1,4)||'-'||SUBSTR(calmonth,5,2) as DOC_MONTH
+		,t.abbreviation as ext_cust_name
+		,y.material as material_num
+		,y.customer as cust_num 
+		,SUM(COALESCE(zxssl,0)) as DELIVER_QTY
+	    ,SUM(COALESCE(zxsyj,0)) as DELIVER_AMOUNT
+		from dm.dm_zasd_p001_q066v2_t y 
+		join upload.upload_b1_customer_data_t t on y.customer = LPAD(t.cust_code,10,'0')
+		group by 
+		SUBSTR(calmonth,1,4)||'-'||SUBSTR(calmonth,5,2)
+		,t.abbreviation 
+		,y.material 
+		,y.customer 
+)
+,tmp11 as (
+select 
+ T1.DOC_MONTH
+,T1.cust_num
+,T1.ext_cust_name
+,T1.material_num 
+,SUM(T2.DELIVER_QTY) OVER(PARTITION BY T1.cust_num,T1.ext_cust_name,T1.material_num ORDER BY T1.DOC_MONTH  ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS DELIVER_QTY
+,SUM(T2.DELIVER_AMOUNT) OVER(PARTITION BY T1.cust_num,T1.ext_cust_name,T1.material_num ORDER BY T1.DOC_MONTH ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS DELIVER_AMOUNT
+from T1
+left join T2 on T1.ext_cust_name = T2.ext_cust_name and T1.material_num = T2.material_num and T1.cust_num = T2.cust_num and T1.DOC_MONTH = T2.DOC_MONTH
+
+),
+tmp1 as (
+	select 
+	 DOC_MONTH
+	,ext_cust_name
+	,material_num
+	,sum(DELIVER_QTY) as DELIVER_QTY
+	,sum(DELIVER_AMOUNT) as DELIVER_AMOUNT
+	from tmp11
+	group by 
+	 DOC_MONTH
+	,ext_cust_name
+	,material_num
+	
+),
+ T3 as (
+select B.DOC_MONTH,A.ext_cust_name,A.material_num 
+from ( select distinct 
+		客户别名 as ext_cust_name,物料编码 as material_num
+		from dm.dm_wm_b1_inventory_t_d ) A
+		left join (SELECT DISTINCT SUBSTR(DAY_DT,1,7) AS DOC_MONTH FROM DM.DM_DIM_DATE_D) B on 1=1 
+) 
+,T44 as (
+SELECT 
+ SUBSTR(日期,1,7) as DOC_MONTH
+,客户别名 as ext_cust_name
+,物料编码 as material_num
+,sum(期间采购收货数量-期间采购退货数量) as PUR_QTY
+,sum(case when 本期入库 <> 0 then 本期入库金额/本期入库*(期间采购收货数量-期间采购退货数量) else 0 end ) as PUR_AMOUNT
+FROM dm.dm_wm_b1_inventory_t_d a
+where (a.分析品类 <> '齐套' or a.分析品类 is null) 
+group by SUBSTR(日期,1,7),客户别名,物料编码 
+union all 
+SELECT 
+ SUBSTR(日期,1,7) as DOC_MONTH
+,客户别名 as ext_cust_name
+,b.bom_component  as material_num
+,sum((期间采购收货数量-期间采购退货数量) * b.component_num ) as PUR_QTY
+,sum(case when 本期入库 <> 0 then 本期入库金额/本期入库*(期间采购收货数量-期间采购退货数量) * b.component_num  else 0 end ) as PUR_AMOUNT
+FROM dm.dm_wm_b1_inventory_t_d a
+left join (select t.material_num,t2.matl_list ,t2.component_num ,t2.bom_component from (
+select matl_list,material_num
+from (select 
+*,row_number() over(partition by material_num order by rec_crt_date desc ) as RN
+from DWRDIM.DWR_DIM_MATERIAL_LIST_LINK_F ) as t1
+where RN = 1 and bom_use_code = '5' ) t
+left join DWRDIM.DWR_DIM_BOM_ITEM_D t2 on t2.matl_list = t.matl_list ) b on a.物料编码 = b.material_num 
+where a.分析品类 = '齐套' 
+group by SUBSTR(日期,1,7),客户别名,物料编码,b.bom_component,a.分析品类
+)
+,T4 as (
+select 
+ DOC_MONTH
+,ext_cust_name
+,material_num
+,sum(PUR_QTY) as PUR_QTY
+,sum(PUR_AMOUNT) as PUR_AMOUNT
+from T44
+group by 
+ DOC_MONTH
+,ext_cust_name
+,material_num
+),
+tmp2 as (
+select 
+ T3.DOC_MONTH
+,T3.ext_cust_name
+,T3.material_num 
+,SUM(T4.PUR_QTY) OVER(PARTITION BY T3.ext_cust_name,T3.material_num ORDER BY T3.DOC_MONTH  ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS PUR_QTY
+,SUM(T4.PUR_AMOUNT) OVER(PARTITION BY T3.ext_cust_name,T3.material_num ORDER BY T3.DOC_MONTH ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS PUR_AMOUNT
+from T3
+left join T4 on T3.ext_cust_name = T4.ext_cust_name and T3.material_num = T4.material_num  and T3.DOC_MONTH = T4.DOC_MONTH
+)
+insert into dm.dm_b1_transit_inventory_t
+select 
+ a.DOC_MONTH --年月
+,a.ext_cust_name --客户别名
+,a.material_num --物料编码
+,m.material_name --物料描述
+,m.category_name --品类 
+,a.DELIVER_QTY --对厂提货数量
+,b.PUR_QTY --采购入库数量
+,a.DELIVER_AMOUNT --对厂提货数量
+,b.PUR_AMOUNT --采购入库数量
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE		-- 同步数据时间
+from tmp1 a
+left join tmp2 b on a.ext_cust_name = b.ext_cust_name and a.material_num = b.material_num and a.DOC_MONTH = b.DOC_MONTH
+left join mat m on a.material_num = m.material_num

@@ -1,0 +1,438 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/11/05 09:22:13 GMT+08:00
+-- ******************************************************************** --
+with detail_data as(
+	select 
+		 a.objid as objid
+		,a.SHORT as SHORT_OBJID_NAME
+		,a.stext as LONG_OBJID_NAME
+		,b.SOBID  PARENT_OBJID
+		,'0' as FLAG 
+	from sdi.sdi_hrp1000_1001 as a 
+	left join sdi.sdi_hrp1001_1001 as b 
+	on a.objid = b.objid and b.plvar = '01' AND b.otype = 'O' and b.endda = '99991231'
+	AND b.istat = '1' AND b.rsign = 'A' AND b.relat = '002' AND b.sclas = 'O' 
+	where a.plvar = '01' AND a.otype = 'O' AND a.istat = '1' and a.LANGU = '1' and a.endda = '99991231' 
+),
+detail_data_01 as(
+select t1.objid as objid_t1,
+       t1.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t1,
+       t1.LONG_OBJID_NAME as LONG_OBJID_NAME_t1,
+       t2.objid as objid_t2,
+       t2.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t2,
+       t2.LONG_OBJID_NAME as LONG_OBJID_NAME_t2,
+       t3.objid  as objid_t3,
+       t3.SHORT_OBJID_NAME  as SHORT_OBJID_NAME_t3,
+       t3.LONG_OBJID_NAME  as LONG_OBJID_NAME_t3,
+       t4.objid   as objid_t4,
+       t4.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t4,
+       t4.LONG_OBJID_NAME  as LONG_OBJID_NAME_t4,
+       t5.objid as objid_t5,
+       t5.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t5,
+       t5.LONG_OBJID_NAME as LONG_OBJID_NAME_t5,
+       t6.objid as objid_t6,
+       t6.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t6,
+       t6.LONG_OBJID_NAME as LONG_OBJID_NAME_t6,
+       t7.objid as objid_t7,
+       t7.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t7,
+       t7.LONG_OBJID_NAME as LONG_OBJID_NAME_t7,
+       t8.objid as objid_t8,
+       t8.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t8,
+       t8.LONG_OBJID_NAME as LONG_OBJID_NAME_t8,
+       t9.objid as objid_t9,
+       t9.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t9,
+       t9.LONG_OBJID_NAME as LONG_OBJID_NAME_t9,
+       t10.objid as objid_t10,
+       t10.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t10,
+       t10.LONG_OBJID_NAME as LONG_OBJID_NAME_t10,
+       t11.objid as objid_t11,
+       t11.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t11,
+       t11.LONG_OBJID_NAME as LONG_OBJID_NAME_t11,
+       t12.objid as objid_t12,
+       t12.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t12,
+       t12.LONG_OBJID_NAME as LONG_OBJID_NAME_t12,
+       t13.objid as objid_t13,
+       t13.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t13,
+       t13.LONG_OBJID_NAME as LONG_OBJID_NAME_t13,
+       t14.objid as objid_t14,
+       t14.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t14,
+       t14.LONG_OBJID_NAME as LONG_OBJID_NAME_t14,
+       t15.objid as objid_t15,
+       t15.SHORT_OBJID_NAME as SHORT_OBJID_NAME_t15,
+       t15.LONG_OBJID_NAME as LONG_OBJID_NAME_t15,
+       COALESCE(t15.objid,t14.objid,t13.objid,t12.objid,t11.objid,t10.objid,t9.objid,t8.objid,t7.objid,t6.objid,t5.objid,t4.objid,t3.objid,t2.objid,t1.objid) objid
+from detail_data t1
+left join detail_data t2
+on t1.objid = t2.PARENT_OBJID
+left join detail_data t3
+on t2.objid = t3.PARENT_OBJID
+left join detail_data t4
+on t3.objid = t4.PARENT_OBJID
+left join detail_data t5
+on t4.objid = t5.PARENT_OBJID
+left join detail_data t6
+on t5.objid = t6.PARENT_OBJID
+left join detail_data t7
+on t6.objid = t7.PARENT_OBJID
+left join detail_data t8
+on t7.objid = t8.PARENT_OBJID
+left join detail_data t9
+on t8.objid = t9.PARENT_OBJID
+left join detail_data t10
+on t9.objid = t10.PARENT_OBJID
+left join detail_data t11
+on t10.objid = t11.PARENT_OBJID
+left join detail_data t12
+on t11.objid = t12.PARENT_OBJID
+left join detail_data t13
+on t12.objid = t13.PARENT_OBJID
+left join detail_data t14
+on t13.objid = t14.PARENT_OBJID
+left join detail_data t15
+on t14.objid = t15.PARENT_OBJID
+where t1.objid = '00000201'
+),
+detail_data_02 as(
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                '' as objid_t2, '' as short_objid_name_t2, '' as long_objid_name_t2,
+                '' as objid_t3, '' as short_objid_name_t3, '' as long_objid_name_t3,
+                '' as objid_t4, '' as short_objid_name_t4, '' as long_objid_name_t4,
+                '' as objid_t5, '' as short_objid_name_t5, '' as long_objid_name_t5,
+                '' as objid_t6, '' as short_objid_name_t6, '' as long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t1 as objid
+from detail_data_01
+where objid_t1 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                '' as objid_t3, '' as short_objid_name_t3, '' as long_objid_name_t3,
+                '' as objid_t4, '' as short_objid_name_t4, '' as long_objid_name_t4,
+                '' as objid_t5, '' as short_objid_name_t5, '' as long_objid_name_t5,
+                '' as objid_t6, '' as short_objid_name_t6, '' as long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t2 as objid
+from detail_data_01
+where objid_t2 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                '' as objid_t4, '' as short_objid_name_t4, '' as long_objid_name_t4,
+                '' as objid_t5, '' as short_objid_name_t5, '' as long_objid_name_t5,
+                '' as objid_t6, '' as short_objid_name_t6, '' as long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t3 as objid
+from detail_data_01
+where objid_t3 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                '' as objid_t5, '' as short_objid_name_t5, '' as long_objid_name_t5,
+                '' as objid_t6, '' as short_objid_name_t6, '' as long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t4 as objid
+from detail_data_01
+where objid_t4 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                '' as objid_t6, '' as short_objid_name_t6, '' as long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t5 as objid
+from detail_data_01
+where objid_t5 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                '' as objid_t7, '' as short_objid_name_t7, '' as long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t6 as objid
+from detail_data_01
+where objid_t6 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                '' as objid_t8, '' as short_objid_name_t8, '' as long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t7 as objid
+from detail_data_01
+where objid_t7 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                '' as objid_t9, '' as short_objid_name_t9, '' as long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t8 as objid
+from detail_data_01
+where objid_t8 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                '' as objid_t10, '' as short_objid_name_t10, '' as long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t9 as objid
+from detail_data_01
+where objid_t9 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                '' as objid_t11, '' as short_objid_name_t11, '' as long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t10 as objid
+from detail_data_01
+where objid_t10 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                objid_t11, short_objid_name_t11, long_objid_name_t11,
+                '' as objid_t12, '' as short_objid_name_t12, '' as long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t11 as objid
+from detail_data_01
+where objid_t11 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                objid_t11, short_objid_name_t11, long_objid_name_t11,
+                objid_t12, short_objid_name_t12, long_objid_name_t12,
+                '' as objid_t13, '' as short_objid_name_t13, '' as long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t12 as objid
+from detail_data_01
+where objid_t12 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                objid_t11, short_objid_name_t11, long_objid_name_t11,
+                objid_t12, short_objid_name_t12, long_objid_name_t12,
+                objid_t13, short_objid_name_t13,long_objid_name_t13,
+                '' as objid_t14, '' as short_objid_name_t14, '' as long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t13 as objid
+from detail_data_01
+where objid_t13 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                objid_t11, short_objid_name_t11, long_objid_name_t11,
+                objid_t12, short_objid_name_t12, long_objid_name_t12,
+                objid_t13, short_objid_name_t13,long_objid_name_t13,
+                objid_t14, short_objid_name_t14,long_objid_name_t14,
+                '' as objid_t15, '' as short_objid_name_t15, '' as long_objid_name_t15,
+                objid_t14 as objid
+from detail_data_01
+where objid_t14 is not null
+union all
+select distinct objid_t1,short_objid_name_t1,long_objid_name_t1,
+                objid_t2, short_objid_name_t2,long_objid_name_t2,
+                objid_t3, short_objid_name_t3, long_objid_name_t3,
+                objid_t4, short_objid_name_t4, long_objid_name_t4,
+                objid_t5, short_objid_name_t5, long_objid_name_t5,
+                objid_t6, short_objid_name_t6, long_objid_name_t6,
+                objid_t7, short_objid_name_t7, long_objid_name_t7,
+                objid_t8, short_objid_name_t8, long_objid_name_t8,
+                objid_t9, short_objid_name_t9, long_objid_name_t9,
+                objid_t10, short_objid_name_t10, long_objid_name_t10,
+                objid_t11, short_objid_name_t11, long_objid_name_t11,
+                objid_t12, short_objid_name_t12, long_objid_name_t12,
+                objid_t13, short_objid_name_t13,long_objid_name_t13,
+                objid_t14, short_objid_name_t14,long_objid_name_t14,
+                objid_t15, short_objid_name_t15,long_objid_name_t15,
+                objid_t15 as objid
+from detail_data_01
+where objid_t15 is not null
+)
+INSERT OVERWRITE TABLE DWIMD.DWI_ORG_PERNR_STRUCTURE_INFO_T
+select   t2.PERNR as EMPLOYEE_CODE, --员工号
+		 t2.NACHN as EMPLOYEE_NAME, -- 员工姓名
+		 t2.GESCH as GENDER_CODE, --性别代码
+		 t2.ORGEH as ORG_UNIT_CODE, --组织单位
+		 t2.STEXT as ORG_UNIT_NAME, --组织单位名称
+		 T1.OBJID_T1,
+		 T1.SHORT_OBJID_NAME_T1,
+		 T1.LONG_OBJID_NAME_T1,
+         T1.OBJID_T2, 
+		 T1.SHORT_OBJID_NAME_T2,
+		 T1.LONG_OBJID_NAME_T2,
+         T1.OBJID_T3, 
+		 T1.SHORT_OBJID_NAME_T3, 
+		 T1.LONG_OBJID_NAME_T3,
+         T1.OBJID_T4, 
+		 T1.SHORT_OBJID_NAME_T4, 
+		 T1.LONG_OBJID_NAME_T4,
+         T1.OBJID_T5, 
+		 T1.SHORT_OBJID_NAME_T5, 
+		 T1.LONG_OBJID_NAME_T5,
+         T1.OBJID_T6, 
+		 T1.SHORT_OBJID_NAME_T6, 
+		 T1.LONG_OBJID_NAME_T6,
+         T1.OBJID_T7,
+		 T1.SHORT_OBJID_NAME_T7, 
+		 T1.LONG_OBJID_NAME_T7,
+         T1.OBJID_T8, 
+		 T1.SHORT_OBJID_NAME_T8, 
+		 T1.LONG_OBJID_NAME_T8,
+         T1.OBJID_T9, 
+		 T1.SHORT_OBJID_NAME_T9, 
+		 T1.LONG_OBJID_NAME_T9,
+         T1.OBJID_T10, 
+		 T1.SHORT_OBJID_NAME_T10, 
+		 T1.LONG_OBJID_NAME_T10,
+         T1.OBJID_T11, 
+		 T1.SHORT_OBJID_NAME_T11, 
+		 T1.LONG_OBJID_NAME_T11,
+         T1.OBJID_T12, 
+		 T1.SHORT_OBJID_NAME_T12, 
+		 T1.LONG_OBJID_NAME_T12,
+         T1.OBJID_T13, 
+		 T1.SHORT_OBJID_NAME_T13,
+		 T1.LONG_OBJID_NAME_T13,
+         T1.OBJID_T14, 
+		 T1.SHORT_OBJID_NAME_T14,
+		 T1.LONG_OBJID_NAME_T14,
+         T1.OBJID_T15, 
+		 T1.SHORT_OBJID_NAME_T15,
+		 T1.LONG_OBJID_NAME_T15,
+         T1.OBJID,
+		 CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+from DWIMD.DWI_HR_OA_PERNR_INFO_T t2
+left join  detail_data_02 t1
+on  t2.ORGEH = t1.OBJID;

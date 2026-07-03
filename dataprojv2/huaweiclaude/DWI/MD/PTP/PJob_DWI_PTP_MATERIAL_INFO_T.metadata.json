@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PTP_MATERIAL_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PTP",
+    "description": "SAP物料信息记录表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipur"
+}

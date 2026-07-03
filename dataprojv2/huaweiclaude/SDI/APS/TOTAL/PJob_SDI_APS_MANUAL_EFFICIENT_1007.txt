@@ -1,0 +1,15 @@
+insert overwrite table sdi.sdi_aps_manual_efficient_1007
+select 
+id,
+create_by,
+create_date,
+efficient,
+inv_org_id,
+plan_task_id,
+process_tech_order_id,
+update_by,
+update_date,
+wip_resource_id,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_manual_efficient_1007;

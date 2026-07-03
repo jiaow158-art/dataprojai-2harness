@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>2026年1-5月集团销售业绩预算达成分析报告</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f5f6fa; color: #2c3e50; line-height: 1.7; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .cover { background: linear-gradient(135deg, #1a3a5c 0%, #2c5f8a 100%); color: #fff; padding: 80px 60px; border-radius: 12px; margin-bottom: 40px; text-align: center; }
+  .cover h1 { font-size: 32px; margin-bottom: 16px; letter-spacing: 2px; }
+  .cover .subtitle { font-size: 18px; opacity: 0.85; margin-bottom: 30px; }
+  .cover .meta { font-size: 14px; opacity: 0.7; }
+  .section { background: #fff; border-radius: 10px; padding: 36px 40px; margin-bottom: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .section h2 { font-size: 22px; color: #1a3a5c; border-left: 4px solid #2c5f8a; padding-left: 14px; margin-bottom: 24px; }
+  .section h3 { font-size: 17px; color: #34495e; margin: 22px 0 12px; }
+  .section p { margin: 10px 0; font-size: 14.5px; }
+  .section ul { padding-left: 22px; margin: 10px 0; }
+  .section li { font-size: 14.5px; margin: 5px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13.5px; }
+  thead th { background: #1a3a5c; color: #fff; padding: 10px 12px; text-align: center; font-weight: 500; }
+  tbody td { padding: 9px 12px; border-bottom: 1px solid #e8ecf1; text-align: center; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #eef3f8; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .tag-red { background: #fdecea; color: #c0392b; }
+  .tag-orange { background: #fef3e2; color: #d35400; }
+  .tag-green { background: #e8f8f0; color: #27ae60; }
+  .tag-blue { background: #e8f0fe; color: #2980b9; }
+  .highlight-red { color: #c0392b; font-weight: 600; }
+  .highlight-green { color: #27ae60; font-weight: 600; }
+  .highlight-orange { color: #d35400; font-weight: 600; }
+  .kpi-row { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+  .kpi-card { flex: 1; min-width: 180px; background: linear-gradient(135deg, #f8fafc, #eef3f8); border-radius: 8px; padding: 20px; text-align: center; border: 1px solid #e0e6ed; }
+  .kpi-card .value { font-size: 28px; font-weight: 700; color: #1a3a5c; }
+  .kpi-card .label { font-size: 13px; color: #7f8c8d; margin-top: 6px; }
+  .kpi-card.alert .value { color: #c0392b; }
+  .finding-box { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; font-size: 14px; }
+  .action-box { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; font-size: 14px; }
+  .risk-box { background: #fdedec; border-left: 4px solid #e74c3c; padding: 14px 18px; border-radius: 0 6px 6px 0; margin: 14px 0; font-size: 14px; }
+  .footer { text-align: center; color: #95a5a6; font-size: 12px; padding: 30px 0 20px; border-top: 1px solid #e0e6ed; margin-top: 40px; }
+  .toc { background: #fff; border-radius: 10px; padding: 30px 40px; margin-bottom: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .toc h2 { font-size: 20px; color: #1a3a5c; margin-bottom: 16px; }
+  .toc ol { padding-left: 24px; }
+  .toc li { margin: 8px 0; font-size: 15px; }
+  .toc a { color: #2c5f8a; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .note { font-size: 12.5px; color: #7f8c8d; margin-top: 8px; font-style: italic; }
+  @media print { body { background: #fff; } .section { box-shadow: none; border: 1px solid #e0e6ed; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- 封面 -->
+<div class="cover">
+  <h1>2026年1-5月 集团销售业绩<br>预算达成分析报告</h1>
+  <div class="subtitle">全集团 / 事业部 / 渠道 / 区域 / 产品 / 客户 六维下钻</div>
+  <div class="meta">数据来源：DWS数仓 dm.dm_fin_operations_mix_sum_t &nbsp;|&nbsp; 报告日期：2026-06-12</div>
+</div>
+
+<!-- 目录 -->
+<div class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#ch1">集团预算达成总览</a></li>
+    <li><a href="#ch2">事业部维度分析</a></li>
+    <li><a href="#ch3">渠道维度分析（瓷砖事业部）</a></li>
+    <li><a href="#ch4">区域维度分析（瓷砖事业部）</a></li>
+    <li><a href="#ch5">产品维度分析（各大区Top品类 &amp; Top物料）</a></li>
+    <li><a href="#ch6">大板规格（918+）专项分析</a></li>
+    <li><a href="#ch7">零售渠道一级客户分析</a></li>
+    <li><a href="#ch8">综合诊断与建议</a></li>
+  </ol>
+</div>
+
+<!-- 第1章 -->
+<div class="section" id="ch1">
+  <h2>一、集团预算达成总览</h2>
+
+  <h3>1.1 月度预算达成率趋势</h3>
+  <table>
+    <thead><tr><th>月份</th><th>实际业绩(亿元)</th><th>预算(亿元)</th><th>月达成率</th></tr></thead>
+    <tbody>
+      <tr><td>1月</td><td>3.24</td><td>3.03</td><td><span class="highlight-green">106.8%</span></td></tr>
+      <tr><td>2月</td><td>0.66</td><td>1.05</td><td><span class="highlight-red">62.3%</span></td></tr>
+      <tr><td>3月</td><td>5.22</td><td>6.79</td><td><span class="highlight-red">76.8%</span></td></tr>
+      <tr><td>4月</td><td>5.41</td><td>6.86</td><td><span class="highlight-red">78.9%</span></td></tr>
+      <tr><td>5月</td><td>5.87</td><td>7.73</td><td><span class="highlight-red">75.9%</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.2 累计达成趋势</h3>
+  <table>
+    <thead><tr><th>截止月份</th><th>累计实际(亿元)</th><th>累计预算(亿元)</th><th>累计达成率</th></tr></thead>
+    <tbody>
+      <tr><td>1月</td><td>3.24</td><td>3.03</td><td><span class="highlight-green">106.8%</span></td></tr>
+      <tr><td>2月</td><td>3.89</td><td>4.08</td><td>95.3%</td></tr>
+      <tr><td>3月</td><td>9.11</td><td>10.87</td><td>83.7%</td></tr>
+      <tr><td>4月</td><td>14.51</td><td>17.73</td><td>81.9%</td></tr>
+      <tr><td>5月</td><td><strong>20.38</strong></td><td><strong>25.46</strong></td><td><strong><span class="highlight-red">80.0%</span></strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="kpi-row">
+    <div class="kpi-card alert"><div class="value">80.0%</div><div class="label">累计预算达成率</div></div>
+    <div class="kpi-card alert"><div class="value">-5.1亿</div><div class="label">累计预算缺口</div></div>
+    <div class="kpi-card"><div class="value">20.38亿</div><div class="label">累计实际业绩</div></div>
+    <div class="kpi-card"><div class="value">25.46亿</div><div class="label">累计预算目标</div></div>
+  </div>
+
+  <div class="finding-box">
+    <strong>核心结论：</strong>仅1月完成预算（107%），之后连续4个月未达标。累计达成率从2月起跌破100%，持续下滑至5月的80%，累计缺口约5.1亿元。后7个月需完成剩余预算120%+才能追回全年目标，压力极大。
+  </div>
+</div>
+
+<!-- 第2章 -->
+<div class="section" id="ch2">
+  <h2>二、事业部维度分析</h2>
+
+  <h3>2.1 各事业部累计达成（1-5月 YTD）</h3>
+  <table>
+    <thead><tr><th>事业部</th><th>累计实际(亿元)</th><th>累计预算(亿元)</th><th>累计达成率</th><th>评价</th></tr></thead>
+    <tbody>
+      <tr><td>国际营销中心</td><td>0.70</td><td>0.63</td><td><span class="highlight-green">110.8%</span></td><td><span class="tag tag-green">唯一超额</span></td></tr>
+      <tr><td>卫浴事业部</td><td>2.75</td><td>3.14</td><td>87.5%</td><td><span class="tag tag-orange">接近未达标</span></td></tr>
+      <tr><td>瓷砖事业部</td><td>16.87</td><td>21.60</td><td><span class="highlight-red">78.1%</span></td><td><span class="tag tag-red">缺口最大</span></td></tr>
+      <tr><td>丽适岩板</td><td>0.06</td><td>0.08</td><td><span class="highlight-red">69.2%</span></td><td><span class="tag tag-red">达成率最低</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 各事业部月度达成率趋势</h3>
+  <table>
+    <thead><tr><th>事业部</th><th>1月</th><th>2月</th><th>3月</th><th>4月</th><th>5月</th><th>趋势判断</th></tr></thead>
+    <tbody>
+      <tr><td>瓷砖事业部</td><td>107%</td><td class="highlight-red">49%</td><td>74%</td><td>79%</td><td>75%</td><td>3-5月在74-79%低位震荡</td></tr>
+      <tr><td>卫浴事业部</td><td>97%</td><td class="highlight-green">167%</td><td>94%</td><td class="highlight-red">70%</td><td>81%</td><td>波动大，4月骤降后5月回升</td></tr>
+      <tr><td>国际营销中心</td><td class="highlight-green">140%</td><td class="highlight-green">189%</td><td>82%</td><td class="highlight-green">107%</td><td>91%</td><td>1-2月超额，后续回落</td></tr>
+      <tr><td>丽适岩板</td><td class="highlight-red">58%</td><td class="highlight-red">58%</td><td>83%</td><td>71%</td><td>69%</td><td>始终未达标</td></tr>
+    </tbody>
+  </table>
+
+  <div class="finding-box">
+    <strong>核心结论：</strong>瓷砖事业部占总预算的85%，累计欠额约4.7亿，是集团整体未达标的主因。国际营销中心表现最好但体量小（0.7亿），对集团拉动有限。丽适岩板体量最小但达成率持续垫底。
+  </div>
+</div>
+
+<!-- 第3章 -->
+<div class="section" id="ch3">
+  <h2>三、渠道维度分析（瓷砖事业部）</h2>
+
+  <h3>3.1 渠道累计达成（1-5月 YTD）</h3>
+  <table>
+    <thead><tr><th>渠道</th><th>累计实际(亿元)</th><th>累计预算(亿元)</th><th>达成率</th><th>缺口额(亿元)</th></tr></thead>
+    <tbody>
+      <tr><td>零售渠道 (GD01)</td><td>7.40</td><td>10.23</td><td><span class="highlight-red">72.4%</span></td><td class="highlight-red">-2.83</td></tr>
+      <tr><td>工程渠道 (GD03)</td><td>7.22</td><td>8.19</td><td>88.2%</td><td>-0.96</td></tr>
+      <tr><td>整装渠道 (GD02)</td><td>2.24</td><td>3.19</td><td><span class="highlight-red">70.3%</span></td><td>-0.95</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 渠道月度达成率趋势</h3>
+  <table>
+    <thead><tr><th>渠道</th><th>1月</th><th>2月</th><th>3月</th><th>4月</th><th>5月</th><th>趋势判断</th></tr></thead>
+    <tbody>
+      <tr><td>零售</td><td>106%</td><td class="highlight-red">34%</td><td>77%</td><td>70%</td><td>69%</td><td class="highlight-red">持续下滑，未见拐点</td></tr>
+      <tr><td>工程</td><td class="highlight-green">122%</td><td>64%</td><td>76%</td><td class="highlight-green">93%</td><td>83%</td><td>波动大，4月回升后5月回落</td></tr>
+      <tr><td>整装</td><td>67%</td><td>42%</td><td>62%</td><td>79%</td><td>75%</td><td>底部回升中，仍低于80%</td></tr>
+    </tbody>
+  </table>
+
+  <div class="risk-box">
+    <strong>最大风险点 — 零售渠道：</strong>达成率从1月106%持续滑落到5月69%，没有企稳迹象，缺口2.83亿，占瓷砖事业部总缺口的60%。零售渠道是瓷砖事业部的核心基本盘，其持续下行是全集团业绩压力的核心来源。
+  </div>
+</div>
+
+<!-- 第4章 -->
+<div class="section" id="ch4">
+  <h2>四、区域维度分析（瓷砖事业部）</h2>
+
+  <h3>4.1 国内营销中心下属各中心</h3>
+  <table>
+    <thead><tr><th>销售中心</th><th>实际(万元)</th><th>预算(万元)</th><th>达成率</th><th>备注</th></tr></thead>
+    <tbody>
+      <tr><td>区域运营中心</td><td>1,424,907</td><td>1,877,956</td><td>75.9%</td><td>占87%体量</td></tr>
+      <tr><td>工程营销中心</td><td>159,551</td><td>178,900</td><td><span class="highlight-green">89.2%</span></td><td>相对最好</td></tr>
+      <tr><td>零售营销中心</td><td>42,630</td><td>47,231</td><td><span class="highlight-green">90.3%</span></td><td>相对最好</td></tr>
+      <tr><td>高端品牌营销中心</td><td>7,245</td><td>9,450</td><td>76.7%</td><td></td></tr>
+      <tr><td>生态新材营销中心</td><td>4,379</td><td>15,740</td><td><span class="highlight-red">27.8%</span></td><td>新业务，预算激进</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 区域运营中心 — 各大区累计达成率</h3>
+  <table>
+    <thead><tr><th>大区</th><th>实际(万元)</th><th>预算(万元)</th><th>达成率</th><th>缺口(万元)</th></tr></thead>
+    <tbody>
+      <tr><td>鲁豫晋运营中心</td><td>153,885</td><td>188,978</td><td><span class="highlight-green">81.4%</span></td><td>-35,093</td></tr>
+      <tr><td>西北运营中心</td><td>115,585</td><td>146,400</td><td>79.0%</td><td>-30,815</td></tr>
+      <tr><td>华北运营中心</td><td>136,344</td><td>173,980</td><td>78.4%</td><td>-37,636</td></tr>
+      <tr><td>西南运营中心</td><td>186,484</td><td>238,054</td><td>78.3%</td><td>-51,570</td></tr>
+      <tr><td>华东运营中心</td><td>260,171</td><td>349,424</td><td>74.5%</td><td class="highlight-red">-89,253</td></tr>
+      <tr><td>粤西运营中心</td><td>152,433</td><td>199,414</td><td>76.4%</td><td>-46,981</td></tr>
+      <tr><td>粤东运营中心</td><td>152,611</td><td>208,839</td><td>73.1%</td><td>-56,228</td></tr>
+      <tr><td>湘鄂运营中心</td><td>114,100</td><td>156,417</td><td>72.9%</td><td>-42,317</td></tr>
+      <tr><td><span class="highlight-red">赣皖运营中心</span></td><td>108,676</td><td>153,243</td><td><span class="highlight-red">70.9%</span></td><td>-44,567</td></tr>
+      <tr><td><span class="highlight-red">东北运营中心</span></td><td>44,617</td><td>63,206</td><td><span class="highlight-red">70.6%</span></td><td>-18,589</td></tr>
+    </tbody>
+  </table>
+
+  <div class="finding-box">
+    <strong>核心结论：</strong>华东运营中心体量最大（26亿）但缺口也最大（8.9亿），是零售+区域双重拖累的集中点。赣皖（70.9%）和东北（70.6%）达成率最低，是两个最需要关注的区域。
+  </div>
+</div>
+
+<!-- 第5章 -->
+<div class="section" id="ch5">
+  <h2>五、产品维度分析</h2>
+
+  <h3>5.1 各大区 Top 5 品类</h3>
+  <table>
+    <thead><tr><th>排名</th><th>华东</th><th>西南</th><th>鲁豫晋</th><th>粤东</th><th>粤西</th><th>西北</th><th>华北</th><th>湘鄂</th><th>赣皖</th><th>东北</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>抛釉砖<br><strong>10,542</strong></td><td>抛釉砖<br>8,886</td><td>抛釉砖<br>9,460</td><td>抛釉砖<br>6,581</td><td>抛釉砖<br>6,383</td><td>抛釉砖<br>7,005</td><td>抛釉砖<br>6,478</td><td>抛釉砖<br>5,242</td><td>抛釉砖<br>5,178</td><td>抛釉砖<br>1,993</td></tr>
+      <tr><td>2</td><td>仿古砖<br><strong>10,131</strong></td><td>仿古砖<br>6,252</td><td>仿古砖<br>3,860</td><td>仿古砖<br>5,181</td><td>仿古砖<br>5,686</td><td>仿古砖<br>2,395</td><td>仿古砖<br>3,830</td><td>仿古砖<br>4,204</td><td>仿古砖<br>3,527</td><td>仿古砖<br>1,961</td></tr>
+      <tr><td>3</td><td>精瓷中板<br>2,870</td><td>精瓷中板<br>1,968</td><td>精瓷中板<br>1,504</td><td>精瓷中板<br>787</td><td>瓷片<br>890</td><td>精瓷中板<br>1,390</td><td>精瓷中板<br>1,566</td><td>精瓷中板<br>1,131</td><td>精瓷中板<br>1,043</td><td>精瓷中板<br>337</td></tr>
+      <tr><td>4</td><td>瓷片<br>1,268</td><td>瓷片<br>698</td><td>瓷片<br>214</td><td>墙板<br>677</td><td>精瓷中板<br>861</td><td>瓷片<br>608</td><td>瓷片<br>288</td><td>瓷片<br>187</td><td>瓷片<br>448</td><td>瓷片<br>76</td></tr>
+      <tr><td>5</td><td>瓷砖配套<br>250</td><td>瓷砖配套<br>256</td><td>瓷砖胶<br>89</td><td>瓷片<br>512</td><td>瓷砖配套<br>201</td><td>瓷砖配套<br>78</td><td>玻化砖<br>120</td><td>墙板<br>167</td><td>玻化砖<br>257</td><td>玻化砖<br>46</td></tr>
+    </tbody>
+  </table>
+  <p class="note">单位：万元。数据范围：瓷砖事业部-区域运营中心，2026年1-5月。</p>
+
+  <h3>5.2 各大区 Top 物料明细</h3>
+  <table>
+    <thead><tr><th>大区</th><th>#1 物料</th><th>达成额(万)</th><th>#2 物料</th><th>达成额(万)</th><th>#3 物料</th><th>达成额(万)</th></tr></thead>
+    <tbody>
+      <tr><td>华东</td><td>800X800菱花白</td><td><strong>524</strong></td><td>800X800爱丁堡灰</td><td>318</td><td>800*800抛釉砖(上海工程)</td><td>313</td></tr>
+      <tr><td>西北</td><td>800X800微云</td><td><strong>730</strong></td><td>800X800安卡拉</td><td>298</td><td>1500X750素写</td><td>296</td></tr>
+      <tr><td>鲁豫晋</td><td>800X800浅麦</td><td>474</td><td>800X800素写</td><td>426</td><td>800X800微云</td><td>374</td></tr>
+      <tr><td>华北</td><td>800X800素写</td><td>436</td><td>800X800微云</td><td>316</td><td>800X800浅麦</td><td>254</td></tr>
+      <tr><td>粤东</td><td>1200X600利纳灰</td><td>249</td><td>800X800微·摩登灰</td><td>240</td><td>1200X600云纱白</td><td>196</td></tr>
+      <tr><td>西南</td><td>800*800抛釉砖(广西工程)</td><td>290</td><td>1200X600菱花白</td><td>259</td><td>1500X750菱花白</td><td>225</td></tr>
+      <tr><td>粤西</td><td>800*800仿古砖(广佛工程)</td><td>524</td><td>800*800仿古砖(广佛工程)</td><td>412</td><td>800*800仿古砖(广佛工程)</td><td>302</td></tr>
+      <tr><td>湘鄂</td><td>1500X750菱花白</td><td>207</td><td>1500X750安卡拉</td><td>166</td><td>1200X600菱花白</td><td>161</td></tr>
+      <tr><td>赣皖</td><td>800X800安卡拉</td><td>188</td><td>1500X750菱花白</td><td>152</td><td>800X800素写</td><td>150</td></tr>
+      <tr><td>东北</td><td>1500X750菱花白</td><td>237</td><td>800X800菱花白</td><td>167</td><td>1500X750杏花雨</td><td>126</td></tr>
+    </tbody>
+  </table>
+
+  <div class="finding-box">
+    <strong>明星单品 — 菱花白：</strong>横跨多规格（800x800/1500x750/1200x600/800x400），在7/10大区进入Top 5，是集团级现象级单品。华东菱花白多规格合计约1,439万元。
+  </div>
+  <div class="finding-box">
+    <strong>产品同质化严重：</strong>10个大区前两名都是"抛釉砖+仿古砖"，全集团产品策略缺乏区域差异化。赣皖和东北达成率最低（70.9%/70.6%）但产品结构与其他大区高度雷同，问题可能在渠道能力而非产品组合。
+  </div>
+</div>
+
+<!-- 第6章 -->
+<div class="section" id="ch6">
+  <h2>六、大板规格（918+）专项分析</h2>
+  <p>918及以上规格定义：长边 &ge; 1800mm 的产品，包括 1800x900(918)、2600x800、2700x1200、2400x1200 等。</p>
+
+  <h3>6.1 各区域 918+ 销售面积汇总</h3>
+  <table>
+    <thead><tr><th>大区</th><th>918+面积(万㎡)</th><th>达成额(万元)</th><th>单价(元/㎡)</th><th>全规格总面积(万㎡)</th><th>918+占比</th></tr></thead>
+    <tbody>
+      <tr><td class="highlight-green">粤东</td><td><strong>38.5</strong></td><td>2,640</td><td><span class="highlight-red">68.6</span></td><td>362.2</td><td><span class="highlight-green">10.6%</span></td></tr>
+      <tr><td>华东</td><td>30.5</td><td>2,387</td><td>78.4</td><td>693.9</td><td>4.4%</td></tr>
+      <tr><td>西南</td><td>22.4</td><td>1,609</td><td>71.9</td><td>511.0</td><td>4.4%</td></tr>
+      <tr><td>粤西</td><td>15.6</td><td>1,376</td><td>88.2</td><td>370.9</td><td>4.2%</td></tr>
+      <tr><td>湘鄂</td><td>14.6</td><td>1,058</td><td>72.6</td><td>317.1</td><td>4.6%</td></tr>
+      <tr><td>鲁豫晋</td><td>13.7</td><td>1,105</td><td>80.4</td><td>426.6</td><td>3.2%</td></tr>
+      <tr><td>赣皖</td><td>10.8</td><td>819</td><td>76.1</td><td>319.4</td><td>3.4%</td></tr>
+      <tr><td>华北</td><td>7.4</td><td>601</td><td>80.9</td><td>371.0</td><td><span class="highlight-red">2.0%</span></td></tr>
+      <tr><td>西北</td><td>6.9</td><td>664</td><td><strong>96.8</strong></td><td>288.9</td><td><span class="highlight-red">2.4%</span></td></tr>
+      <tr><td>东北</td><td>4.0</td><td>337</td><td>83.7</td><td>122.8</td><td>3.3%</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.2 主力规格分布</h3>
+  <table>
+    <thead><tr><th>规格</th><th>华东</th><th>西南</th><th>鲁豫晋</th><th>粤东</th><th>粤西</th><th>西北</th><th>华北</th><th>湘鄂</th><th>赣皖</th><th>东北</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1800X900</strong></td><td><strong>20.5</strong></td><td><strong>20.2</strong></td><td><strong>12.9</strong></td><td><strong>18.8</strong></td><td><strong>11.2</strong></td><td><strong>6.4</strong></td><td><strong>6.6</strong></td><td><strong>10.3</strong></td><td><strong>9.6</strong></td><td><strong>3.8</strong></td></tr>
+      <tr><td>2600X800</td><td>3.5</td><td>0.7</td><td>0.3</td><td>0.8</td><td>1.1</td><td>0.2</td><td>0.3</td><td>0.5</td><td>0.4</td><td>0.1</td></tr>
+      <tr><td>2700X1200</td><td>1.7</td><td>0.6</td><td>0.4</td><td>0.8</td><td>0.9</td><td>0.3</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.2</td></tr>
+      <tr><td>2400X1200</td><td>0.4</td><td>&mdash;</td><td>0.01</td><td>3.1</td><td>1.3</td><td>0.01</td><td>&mdash;</td><td>0.1</td><td>0.1</td><td>&mdash;</td></tr>
+    </tbody>
+  </table>
+  <p class="note">单位：万㎡。1800X900 (918) 占全部 918+ 面积的 80-90%，其他大规格尚处于市场导入期。</p>
+
+  <div class="finding-box">
+    <strong>粤东是大板高地：</strong>918+ 占比 10.6%，是其他区域的 2-5 倍。但单价仅 68.6 元/㎡，全集团单价最低。西北单价最高（96.8元/㎡），渗透率仅 2.4%，存在增长空间。
+  </div>
+</div>
+
+<!-- 第7章 -->
+<div class="section" id="ch7">
+  <h2>七、零售渠道一级客户分析</h2>
+  <p>分析范围：瓷砖事业部零售渠道(GD01) + 一级A(B0) + 一级B(B1) 客户，共 1,575 家。</p>
+
+  <h3>7.1 客户业绩分布</h3>
+  <table>
+    <thead><tr><th>业绩档位</th><th>客户数</th><th>占比</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td class="highlight-red">零业绩</td><td><strong>71</strong></td><td>4.5%</td><td>在册但 1-5 月无任何销售</td></tr>
+      <tr><td class="highlight-orange">&lt;5万</td><td><strong>273</strong></td><td>17.3%</td><td>极低，月均不足1万</td></tr>
+      <tr><td>5-20万</td><td>459</td><td>29.1%</td><td>偏低，月均1-4万</td></tr>
+      <tr><td>20-50万</td><td>480</td><td>30.5%</td><td>中等</td></tr>
+      <tr><td>50-100万</td><td>202</td><td>12.8%</td><td>良好</td></tr>
+      <tr><td>100-300万</td><td>99</td><td>6.3%</td><td>优秀</td></tr>
+      <tr><td class="highlight-green">&gt;300万</td><td>24</td><td>1.5%</td><td>头部</td></tr>
+    </tbody>
+  </table>
+
+  <div class="kpi-row">
+    <div class="kpi-card alert"><div class="value">344家</div><div class="label">零业绩+&lt;5万 (21.8%)</div></div>
+    <div class="kpi-card alert"><div class="value">71家</div><div class="label">完全零业绩</div></div>
+    <div class="kpi-card"><div class="value">24家</div><div class="label">头部(&gt;300万)</div></div>
+    <div class="kpi-card"><div class="value">1.5%</div><div class="label">头部客户占比</div></div>
+  </div>
+
+  <h3>7.2 各区域零业绩/低业绩分布</h3>
+  <table>
+    <thead><tr><th>大区</th><th>总客户</th><th>零业绩</th><th>零业绩占比</th><th>&lt;20万客户</th><th>&lt;20万占比</th></tr></thead>
+    <tbody>
+      <tr><td>西南</td><td>271</td><td class="highlight-red">13</td><td>4.8%</td><td>155</td><td class="highlight-red">57%</td></tr>
+      <tr><td>湘鄂</td><td>163</td><td>12</td><td class="highlight-red">7.4%</td><td>65</td><td>40%</td></tr>
+      <tr><td class="highlight-red">东北</td><td>107</td><td>10</td><td class="highlight-red">9.3%</td><td>84</td><td class="highlight-red">79%</td></tr>
+      <tr><td>ART+</td><td>45</td><td>6</td><td class="highlight-red">13.3%</td><td>41</td><td class="highlight-red">91%</td></tr>
+      <tr><td>华北</td><td>107</td><td>6</td><td>5.6%</td><td>40</td><td>37%</td></tr>
+      <tr><td>梦之家</td><td>160</td><td>2</td><td>1.3%</td><td>113</td><td class="highlight-red">71%</td></tr>
+      <tr><td>鲁豫晋</td><td>220</td><td>5</td><td>2.3%</td><td>81</td><td>37%</td></tr>
+      <tr><td>华东</td><td>109</td><td>3</td><td>2.8%</td><td>30</td><td>28%</td></tr>
+      <tr><td>西北</td><td>135</td><td>3</td><td>2.2%</td><td>58</td><td>43%</td></tr>
+      <tr><td>粤东</td><td>49</td><td>4</td><td>8.2%</td><td>26</td><td>53%</td></tr>
+      <tr><td>赣皖</td><td>130</td><td>5</td><td>3.8%</td><td>38</td><td>29%</td></tr>
+      <tr><td>粤西</td><td>49</td><td>1</td><td>2.0%</td><td>19</td><td>39%</td></tr>
+    </tbody>
+  </table>
+
+  <div class="risk-box">
+    <strong>东北重灾区：</strong>零业绩占比 9.3%（最高），79% 的一级客户月均不到 4 万。零业绩客户全部在东北小县城（敦化、呼玛、抚远、汤原等），属于下沉市场但未有效覆盖。
+  </div>
+</div>
+
+<!-- 第8章 -->
+<div class="section" id="ch8">
+  <h2>八、综合诊断与建议</h2>
+
+  <h3>8.1 问题定位总结</h3>
+  <table>
+    <thead><tr><th>层级</th><th>核心问题</th><th>影响</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag tag-blue">集团</span></td><td>累计预算达成率 80%，缺口 5.1 亿</td><td>全年目标承压</td></tr>
+      <tr><td><span class="tag tag-red">事业部</span></td><td>瓷砖事业部（占85%预算）达成率仅 78.1%</td><td>主因</td></tr>
+      <tr><td><span class="tag tag-red">渠道</span></td><td>零售渠道达成率 72.4% 且持续下滑，缺口 2.83 亿</td><td>最大单一拖累</td></tr>
+      <tr><td><span class="tag tag-orange">区域</span></td><td>华东缺口最大（8.9亿），赣皖/东北达成率最低（~71%）</td><td>结构性问题</td></tr>
+      <tr><td><span class="tag tag-orange">客户</span></td><td>344家一级客户（21.8%）零业绩或极低业绩</td><td>客户质量堪忧</td></tr>
+      <tr><td><span class="tag tag-blue">产品</span></td><td>产品结构高度同质化，缺乏区域差异化策略</td><td>竞争力不足</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.2 行动建议</h3>
+  <table>
+    <thead><tr><th>优先级</th><th>行动项</th><th>范围</th><th>预期效果</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag tag-red">P0</span></td><td>零售渠道止跌：诊断1-5月持续下滑原因（竞品/政策/库存），制定6-12月追赶方案</td><td>零售渠道 GD01</td><td>稳住基本盘</td></tr>
+      <tr><td><span class="tag tag-red">P0</span></td><td>激活/清退零业绩客户：对71家零业绩客户逐一排查，制定激活或退出机制</td><td>71家零业绩客户</td><td>释放渠道资源</td></tr>
+      <tr><td><span class="tag tag-orange">P1</span></td><td>华东大区重点帮扶：缺口8.9亿占集团总缺口的35%，需专项方案</td><td>华东运营中心</td><td>最大边际改善</td></tr>
+      <tr><td><span class="tag tag-orange">P1</span></td><td>赣皖/东北渠道重建：达成率最低（~71%），产品结构同质化说明问题在渠道能力</td><td>赣皖/东北运营中心</td><td>结构性改善</td></tr>
+      <tr><td><span class="tag tag-blue">P2</span></td><td>918+大板市场拓展：华北/西北渗透率低(2.0-2.4%)但单价高(81-97元)，可加大推广</td><td>华北/西北运营中心</td><td>增量市场</td></tr>
+      <tr><td><span class="tag tag-blue">P2</span></td><td>产品差异化：当前全集团产品策略雷同，粤东的墙板品类在低达成率区域有推广潜力</td><td>各区域运营中心</td><td>竞争力提升</td></tr>
+      <tr><td><span class="tag tag-blue">P2</span></td><td>低产出客户盘点：273家&lt;5万客户需区分"新开户"还是"衰退中"，对症下药</td><td>273家低产出客户</td><td>客户质量提升</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 风险提示</h3>
+  <div class="risk-box">
+    <strong>全年目标风险：</strong>截至5月底累计达成率仅80%，缺口5.1亿元。后7个月需完成剩余预算的120%+才能追回全年目标，从当前趋势看难度极大。建议管理层重新评估全年预算可达性，必要时调整预期并制定应急方案。
+  </div>
+</div>
+
+<!-- 数据溯源 -->
+<div class="section">
+  <h2>数据溯源与口径说明</h2>
+  <table>
+    <thead><tr><th>项目</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>数据来源</td><td>DWS数仓 DM 层 <code>dm.dm_fin_operations_mix_sum_t</code></td></tr>
+      <tr><td>数据范围</td><td>2026年1月 ~ 2026年5月（6月数据不完整，未纳入）</td></tr>
+      <tr><td>业绩口径</td><td>含税达成额 <code>ambperformance</code>（默认口径）</td></tr>
+      <tr><td>预算口径</td><td>Mix表内置预算字段 <code>ambperformance_ys</code>（年初编制值）</td></tr>
+      <tr><td>组织过滤</td><td>集团层级：<code>data_source IN ('S','T','D','')</code></td></tr>
+      <tr><td>已知限制</td><td>预算未分解到客户级别；预算为年初编制值，不反映年中调整</td></tr>
+      <tr><td>Skill版本</td><td>sales-performance-analyst / sales-performance-knowledge</td></tr>
+      <tr><td>分析引擎</td><td>Claude Code + Anthropic 4层 Agentic Analytics Stack</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <p>本报告由 AI 分析引擎自动生成 &nbsp;|&nbsp; 数据截止日期：2026-06-12 &nbsp;|&nbsp; 仅供参考，最终数据以 DWS 数仓为准</p>
+</div>
+
+</div>
+</body>
+</html>

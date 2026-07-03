@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_DATA_MATERIAL_FACTORY_T_HIS_20230422",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD",
+    "description": "物料工厂主数据历史表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_CC_SYSTEM_TALK_CONTENT_F",
+    "type": "HiveSQL",
+    "directory": "/DM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

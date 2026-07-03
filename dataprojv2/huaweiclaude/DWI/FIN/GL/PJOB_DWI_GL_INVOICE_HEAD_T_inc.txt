@@ -1,0 +1,10 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2025/06/07 16:46:05 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -
+SELECT case when concat_ws(",",collect_set(concat("'",period_id_m,"'")))='' then  "''" else concat_ws(",",collect_set(concat("'",period_id_m,"'"))) end    as period_id_m
+ from sdi.sdi_vbrk_1001_inc_month  a

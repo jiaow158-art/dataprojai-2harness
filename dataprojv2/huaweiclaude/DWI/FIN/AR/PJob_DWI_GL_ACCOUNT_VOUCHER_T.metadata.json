@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GL_ACCOUNT_VOUCHER_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "会计凭证，来源表SDI_ACDOCA_1001",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

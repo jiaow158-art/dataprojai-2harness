@@ -1,0 +1,310 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/05/26 10:40:49 GMT+08:00
+-- update 20250516 新增DPI、绿家、辅材
+-- 修复ART+因为层级调整导致没数问题
+-- ******************************************************************** --
+--不含1+n的业绩: 预测(金额、面积) + 达成(金额、面积)
+DELETE FROM dm.dm_target_achievement 
+WHERE start_month = 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end;
+
+insert into dm.dm_target_achievement
+with A as(
+select  
+	case when  substr(stat_month,-2,2)='01' then  substr(stat_month,1,4)||'02' else stat_month end as start_month,
+	case 
+		when sub_name in ('国贸','国际营销') then  '国际营销'
+		else sub_name
+	end as sub_name,
+	case 
+		when sub_grp_name in ('国贸','国际营销') then  '国际营销'
+		else sub_grp_name
+	end as sub_grp_name,
+	sum(zxsyj_dy) as ndn_amount_dy, --实际金额
+	sum(zxsmj_dy) as ndn_area_dy, --实际面积
+	sum(yc_area) as ndn_area_yc, --预测面积
+	sum(yc_amount) as ndn_amount_yc--预测金额
+from DM.DM_RPT_DEMAND_FORECAST_T
+where 1=1
+-- and sub_grp_name not in ('ART+')
+and case when  substr(stat_month,-2,2)='01' then  substr(stat_month,1,4)||'02' else stat_month end =
+	case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end
+group by start_month,sub_name,sub_grp_name
+)
+
+,A1_groups as(
+select distinct start_month_A1,sub_name,sub_grp_name from (
+select distinct 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end as start_month_A1
+    ,sub_name
+    ,sub_grp_name 
+from DM.DM_RPT_DEMAND_FORECAST_T
+where stat_month >= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 month', 1, 7),'-','')
+union all 
+--DPI、绿家、辅材
+select 
+	distinct case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end
+	,node_desc5,node_desc5 
+from dm.dm_rpt_sales_group_t
+where node_name5 in ('H03230604','H03230605','H03230612'))
+)
+
+--含1+n的业绩： 达成(金额、面积)
+,B as(
+select 
+    case when  substr(REPLACE(a.calmonth,'-',''),-2,2)='01' then  substr(REPLACE(a.calmonth,'-',''),1,4)||'02' 
+    		else REPLACE(a.calmonth,'-','') end  as start_month,
+    case
+	    when b.node_name4 in ('H04230600', 'H04230655') then b.node_desc4 --区域运营中心 + 直营经营管理板块
+        when b.node_name3 in ('H03230617', 'H03230628','REQ') then b.node_desc3 --国际营销系统 + 梦之家事业部
+        when b.node_name5 in ('H05240601', 'Z031', 'H05230609','H03230604','H03230627','H03230605','H03230612') then b.node_desc5 --商机资源开发部 + 幕墙工程中心 + 战略工程中心
+        end sub_name,
+    case
+        when b.node_name4 in ('H04230600', 'H04230655')  then b.node_desc5
+        when b.node_desc5 in ('幕墙工程中心') then '幕墙'
+        when b.node_desc5 in ('商机资源开发部','战略客户部') or b.node_desc6 in ('商机资源开发部','战略客户部')then '资源开发运营部'
+        when b.node_desc5 in ('战略工程中心','战略地产') then '战略工程'
+        when b.node_desc3 in ('国际营销系统','瓷砖国际营销中心') then '国际营销'
+        when b.node_desc3 in ('梦之家事业部','梦之家') then '梦之家'
+        when b.node_desc5 in ('DPI','辅材','绿家','ART+') then b.node_desc5
+        when b.node_desc6 in ('DPI','辅材','绿家','ART+') then b.node_desc6
+        end  sub_grp_name,
+    sum(a.ambperformance) adn_amount_dy,
+    sum(zxsmj)        adn_area_dy
+from dm.dm_ambv2_zzt_xssr_t a
+         left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join DM.DM_RPT_PROD_LEVEL_T c on a.ZPRODH3 = c.prod_code3 and c.PROD_CODE3 IS NOT NULL
+where 1=1 
+	and NODE_NAME2 = 'H11000001'
+  	and ((node_name4 in ('H04230600', 'H04230655') and
+        (strpos(node_desc5, '子公司') > 0 or strpos(node_desc5, '运营中心') > 0))
+    	or (node_name3 in ('H03230617', 'H03230628','REQ'))
+    	or node_name5 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612')
+        or node_name6 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612') --ART+层级调整
+    )
+    and data_source <> 'U'
+--    and (lve2_code not in ('ART+', 'DPI', '1+N产品', '其他品类') or lve3_code = '其他杂类')
+group by start_month,sub_name, sub_grp_name
+)
+
+,tem as (
+--含1+n的业绩：达成(年累计金额、年累计面积)
+select 
+    case when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end as start_month,
+    case
+        when b.node_name4 in ('H04230600', 'H04230655')  then b.node_desc5
+        when b.node_desc5 in ('幕墙工程中心') then '幕墙'
+        when b.node_desc5 in ('商机资源开发部','战略客户部') then '资源开发运营部'
+        when b.node_desc5 in ('战略工程中心','战略地产') then '战略工程'
+        when b.node_desc3 in ('国际营销系统','瓷砖国际营销中心') then '国际营销'
+        when b.node_desc3 in ('梦之家事业部', '梦之家') then '梦之家'
+        when b.node_desc5 in ('DPI','辅材','绿家','ART+') then b.node_desc5
+        when b.node_desc6 in ('DPI','辅材','绿家','ART+') then b.node_desc6
+        end  sub_grp_name,
+    sum(a.ambperformance) adn_acc_amount,
+--    sum(a.performance_1n)           adn_acc_amount,
+    sum(zxsmj)        adn_acc_area,
+	sum(0) as adn_amount_target,
+	sum(0) as adn_area_target,
+	sum(0) as adn_acc_amount_target,
+	sum(0)  as adn_acc_area_target,
+	sum(0) as adn_estimated_pickup_area
+from dm.dm_ambv2_zzt_xssr_t a
+         left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join DM.DM_RPT_PROD_LEVEL_T c on a.ZPRODH3 = c.prod_code3 and c.PROD_CODE3 IS NOT NULL
+where 1=1 
+    and NODE_NAME2 = 'H11000001'
+  	and ((node_name4 in ('H04230600', 'H04230655') and
+        (strpos(node_desc5, '子公司') > 0 or strpos(node_desc5, '运营中心') > 0))
+    	or (node_name3 in ('H03230617', 'H03230628','REQ'))
+    	or node_name5 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612')
+        or node_name6 in ('Z031', 'H05230609', 'H05240601','H03230604','H03230627','H03230605','H03230612')--ART+层级调整
+    )
+    and SUBSTR(REPLACE(a.calmonth,'-',''),1,4) = REPLACE(SUBSTR(date('${PERIOD_ID_D}'),1,4),'-','') 
+    and REPLACE(a.calmonth,'-','') <= REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','')
+    and data_source <> 'U'
+--    and (lve2_code not in ('ART+', 'DPI', '1+N产品', '其他品类') or lve3_code = '其他杂类')
+group by start_month,sub_grp_name
+
+union all
+
+--含1+n的业绩：目标
+select 
+	case 
+		when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(stat_month,1,7),'-','') end as start_month,
+	case
+        when b.node_name4 in ('H04230600', 'H04230655')  then b.node_desc5
+        when b.node_desc5 in ('幕墙工程中心') then '幕墙'
+        when b.node_desc5 in ('商机资源开发部','战略客户部') or  b.node_desc6 in ('商机资源开发部','战略客户部') then '资源开发运营部'
+        when b.node_desc5 in ('战略工程中心','战略地产') then '战略工程'
+        when b.node_desc3 in ('国际营销系统','瓷砖国际营销中心') then '国际营销'
+        when b.node_desc3 in ('梦之家事业部','梦之家') then '梦之家'
+        when b.node_desc5 in ('DPI','辅材','绿家','ART+') then b.node_desc5
+        when b.node_desc6 in ('DPI','辅材','绿家','ART+') then b.node_desc6
+        end  as sub_grp_name,
+	sum(0) as adn_acc_amount,
+	sum(0) as adn_acc_area,
+	sum(prod_it_amt1) as adn_amount_target,
+	sum(sales_area) as adn_area_target,
+	sum(0) as adn_acc_amount_target,
+	sum(0)  as adn_acc_area_target,
+	sum(0) as adn_estimated_pickup_area
+from upload.upload_achievement_budget_t t1
+left join dm.dm_rpt_sales_group_t b on  t1.sale_grp_name =  b.node_name9
+where 1=1
+and data_source in ('S','D')
+and case when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(stat_month,1,7),'-','') end
+	= 
+	case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+and NODE_NAME2 = 'H11000001'
+group by start_month,sub_grp_name
+
+union all
+
+--含1+n的业绩：年累计目标
+select 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end as start_month,
+	case
+        when b.node_name4 in ('H04230600', 'H04230655')  then b.node_desc5
+        when b.node_desc5 in ('幕墙工程中心') then '幕墙'
+        when b.node_desc5 in ('商机资源开发部','战略客户部') then '资源开发运营部'
+        when b.node_desc5 in ('战略工程中心','战略地产') then '战略工程'
+        when b.node_desc3 in ('国际营销系统','瓷砖国际营销中心') then '国际营销'
+        when b.node_desc3 in ('梦之家事业部','梦之家') then '梦之家'
+        when b.node_desc5 in ('DPI','辅材','绿家','ART+') then b.node_desc5
+        end  as sub_grp_name,
+	sum(0) as adn_acc_amount,
+	sum(0) as adn_acc_area,
+	sum(0) as adn_amount_target,
+	sum(0) as adn_area_target,
+	sum(prod_it_amt1) as adn_acc_amount_target ,
+	sum(sales_area) as adn_acc_area_target,
+	sum(0) as adn_estimated_pickup_area
+from upload.upload_achievement_budget_t t1
+left join dm.dm_rpt_sales_group_t b on  t1.sale_grp_name =  b.node_name9
+where 1=1
+and data_source in ('S','D')
+and SUBSTR(stat_month,1,4) = SUBSTR(date('${PERIOD_ID_D}') ,1,4)
+and case when  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(stat_month,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(stat_month,1,7),'-','') end
+	<= 
+	case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+			else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+and NODE_NAME2 = 'H11000001'
+group by start_month,sub_grp_name
+	
+union ALL 
+
+--1+N预测业绩
+select stat_month as start_month,
+case 
+    when sales_department in ('战略工程中心','战略地产') then '战略工程'
+    when  sales_department in ('商机资源开发部','战略客户部') then '资源开发运营部'
+    else sales_department
+end as sub_grp_name,
+sum(0) as adn_acc_amount,
+sum(0) as adn_acc_area,
+sum(0) as adn_amount_target,
+sum(0) as adn_area_target,
+sum(0) as adn_acc_amount_target ,
+sum(0) as adn_acc_area_target,
+sum(adn_estimated_pickup_area) as adn_estimated_pickup_area
+from upload.upload_sd_forecast_adn_achievement_t
+where start_month = 	
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),-2,2)='01' then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}') ,1,7),'-','') end
+group by start_month,
+case 
+    when sales_department in ('战略工程中心','战略地产') then '战略工程'
+    when  sales_department in ('商机资源开发部','战略客户部') then '资源开发运营部'
+    else sales_department
+end
+)
+,tem1 as(
+select
+	start_month,
+	sub_grp_name,
+	sum(adn_acc_amount) as adn_acc_amount,
+	sum(adn_acc_area) as adn_acc_area,
+	sum(adn_amount_target) as adn_amount_target,
+	sum(adn_area_target) as adn_area_target,
+	sum(adn_acc_amount_target) as adn_acc_amount_target ,
+	sum(adn_acc_area_target) as adn_acc_area_target,
+	sum(adn_estimated_pickup_area) as adn_estimated_pickup_area
+from tem
+group by start_month,sub_grp_name
+),
+--20240412l两个运营中心合并，需要剔除，但是不影响历史刷数
+sub_grp_control as 
+(
+select 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end as start_month,
+'浙江运营中心' as sub_grp_name
+union all
+select 
+    case 
+		when  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),-2,2)='01' 
+		then  substr(REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-',''),1,4)||'02' 
+		else REPLACE(SUBSTR(date('${PERIOD_ID_D}')  ,1,7),'-','')
+	end as start_month,
+'江苏运营中心' as sub_grp_name
+)
+select 
+	m1.start_month_A1 as start_month,
+	m1.sub_name,
+	m1.sub_grp_name,
+	A.ndn_amount_yc, --不含1+n 预测面积
+	A.ndn_area_yc, --不含1+n 预测金额
+	A.ndn_amount_dy, --不含1+n 实际达成金额
+	A.ndn_area_dy, --不含1+n 实际达成面积
+	
+	C.adn_amount_target/10000 as adn_amount_target, --含1+n 金额目标
+	C.adn_area_target/10000 as adn_area_target, --含1+n 面积目标
+	C.adn_estimated_pickup_area as adn_amount_yc, --含1+n 预测金额
+	0 as adn_area_yc, --含1+n 预测面积
+	B.adn_amount_dy/10000 as adn_amount_dy, --含1+n 达成金额
+	B.adn_area_dy/10000 as adn_area_dy, --含1+n 达成面积
+	C.adn_acc_amount_target/10000 as adn_acc_amount_target, --含1+n 年累计金额目标
+	C.adn_acc_area_target/10000 as adn_acc_area_target, --含1+n 年累计面积目标
+	C.adn_acc_amount/10000 as adn_acc_amount, --含1+n 年累计达成金额
+	C.adn_acc_area/10000 as adn_acc_area, --含1+n 年累计达成面积
+	NOW() as dw_last_update_date
+from A1_groups m1
+left join A on m1.start_month_A1 = A.start_month  and  m1.sub_grp_name = A.sub_grp_name
+left join B on m1.start_month_A1 = B.start_month and  m1.sub_grp_name = B.sub_grp_name
+left join tem1 C on m1.start_month_A1 = C.start_month and  m1.sub_grp_name = C.sub_grp_name
+left join sub_grp_control D on m1.start_month_A1 = D.start_month  and  m1.sub_grp_name = D.sub_grp_name and D.start_month >= 202504
+where D.sub_grp_name is null

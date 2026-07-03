@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_AR_RECEIVABLE_TURNOVER_DAYS_F",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "计算应收周转天数",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

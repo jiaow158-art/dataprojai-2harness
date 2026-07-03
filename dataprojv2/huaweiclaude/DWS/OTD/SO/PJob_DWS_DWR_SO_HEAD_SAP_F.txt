@@ -1,0 +1,284 @@
+--删除目标表数据
+DELETE FROM
+  DWROTD.DWR_SO_HEAD_SAP_F;
+INSERT INTO
+  DWROTD.DWR_SO_HEAD_SAP_F --SAP销售订单头表
+SELECT
+  TMP.GROUP_NUM,
+  --集团
+  TMP.SAL_VCH_NUM,
+  --销售凭证
+  TMP.SO_NUM,
+  --销售订单编码
+  TMP.ENGNR_REPORT_NUM,
+  --工程报表单号(商机/机会点)
+  TMP.SO_HEADER_ID,
+  --OSS订单头Id
+  TMP.WW_SO_HEADER_ID,
+  --万维订单头ID
+  TMP.PLAN_SO_TYPE,
+  --计划订单类型
+  TMP.SO_CREATE_BY,
+  --OSS订单创建人
+  TMP.QUOTE_NUM,
+  --报价单号
+  TMP.REQ_PLAN_NUM,
+  --需求计划号
+  TMP.WHOLE_DELIVERY_FLAG,
+  --是否整单交付
+  TMP.WW_SO_NUM,
+  --万维单号
+  TMP.SAP_APP_PER,
+  --审批人
+  TMP.INTEGRAL_BALANCE,
+  --积分余额
+  TMP.CREATE_DATE,
+  --创建时间
+  TMP.CREATE_BY,
+  --创建人
+  TMP.LAST_UPD_TIMESTAMP,
+  --源系统更新时间
+  TMP.QUOTE_VALID_START_DATE,
+  --报价/询价的有效起始日期
+  TMP.QUOTE_VALID_END_DATE,
+  --绑定投标/报价的截止日期（有效期截止日期）
+  TMP.VCH_DATE,
+  --凭证日期 (接收/发送日期)
+  TMP.SAL_DIS_VCH_TYPE,
+  --销售和分销凭证类别
+  TMP.SAL_DIS_VCH_TYPE_NAME,
+  --销售和分销凭证类别中文名称
+  TMP.AFFAIRS_GROUP,
+  --事务组
+  TMP.AFFAIRS_GROUP_NAME,
+  --事务组中文名称
+  TMP.SAL_VCH_TYPE,
+  --销售凭证类型
+  TMP.SAL_VCH_TYPE_NAME,
+  --销售凭证类型中文名称
+  TMP.ORDER_REASON,
+  --订单原因（业务交易原因）
+  TMP.ORDER_REASON_NAME,
+  --订单原因（业务交易原因）中文名称
+  TMP.SUM_NO,
+  --汇总号 (SD)
+  TMP.DELIVERY_FROZEN,
+  --交货冻结（凭证抬头）
+  TMP.SAL_DIS_BILL_FROZEN,
+  --销售与分销凭证中的开票冻结
+  TMP.NET_WORTH,
+  --凭证货币中销售订单的净值
+  TMP.CURRENCY,
+  --销售和分销凭证货币
+  TMP.SAL_ORG_ID,
+  --销售组织
+  TMP.SAL_ORG_ID_NAME,
+  --销售组织中文名称
+  TMP.DIS_CHANNEL,
+  --分销渠道
+  TMP.DIS_CHANNEL_NAME,
+  --分销渠道中文名称
+  TMP.SAL_GROUP,
+  --销售组
+  TMP.SAL_GROUP_NAME,
+  --销售组中文名称
+  TMP.SAL_OFFICE,
+  --销售办事处
+  TMP.SAL_OFFICE_NAME,
+  --销售办事处中文名称
+  TMP.VCH_TERM_NO,
+  --凭证条件号
+  TMP.REQ_DELIVERY_DATE,
+  --要求的交货日期
+  TMP.PRICING_PROCEDURE,
+  --销售和分销:定价中的定价过程
+  TMP.ADVICE_INVOICE_TYPE,
+  --与订单有关的出具发票凭证的建议出具发票类型
+  TMP.ADVICE_INVOICE_TYPE_NAME,
+  --与订单有关的出具发票凭证的建议出具发票类型中文名称
+  TMP.SAL_POSSIBILITY,
+  --销售可能性
+  TMP.CUST_REFERENCE,
+  --客户参考
+  TMP.CUST_PO_TYPE,
+  --客户采购订单类型
+  TMP.CUST_REFERENCE_DATE,
+  --客户参考日期
+  TMP.YOUR_REFERENCE,
+  --您的参考
+  TMP.PHONE_NO,
+  --电话号码
+  TMP.CUST_ID,
+  --客户ID
+  TMP.CUST_NUM,
+  --客户编码
+  TMP.CUST_NAME,
+  --客户名称
+  TMP.COST_CENTE,
+  --成本中心
+  TMP.CUST_GROUP1,
+  --客户组 1
+  TMP.CUST_GROUP1_NAME,
+  --客户组 1中文名称
+  TMP.CUST_GROUP2,
+  --客户组 2
+  TMP.CUST_GROUP2_NAME,
+  --客户组 2中文名称
+  TMP.CUST_GROUP3,
+  --客户组 3
+  TMP.CUST_GROUP3_NAME,
+  --客户组 3中文名称
+  TMP.BUSINESS_PLATE,
+  --业务版块
+  TMP.BUSINESS_PLATE_NAME,
+  --业务版块中文名称
+  TMP.WBS_ELEMENT,
+  --工作分解结构元素 (WBS 元素)
+  TMP.CREDIT_CONTROL_SCOPE,
+  --信用控制范围
+  TMP.CREDIT_CONTROL_SCOPE_NAME,
+  --信用控制范围中文名称
+  TMP.CREDIT_REF_CUST_ACC_,
+  --带有贷方限额参考的客户帐户号
+  TMP.CREDIT_RISK_TYPE,
+  --信贷管理: 风险种类
+  TMP.CREDIT_VCH_APP_DATE,
+  --由信用管理确定的凭证批准日期
+  TMP.NEXT_DATE,
+  --下一个日期
+  TMP.CREDIT_APPROVED_AMT,
+  --已批准凭证信贷值
+  TMP.REFERENCE_BILL_NUM,
+  --参考单据的单据编号
+  TMP.REFERENCE_BILL_NUM_NAME,
+  --参考单据的单据编号中文名称
+  TMP.RECEIVER_COMP_ID,
+  --收票方的公司公司ID
+  TMP.RECEIVER_COMP_CODE,
+  --收票方的公司代码
+  TMP.RECEIVER_COMP_NAME,
+  --收票方的公司名称
+  TMP.ALTERNATIVE_TAX_TYPE,
+  --备选税收分类
+  TMP.REFERENCE_VCH_NUM,
+  --参考凭证号
+  TMP.DISTRIBUTION_NUM,
+  --分配编号
+  TMP.PREVIOUSLY_VCH_TYPE,
+  --先前销售和分销凭证的凭证类别
+  TMP.PREVIOUSLY_VCH_TYPE_NAME,
+  --先前销售和分销凭证的凭证类别中文名称
+  TMP.CONFIRM_PROCEDURE,
+  --批确定的查找过程
+  TMP.TAX_ARRIVE_COUNTRY,
+  --税收到达国家
+  TMP.SO_BILL_VERSION_NUM,
+  --销售单据版本编号
+  TMP.INTER_UNIQUE_CODE,
+  --VBAK-VBELN 的国际唯一码
+  TMP.BUSI_VCH_UPD_USER,
+  --业务凭证的最后更改用户
+  TMP.ALL_PROJ_REFUSE_STATUS,
+  --所有凭证项目的总体拒绝状态
+  TMP.ALL_PROJ_REFUSE_STATUS_NAME,
+  --所有凭证项目的总体拒绝状态中文名称
+  TMP.CONFIRM_STATUS,
+  --确认状态
+  TMP.CONFIRM_STATUS_NAME,
+  --确认状态中文名称
+  TMP.CREDIT_SAP_MNGMT_STATUS,
+  --信用检查 SAP 信用管理的状态
+  TMP.CREDIT_SAP_MNGMT_STATUS_NAME,
+  --信用检查 SAP 信用管理的状态中文名称
+  TMP.CREDIT_TECH_ERR_STATUS,
+  --SAP Credit Management 的技术错误状态
+  TMP.CREDIT_TECH_ERR_STATUS_NAME,
+  --SAP Credit Management 的技术错误状态中文名称
+  TMP.CREDIT_CHECK_STATUS,
+  --信用检查的总体状态
+  TMP.CREDIT_CHECK_STATUS_NAME,
+  --信用检查的总体状态中文名称
+  TMP.ALE_CONFIRM_STATUS,
+  --ALE 的确认状态
+  TMP.ALE_CONFIRM_STATUS_NAME,
+  --ALE 的确认状态中文名称
+  TMP.ISSUE_INVOICE_STATUS,
+  --出具发票状态( 订单相关的出具发票凭证)
+  TMP.ISSUE_INVOICE_STATUS_NAME,
+  --出具发票状态( 订单相关的出具发票凭证)中文名称
+  TMP.STATUS_FUND_MANAGEMENT,
+  --状态基金管理
+  TMP.STATUS_FUND_MAGT_NAME,
+  --状态基金管理中文名称
+  TMP.BILL_FROZEN_STATUS,
+  --总体开票冻结状态
+  TMP.BILL_FROZEN_STATUS_NAME,
+  --总体开票冻结状态中文名称
+  TMP.WHOLE_VCH_DEAL_STATUS,
+  --凭证的总体处理状态
+  TMP.WHOLE_VCH_DEAL_STATUS_NAME,
+  --凭证的总体处理状态中文名称
+  TMP.WHOLE_DELIVERY_STATUS,
+  --所有项目的总体交货状态
+  TMP.WHOLE_DELIVERY_STATUS_NAME,
+  --所有项目的总体交货状态中文名称
+  TMP.DELIVERY_STATUS,
+  --交货状态
+  TMP.DELIVERY_STATUS_NAME,
+  --交货状态中文名称
+  TMP.DELIVERY_FROZEN_STATUS,
+  --总体交货冻结状态
+  TMP.DELIVERY_FROZEN_STATUS_NAME,
+  --总体交货冻结状态中文名称
+  TMP.WHOLE_PROJ_REF_STATUS,
+  --所有项目的总参考状态
+  TMP.WHOLE_PROJ_REF_STATUS_NAME,
+  --所有项目的总参考状态中文名称
+  TMP.REFER_VCH_TITLE_STATUS,
+  --参考凭证抬头状态
+  TMP.REFER_VCH_TITLE_STATUS_NAME,
+  --参考凭证抬头状态中文名称
+  TMP.WHOLE_FORZEN_STATUS,
+  --总体冻结的状态
+  TMP.WHOLE_FORZEN_STATUS_NAME,
+  --总体冻结的状态中文名称
+  TMP.SHIPMENT_PLAN_STATUS,
+  --运输计划状态
+  TMP.SHIPMENT_PLAN_STATUS_NAME,
+  --运输计划状态中文名称
+  TMP.TITLE_ROUTINE_STATUS,
+  --抬头的常规不完整状态
+  TMP.TITLE_ROUTINE_STATUS_NAME,
+  --抬头的常规不完整状态中文名称
+  TMP.TOTAL_NCOMP_STATUS,
+  --大体上所有项目的总计不完整状态
+  TMP.TOTAL_NCOMP_STATUS_NAME,
+  --大体上所有项目的总计不完整状态中文名称
+  TMP.BILL_NOWHOLE_STATUS,
+  --相对于开票的抬头不完整状态
+  TMP.BILL_NOWHOLE_STATUS_NAME,
+  --相对于开票的抬头不完整状态中文名称
+  TMP.PROJ_BILL_INCOMP_STATUS,
+  --所有项目的总计不完整状态：开票
+  TMP.PROJ_BILL_INCOMP_STATUS_NAME,
+  --所有项目的总计不完整状态开票中文名称
+  TMP.VCH_NOWHOLE_STATUS,
+  --对于定价凭证不完整
+  TMP.VCH_NOWHOLE_STATUS_NAME,
+  --对于定价凭证不完整中文名称
+  TMP.DELIVERY_NOWHOLE_STATUS,
+  --关于交货的抬头不完整状态
+  TMP.DELIVERY_NOWHOLE_STATUS_NAME,
+  --关于交货的抬头不完整状态中文名称
+  TMP.PROJ_DELV_NCOMP_STATUS,
+  --所有项目的总计不完整状态：交货
+  TMP.PROJ_DELV_NCOMP_STATUS_NAME,
+  --所有项目的总计不完整状态交货中文名称
+  TMP.FOUR_SYMBOLS_CODE,
+  --四符编码
+  'N' AS DEL_FLAG,
+  --删除标识
+  SYSDATE AS DW_LAST_UPDATE_DATE  --DW最后更新时间
+FROM
+  DWROTD.DWR_SO_HEAD_SAP_TMP TMP  --SAP销售订单头临时表
+;

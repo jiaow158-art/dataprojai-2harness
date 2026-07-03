@@ -1,0 +1,48 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2023/10/10 18:58:52 GMT+08:00
+-- description:隐形码出库明细
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+--只取BILL_OUT_APPLY T2 与 CODE_RELATION 
+-- ******************************************************************** -- --
+insert OVERWRITE table DM.DM_BILL_OUT_APPLY_DETAIL
+SELECT 
+t1.invisible_code ,--隐形码
+t3.plan_no ,--工厂
+t1.storage_out_time ,--出库时间
+t1.product_code ,--产品编码
+t1.batch,--批次
+t3.factory_code ,--基地
+t4.line_name  ,--产线
+t1.box_code  ,--箱码
+t1.warehouse_area_code ,--库存地点
+t3.customer_code,--提货客户
+t3.customer_name,--客户名称
+t2.actual_number,--提货客户名称   
+CURRENT_TIMESTAMP() as dw_last_update_date,--最后更新时间
+'N' AS del_flag
+FROM SDI.sdi_code_relation_out_1042 t1
+left join SDI.SDI_BILL_OUT_APPLY_LADING_1040  t2 
+on t2.id =t1 .storage_out_id 
+INNER JOIN SDI.SDI_BILL_OUT_APPLY_1040 t3 
+on t3.id =t2.apply_id 
+INNER JOIN SDI.SDI_PDM_PRODUCTION_TASK_1022 t4 
+on t4.id =t1.task_id 
+WHERE t1.storage_out_id IS NOT NULL  AND t1.invisible_code != ''  
+AND  t1.storage_out_time IS NOT NULL AND  DATE(t1.storage_out_time) >= '2023-07-19'
+
+
+-- select count(1) ,COUNT(distinct product_code)from DM.DM_BILL_OUT_APPLY_DETAIL where storage_out_time < '2023-12-01'
+
+-- -- select min(storage_out_time) from   DM.DM_BILL_OUT_APPLY_DETAIL
+-- SELECT 
+--     COUNT( invisible_code) as invisible_code,
+--     COUNT(distinct product_code)as product_code ,
+--     count(distinct batch_no) as batch_no,
+--     count(distinct customer_name) as  customer_name
+-- FROM DM.DM_BILL_OUT_APPLY_DETAIL where storage_out_time < '2023-11-30'
+-- select COUNT(DISTINCT(product_code)),count(1) from DM.DM_BILL_OUT_APPLY_DETAIL where storage_out_time < '2023-11-30'
+
+

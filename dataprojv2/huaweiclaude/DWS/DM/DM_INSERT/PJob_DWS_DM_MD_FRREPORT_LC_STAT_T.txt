@@ -1,0 +1,175 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/04/27 14:10:49 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_MD_FRREPORT_LC_STAT_T
+WHERE STAT_MONTH = '${PERIOD_ID_M}'
+;
+
+WITH T1 AS(
+SELECT A.REPORT_CODE --模板编码
+      ,A.REPORT_PATH --模板路径
+      ,A.ONLINE_DATE --上线日期
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型
+      ,A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上月
+	  ,A.DAY_MEND_DT --月末
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员	  
+	  ,COALESCE(COUNT(CASE WHEN B.BEGIN_TIME IS NOT NULL THEN 1 END),0) AS VISIT_CNT --访问量
+  FROM (SELECT DISTINCT A.REPORT_CODE
+                       ,A.REPORT_PATH
+					   ,A.ONLINE_DATE
+					   ,A.REPORT_TEMPL_NAME
+					   ,A.REPORT_TYPE
+					   ,A.REQUIRER --需求确认人
+	                   ,A.DEVELOPER --开发人员
+					   ,B.STAT_MONTH
+					   ,B.LAST_MONTH
+					   ,B.DAY_MEND_DT
+          FROM(SELECT *
+		             ,ROW_NUMBER() OVER(PARTITION BY REPORT_PATH ORDER BY ONLINE_DATE DESC) AS RN
+  		         FROM DM.DM_MD_FR_REPORT_INFO_T
+			    WHERE SUBSTR(REPORT_PATH,1,3) = 'PC端' 	 
+			  ) A
+		  LEFT JOIN (SELECT DISTINCT
+                            DAY_MEND_DT
+						   ,SUBSTR(DAY_MEND_DT,1,7) AS STAT_MONTH
+						   ,SUBSTR(CAST(DAY_MEND_DT AS DATE) - INTERVAL'1 MONTH',1,7) AS LAST_MONTH --上月
+                       FROM DM.DM_DIM_DATE_D
+                      WHERE DAY_SHORT_NAME = 1
+					    AND DAY_DT <= CURRENT_DATE
+                        AND YEAR_ID >= 2022) B
+			ON SUBSTR(COALESCE(A.ONLINE_DATE,CURRENT_DATE),1,7) <= B.STAT_MONTH		
+         WHERE A.RN = 1
+	   ) A
+   LEFT JOIN (SELECT COALESCE(C.NEW_REPORT_PATH,B.TNAME) AS REPORT_PATH
+                   ,B.TNAME
+				   ,B.BEGIN_TIME
+				   ,B.USERNAME
+				   ,SUBSTR(SPLIT_PART(COALESCE(C.NEW_REPORT_PATH,B.TNAME),'/',LENGTH(COALESCE(C.NEW_REPORT_PATH,B.TNAME)) - LENGTH(REPLACE(COALESCE(C.NEW_REPORT_PATH,B.TNAME),'/','')) + 1),1,5) AS REPORT_CODE
+               FROM DWIMD.DWI_MD_FR_FINE_RECORD_EXECUTE_T B
+               LEFT JOIN UPLOAD.UPLOAD_MD_FR_REPORT_PATH_RELEVANT_T C
+                 ON C.OLD_REPORT_PATH = B.TNAME
+			  WHERE B.DISPLAYNAME IS NOT NULL	 
+            ) B
+	ON A.REPORT_CODE = B.REPORT_CODE
+   AND A.STAT_MONTH = SUBSTR(B.BEGIN_TIME,1,7)
+ --WHERE DATE_PART('DAY',CAST(SUBSTR(B.BEGIN_TIME,1,10) AS DATE) - CAST(SUBSTR(A.ONLINE_DATE,1,10) AS DATE)) >= 0
+ GROUP BY
+       A.REPORT_CODE
+      ,A.REPORT_PATH
+      ,A.ONLINE_DATE
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型	  
+      ,A.STAT_MONTH
+	  ,A.LAST_MONTH
+	  ,A.DAY_MEND_DT --月末
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员	  
+	  )
+,T2 AS(
+SELECT A.REPORT_CODE --模板编码
+      ,A.REPORT_PATH --模板路径
+      ,A.ONLINE_DATE --上线日期
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型	  
+      ,A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上月
+	  ,A.VISIT_CNT --当月访问量
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员	  
+	  ,COALESCE(B.VISIT_CNT,0) AS LAST_VISIT_CNT --上月访问量
+	  ,CASE WHEN A.ONLINE_DATE IS NOT NULL THEN DATE_PART('DAY',CAST(A.DAY_MEND_DT AS DATE) - CAST(A.ONLINE_DATE AS DATE)) END AS ONLINE_CNT --上线时长
+	  ,CASE WHEN COALESCE(B.VISIT_CNT,0) = 0 THEN A.VISIT_CNT
+	        ELSE (A.VISIT_CNT - COALESCE(B.VISIT_CNT,0)) / COALESCE(B.VISIT_CNT,0)
+			 END AS HB_RATE --环比
+  FROM T1 A
+  LEFT JOIN T1 B
+    ON A.LAST_MONTH = B.STAT_MONTH
+   AND A.REPORT_CODE = B.REPORT_CODE)
+,T3 AS(
+SELECT A.REPORT_CODE --模板编码
+      ,A.REPORT_PATH --模板路径
+      ,A.ONLINE_DATE --上线日期
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型	  
+      ,A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上月
+	  ,A.VISIT_CNT --当月访问量
+	  ,A.LAST_VISIT_CNT --上月访问量
+	  ,A.ONLINE_CNT --上线时长
+	  ,A.HB_RATE --环比
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员	  
+	  ,LAG(A.HB_RATE,1) OVER(PARTITION BY A.REPORT_CODE ORDER BY A.STAT_MONTH ASC) AS LAST_HR_RATE1 --上一个环比值
+	  ,LAG(A.HB_RATE,2) OVER(PARTITION BY A.REPORT_CODE ORDER BY A.STAT_MONTH ASC) AS LAST_HR_RATE2 --上二个环比值
+  FROM T2 A)
+,T4 AS(
+SELECT A.REPORT_CODE --模板编码
+      ,A.REPORT_PATH --模板路径
+      ,A.ONLINE_DATE --上线日期
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型	  
+      ,A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上月
+	  ,A.VISIT_CNT --当月访问量
+	  ,A.LAST_VISIT_CNT --上月访问量
+	  ,A.ONLINE_CNT --上线时长
+	  ,A.HB_RATE --环比
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员	  
+	  ,(A.HB_RATE + COALESCE(A.LAST_HR_RATE1,0) + COALESCE(A.LAST_HR_RATE2,0)) / 3 AS AVG_HB_RATE --平均环比
+  FROM T3 A)
+INSERT INTO DM.DM_MD_FRREPORT_LC_STAT_T
+(
+       REPORT_CODE --模板编码
+      ,REPORT_PATH --模板路径
+      ,ONLINE_DATE --上线日期
+      ,STAT_MONTH --统计月份
+	  ,LAST_MONTH --上月
+	  ,VISIT_CNT --当月访问量
+	  ,LAST_VISIT_CNT --上月访问量
+	  ,ONLINE_CNT --上线时长
+	  ,HB_RATE --环比
+	  ,AVG_HB_RATE --平均环比
+	  ,RPT_TYPE --模板生命周期类型
+	  ,DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,REPORT_TEMPL_NAME --模板名称
+      ,REPORT_TYPE --报表类型
+      ,AVG_VISIT_CNT --最近3个月平均访问量	
+	  ,REQUIRER --需求确认人
+	  ,DEVELOPER --开发人员	  
+)
+SELECT A.REPORT_CODE --模板编码
+      ,A.REPORT_PATH --模板路径
+      ,A.ONLINE_DATE --上线日期
+      ,A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上月
+	  ,A.VISIT_CNT --当月访问量
+	  ,A.LAST_VISIT_CNT --上月访问量
+	  ,A.ONLINE_CNT --上线时长
+	  ,A.HB_RATE --环比
+	  ,A.AVG_HB_RATE --平均环比
+	  ,CASE WHEN A.ONLINE_CNT < 90 THEN '推广期'
+	        WHEN A.VISIT_CNT > 0 AND A.AVG_HB_RATE >= -0.1 THEN '稳定期'
+			ELSE '衰退期'
+			 END AS RPT_TYPE --模板生命周期类型
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,A.REPORT_TEMPL_NAME --模板名称
+      ,A.REPORT_TYPE --报表类型
+      ,(A.VISIT_CNT + A.LAST_VISIT_CNT + COALESCE(B.VISIT_CNT,0)) / 3 AS AVG_VISIT_CNT --最近3个月平均访问量	  
+	  ,A.REQUIRER --需求确认人
+	  ,A.DEVELOPER --开发人员
+  FROM (SELECT *
+              ,CASE WHEN LAST_MONTH IS NOT NULL
+			        THEN SUBSTR(CAST(CONCAT(LAST_MONTH,'-01') AS DATE) - INTERVAL'1 MONTH',1,7)
+					 END AS T_MONTH
+          FROM T4) A
+  LEFT JOIN T1 B
+    ON A.T_MONTH = B.STAT_MONTH
+   AND A.REPORT_CODE = B.REPORT_CODE
+ WHERE A.STAT_MONTH = '${PERIOD_ID_M}'
+ --WHERE A.ONLINE_DATE IS NOT NULL

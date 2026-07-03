@@ -1,0 +1,80 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/03/20 15:38:06 GMT+08:00
+-- update from zhouhaochang 20230320 新增逻辑
+-- ******************************************************************** --
+delete from dm.dm_rpt_ct_achievement_amb_t where substr(calmonth,1,4)='2023';
+insert into dm.dm_rpt_ct_achievement_amb_t
+select bill_item
+     , bill_num
+     , calmonth
+     , comp_code
+     , comp_code___t
+     , distr_chan
+     , distr_chan___t
+     , division
+     , division___t
+     , doc_number
+     , doc_number___t
+     , fiscper
+     , material
+     , material___t
+     , payer
+     , payer___t
+     , plant
+     , plant___t
+     , salesemply
+     , salesemply___t
+     , salesorg
+     , salesorg___t
+     , t1.sales_grp
+     , sales_grp___t
+     , sold_to
+     , sold_to___t
+     , stor_loc
+     , stor_loc___t
+     , s_ord_item
+     , wbs_elemt
+     , wbs_elemt___t
+     , zqdzh
+     , zqdzh___t
+     , z_zcck
+     , zfdje
+     , zxsyj_kjy
+     , zxsyj_zd
+     , CURRENT_TIMESTAMP() AS dw_last_update_date
+     , calday
+     , zbhssrgl
+     , zbhsxssr
+     , zmle
+     , zppsysr
+     , zppsyzc
+     , zxscb
+     , zxsmj
+     , zxssl
+     , zdcmkb
+     , zdcmkb___t
+     , zyl01
+     , zyl01___t
+     , zzyqd
+     , zzyqd___t
+     , zsyjf
+     , zytjf
+     , zxsyj_jc
+     , zxsmj_tcgxc
+     , zxssj_tcgxc
+     , infoprov
+     , zqdzh23_1
+     , zqdzh23_1___t
+     , zqdzh23_2
+     , zqdzh23_2___t
+     , zgxcyj
+     , zgccjjf
+     , zqtyjz
+     , zqdzhstr
+     , zqdzhstr___t
+from dm.dm_rpt_group_achievement_amb_t_01 t1
+         join dm.dm_rpt_sales_group_t t3 on t1.sales_grp = t3.node_name9
+where calmonth >= '202301'
+  and t3.node_desc2 = '瓷砖事业部';

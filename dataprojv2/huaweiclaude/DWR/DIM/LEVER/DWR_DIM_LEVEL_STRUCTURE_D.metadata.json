@@ -1,0 +1,8 @@
+{
+    "name": "DWR_DIM_LEVEL_STRUCTURE_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/LEVER",
+    "description": "层次结构表(表结构)",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

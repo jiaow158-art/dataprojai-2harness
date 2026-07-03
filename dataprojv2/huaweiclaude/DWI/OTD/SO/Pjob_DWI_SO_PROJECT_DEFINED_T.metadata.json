@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWI_SO_PROJECT_DEFINED_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "SAP项目定义表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

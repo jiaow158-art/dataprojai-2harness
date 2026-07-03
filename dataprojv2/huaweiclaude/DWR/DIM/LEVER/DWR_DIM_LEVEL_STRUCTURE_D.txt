@@ -1,0 +1,28 @@
+--层次结构表
+DROP TABLE IF EXISTS DWRDIM.DWR_DIM_LEVEL_STRUCTURE_D;
+CREATE TABLE IF NOT EXISTS DWRDIM.DWR_DIM_LEVEL_STRUCTURE_D
+(LV1_NODE_ID             STRING            COMMENT'第一层级组织ID',
+ LV1_NODE_NAME           STRING            COMMENT'第一层级组织名称',
+ LV2_NODE_ID             STRING            COMMENT'第二层级组织ID',
+ LV2_NODE_NAME           STRING            COMMENT'第二层级组织名称',
+ LV3_NODE_ID             STRING            COMMENT'第三层级组织ID',
+ LV3_NODE_NAME           STRING            COMMENT'第三层级组织名称',
+ LV4_NODE_ID             STRING            COMMENT'第四层级组织ID',
+ LV4_NODE_NAME           STRING            COMMENT'第四层级组织名称',
+ LV5_NODE_ID             STRING            COMMENT'第五层级组织ID',
+ LV5_NODE_NAME           STRING            COMMENT'第五层级组织名称',
+ LV6_NODE_ID             STRING            COMMENT'第六层级组织ID',
+ LV6_NODE_NAME           STRING            COMMENT'第六层级组织名称',
+ LV7_NODE_ID             STRING            COMMENT'第七层级组织ID',
+ LV7_NODE_NAME           STRING            COMMENT'第七层级组织名称',
+ LV8_NODE_ID             STRING            COMMENT'第八层级组织ID',
+ LV8_NODE_NAME           STRING            COMMENT'第八层级组织名称',
+ LV9_NODE_ID             STRING            COMMENT'第九层级组织ID',
+ LV9_NODE_NAME           STRING            COMMENT'第九层级组织名称',
+ LV10_NODE_ID            STRING            COMMENT'第十层级组织ID',
+ LV10_NODE_NAME          STRING            COMMENT'第十层级组织名称',
+ NODE_ID                 STRING            COMMENT'组织ID'  ,
+ NODE_NAME               STRING            COMMENT'组织名称',
+ DEL_FLAG                STRING            COMMENT'删除标识',
+ DW_LAST_UPDATE_DATE     TIMESTAMP         COMMENT'DW最后更新时间'
+);

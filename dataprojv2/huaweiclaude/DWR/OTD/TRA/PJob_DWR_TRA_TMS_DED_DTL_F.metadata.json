@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_TRA_TMS_DED_DTL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/TRA",
+    "description": "异常扣款",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

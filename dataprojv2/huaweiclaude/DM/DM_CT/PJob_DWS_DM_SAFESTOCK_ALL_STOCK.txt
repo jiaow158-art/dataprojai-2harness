@@ -1,0 +1,35 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/24 13:52:36 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from  dm.dm_safestock_all_stock  ; 
+insert into dm.dm_safestock_all_stock
+with batch_prod_area as(
+select batch_start,max(product_area_code) product_area_code, 
+       case  max(product_area_code) when 'GD' then '华南'
+                                     when 'SD' then '华北'
+                                      when 'SX' then '西北'
+                                       when 'HN' then '华中'
+                                        when 'JX' then '华东'
+                                         when 'XN' then '西南' end  as prod_area
+from dwrdim.dwr_dim_product_area_d 
+group by  batch_start 
+)
+select t1.product_level2_name,t1.dimension ,coalesce(t2.prod_area,t3.prod_area) as prod_area  , sum(t.all_stock_quantity) as all_stock_quantity,
+       sum(t.all_stock_quantity*t1.unit_area) as all_stock_area
+from dm.dm_wm_all_type_stock_t t
+join dwimd.dwi_md_data_material_general_t t1 on t.material_num  = t1.material_num 
+left join batch_prod_area t2  on substr(t.batch_num,1,3) =  t2.batch_start 
+left join batch_prod_area t3  on substr(t.batch_num,1,2) =  t3.batch_start 
+--left join upload.upload_safestock_batch_prod_area  t2  on substr(t.batch_num,1,2) = t2.batch_num  
+  where t1.matl_group_code ='1000010'
+	and t1.external_matl_group_code in('10010','10080')
+    and t1.product_level2_code  like '1%'
+    and t1.product_level2_code  not in('1011','1012','1013','1014','1016')
+	and t1.matl_type_code='FERT'
+	--and t.batch_num  is not null
+group by t1.product_level2_name,t1.dimension, coalesce(t2.prod_area,t3.prod_area) ;

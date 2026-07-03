@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_CRE_INTEGRAL_CHANGE_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/CRE",
+    "description": "积分更改记录表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

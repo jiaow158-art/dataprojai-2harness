@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_HF_JOB_STATE_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/INCREMENT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,91 @@
+DROP TABLE IF  EXISTS  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP;
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP
+(DOCUMENT_YEAR                              INT,                        
+ACCOUNT_PERIOD                              VARCHAR(500),               
+FINANCIAL_MANAGEMENT_SCOPE                  VARCHAR(500),               
+GROUP_NUM                                   INT,                        
+BUDGET_ENTRIES_VOUCHER_NUM                  VARCHAR(500),               
+BUDGET_ENTRIES_VOUCHER_ITEM                 VARCHAR(500),               
+FISCAL_YEAR                                 INT,                        
+ITEM_TEXT                                   VARCHAR(500),               
+BUDGET_TYPE                                 VARCHAR(500),               
+BCS_TYPE                                    VARCHAR(500),               
+BCS_TYPE_NAME                               VARCHAR(500),               
+INNER_BUDGET_PROCESS                        VARCHAR(500),               
+DISTRIBUTION_CODE                           VARCHAR(500),               
+FUND_CENTER_CODE                            VARCHAR(500),               
+COMMITMENT_ITEM_ID                          VARCHAR(500),               
+COMMITMENT_ITEM_TYPE                        VARCHAR(500),               
+TRANSACTIONAL_CURRENCY_CODE                 VARCHAR(500),               
+TC_BUDGET_01_AMT                            DECIMAL(38,10),             
+TC_BUDGET_02_AMT                            DECIMAL(38,10),             
+TC_BUDGET_03_AMT                            DECIMAL(38,10),             
+TC_BUDGET_04_AMT                            DECIMAL(38,10),             
+TC_BUDGET_05_AMT                            DECIMAL(38,10),             
+TC_BUDGET_06_AMT                            DECIMAL(38,10),             
+TC_BUDGET_07_AMT                            DECIMAL(38,10),             
+TC_BUDGET_08_AMT                            DECIMAL(38,10),             
+TC_BUDGET_09_AMT                            DECIMAL(38,10),             
+TC_BUDGET_10_AMT                            DECIMAL(38,10),             
+TC_BUDGET_11_AMT                            DECIMAL(38,10),             
+TC_BUDGET_12_AMT                            DECIMAL(38,10),             
+LC_BUDGET_01_AMT                            DECIMAL(38,10),             
+LC_BUDGET_02_AMT                            DECIMAL(38,10),             
+LC_BUDGET_03_AMT                            DECIMAL(38,10),             
+LC_BUDGET_04_AMT                            DECIMAL(38,10),             
+LC_BUDGET_05_AMT                            DECIMAL(38,10),             
+LC_BUDGET_06_AMT                            DECIMAL(38,10),             
+LC_BUDGET_07_AMT                            DECIMAL(38,10),             
+LC_BUDGET_08_AMT                            DECIMAL(38,10),             
+LC_BUDGET_09_AMT                            DECIMAL(38,10),             
+LC_BUDGET_10_AMT                            DECIMAL(38,10),             
+LC_BUDGET_11_AMT                            DECIMAL(38,10),             
+LC_BUDGET_12_AMT                            DECIMAL(38,10),             
+DEL_FLAG                                    VARCHAR(500),               
+DW_LAST_UPDATE_DATE                         TIMESTAMP);                 
+
+
+COMMENT  ON TABLE   DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP	                              IS   '基金管理预算凭证行 (分录凭证)'; 
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.DOCUMENT_YEAR                  IS   '文档年度';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.ACCOUNT_PERIOD                 IS   '期间';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.FINANCIAL_MANAGEMENT_SCOPE     IS   '财务管理范围';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.GROUP_NUM                      IS   '集团';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.BUDGET_ENTRIES_VOUCHER_NUM     IS   '预算分录凭证编号';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.BUDGET_ENTRIES_VOUCHER_ITEM    IS   '预算分录凭证行';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.FISCAL_YEAR                    IS   '财年';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.ITEM_TEXT                      IS   '项目文本';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.BUDGET_TYPE                    IS   '预算类型';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.BCS_TYPE                       IS   'BCS值类型';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.BCS_TYPE_NAME                  IS   'BCS值类型名称';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.INNER_BUDGET_PROCESS           IS   '内部预算过程';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.DISTRIBUTION_CODE              IS   '分配代码';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.FUND_CENTER_CODE               IS   '基金中心';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.COMMITMENT_ITEM_ID             IS   '承诺项目';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.COMMITMENT_ITEM_TYPE           IS   '承诺项目类别';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TRANSACTIONAL_CURRENCY_CODE    IS   '交易货币';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_01_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_02_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_03_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_04_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_05_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_06_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_07_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_08_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_09_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_10_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_11_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.TC_BUDGET_12_AMT               IS   '在交易货币中的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_01_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_02_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_03_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_04_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_05_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_06_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_07_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_08_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_09_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_10_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_11_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.LC_BUDGET_12_AMT               IS   '本币的预算金额';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.DEL_FLAG                       IS   '删除标识';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_BUDGET_VOUCHER_TMP.DW_LAST_UPDATE_DATE            IS   'DW最后更新日期';

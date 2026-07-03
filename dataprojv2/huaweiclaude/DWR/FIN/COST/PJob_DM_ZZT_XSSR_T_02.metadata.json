@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_ZZT_XSSR_T_02",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "收入成本表（成本脚本）",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

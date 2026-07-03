@@ -1,0 +1,62 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：B1瓷砖库存地点
+-- create time: 2022/11/07 16:42:51 GMT+08:00
+-- update from chenzhiyong 20230202 DM_B1_CUSTOMER_DATA_T 去重
+-- ******************************************************************** --
+delete from DM.DM_WM_B1_INVENTORY_CT_T
+where STAT_MONTH between to_char(sysdate - interval '6 months', 'YYYY-MM') and substr(sysdate ,1,7)
+;
+insert into DM.DM_WM_B1_INVENTORY_CT_T
+with MATERIAL_GENERAL_data as(  -- 物料数据
+  select material_num,dimension,width,length_1,product_level2_name,reserved_field_6
+  from DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T
+  where matl_group_code = '1000010'
+),
+b1_customer_data as  -- 瓷砖的经销商数据
+(select DISTINCT CUSTOMER_TYPE,
+		customer_code,
+		customer_name_cn 
+ from dm.dm_b1_customer_data_t 
+ where customer_type in ('CT','SH')  
+ and customer_flag = 'N'
+)
+select 
+		SUBSTR(A.日期,1,7 ) as STAT_MONTH,
+	    A.客户别名 as CUST_NUM,
+	    c.customer_name_cn,
+		b.dimension,
+		b.product_level2_name AS material_TYPE,
+	    A.物料编码 as material_num,
+	    A.物料描述 as material_name,
+		b.reserved_field_6 as wlz_desc,
+		case when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 180 then '半年内'
+		     when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 360 then '半年至一年'
+			 when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 720 then '一年至两年'
+			 else '两年以上'
+			  end as kl_date,
+	    sum(A.期末金额) as final_amount,
+	    sum(A.期末数量) as final_quality,
+		sum(a.期末数量 * b.width * b.length_1)/1000/1000 as area,
+		current_timestamp as DW_LAST_UPDATE_DATE
+	from DM.DM_WM_B1_INVENTORY_CT_T_D  A 
+	join MATERIAL_GENERAL_data   B 
+	on A.物料编码 = B.material_num 
+	join b1_customer_data c
+	on A.客户别名 = c.customer_code
+	where substr(to_date(A.日期)  + interval '1 day',1,7) = substr(to_date(A.日期)  + interval '1 month',1,7) 
+	and substr(A.日期,1,7) between to_char(sysdate - interval '6 months', 'YYYY-MM') and substr(sysdate ,1,7)
+	group by SUBSTR(A.日期,1,7), 
+			 A.客户别名, 
+			 c.customer_name_cn,
+			 A.物料编码,  
+			 A.物料描述,
+			 b.dimension,
+		     b.product_level2_name,
+			 b.reserved_field_6,
+			 case when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 180 then '半年内'
+		     when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 360 then '半年至一年'
+			 when date_part('day',cast(日期 as date)-cast(最末入库日期 as date)) <= 720 then '一年至两年'
+			 else '两年以上'
+			  end

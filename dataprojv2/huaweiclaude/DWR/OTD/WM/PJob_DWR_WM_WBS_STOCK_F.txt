@@ -1,0 +1,215 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- 用于计算剩余项目库存
+-- update qyj 20240517 新增lev2_name字段
+-- update qyj 修改HR架构的显示格式
+-- update qyj 新增单价字段
+-- create time: 2023/05/25 16:15:10 GMT+08:00
+-- ******************************************************************** --
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with salesman2 as(
+select kunnr,vkorg,vtweg,spart,
+       concat_ws(',',collect_list( a.pernr)) as salesman_num,
+       concat_ws(',',collect_list( b.nachn)) salesman_name
+from sdi.sdi_knvp_1001 a  
+left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.pernr  = b.pernr 
+where a.mandt='800'
+and a.pernr<>'00000000'
+group by kunnr,vkorg,vtweg,spart
+)
+,tmp as(
+select mat_pspnr
+			  ,matnr
+			  ,werks
+			  ,coalesce(charg,charg_sid) as charg
+			  ,max(case when h.bwart = '415' and h.shkzg = 'S' then BUDAT end) as budat --已转入的项目库存
+		from sdi.sdi_MATDOC_1001 h
+		where bwart IN('415','411')
+		and sobkz = 'Q'
+		and DEL_FLAG = 'N'
+		group by  mat_pspnr
+				  ,matnr
+				  ,werks
+				  ,coalesce(charg,charg_sid)
+)
+,wbs as(
+select 
+	a.pspnr,--行
+	a.posid,--头
+	b.pspid ,
+	b.zxszz, --销售组织
+	b.zunnr , --客户编码
+	case 
+	    when COALESCE(b.ZVKGRP,'NAL') not in ('','NAL') then b.ZVKGRP
+	else c.vkgrp end as vkgrp , --销售组编码:线组
+	e.zcjrq as order_date,--订单日期
+	g.name1 as cust_name,
+-- 	case when  e.werks like '%80' then 'GD04' else 'GD02' end as zh_channel_code4, --剩余项目库存应均为06渠道
+    'GD03' as zh_channel_code4, --剩余项目库存应均为06渠道,取消特惠品渠道
+    e.pernr as creator_id,
+	e.pernrname as creator_name,
+	b.ZXSRY as salesman_id,
+	zhr.nachn as salesman_name,
+	q4.BSTDK as expect_date,
+	'06' as distribution_channel_code,
+	e.ZCJRQ as create_date,
+	e.ddzt as plan_order_type, -- 采购单类型 一个项目库存，可能有多个订单
+	e.jjyy as pj_jjyy, --拒绝原因
+	tv.bezei as zlkhmc -- 销售组
+from sdi.sdi_prps_1001 a 
+join sdi.sdi_proj_1001 b ON substr(a.posid,1,10) = b.pspid 
+LEFT JOIN sdi.sdi_knvv_1001 c ON b.zunnr = c.kunnr AND c.vkorg = b.zxszz AND c.vtweg = '06' AND c.DEL_FLAG ='N'
+left join sdi.sdi_zpst005_1001 e ON e.zjhdid = a.posid and a.DEL_FLAG = 'N'
+left join (select distinct pernr,nachn from sdi.sdi_pa0002_1001) zhr on zhr.pernr = b.ZXSRY
+--left join salesman2 f ON e.zunnr = f.kunnr and coalesce(e.VKORG,b.zxszz ) = f.vkorg and f.vtweg='06' and f.spart='00' 
+left join sdi.sdi_kna1_1001  g On b.zunnr = g.kunnr and g.mandt='800'
+left join dm.dm_otd_wbs_plan_order_det_t q4 on a.pspnr = q4.pspnr
+left join sdi.sdi_tvgrt_1001 tv on tv.vkgrp = COALESCE(b.ZVKGRP,c.vkgrp)
+),
+stock_detail as (
+select a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_werks_code as factory_code,
+       sum(stock_qty) as total_stock_qty,
+       sum(case when a.goods_move_stock_type_sid in('01','') then stock_qty else 0 end ) no_limit_stock_qty,
+       sum(case when a.goods_move_stock_type_sid in('02') then stock_qty else 0 end )  as qc_stock_qty,
+       sum(case when a.goods_move_stock_type_sid in('07') then stock_qty else 0 end )  as frozen_stock_qty,
+       0 as res_stock_qty,
+       0 as prepare_stock_qty
+FROM 
+dwrotd.dwr_wm_all_type_stock_month_t a 
+where wbs_element <>'00000000'
+and  a.month_date = SUBSTR(date_format('${PERIOD_ID_D}','yyyyMMdd'),1,6) -- 最新月份
+group by a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_werks_code
+union all
+select a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code,
+       0,0,0,0,
+       sum(a.sku_confirm_qty_pro) as res_stock_qty,
+       0
+from dwrotd.dwr_wm_stock_res_from_sales a 
+where wbs_element <>'00000000'
+group by a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code
+union all  
+
+select a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code,
+      0,0,0,0,
+      0,
+      sum(a.pro_sku_prepare_qty) as prepare_stock_qty
+from dwrotd.dwr_wm_stock_prepare_from_stockout  a 
+where wbs_element <>'00000000'
+group by a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code
+),
+stock_sum as 
+(
+select a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code,
+     sum(total_stock_qty) as total_stock_qty,
+     sum(no_limit_stock_qty) no_limit_stock_qty,
+     sum(qc_stock_qty)  as qc_stock_qty,
+     sum(frozen_stock_qty)  as frozen_stock_qty,
+     sum(res_stock_qty) as res_stock_qty,
+     sum(prepare_stock_qty) as prepare_stock_qty
+from stock_detail  a 
+group by a.wbs_element,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code
+)
+
+insert overwrite table dwrotd.dwr_wm_wbs_stock_f partition(start_month)
+select a.wbs_element ,a.material_num ,a.batch_num ,a.inv_location ,a.factory_code,
+    total_stock_qty,   -- 总项目库存
+    no_limit_stock_qty,  -- 非限制项目库存
+    qc_stock_qty,      -- 质检库存
+    frozen_stock_qty,   -- 冻结库存
+    res_stock_qty,   -- 项目库存留货
+    prepare_stock_qty,   -- 项目库存备货
+    no_limit_stock_qty - res_stock_qty - prepare_stock_qty as available_stock_qty,  -- 可用库存
+    b.posid as wbs_num,    -- wbs号
+    b.pspid as top_wbs_num,   -- 一层wbs号
+    b.zxszz as sales_org,    -- 销售组织
+    b.zunnr as cust_num,  -- 客户
+    b.vkgrp as sale_grp,   -- 销售组编码
+    CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE ,
+    order_date,--订单日期
+    cust_name,--客户名称
+	zh_channel_code4, --整合渠道 剩余项目库存应均为08渠道
+	creator_id,
+	creator_name,
+	salesman_id,
+	salesman_name,
+	expect_date,
+	case 
+		when COALESCE(t2.node_desc3,'') <> '' and t2.node_desc3 <> '内部交易组' then t2.node_desc3
+		when t2.node_desc3 = '内部交易组' then '国内营销系统'
+		when org.short_objid_name_t5 like '%运营中心' then '国内营销系统'
+		when org.short_objid_name_t5 like '%子公司' then '国内营销系统'
+		when org.short_objid_name_t5 = '工程市场中心' then '国内营销系统'
+		else org.short_objid_name_t4
+-- 		else concat('HR架构-',org.short_objid_name_t4)
+	end as lev3_name,
+	case 
+		when COALESCE(t2.node_desc4,'') <> '' and t2.node_desc4 <> '内部交易组' then t2.node_desc4
+		when t2.node_desc4 = '内部交易组' then '工程市场中心'
+		when org.short_objid_name_t5 like '%运营中心' then '区域运营中心'
+		when org.short_objid_name_t5 like '%子公司' then '直营经营管理板块'
+		when org.short_objid_name_t5 = '工程市场中心' then '工程市场中心'
+		else org.short_objid_name_t5
+-- 		else concat('HR架构-',org.short_objid_name_t5)
+	end as lev4_name,
+	case 
+		when COALESCE(t2.node_desc5,'') <> '' and t2.node_desc5 <> '内部交易组'  then t2.node_desc5
+		when t2.node_desc5 = '内部交易组' then '战略地产'
+		when org.short_objid_name_t5 like '%运营中心' then org.short_objid_name_t5
+		when org.short_objid_name_t5 like '%子公司' then org.short_objid_name_t5
+		when org.short_objid_name_t5 = '工程市场中心' and (org.short_objid_name_t6 = '资源开发运营部' or org.short_objid_name_t6 = '战略客户部') then '战略客户部'
+		when org.short_objid_name_t5 = '工程市场中心' then org.short_objid_name_t6
+		else org.short_objid_name_t6
+-- 		else concat('HR架构-',org.short_objid_name_t6)
+	end as lev5_name,
+	b.distribution_channel_code,
+	b.plan_order_type, -- 计划订单类型
+	tmp.BUDAT as pj_res_date, -- 项目库存留货日期 ： 部分剩余项目库存没有留货时间
+	b.pj_jjyy,
+	b.create_date, -- 创建日期
+	case 
+		--销售订单留备货中113*开头订单+订单来源LTC的，按照如下规则（项目库存）
+		when b.pj_jjyy = '' then date_format(date_add(from_unixtime(unix_timestamp(GREATEST(b.expect_date,coalesce(tmp.BUDAT,b.expect_date)), 'yyyyMMdd'), 'yyyy-MM-dd'),60),'yyyyMMdd')
+		when b.pj_jjyy <> '' then date_format(date_add(from_unixtime(unix_timestamp(coalesce(tmp.BUDAT,b.expect_date), 'yyyyMMdd'), 'yyyy-MM-dd'),60),'yyyyMMdd')
+-- 		when B.vtweg = '06' then date_format(date_add(from_unixtime(unix_timestamp( te.res_stock_date, 'yyyyMMdd'), 'yyyy-MM-dd'),60),'yyyyMMdd')
+        else date_format(date_add(from_unixtime(unix_timestamp(coalesce(tmp.BUDAT), 'yyyyMMdd'), 'yyyy-MM-dd'),60),'yyyyMMdd')
+	end as promise_stock_date, -- 应提时间
+	case 
+	    when org.short_objid_name_t5 = '工程市场中心' then org.short_objid_name_t7
+	    else org.short_objid_name_t6
+	end lev6_name,
+	case 
+	    when org.short_objid_name_t5 = '工程市场中心' then org.short_objid_name_t8
+	    else org.short_objid_name_t7
+	end as lev7_name,
+	b.zlkhmc,-- 销售组
+	case 
+		when COALESCE(t2.node_desc2,'') <> '' and t2.node_desc2 <> '内部交易组' then t2.node_desc2
+		when t2.node_desc2 = '内部交易组' then '国内营销系统'
+		when org.short_objid_name_t5 like '%运营中心' then '国内营销系统'
+		when org.short_objid_name_t5 like '%子公司' then '国内营销系统'
+		when org.short_objid_name_t5 = '工程市场中心' then '国内营销系统'
+		else org.short_objid_name_t3
+-- 		else concat('HR架构-',org.short_objid_name_t3)
+	end as lev2_name,
+	tt3.yj_unit_price ,
+    SUBSTR(date_format('${PERIOD_ID_D}','yyyyMMdd'),1,6) as start_month
+from stock_sum a  
+left join wbs b On a.wbs_element  = b.pspnr
+left join dwimd.dwi_md_data_material_general_t t3 on a.material_num = t3.material_num
+left join dm.dm_rpt_sales_group_t t2 on b.vkgrp = t2.node_name9
+left join DWIMD.DWI_ORG_PERNR_STRUCTURE_INFO_T org On COALESCE(SPLIT(salesman_id, ',')[0],creator_id)  = org.employee_code
+left join tmp on a.material_num = tmp.matnr
+	and a.factory_code = tmp.werks
+	and a.wbs_element = tmp.mat_pspnr
+	and coalesce(a.batch_num,'#') =  coalesce(tmp.charg,'#')
+left join dwrltc.dwr_bo_wbs_material_price  tt3 on concat(b.pspid,'000000') = tt3.wbs_num
+	and a.material_num = tt3.material_num and length(tt3.wbs_num) > 1
+where  1=1 
+and t3.matl_group_code in ('1000010')
+and t3.prod_property in ('A0001','A0002','E0001','C0002')
+and substring(a.inv_location,1,2) not in ('00') -- 剔除子公司仓
+and a.inv_location not in ('GFZ') --子公司库存
+and a.factory_code not like '%50' --加工工厂

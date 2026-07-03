@@ -1,0 +1,126 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/07/09 15:06:11 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:PJob_DWS_DM_NORTH_ZB43
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB43';
+
+--大规格产品销售面积占比（整装头部）ZB43
+with bigmjzb as (
+select 
+calmonth
+,SUM(
+case when  
+t2.node_desc3 = '国内营销系统' 
+and coalesce (t2.node_desc6,'#') <>'ART+'
+and coalesce (t2.node_desc5,'#') not in ('绿家','辅材')
+and coalesce (t2.node_desc4,'#') <> '高端品牌营销中心'
+and t1.integrate_channel = 'GD02' 
+and t1.data_source in ('S','T','D','U') 
+and (mt.product_series_name in ('918','超大板') or MT.PRODUCT_BRAND_NAME in ('世界印象'))
+and mt.prod_property_name = '瓷砖产品'
+then T1.zxsmj else 0  end 
+)as "大规格产品"
+,SUM(
+case when  
+t2.node_desc3 = '国内营销系统' 
+and coalesce (t2.node_desc5,'#') not in ('绿家','辅材')
+and coalesce (t2.node_desc4,'#') <> '高端品牌营销中心'
+and (t1.integrate_channel = 'GD02' or t1.integrate_channel is null)
+and t1.data_source in ('S','T','D','U') 
+and mt.prod_property_name = '瓷砖产品'
+then T1.zxsmj else 0  end 
+)as "整体销售面积"
+from dm.dm_ambv2_zzt_xssr_t t1
+left join  
+dm.dm_rpt_sales_group_t  t2   
+on t1.sales_grp  = t2.node_name9
+left join 
+dwimd.dwi_md_data_material_general_t mt
+on t1.material  = mt.material_num 
+left join 
+DWRLTC.DWR_BO_PROJECT_DETAIL_F PROJECT_DETAIL
+on t1.zsjbm = PROJECT_DETAIL.bo_code
+group by calmonth
+)
+,bigmjzb2 as (
+select 
+calmonth,
+'ZB43' as zb_code,
+case when 整体销售面积 = 0 then 0 else 大规格产品/整体销售面积 end as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+bigmjzb
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB43' as zb_code,
+0 as 当月实绩,
+datatool.division_by_zero(SUM(大规格产品),SUM(整体销售面积) ) as 累计实绩,
+0 as 季度累计实绩
+from 
+bigmjzb
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB43' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+datatool.division_by_zero(SUM(大规格产品),SUM(整体销售面积) ) as 季度累计实绩
+
+from 
+bigmjzb
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩)*100 as CM_STAT_AMT,
+sum(累计实绩)*100 as ACC_STAT_AMT,
+sum(季度累计实绩)*100 as QTR_TGT_AMT
+from 
+bigmjzb2
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.PJFX
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+

@@ -1,0 +1,106 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/07/09 17:21:55 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_DMT_CUST_STAT_T
+SELECT SUBSTR(A.FOLOW_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(A.FOLOW_TIME,1,10) AS STAT_DATE --统计日期
+      ,A.SOURCE_CAT_NAME --客户来源类别名称
+	  ,CASE WHEN A.STAGE_NAME = '已报备' THEN 1
+	        WHEN A.STAGE_NAME = '已到店' THEN 2
+			WHEN A.STAGE_NAME IN('已大定','已小定') THEN 3
+			WHEN A.STAGE_NAME = '已出图' THEN 4
+			WHEN A.STAGE_NAME = '交易成功' THEN 5
+			WHEN A.STAGE_NAME = '已流失' THEN 6
+			 END AS STAGE_ID --客户阶段ID
+	  ,CASE WHEN A.STAGE_NAME IN('已大定','已小定') THEN '已交定'
+	        WHEN A.STAGE_NAME = '交易成功' THEN '已成交'
+			WHEN A.STAGE_NAME = '已流失' THEN '已失效'
+			ELSE A.STAGE_NAME
+			 END AS STAGE_NAME --客户阶段名称
+	  ,A.BIND_PROVINCE_NAME --绑定省份
+      ,A.BIND_CITY_NAME --绑定城市
+	  ,A.BIND_DISTRICT_NAME --绑定区域
+	  ,A.CMY_ADDR --小区名称
+	  ,A.REAL_NAME AS CUST_NAME --客户名称
+	  ,A.DEPT_ID --部门ID		 
+	  ,B.LVL1_DEPT_ID	--一级部门ID
+      ,B.LVL1_DEPT_SYC_ID	--一级部门原ID
+      ,B.LVL1_DEPT_NAME	--一级部门名称
+      ,B.LVL2_DEPT_ID	--二级部门ID
+      ,B.LVL2_DEPT_SYC_ID	--二级部门原ID
+      ,B.LVL2_DEPT_NAME	--二级部门名称
+      ,B.LVL3_DEPT_ID	--三级部门ID
+      ,B.LVL3_DEPT_SYC_ID	--三级部门原ID
+      ,B.LVL3_DEPT_NAME	--三级部门名称
+      ,B.LVL4_DEPT_ID	--四级部门ID
+      ,B.LVL4_DEPT_SYC_ID	--四级部门原ID
+      ,B.LVL4_DEPT_NAME	--四级部门名称
+      ,B.LVL5_DEPT_ID	--五级部门ID
+      ,B.LVL5_DEPT_SYC_ID	--五级部门原ID
+      ,B.LVL5_DEPT_NAME	--五级部门名称
+      ,B.LVL6_DEPT_ID	--六级部门ID
+      ,B.LVL6_DEPT_SYC_ID	--六级部门原ID
+      ,B.LVL6_DEPT_NAME	--六级部门名称
+      ,B.LVL7_DEPT_ID	--七级部门ID
+      ,B.LVL7_DEPT_SYC_ID	--七级部门原ID
+      ,B.LVL7_DEPT_NAME	--七级部门名称
+      ,B.LVL8_DEPT_ID	--八级部门ID
+      ,B.LVL8_DEPT_SYC_ID	--八级部门原ID
+      ,B.LVL8_DEPT_NAME	--八级部门名称
+      ,COUNT(DISTINCT A.MEMBER_ID) AS CUST_CNT --客户数
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间	  
+  FROM DWRCS.DWR_CS_DMT_LIFETIME_F A
+ INNER JOIN DWRDIM.DWR_DIM_DMT_DEPT_INFO_D B
+    ON A.DEPT_ID = B.DEPT_SYC_ID
+   AND B.EP_ID = 3044
+   AND B.APP_ID = 1831   
+ WHERE A.STAGE_NAME IN('已报备','已到店','已测量','已出图','已大定','已小定','交易成功','已流失')
+   AND A.FOLOW_TIME IS NOT NULL
+ GROUP BY
+       SUBSTR(A.FOLOW_TIME,1,7) --统计月份
+      ,SUBSTR(A.FOLOW_TIME,1,10) --统计日期
+      ,A.SOURCE_CAT_NAME --客户来源类别名称
+	  ,CASE WHEN A.STAGE_NAME = '已报备' THEN 1
+	        WHEN A.STAGE_NAME = '已到店' THEN 2
+			WHEN A.STAGE_NAME IN('已大定','已小定') THEN 3
+			WHEN A.STAGE_NAME = '已出图' THEN 4
+			WHEN A.STAGE_NAME = '交易成功' THEN 5
+			WHEN A.STAGE_NAME = '已流失' THEN 6
+			 END --客户阶段ID
+	  ,CASE WHEN A.STAGE_NAME IN('已大定','已小定') THEN '已交定'
+	        WHEN A.STAGE_NAME = '交易成功' THEN '已成交'
+			WHEN A.STAGE_NAME = '已流失' THEN '已失效'
+			ELSE A.STAGE_NAME
+			 END --客户阶段名称
+	  ,A.BIND_PROVINCE_NAME --绑定省份
+      ,A.BIND_CITY_NAME --绑定城市
+	  ,A.BIND_DISTRICT_NAME --绑定区域
+	  ,A.CMY_ADDR --小区名称
+	  ,A.REAL_NAME --客户名称
+	  ,A.DEPT_ID --部门ID		 
+	  ,B.LVL1_DEPT_ID	--一级部门ID
+      ,B.LVL1_DEPT_SYC_ID	--一级部门原ID
+      ,B.LVL1_DEPT_NAME	--一级部门名称
+      ,B.LVL2_DEPT_ID	--二级部门ID
+      ,B.LVL2_DEPT_SYC_ID	--二级部门原ID
+      ,B.LVL2_DEPT_NAME	--二级部门名称
+      ,B.LVL3_DEPT_ID	--三级部门ID
+      ,B.LVL3_DEPT_SYC_ID	--三级部门原ID
+      ,B.LVL3_DEPT_NAME	--三级部门名称
+      ,B.LVL4_DEPT_ID	--四级部门ID
+      ,B.LVL4_DEPT_SYC_ID	--四级部门原ID
+      ,B.LVL4_DEPT_NAME	--四级部门名称
+      ,B.LVL5_DEPT_ID	--五级部门ID
+      ,B.LVL5_DEPT_SYC_ID	--五级部门原ID
+      ,B.LVL5_DEPT_NAME	--五级部门名称
+      ,B.LVL6_DEPT_ID	--六级部门ID
+      ,B.LVL6_DEPT_SYC_ID	--六级部门原ID
+      ,B.LVL6_DEPT_NAME	--六级部门名称
+      ,B.LVL7_DEPT_ID	--七级部门ID
+      ,B.LVL7_DEPT_SYC_ID	--七级部门原ID
+      ,B.LVL7_DEPT_NAME	--七级部门名称
+      ,B.LVL8_DEPT_ID	--八级部门ID
+      ,B.LVL8_DEPT_SYC_ID	--八级部门原ID
+      ,B.LVL8_DEPT_NAME	--八级部门名称

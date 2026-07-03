@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_OTD_MAT_OUTGOODS_RATIO_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

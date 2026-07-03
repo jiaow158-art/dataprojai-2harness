@@ -1,0 +1,190 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: 
+-- UPDATE FROM guzhengfeng 20230904 新增字段：PAY_TERM_DESC 付款条件描述
+-- update from huangwenbin 2023-03-18 新增字段：UPDATE_TIME 更新时间
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_CUST_SALES_AREA_D
+SELECT 
+    ST.CUST_ID AS CUST_ID                      								
+   ,ST.CUST_NUM AS CUST_NUM                                                    
+   ,ST.GROUP_NUM AS GROUP_NUM                                                  
+   ,ST.PRODUCT_GROUP AS PRODUCT_GROUP                                          
+   ,ST.DISTRIBUTION_CHNL_CODE AS DISTRIBUTION_CHNL_CODE                        
+   ,ST.SALES_ORG_CODE AS SALES_ORG_CODE                                                                  
+   ,ST.DISTRIBUTION_CHNL_NAME AS DISTRIBUTION_CHNL_NAME                        
+   ,ST.SALES_ORG_NAME AS SALES_ORG_NAME                                                                        
+   ,ST.INTER_TRADE_CLAUSE_LOC_1 AS INTER_TRADE_CLAUSE_LOC_1                    
+   ,ST.CURRENCY AS CURRENCY                                                    
+   ,ST.REC_CRT_DATE AS REC_CRT_DATE                                            
+   ,D.EMP_NAME AS CTR_OBJECT_PERSON_NAME                                       
+   ,ST.PERMISSION_GROUP_CODE AS PERMISSION_GROUP_NAME                          
+   ,ST.ORG_CODE AS ORG_CODE                                                    
+   ,ST.ORG_NAME AS ORG_NAME                                                    
+   ,ST.SHIP_TERM_CODE AS SHIP_TERM_DESC                                        
+   ,ST.PER_PRJ_DELIV_MAX_NUM AS PER_PRJ_DELIV_MAX_NUM                          
+   ,ST.CUST_PRICE_GROUP_CODE AS CUST_PRICE_GROUP_NAME                          
+   ,ST.SALES_GROUP_CODE AS SALES_GROUP_CODE                                    
+   ,ST.DELIVERY_PRIORITY AS DELIVERY_PRIORITY                                  
+   ,ST.PAY_TERM_CODE AS PAY_TERM_CODE                                          
+   ,ST.CUST_GROUP_NAME AS CUST_GROUP_NAME                                          
+   ,ST.CUST_GROUP3_CODE AS CUST_GROUP3_NAME                                    
+   ,ST.CUST_DELIVERY_FROZEN_CODE  AS CUST_DELIVERY_FROZEN_CODE                     
+   ,T5.CONFIG_NAME AS SALES_OFFICE_NAME                                        
+   ,ST.OVERDELIVERY_LIMIT AS OVERDELIVERY_LIMIT                                
+   ,ST.PROJ_ORDER_PROBABILITY AS PROJ_ORDER_PROBABILITY                        
+   ,ST.RELATED_POD_PROCESSING AS RELATED_POD_PROCESSING                        
+   ,ST.POD_VALID_TIME_FRAME AS POD_VALID_TIME_FRAME                            
+   ,ST.CUST_GROUP1_CODE AS CUST_GROUP1_NAME                                    
+   ,ST.CUST_GROUP2_CODE AS CUST_GROUP2_NAME                                    
+   ,ST.PROJ_PROPOSAL AS PROJ_PROPOSAL                                          
+   ,ST.PRICE_PROCESS_CUST_CLSFY_CODE AS PRICE_PROCESS_CUST_CLSFY_NAME          
+   ,ST.UNDERDELIVERY_LIMIT_CODE AS UNDERDELIVERY_LIMIT_NAME                    
+   ,ST.CUST_SALE_FROZEN AS CUST_SALE_FROZEN                                    
+   ,ST.CUST_REBATE_VALID_DATE AS CUST_REBATE_VALID_DATE                        
+   ,ST.CUST_OR_SUPPLIER_CRY_NUM AS CUST_OR_SUPPLIER_CRY_NUM                    
+   ,ST.COST_ESTIMATE_LIMIT AS COST_ESTIMATE_LIMIT                              
+   ,ST.INTER_TRADE_TERMS_P1_CODE AS INTER_TRADE_TERMS_P1_NAME                  
+   ,ST.INTER_TRADE_TERMS_P2 AS INTER_TRADE_TERMS_P2                            
+   ,ST.CLOSE_ROUNDING AS CLOSE_ROUNDING                                        
+   ,ST.MEET_RATE_CODE AS MEET_RATE_NAME                                        
+   ,ST.CUST_GROUP_7 AS CUST_GROUP_7                                            
+   ,ST.SETTLE_MNGMT_FLAG AS SETTLE_MNGMT_FLAG                                  
+   ,ST.SALE_REGION_CODE AS SALE_REGION_CODE                                    
+   ,ST.CUST_ACCT_ASSIGN_GROUP_CODE AS CUST_ACCT_ASSIGN_GROUP_NAME              
+   ,ST.CUST_ORDER_FROZEN_CODE AS CUST_ORDER_FROZEN_CODE                        
+   ,ST.CUST_INVC_FROZEN_CODE AS CUST_INVC_FROZEN_CODE                       
+   ,ST.PARENT_CUST_NUM AS PARENT_CUST_NUM                                      
+   ,ST.FEMALE_CUST_ORG_CODE AS FEMALE_CUST_ORG_NAME                            
+   ,ST.BUSI_SECTION_CODE AS BUSI_SECTION_NAME                                  
+   ,ST.INTEGRAL_RELATED_CODE AS INTEGRAL_RELATED_NAME                          
+   ,T8.PRIMARY_SALES_DEPT_DESC AS PRIMARY_SALES_DEPT_NAME                      
+   ,ST.DIVISION_CODE                                     
+   ,ST.SPECIFY_3320FTY_DELIVERY AS SPECIFY_3320FTY_DELIVERY                    
+   ,ST.VALID_DATE_BEGIN AS VALID_DATE_BEGIN                                    
+   ,ST.VALID_DATE_END AS VALID_DATE_END                                        
+   ,ST.M_CUST_NUM_PERMISSION AS M_CUST_NUM_PERMISSION                                                                     
+   ,ST.DEL_FLAG AS DEL_FLAG                                                    
+    ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE                                
+	 ,ST.START_DATE                                                            
+   ,ST.END_DATE                                                                
+   ,ST.SALES_GROUP_NAME AS SALES_GROUP_NAME    
+    ,ST.CUST_INVC_FROZEN_NAME 		
+    ,ST.SALE_REGION_NAME 			
+    ,ST.CUST_ORDER_FROZEN_NAME 		
+    ,ST.CUST_DELIVERY_FROZEN_NAME   
+	,ST.CUST_GROUP_CODE
+	,ST.SRC_CUST_NUM
+	,ST.PAY_TERM_DESC       -- 	付款条件描述 20230904新增
+	,ST.UPDATE_TIME --更新时间 20240318新增
+FROM DWIMD.DWI_MD_CUST_SALES_AREA_T ST                                              
+LEFT JOIN(SELECT ADRP.EMP_NAME,USR21.CTR_OBJECT_PERSON_NAME                         	
+			FROM DWIMD.DWI_MD_PERSON_OFFI_ADDR_T ADRP                                       
+	 INNER JOIN DWIMD.DWI_MD_USER_NAME_T USR21                                      	
+            ON ADRP.EMP_NUM = USR21.EMP_NUM) D
+	 ON D.CTR_OBJECT_PERSON_NAME = ST.CTR_OBJECT_PERSON_CODE
+LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R T5 
+     ON ST.SALES_OFFICE_CODE = T5.CONFIG_CODE
+	AND ST.GROUP_NUM = T5.GROUP_NUM
+	AND T5.LANG_CODE = '1'
+LEFT JOIN DWIMD.DWI_MD_PRIMARY_SALES_DEPT_TEXT_T T8 
+     ON ST.PRIMARY_SALES_DEPT_CODE = T8.PRIMARY_SALES_DEPT_CODE;
+     
+--- 张瀚中专用，DWR_DIM_CUST_SALES_AREA_D新增9个字段，但是字段映射关系发生变化，CODE对CODE,NAME对NAME。这个需要先分析完关联影响之后，才能改为正式表
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_CUST_SALES_AREA_D2
+SELECT 
+    ST.CUST_ID AS CUST_ID                      								
+   ,ST.CUST_NUM AS CUST_NUM                                                    
+   ,ST.GROUP_NUM AS GROUP_NUM                                                  
+   ,ST.PRODUCT_GROUP AS PRODUCT_GROUP                                          
+   ,ST.DISTRIBUTION_CHNL_CODE AS DISTRIBUTION_CHNL_CODE                        
+   ,ST.SALES_ORG_CODE AS SALES_ORG_CODE                                                                  
+   ,ST.DISTRIBUTION_CHNL_NAME AS DISTRIBUTION_CHNL_NAME                        
+   ,ST.SALES_ORG_NAME AS SALES_ORG_NAME                                                                        
+   ,ST.INTER_TRADE_CLAUSE_LOC_1 AS INTER_TRADE_CLAUSE_LOC_1                    
+   ,ST.CURRENCY AS CURRENCY                                                    
+   ,ST.REC_CRT_DATE AS REC_CRT_DATE                                            
+   ,D.EMP_NAME AS CTR_OBJECT_PERSON_NAME                                       
+   ,ST.PERMISSION_GROUP_CODE AS PERMISSION_GROUP_NAME                          
+   ,ST.ORG_CODE AS ORG_CODE                                                    
+   ,ST.ORG_NAME AS ORG_NAME                                                    
+   ,ST.SHIP_TERM_CODE AS SHIP_TERM_CODE  
+   ,ST.SHIP_TERM_DESC AS SHIP_TERM_DESC     
+   ,ST.PER_PRJ_DELIV_MAX_NUM AS PER_PRJ_DELIV_MAX_NUM 
+   ,ST.CUST_PRICE_GROUP_CODE AS CUST_PRICE_GROUP_CODE   
+   ,ST.CUST_PRICE_GROUP_DESC AS CUST_PRICE_GROUP_NAME                          
+   ,ST.SALES_GROUP_CODE AS SALES_GROUP_CODE                                    
+   ,ST.DELIVERY_PRIORITY AS DELIVERY_PRIORITY                                  
+   ,ST.PAY_TERM_CODE AS PAY_TERM_CODE                                          
+   ,ST.CUST_GROUP_NAME AS CUST_GROUP_NAME 
+   ,ST.CUST_GROUP3_CODE AS CUST_GROUP3_CODE     
+   ,ST.CUST_GROUP3_DESC AS CUST_GROUP3_NAME                                    
+   ,ST.CUST_DELIVERY_FROZEN_CODE  AS CUST_DELIVERY_FROZEN_CODE 
+   ,ST.SALES_OFFICE_CODE AS SALES_OFFICE_CODE    
+   ,T5.CONFIG_NAME AS SALES_OFFICE_NAME                                        
+   ,ST.OVERDELIVERY_LIMIT AS OVERDELIVERY_LIMIT                                
+   ,ST.PROJ_ORDER_PROBABILITY AS PROJ_ORDER_PROBABILITY                        
+   ,ST.RELATED_POD_PROCESSING AS RELATED_POD_PROCESSING                        
+   ,ST.POD_VALID_TIME_FRAME AS POD_VALID_TIME_FRAME                            
+   ,ST.CUST_GROUP1_CODE AS CUST_GROUP1_CODE  
+   ,ST.CUST_GROUP1_DESC AS CUST_GROUP1_NAME   
+   ,ST.CUST_GROUP2_CODE AS CUST_GROUP2_CODE
+   ,ST.CUST_GROUP2_DESC AS CUST_GROUP1_NAME   
+   ,ST.PROJ_PROPOSAL AS PROJ_PROPOSAL                                          
+   ,ST.PRICE_PROCESS_CUST_CLSFY_CODE AS PRICE_PROCESS_CUST_CLSFY_NAME          
+   ,ST.UNDERDELIVERY_LIMIT_CODE AS UNDERDELIVERY_LIMIT_NAME                    
+   ,ST.CUST_SALE_FROZEN AS CUST_SALE_FROZEN                                    
+   ,ST.CUST_REBATE_VALID_DATE AS CUST_REBATE_VALID_DATE                        
+   ,ST.CUST_OR_SUPPLIER_CRY_NUM AS CUST_OR_SUPPLIER_CRY_NUM                    
+   ,ST.COST_ESTIMATE_LIMIT AS COST_ESTIMATE_LIMIT                              
+   ,ST.INTER_TRADE_TERMS_P1_CODE AS INTER_TRADE_TERMS_P1_CODE 
+   ,ST.INTER_TRADE_TERMS_P1_DESC AS INTER_TRADE_TERMS_P1_NAME   
+   ,ST.INTER_TRADE_TERMS_P2 AS INTER_TRADE_TERMS_P2                            
+   ,ST.CLOSE_ROUNDING AS CLOSE_ROUNDING                                        
+   ,ST.MEET_RATE_CODE AS MEET_RATE_NAME                                        
+   ,ST.CUST_GROUP_7 AS CUST_GROUP_7                                            
+   ,ST.SETTLE_MNGMT_FLAG AS SETTLE_MNGMT_FLAG                                  
+   ,ST.SALE_REGION_CODE AS SALE_REGION_CODE                                    
+   ,ST.CUST_ACCT_ASSIGN_GROUP_CODE AS CUST_ACCT_ASSIGN_GROUP_NAME              
+   ,ST.CUST_ORDER_FROZEN_CODE AS CUST_ORDER_FROZEN_CODE                        
+   ,ST.CUST_INVC_FROZEN_CODE AS CUST_INVC_FROZEN_CODE                       
+   ,ST.PARENT_CUST_NUM AS PARENT_CUST_NUM                                      
+   ,ST.FEMALE_CUST_ORG_CODE AS FEMALE_CUST_ORG_NAME 
+   ,ST.BUSI_SECTION_CODE AS BUSI_SECTION_CODE    
+   ,ST.BUSI_SECTION_DESC AS BUSI_SECTION_NAME 
+   ,ST.INTEGRAL_RELATED_CODE AS INTEGRAL_RELATED_CODE    
+   ,ST.INTEGRAL_RELATED_DESC AS INTEGRAL_RELATED_NAME                          
+   ,T8.PRIMARY_SALES_DEPT_DESC AS PRIMARY_SALES_DEPT_NAME                      
+   ,ST.DIVISION_CODE 
+   ,ST.DIVISION_DESC   
+   ,ST.SPECIFY_3320FTY_DELIVERY AS SPECIFY_3320FTY_DELIVERY                    
+   ,ST.VALID_DATE_BEGIN AS VALID_DATE_BEGIN                                    
+   ,ST.VALID_DATE_END AS VALID_DATE_END                                        
+   ,ST.M_CUST_NUM_PERMISSION AS M_CUST_NUM_PERMISSION                                                                     
+   ,ST.DEL_FLAG AS DEL_FLAG                                                    
+    ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE                                
+	 ,ST.START_DATE                                                            
+   ,ST.END_DATE                                                                
+   ,ST.SALES_GROUP_NAME AS SALES_GROUP_NAME    
+    ,ST.CUST_INVC_FROZEN_NAME 		
+    ,ST.SALE_REGION_NAME 			
+    ,ST.CUST_ORDER_FROZEN_NAME 		
+    ,ST.CUST_DELIVERY_FROZEN_NAME   
+	,ST.CUST_GROUP_CODE
+	,ST.SRC_CUST_NUM
+	,ST.PAY_TERM_DESC       -- 	付款条件描述 20230904新增
+	,ST.UPDATE_TIME --更新时间 20240318新增
+FROM DWIMD.DWI_MD_CUST_SALES_AREA_T ST                                              
+LEFT JOIN(SELECT ADRP.EMP_NAME,USR21.CTR_OBJECT_PERSON_NAME                         	
+			FROM DWIMD.DWI_MD_PERSON_OFFI_ADDR_T ADRP                                       
+	 INNER JOIN DWIMD.DWI_MD_USER_NAME_T USR21                                      	
+            ON ADRP.EMP_NUM = USR21.EMP_NUM) D
+	 ON D.CTR_OBJECT_PERSON_NAME = ST.CTR_OBJECT_PERSON_CODE
+LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R T5 
+     ON ST.SALES_OFFICE_CODE = T5.CONFIG_CODE
+	AND ST.GROUP_NUM = T5.GROUP_NUM
+	AND T5.LANG_CODE = '1'
+LEFT JOIN DWIMD.DWI_MD_PRIMARY_SALES_DEPT_TEXT_T T8 
+     ON ST.PRIMARY_SALES_DEPT_CODE = T8.PRIMARY_SALES_DEPT_CODE
+;

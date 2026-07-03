@@ -1,0 +1,8 @@
+{
+    "name": "DWR_DIM_MATL_INVENT_LOC_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/MM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,16 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/05/03 09:36:45 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRBIT.DWR_OPR_LOG_TMS_F
+SELECT ID
+      ,A.OPERATOR_ID
+      ,A.OPERATOR_DT AS OPERATOR_DATE
+      ,A.OPERATION AS OPERATOR_STATUS
+      ,A.OPERATION_NO AS OPERATOR_NUM
+      ,A.OPERATION_TYPE
+      ,A.OPERATOR_NAME
+      ,A.IP
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM SDI.SDI_PLAT_OPERATION_LOG_1005 A

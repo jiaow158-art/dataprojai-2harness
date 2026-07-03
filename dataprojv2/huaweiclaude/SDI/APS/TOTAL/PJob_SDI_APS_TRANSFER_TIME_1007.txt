@@ -1,0 +1,16 @@
+insert overwrite table sdi.sdi_aps_transfer_time_1007
+select 
+id,
+create_by,
+create_date,
+inv_org_id,
+pre_property,
+scheduling_property,
+sync_id,
+update_by,
+update_date,
+value,
+wip_resource_id,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_transfer_time_1007;

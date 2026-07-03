@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_QMS_ERR_ORDER_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/QMS",
+    "description": "异常监控单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

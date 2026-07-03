@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_UKM_LIMIT_RULE0T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "来源表UKM_LIMIT_RULE0T",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

@@ -1,0 +1,795 @@
+-- DWS sql
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：瓷砖事业部销售业绩
+-- create time: 2022/08/29 09:20:05 GMT+08:00
+-- ******************************************************************** --
+delete
+from DM.DM_RPT_CT_DEPARTMENT_SALES_PERFORMANCE_T
+where calday = to_char(current_date - 1, 'yyyyMMdd');
+insert
+into DM.DM_RPT_CT_DEPARTMENT_SALES_PERFORMANCE_T (一级,
+                                                  二级,
+                                                  三级,
+                                                  渠道,
+                                                  四级,
+                                                  五级,
+                                                  本日业绩,
+                                                  零售本日业绩,
+                                                  工程本日业绩,
+                                                  大包本日业绩,
+                                                  设计师本日业绩,
+                                                  本月715销售面积,
+                                                  本月超大板销售面积,
+                                                  本月高值,
+                                                  本月工程差价积分,
+                                                  本月共享仓业绩,
+                                                  本月其他业绩调整,
+                                                  月业绩,
+                                                  本月需求未出货金额,
+                                                  季业绩,
+                                                  历史年业绩,
+                                                  季度715,
+                                                  季度新品,
+                                                  季度超大板,
+                                                  季度高值,
+                                                  年累计715,
+                                                  年累计新品,
+                                                  年累计超大板,
+                                                  年累计高值,
+                                                  季度工程差价积分业绩划分,
+                                                  季度共享仓业绩划分,
+                                                  季度经销商其他业绩调整,
+                                                  年累计工程差价积分业绩划分,
+                                                  年累计共享仓业绩划分,
+                                                  年累计经销商其他业绩调整,
+                                                  去年同期业绩,
+                                                  季度同期业绩,
+                                                  年业绩,
+                                                  去年业绩,
+                                                  六级编码,
+                                                  六级,
+                                                  排名,
+                                                  三级排名,
+                                                  五级排名,
+                                                  顺序,
+                                                  CALDAY,
+                                                  本月毛利额,
+                                                  本月不含税收入,
+                                                  本月918销售面积,
+                                                  本月销售面积,
+                                                  季度销售面积,
+                                                  年度销售面积,
+                                                  季度918销售面积,
+                                                  年累计918销售面积,
+                                                  三级年排名,
+                                                  渠道年排名,
+                                                  五级年排名,
+                                                  DW_LAST_UPDATE_DATE)
+with 层次清仓后 as (
+    select distinct '国内营销系统'                              一级,
+                    case
+                        when system = '22000001' and subcompany_big_area != '33000046' then '区域运营中心'
+                        when subcompany_big_area = '33000046' then '工程市场中心'
+                        when subcompany_big_area = '33000030' then '大包市场中心'
+                        else system_name end              二级,
+                    case
+                        when system = '22000001' and subcompany_big_area != '33000046' then '22000001'
+                        when subcompany_big_area = '33000046' then '33000046'
+                        when subcompany_big_area = '33000030' then '33000030'
+                        else system end                   二级编码,
+                    case
+                        when subcompany_big_area_name = '大包市场部' then '大包市场中心'
+                        else subcompany_big_area_name end 三级,
+                    subcompany_big_area                   三级编码,
+                    case
+                        when distr_chan = '06' and coalesce(zyl01, '00') != 'G105' then '工程' ---工程不参与清仓
+                        when (distr_chan = '06' and coalesce(zyl01, '00') = 'G105')
+                            or (distr_chan != '06' and coalesce(zyl01, '00') = 'G105' and
+                                right(coalesce(plant, '00'), 2) != '80')
+                            or (distr_chan = '09' and right(plant, 2) = '80') then '设计师'
+                        else case
+                                 when (right(plant, 2) != '80' or plant is null) then
+                                     case
+                                         when zqdzh = 'G103' then '大包'
+                                         else zqdzh___t end
+                                 when right(plant, 2) = '80' then
+                                     case
+                                         when distr_chan = '08' then '大包'
+                                         when distr_chan not in ('06', '08', '09') or distr_chan is null
+                                             then '零售'
+                                         end
+                            end
+                        end
+                                                          渠道,
+                    case
+                        when system in ('22000001', '22000004') and
+                             subcompany_big_area not in ('33000030', '33000046')
+                            then
+                            case
+                                when 渠道 = '设计师' then replace(
+                                        replace(subcompany_big_area_name, '子公司', '设计师业务'),
+                                        '运营中心', '设计师业务')
+                                else replace(
+                                             replace(subcompany_big_area_name, '子公司', ''),
+                                             '运营中心', '') || 渠道 ||
+                                     (case when subcompany_big_area_name like '%运营中心%' then '营销部' else '渠道' end)
+                                end
+                        else case
+                                 when subcompany_big_area = '33000046' then '工程市场中心'
+                                 when subcompany_big_area = '33000030' then '大包市场中心'
+                                 else subcompany_big_area_name
+                            end
+                        end                               四级
+            ,
+                    case
+                        when subcompany_big_area = '33000046' then '工程市场中心'
+                        when subcompany_big_area = '33000030' then '大包市场中心'
+                        when system in ('22000001') and subcompany_big_area not in ('33000030', '33000046') then
+                            case
+                                when 渠道 = '设计师' then replace(
+                                        replace(subcompany_big_area_name, '子公司', '设计师业务'),
+                                        '运营中心', '设计师业务')
+                                else case
+                                         when sales_group_name in ('嘉兴组', '湖州组') then '嘉湖组'
+                                         when sales_group_name = '海南工程组' then '海南组'
+                                         else sales_group_name
+                                    end
+                                end
+                        else 四级
+                        end                               五级,
+                    sold_to                               六级编码,
+                    c.txtmd                               六级
+    from DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T a
+             join dwrfin.dwr_gl_sales_group_v b
+                  on a.sales_grp = b.sales_group
+             join dm.dm_rpt_bi0_tcustomer_t c on a.sold_to = c.customer
+    where ((system in ('22000001', '22000004') and subcompany_big_area not in ('00000000', '33000046')) or
+           subcompany_big_area in ('33000030', '33000046'))
+      and sales_group not like 'R%'
+      and calmonth >= '202208'
+    union all
+    select '国内营销系统'   一级,
+           '区域运营中心'   二级,
+           '22000001' 二级编码,
+           '黑吉辽运营中心'  三级,
+           '33000069' 三级编码,
+           '工程'       渠道,
+           '黑吉辽工程营销部' 四级,
+           '辽宁组'      五级,
+           '0000321042',
+           '内蒙古锡林郭勒盟嘉旭'
+    from upload.upload_achievement_history
+    where 客编 = '0000321042'
+    union all
+-----------原有
+    select distinct '国内营销系统'                                           一级,
+                    case
+                        when system = '22000001' and subcompany_big_area != '33000046' then '区域运营中心'
+                        when subcompany_big_area = '33000046' then '工程市场中心'
+                        when subcompany_big_area = '33000030' then '大包市场中心'
+                        else system_name end                           二级,
+                    case
+                        when system = '22000001' and subcompany_big_area != '33000046' then '22000001'
+                        when subcompany_big_area = '33000046' then '33000046'
+                        when subcompany_big_area = '33000030' then '33000030'
+                        else system end                                二级编码,
+                    case
+                        when subcompany_big_area_name = '大包市场部' then '大包市场中心'
+                        else subcompany_big_area_name end              三级,
+                    subcompany_big_area                                三级编码,
+                    case
+                        when zqdzh = 'G102' and (zyl01 != 'G105' or zyl01 is null) then '工程' ---工程不参与清仓
+                        when (zqdzh = 'G105' or (zqdzh = 'G102' and zyl01 = 'G105')) then '设计师'
+                        when zqdzh = 'G103' then '大包'
+                        else zqdzh___t end                             渠道,
+                    case
+                        when system in ('22000001', '22000004') and
+                             subcompany_big_area not in ('33000030', '33000046')
+                            then
+                            case
+                                when 渠道 = '设计师' then replace(
+                                        replace(subcompany_big_area_name, '子公司', '设计师业务'),
+                                        '运营中心', '设计师业务')
+                                else replace(
+                                             replace(subcompany_big_area_name, '子公司', ''),
+                                             '运营中心', '') || 渠道 ||
+                                     (case when subcompany_big_area_name like '%运营中心%' then '营销部' else '渠道' end) end
+                        else case
+                                 when subcompany_big_area = '33000046' then '工程市场中心'
+                                 when subcompany_big_area = '33000030' then '大包市场中心'
+                                 else subcompany_big_area_name end end 四级,
+                    case
+                        when subcompany_big_area = '33000046' then '工程市场中心'
+                        when subcompany_big_area = '33000030' then '大包市场中心'
+                        when system in ('22000001') and subcompany_big_area not in ('33000030', '33000046') then
+                            case
+                                when 渠道 = '设计师' then replace(
+                                        replace(subcompany_big_area_name, '子公司', '设计师业务'),
+                                        '运营中心', '设计师业务')
+                                else case
+                                         when sales_group_name in ('嘉兴组', '湖州组') then '嘉湖组'
+                                         when sales_group_name = '海南工程组' then '海南组'
+                                         else sales_group_name end end
+                        else 四级 end                                    五级,
+                    sold_to                                            六级编码,
+                    c.txtmd                                            六级
+    from DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T a
+             join dwrfin.dwr_gl_sales_group_v b
+                  on a.sales_grp = b.sales_group
+             join dm.dm_rpt_bi0_tcustomer_t c on a.sold_to = c.customer
+    where ((system in ('22000001', '22000004') and subcompany_big_area not in ('00000000', '33000046')) or
+           subcompany_big_area in ('33000030', '33000046'))
+      and sales_group not like 'R%'),
+     层次 as (
+         select distinct 一级,
+                         二级,
+                         二级编码,
+                         三级,
+                         三级编码,
+                         渠道,
+                         四级,
+                         五级,
+                         六级编码,
+                         六级
+         from 层次清仓后
+     ),
+     转换线组 as (
+         select distinct 一级,
+                         二级,
+                         二级编码,
+                         三级,
+                         三级编码,
+                         渠道,
+                         四级,
+                         case b.运营中心
+                             when '工程市场中心' then '工程市场中心'
+                             else
+                                 case a.渠道
+                                     when '零售' then (case b.零售线组
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(b.零售线组, '子公司', '') end)
+                                     when '工程' then (case b.工程线组
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(b.工程线组, '子公司', '') end)
+                                     when '大包' then (case b.大包线组
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(b.大包线组, '子公司', '') end)
+                                     when '设计师' then (case b.设计师业务
+                                                          when '大包市场部' then '大包市场中心'
+                                                          else replace(b.设计师业务, '子公司设计师渠道', '设计师业务') end)
+                                     else a.四级 end end 五级,
+                         六级编码,
+                         六级
+         from 层次 a
+                  join upload.upload_achievement_history b on a.六级编码 = lpad(b.客编, 10, '0') and
+                                                              a.三级 = (case b.运营中心 when '大包市场部' then '大包市场中心' else b.运营中心 end)
+         union all
+         select distinct '国内营销系统'                                           一级,
+                         case
+                             when system = '22000001' and subcompany_big_area != '33000046' then '区域运营中心'
+                             when subcompany_big_area = '33000046' then '工程市场中心'
+                             when subcompany_big_area = '33000030' then '大包市场中心'
+                             else system_name end                           二级,
+                         case
+                             when system = '22000001' and subcompany_big_area != '33000046' then '22000001'
+                             when subcompany_big_area = '33000046' then '33000046'
+                             when subcompany_big_area = '33000030' then '33000030'
+                             else system end                                二级编码,
+                         case
+                             when subcompany_big_area_name = '大包市场部' then '大包市场中心'
+                             else subcompany_big_area_name end              三级,
+                         subcompany_big_area                                三级编码,
+                         (case
+                              when distr_chan_code = '06' and coalesce(product_channel_code, '00') != 'G105'
+                                  then '工程' ---工程不参与清仓
+                              when (distr_chan_code = '06' and coalesce(product_channel_code, '00') = 'G105')
+                                  or
+                                   (distr_chan_code != '06' and
+                                    coalesce(product_channel_code, '00') = 'G105' and
+                                    right(coalesce(plant, '00'), 2) != '80')
+                                  or
+                                   (distr_chan_code = '09' and right(plant, 2) = '80')
+                                  then '设计师'
+                              else case
+                                       when (right(plant, 2) != '80' or plant is null)
+                                           then
+                                           case
+                                               when channel_unit_code = 'G103'
+                                                   then '大包'
+                                               else '零售' end
+                                       when right(plant, 2) = '80'
+                                           then
+                                           case
+                                               when distr_chan_code = '08'
+                                                   then '大包'
+                                               when distr_chan_code not in ('06', '08', '09') or distr_chan_code is null
+                                                   then '零售'
+                                               end
+                                  end
+                             end)                                           渠道,
+                         case
+                             when system in ('22000001', '22000004') and
+                                  subcompany_big_area not in ('33000030', '33000046')
+                                 then
+                                 case
+                                     when 渠道 = '设计师' then replace(
+                                             replace(subcompany_big_area_name, '子公司', '设计师业务'),
+                                             '运营中心', '设计师业务')
+                                     else replace(
+                                                  replace(subcompany_big_area_name, '子公司', ''),
+                                                  '运营中心', '') || 渠道 ||
+                                          (case when subcompany_big_area_name like '%运营中心%' then '营销部' else '渠道' end) end
+                             else case
+                                      when subcompany_big_area = '33000046' then '工程市场中心'
+                                      when subcompany_big_area = '33000030' then '大包市场中心'
+                                      else subcompany_big_area_name end end 四级,
+                         case
+                             when subcompany_big_area = '33000046' then '工程市场中心'
+                             when subcompany_big_area = '33000030' then '大包市场中心'
+                             else
+                                 case 渠道
+                                     when '零售' then (case b.sales_group_name
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(case
+                                                                          when sales_group_name in ('嘉兴组', '湖州组')
+                                                                              then '嘉湖组'
+                                                                          when sales_group_name = '海南工程组' then '海南组'
+                                                                          else sales_group_name end, '子公司', '') end)
+                                     when '工程' then (case b.sales_group_name
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(case
+                                                                          when sales_group_name in ('嘉兴组', '湖州组')
+                                                                              then '嘉湖组'
+                                                                          when sales_group_name = '海南工程组' then '海南组'
+                                                                          else sales_group_name end, '子公司', '') end)
+                                     when '大包' then (case b.sales_group_name
+                                                         when '大包市场部' then '大包市场中心'
+                                                         else replace(case
+                                                                          when sales_group_name in ('嘉兴组', '湖州组')
+                                                                              then '嘉湖组'
+                                                                          when sales_group_name = '海南工程组' then '海南组'
+                                                                          else sales_group_name end, '子公司', '') end)
+                                     when '设计师' then (case b.sales_group_name
+                                                          when '大包市场部' then '大包市场中心'
+                                                          else replace(case
+                                                                           when sales_group_name in ('嘉兴组', '湖州组')
+                                                                               then '嘉湖组'
+                                                                           when sales_group_name = '海南工程组' then '海南组'
+                                                                           else sales_group_name end, '子公司设计师渠道',
+                                                                       '设计师业务') end)
+                                     else 四级 end end                        五级,
+                         son_cust_num                                       六级编码,
+                         txtmd                                              六级
+         from DM.dm_rpt_sales_achievement_send_rpt_t a
+                  join dwrfin.dwr_gl_sales_group_v b
+                       on a.sales_grp_code = b.sales_group
+                  join dm.dm_rpt_bi0_tcustomer_t c on a.son_cust_num = c.customer
+                  left join upload.upload_achievement_history z on a.son_cust_num = lpad(z.客编, 10, '0') and
+                                                                   case
+                                                                       when subcompany_big_area_name = '大包市场部'
+                                                                           then '大包市场中心'
+                                                                       else subcompany_big_area_name end =
+                                                                   (case z.运营中心 when '大包市场部' then '大包市场中心' else z.运营中心 end)
+         where ((system in ('22000001', '22000004') and subcompany_big_area not in ('00000000', '33000046')) or
+                subcompany_big_area in ('33000030', '33000046'))
+           and sales_group not like 'R%'
+           and z.客编 is null
+           and calmonth = to_char(current_date - 1, 'yyyyMM')
+           and zxsyj_dn != 0
+     ),
+     业绩 as (
+         select sum(zxsyj_dr) / 10000                                                                        本日业绩,
+                sum(case c.渠道 when '零售' then zxsyj_dr else 0 end) / 10000                                    零售本日业绩,
+                sum(case c.渠道 when '工程' then zxsyj_dr else 0 end) / 10000                                    工程本日业绩,
+                sum(case c.渠道 when '大包' then zxsyj_dr else 0 end) / 10000                                    大包本日业绩,
+                sum(case c.渠道 when '设计师' then zxsyj_dr else 0 end) / 10000                                   设计师本日业绩,
+                sum(zxsyj_dy) / 10000                                                                        本月业绩合计,
+                sum(zxsyj_dy_a000) / 10000                                                                   本月工程差价积分,
+                sum(zxsyj_dy_g000) / 10000                                                                   本月共享仓业绩,
+                sum(zxsyj_dy_qt) / 10000                                                                     本月其他业绩调整,
+                sum(zxsmj_dy_715) / 10000                                                                    本月715销售面积,
+                sum(zxsmj_dy_cdb) / 10000                                                                    本月超大板销售面积,
+                sum(zxsyj_dy_gz) / 10000                                                                     本月高值,
+                sum(zxqwchje_dy) / 10000                                                                     本月需求未出货金额,
+                sum(zmle_dy) / 10000                                                                         本月毛利额,
+                sum(zxssr_dy) / 10000                                                                        本月不含税收入,
+                sum(case when right(plant, 2) != '80' or plant is null then zxsmj_dy_918 else 0 end) / 10000 本月918销售面积,
+                sum(case when right(plant, 2) != '80' or plant is null then ZXSMJ_DY else 0 end) / 10000     本月销售面积,
+                sum(zxsyj_jd) / 10000                                                                        历史季业绩,
+                sum(zxsyj_dn) / 10000                                                                        历史年业绩,
+                sum(zxsmj_jd_715) / 10000                                                                    季度715,
+                0                                                                                            季度新品,
+                sum(zxsmj_jd_cdb) / 10000                                                                    季度超大板,
+                sum(zxsyj_jd_gz) / 10000                                                                     季度高值,
+                sum(zxsmj_dy_715) / 10000                                                                    年累计715,
+                0                                                                                            年累计新品,
+                sum(zxsmj_dy_cdb) / 10000                                                                    年累计超大板,
+                sum(zxsyj_dy_gz) / 10000                                                                     年累计高值,
+                sum(zxsyj_jd_a000) / 10000                                                                   季度工程差价积分业绩划分,
+                sum(zxsyj_jd_g000) / 10000                                                                   季度共享仓业绩划分,
+                sum(zxsyj_jd_qt) / 10000                                                                     季度经销商其他业绩调整,
+                sum(zxsyj_dy_a000) / 10000                                                                   年累计工程差价积分业绩划分,
+                sum(zxsyj_dy_g000) / 10000                                                                   年累计共享仓业绩划分,
+                sum(zxsyj_dy_qt) / 10000                                                                     年累计经销商其他业绩调整,
+                sum(case when right(plant, 2) != '80' or plant is null then ZXSMJ_JD else 0 end) /
+                10000                                                                                        总面积剔除80工厂季度,
+                sum(case when right(plant, 2) != '80' or plant is null then ZXSMJ_DN else 0 end) /
+                10000                                                                                        总面积剔除80工厂年度,
+                sum(zxsmj_jd_918) / 10000                                                                    季度918,
+                sum(zxsmj_dy_918) / 10000                                                                    年累计918,
+                sum(zxsyj_dy_qntq) / 10000                                                                   去年同期业绩,
+                sum(zxsyj_jd_qntq) / 10000                                                                   季度同期业绩,
+                sum(zxsyj_dn_qntq) / 10000                                                                   去年业绩,
+                c.三级,
+                c.渠道,
+                c.四级,
+                c.五级,
+                c.六级编码,
+                c.六级
+         from dm.dm_rpt_sales_achievement_send_rpt_t a
+                  join dwrfin.dwr_gl_sales_group_v b
+                       on a.sales_grp_code = b.sales_group
+                  join 转换线组 c on a.son_cust_num = c.六级编码 and (case b.subcompany_big_area_name
+                                                                  when '大包市场部' then '大包市场中心'
+                                                                  else b.subcompany_big_area_name end) = c.三级 and (case
+                                                                                                                       when distr_chan_code = '06' and coalesce(product_channel_code, '00') != 'G105'
+                                                                                                                           then '工程' ---工程不参与清仓
+                                                                                                                       when (distr_chan_code = '06' and coalesce(product_channel_code, '00') = 'G105')
+                                                                                                                           or
+                                                                                                                            (distr_chan_code != '06' and
+                                                                                                                             coalesce(product_channel_code, '00') = 'G105' and
+                                                                                                                             right(coalesce(plant, '00'), 2) != '80')
+                                                                                                                           or
+                                                                                                                            (distr_chan_code = '09' and right(plant, 2) = '80')
+                                                                                                                           then '设计师'
+                                                                                                                       else case
+                                                                                                                                when (right(plant, 2) != '80' or plant is null)
+                                                                                                                                    then
+                                                                                                                                    case
+                                                                                                                                        when channel_unit_code = 'G103'
+                                                                                                                                            then '大包'
+                                                                                                                                        else '零售' end
+                                                                                                                                when right(plant, 2) = '80'
+                                                                                                                                    then
+                                                                                                                                    case
+                                                                                                                                        when distr_chan_code = '08'
+                                                                                                                                            then '大包'
+                                                                                                                                        when distr_chan_code not in ('06', '08', '09') or distr_chan_code is null
+                                                                                                                                            then '零售'
+                                                                                                                                        end
+                                                                                                                           end
+             end) = c.渠道
+         where 1 = 1
+           and calday = to_char(current_date - 1, 'yyyyMMdd')
+         group by c.三级, c.渠道, c.四级, c.五级, c.六级编码, c.六级
+     ),
+     目标 as (
+         select replace(marketing_department, '设计师渠道', '设计师业务')                                  营销部,
+                replace(regional_group, '设计师渠道', '设计师业务')                                        线组,
+                unnest(string_to_array((
+                                                                                                                               COALESCE(january_value, '0') || ',' ||
+                                                                                                                               COALESCE(february_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(march_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(april_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(may_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(june_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(july_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(august_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(september_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(october_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(november_value, '0') ||
+                                                                                                                               ',' ||
+                                                                                                                               COALESCE(december_value, '0')),
+                                       ','))                                                     目标,
+                年份 || '-' || unnest(string_to_array('01,02,03,04,05,06,07,08,09,10,11,12', ',')) 月份,
+                调整数
+         FROM upload.upload_Sales_performance_target_pus),
+     三级月目标 as (
+         select 营销部
+              , 线组
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 目标
+                        else '0' end) 三级月目标
+              , sum(目标)               三级年目标
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 调整数
+                        else '0' end) 三级月调整
+              , sum(调整数)              三级年调整
+         from 目标
+         where 营销部 = 线组
+           and (营销部 like '%运营中心%'
+             or 营销部 like '%子公司%'
+             or 营销部 like '%市场中心%')
+           and 营销部 not like '%渠道%'
+           and 月份 <= to_char(current_date - 1
+             , 'yyyy-mm')
+         group by 营销部, 线组
+     ),
+     四级月目标 as (
+         select 营销部
+              , 线组
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 目标
+                        else '0' end) 四级月目标
+              , sum(目标)               四级年目标
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 调整数
+                        else '0' end) 四级月调整
+              , sum(调整数)              四级年调整
+         from 目标
+         where 营销部 = 线组
+           and 营销部 = 营销部
+           and (营销部 like '%营销部%'
+             or 营销部 like '%渠道%'
+             or 营销部 like '%设计师业务%')
+           and 月份 <= to_char(current_date - 1
+             , 'yyyy-mm')
+         group by 营销部, 线组
+     ),
+     五级月目标 as (
+         select 营销部
+              , 线组
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 目标
+                        else '0' end) 五级月目标
+              , sum(目标)               五级年目标
+              , sum(case
+                        when 月份 = to_char(current_date - 1
+                            , 'yyyy-mm') then 调整数
+                        else '0' end) 五级月调整
+              , sum(调整数)              五级年调整
+
+         from 目标
+         where (营销部 != 线组
+             or 线组 like '%设计师业务%')
+           and 月份 <= to_char(current_date - 1
+             , 'yyyy-mm')
+         group by 营销部, 线组
+     ),
+     三级排名 as (
+         select a.三级,
+                row_number()
+                over (order by case nvl(sum(三级月目标), 0) when 0 then 0 else sum(月业绩) / sum(三级月目标) end desc) 三级排名
+         from (select sum(本月业绩合计) 月业绩, 三级 from 业绩 WHERE 五级 IS NOT NULL group by 三级) a
+                  join 三级月目标 b
+                       on a.三级 = b.营销部
+         where 三级 like '%运营中心%'
+         group by a.三级
+         union all
+         select a.三级,
+                row_number()
+                over (order by case nvl(sum(三级月目标), 0) when 0 then 0 else sum(月业绩) / sum(三级月目标) end desc) 三级排名
+         from (select sum(本月业绩合计) 月业绩, 三级 from 业绩 WHERE 五级 IS NOT NULL group by 三级) a
+                  join 三级月目标 b
+                       on a.三级 = b.营销部
+         where 三级 like '%子公司%'
+         group by a.三级
+     ),
+     渠道排名 as (
+         select a.四级,
+                row_number()
+                over (partition by 渠道 order by case nvl(sum(四级月目标), 0) when 0 then 0 else sum(月业绩) / sum(四级月目标) end desc) 排名
+         from (select sum(本月业绩合计) 月业绩, 四级, 三级, 渠道 from 业绩 where 五级 is not null group by 四级, 三级, 渠道) a
+                  join 四级月目标 b
+                       on a.四级 = b.营销部
+         where 三级 like '%运营中心%'
+         group by a.四级, 渠道
+         union all
+         select a.四级,
+                row_number() over (partition by 渠道 order by case
+                                                                when nvl(sum(四级月目标), 0) = 0 then 0
+                                                                else sum(月业绩) / sum(四级月目标) end desc) 排名
+         from (select sum(本月业绩合计) 月业绩, 四级, 三级, 渠道 from 业绩 where 五级 is not null group by 四级, 三级, 渠道) a
+                  join 四级月目标 b
+                       on a.四级 = b.营销部
+         where 三级 like '%子公司%'
+         group by a.四级, 渠道
+     ),
+     五级排名 as (
+         select a.四级,
+                a.五级,
+                row_number()
+                over (order by case nvl(sum(五级月目标), 0) when 0 then 0 else sum(月业绩) / sum(五级月目标) end desc) 五级排名
+         from (select sum(本月业绩合计) 月业绩, 三级, 四级, 五级 from 业绩 group by 三级, 四级, 五级) a
+                  join 五级月目标 b
+                       on a.四级 = b.营销部 and a.五级 = b.线组
+         where 三级 like '%运营中心%'
+         group by a.四级, a.五级
+     ),
+     result as (
+         select 一级,
+                二级,
+                a.三级,
+                a.渠道,
+                a.四级,
+                a.五级,
+                b.本日业绩,
+                b.零售本日业绩,
+                b.工程本日业绩,
+                b.大包本日业绩,
+                b.设计师本日业绩,
+                本月715销售面积,
+                本月超大板销售面积,
+                本月高值,
+                coalesce(b.本月工程差价积分, 0)                  本月工程差价积分,
+                coalesce(b.本月共享仓业绩, 0)                   本月共享仓业绩,
+                coalesce(b.本月其他业绩调整, 0)                  本月其他业绩调整,
+                coalesce(b.本月业绩合计, 0)                    月业绩,
+                b.本月需求未出货金额,
+                coalesce(历史季业绩, 0)                       季业绩,
+                coalesce(历史年业绩, 0)                       历史年业绩,
+                coalesce(季度715, 0)                       季度715,
+                coalesce(季度新品, 0)                        季度新品,
+                coalesce(季度超大板, 0)                       季度超大板,
+                coalesce(季度高值, 0)                        季度高值,
+                coalesce(年累计715, 0)                      年累计715,
+                coalesce(年累计新品, 0)                       年累计新品,
+                coalesce(年累计超大板, 0)                      年累计超大板,
+                coalesce(年累计高值, 0)                       年累计高值,
+                coalesce(季度工程差价积分业绩划分, 0)                季度工程差价积分业绩划分,
+                coalesce(季度共享仓业绩划分, 0)                   季度共享仓业绩划分,
+                coalesce(季度经销商其他业绩调整, 0)                 季度经销商其他业绩调整,
+                coalesce(年累计工程差价积分业绩划分, 0)               年累计工程差价积分业绩划分,
+                coalesce(年累计共享仓业绩划分, 0)                  年累计共享仓业绩划分,
+                coalesce(年累计经销商其他业绩调整, 0)                年累计经销商其他业绩调整,
+                coalesce(去年同期业绩, 0)                      去年同期业绩,
+                coalesce(季度同期业绩, 0)                      季度同期业绩,
+                coalesce(历史年业绩, 0)                       年业绩,
+                去年业绩,
+                a.六级编码,
+                a.六级,
+                s.排名,
+                t.三级排名,
+                u.五级排名,
+                z.顺序,
+                to_char(current_date - 1, 'yyyyMMdd') AS CALDAY,
+                本月毛利额,
+                本月不含税收入,
+                本月918销售面积,
+                本月销售面积,
+                coalesce(总面积剔除80工厂季度, 0)                 季度销售面积,
+                coalesce(总面积剔除80工厂年度, 0)                 年度销售面积,
+                coalesce(季度918, 0)                       季度918销售面积,
+                coalesce(年累计918, 0)                      年度918销售面积
+         from 转换线组 a
+                  left join 业绩 b on a.三级 = b.三级 and a.四级 = b.四级 and a.五级 = b.五级 and a.渠道 = b.渠道 and a.六级编码 = b.六级编码
+                  left join 渠道排名 s on a.四级 = s.四级
+                  left join 三级排名 t on a.三级 = t.三级
+                  left join 五级排名 u on a.四级 = u.四级 and a.五级 = u.五级
+                  left join upload.upload_ctseq z on a.三级 = z.ct运营中心
+         where 1 = 1
+           AND a.五级 is not null
+         order by z.顺序, (case a.渠道 when '零售' then 1 when '工程' then 2 when '大包' then 3 else 4 end), a.五级
+     ),
+     三级年排名 as (
+         select a.三级,
+                row_number() over (order by case nvl(sum(三级年目标), 0)
+                                                when 0 then 0
+                                                else (sum(年业绩) + sum(b.三级年调整)) / sum(三级年目标) end desc) 三级年排名
+         from (select sum(年业绩) 年业绩, 三级 from result WHERE 五级 IS NOT NULL group by 三级) a
+                  join 三级月目标 b
+                       on a.三级 = b.营销部
+         where 三级 like '%运营中心%'
+         group by a.三级
+         union all
+         select a.三级,
+                row_number() over (order by case nvl(sum(三级年目标), 0)
+                                                when 0 then 0
+                                                else (sum(年业绩) + sum(b.三级年调整)) / sum(三级年目标) end desc) 三级年排名
+         from (select sum(年业绩) 年业绩, 三级 from result WHERE 五级 IS NOT NULL group by 三级) a
+                  join 三级月目标 b
+                       on a.三级 = b.营销部
+         where 三级 like '%子公司%'
+         group by a.三级
+     ),
+     渠道年排名 as (
+         select a.四级,
+                row_number() over (partition by 渠道 order by case nvl(sum(四级年目标), 0)
+                                                                when 0 then 0
+                                                                else (sum(年业绩) + sum(b.四级年调整)) / sum(四级年目标) end desc) 渠道年排名
+         from (select sum(年业绩) 年业绩, 四级, 三级, 渠道 from result where 五级 is not null group by 四级, 三级, 渠道) a
+                  join 四级月目标 b
+                       on a.四级 = b.营销部
+         where 三级 like '%运营中心%'
+         group by a.四级, 渠道
+         union all
+         select a.四级,
+                row_number() over (partition by 渠道 order by case nvl(sum(四级年目标), 0)
+                                                                when 0 then 0
+                                                                else (sum(年业绩) + sum(b.四级年调整)) / sum(四级年目标) end desc) 渠道年排名
+         from (select sum(年业绩) 年业绩, 四级, 三级, 渠道 from result where 五级 is not null group by 四级, 三级, 渠道) a
+                  join 四级月目标 b
+                       on a.四级 = b.营销部
+         where 三级 like '%子公司%'
+         group by a.四级, 渠道
+     ),
+     五级年排名 as (
+         select a.四级,
+                a.五级,
+                row_number() over (order by case nvl(sum(五级年目标), 0)
+                                                when 0 then 0
+                                                else (sum(年业绩) + sum(b.五级年调整)) / sum(五级年目标) end desc) 五级年排名
+         from (select sum(年业绩) 年业绩, 三级, 四级, 五级 from result group by 三级, 四级, 五级) a
+                  join 五级月目标 b
+                       on a.四级 = b.营销部 and a.五级 = b.线组
+         where 三级 like '%运营中心%'
+         group by a.四级, a.五级
+     )
+select 一级,
+       二级,
+       a.三级,
+       渠道,
+       a.四级,
+       a.五级,
+       本日业绩,
+       零售本日业绩,
+       工程本日业绩,
+       大包本日业绩,
+       设计师本日业绩,
+       本月715销售面积,
+       本月超大板销售面积,
+       本月高值,
+       本月工程差价积分,
+       本月共享仓业绩,
+       本月其他业绩调整,
+       月业绩,
+       本月需求未出货金额,
+       季业绩,
+       历史年业绩,
+       季度715,
+       季度新品,
+       季度超大板,
+       季度高值,
+       年累计715,
+       年累计新品,
+       年累计超大板,
+       年累计高值,
+       季度工程差价积分业绩划分,
+       季度共享仓业绩划分,
+       季度经销商其他业绩调整,
+       年累计工程差价积分业绩划分,
+       年累计共享仓业绩划分,
+       年累计经销商其他业绩调整,
+       去年同期业绩,
+       季度同期业绩,
+       年业绩,
+       去年业绩,
+       六级编码,
+       六级,
+       排名,
+       三级排名,
+       五级排名,
+       顺序,
+       CALDAY,
+       本月毛利额,
+       本月不含税收入,
+       本月918销售面积,
+       本月销售面积,
+       季度销售面积,
+       年度销售面积,
+       季度918销售面积,
+       年度918销售面积,
+       t.三级年排名,
+       s.渠道年排名,
+       u.五级年排名,
+       CURRENT_TIMESTAMP() AS dw_last_update_date
+from result a
+         left join 渠道年排名 s on a.四级 = s.四级
+         left join 三级年排名 t on a.三级 = t.三级
+         left join 五级年排名 u on a.四级 = u.四级 and a.五级 = u.五级
+order by 顺序, (case a.渠道 when '零售' then 1 when '工程' then 2 when '大包' then 3 else 4 end), a.五级

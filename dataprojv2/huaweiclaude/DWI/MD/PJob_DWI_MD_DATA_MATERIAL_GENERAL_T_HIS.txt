@@ -1,0 +1,1212 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/17 16:55:18 GMT+08:00
+-- update from chenzhiyong  20221107 15:10 新增YL09字段(产品所有权)
+-- update from guzhengfeng  20221109 11:23 新增prod_property_name字段(产品所有权名称)
+-- update from chenzhiyong  20221122 13:50 放开INSERT语句
+-- 2023-06-14 zhz 新增字段xsdm,yl10,yl11
+-- 2023-07-18 zhz 新增产品工艺枚举值
+-- 2023-11-23 ZHANGPENG 新增字段旧物料编码
+-- update from huangwenbin 2024-03-26 补充PRODUCT_BRAND_NAME的取值逻辑，原先是留空
+-- update from huangwenbin 2024-04-03 新增字段：单位面积（瓷砖）、瓷砖产品系列1
+-- update from huangwenbin 2024-04-18 修改瓷砖产品系列1： 超大版-->超大板
+-- update from zhanghz 2024-10-28 新增物料小类
+-- update from QYJ 2024-12-12 部分编码描述统一维护到：ZMMT014
+-- update from wjh 2025-02-27 新增定制主体字段
+-- update from wjh 2025-03-11 新增gy02, gy03, pt02,QD02 字段
+-- update from zhz 2025-04-28 新增color_temp_code色温编码,color_temp_name色温名称,lightness_code，明度编码,lightness_name 明度名称,light_sense_code --光感编码 ,light_sense_name --光感名称,dermat_pattern_code --纹样编码,dermat_pattern_name --纹样名称 ,touch_sense_code --触感编码,touch_sense_name --触感名称字段
+-- update from huangwenbin 2026-04-21 产品规格1修改逻辑
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+with sdi as (
+select 
+ mara.mandt group_num                       -- 集团
+,mara.matnr material_num 					-- 物料编码
+,makt.maktx material_name 					-- 物料名称
+,mara.mtart matl_type_code 					-- 物料类型
+,tt3.mtbez  matl_type_name 					-- 物料类型名称
+,mara.spart product_group_code 				-- 产品组
+,tt11.vtext product_group_name	    		-- 产品组名称
+,mara.labor product_classify_code			-- 产品分级
+,tt14.lbtxt product_classify_name  			-- 产品分级名称
+,mara.meins basic_calc_unit_name   			-- 基本计量单位
+,mara.xchpf batch_mngnt_require_flag 		-- 批次管理
+,mara.meabm size_unit 			 			-- 单位
+,mara.laeng length_1 						-- 长度
+,mara.breit width  							-- 宽度
+,mara.hoehe height  						-- 高度
+,mara.volum busi_volume 					-- 体积
+,mara.voleh volume_unit_name 				-- 体积单位
+,mara.groes dimension 						-- 大小量纲
+,mara.brgew gross_weight 					-- 毛重
+,mara.ntgew net_weight 				    	-- 净重
+,mara.gewei weight_unit						-- 重量单位
+,mara.tragr trans_group_code 				-- 运输组代码
+,tt.vtext   trans_group_name 				-- 运输组名称
+,mara.matkl matl_group_code  				-- 物料组代码
+,tt2.wgbez  matl_group_name  				-- 物料组名称
+,mara.extwg external_matl_group_code		-- 外部物料组
+,tt4.ewbez  external_matl_group_name		-- 外部物料组名称
+,mara.prdha product_level_code				-- 产品层次
+,tt16.vtext product_level_name 				-- 产品层次名称
+,tt30.prodh product_level1_code 
+,tt31.VTEXT product_level1_name 
+,tt32.prodh product_level2_code
+,tt33.VTEXT product_level2_name 
+,tt34.prodh product_level3_code
+,tt35.VTEXT product_level3_name 
+,tt36.prodh product_level4_code
+,tt37.VTEXT product_level4_name 
+,tt38.prodh product_level5_code
+,tt39.VTEXT product_level5_name 
+,tt40.prodh product_level6_code
+,tt41.VTEXT product_level6_name 
+,MARA.WLPP PRODUCT_BRAND_CODE 
+,tt44.value_desc  PRODUCT_BRAND_NAME 
+,MARA.WLCD PRODUCT_PLACE_CODE 
+,dd07t1.value_desc  PRODUCT_PLACE_NAME  --产品工艺名称
+,mara.mtpos_mara general_item_ctgry_group_code  -- 普通项目类别组
+,tt6.bezei general_item_ctgry_group_name	-- 普通项目类别组名称
+,mara.dw01 product_position_code			-- 高值说明
+,tt15.value_desc product_position_name 			-- 高值说明名称
+,mara.sx01 color_code						-- 色系
+,tt5.value_desc color_name						-- 色系名称
+,mara.gg01 product_specify_code			    -- 产品规格
+,tt12.value_desc product_specify_name			-- 产品规格名称 
+,mara.mx01  faces_code						-- 面相
+,tt7.value_desc faces_name						-- 面相名称
+,mara.wl01 texture_1						-- 产品材质
+,tt17.value_desc texture_1_name 							-- 产品材质名称  zc005-wl01mc
+,mara.wl02 texture_2						-- 纹理
+,tt18.value_desc  texture_2_name 							-- 纹理名称  zc006-wl02mc
+,mara.wlmc  new_product_code				-- 工艺新品
+,tt10.value_desc  new_product_name				-- 工艺新品名称
+,mara.wlgg menu_desc_code 					-- 菜单说明
+,tt19.value_desc  menu_desc_name 						    -- 菜单说明名称 zc008-wlggmc
+,mara.wlxh height2_code						-- 高度
+,tt20.value_desc  height2_name 								-- 高度描述 zc009-wlxhmc
+,mara.wlcz matl_texture						-- 物料材质
+,tt21.value_desc  matl_texture_name 							-- 物料材质名称 zc010-wlczmc
+,mara.yl01 reserved_field_1					-- 产品渠道 
+,tt22.value_desc  reserved_field1_name 						-- 产品渠道名称 ztyl01-yl01mc
+,mara.yl02 reserved_field_2					-- 库存类型
+,tt23.value_desc  reserved_field2_name 						-- 库存类型名称 ztyl02-yl02mc
+,mara.yl03 reserved_field_3					-- 盈利分析
+,tt24.value_desc reserved_field3_name 						-- 盈利分析名称 ztyl03-yl03mc
+,mara.yl04 reserved_field_4					-- 清库存标识 
+,tt25.value_desc reserved_field4_name 						-- 清库存标识名称 ztyl04-yl04mc 
+,mara.yl05 reserved_field_5					-- 市场新品 
+,tt26.value_desc reserved_field5_name 					    -- 市场新品名称 ztyl05-yl05mc 
+,mara.yl06 reserved_field_6					-- 产品等级 
+,tt27.value_desc reserved_field6_name 						-- 产品等级名称 ztyl06-yl06mc 
+,mara.yl07 reserved_field_7					-- 产品胚体 mara-yl07
+,tt28.value_desc reserved_field7_name 						-- 产品胚体名称 ztyl07-yl07mc 
+,mara.yl08 reserved_field_8					-- 产品功能
+,tt29.value_desc reserved_field8_name 						-- 产品功能名称 ztyl08-yl08mc 
+,mara.mstav x_dstrb_c_mm_status_code 		-- 冻结标识
+,tt9.vmstb x_dstrb_c_mm_status_name 		-- 冻结名称
+,mara.mbrsh industry_field_code 			-- 行业领域
+,tt1.mbbez industry_field_name 			    -- 行业领域名称
+,case when mara.ferth = '000000' then '19000101' else mara.ferth end   product_listed_date 			-- 产品上线时间
+,mara.mhdrz min_remain_shelf_life 			-- 最小剩余货架寿命
+,mara.mhdhb total_shelf_life 				-- 总货架寿命
+,from_unixtime(unix_timestamp(mara.ersda,'yyyymmdd'),'yyyy-mm-dd') create_date                     -- 创建时间
+,mara.del_flag 								-- 删除标识
+,from_unixtime(unix_timestamp(case when mara.laeda = '00000000' then '19700101' else mara.laeda end,'yyyymmdd'),'yyyy-mm-dd') start_date
+,'4712-12-31' end_date
+,from_unixtime(unix_timestamp(case when mara.laeda = '00000000' then '19700101' else mara.laeda end,'yyyymmdd'),'yyyy-mm-dd')  update_date 
+,'日增量数据' AS DATA_TYPE
+,mara.mstae as X_plant_matl_status
+,tt8.MTSTB as X_plant_matl_status_name
+,mara.yl09 as prod_property -- 产品所有权
+,dd07t.value_desc AS prod_property_name -- 产品所有权名称
+,mara.xsdm as sales_code --销售代码
+,mara.yl10 as category --品类
+,tt42.value_desc as category_name --品类名称
+,mara.yl11 as product_position1 --产品定位
+,tt43.value_desc as product_position_name1 --产品定位名称
+,mara.bismt as old_material_num
+,case when mara.matkl = '1000010' then mara.laeng * mara.breit / 1000000 else null end as unit_area --单位面积（瓷砖）
+/*瓷砖产品系列1：
+600=大小量纲“600x600”
+800=大小量纲“800x800”
+612=大小量纲“1200x600”
+715=大小量纲“1500x750”
+918=大小量纲“1800x900”
+630=大小量纲“600x300”
+840=大小量纲“800x400”
+超大板=面积大于等于1.62&=1200x1200
+其他规格=以上之外其他规格
+*/
+,case when mara.groes = '600X600' then '600'
+      when mara.groes = '800X800' then '800'
+	  when mara.groes = '1200X600' then '612'
+	  when mara.groes = '1500X750' then '715'
+	  when mara.groes = '1800X900' then '918'
+	  when mara.groes = '600X300' then '630'
+	  when mara.groes = '800X400' then '840'
+	  when mara.groes = '1200X1200' then '1200'
+	  when mara.groes = '300X300' then '300'
+	  when mara.groes = '400X400' then '400'
+	  when mara.matkl = '1000010' and mara.laeng * mara.breit / 1000000 >= 1.62 then '超大板'
+	  when mara.yl09 = 'A0001' then '其他规格'
+	  else null
+	   end as product_series_name --瓷砖产品系列1
+,mara.wlxl as product_subclass_code --物料小类代码
+,tt45.VALUE_DESC as product_subclass_name
+,MARA.DZ01 AS  CSTM_MAIN_CODE            --定制主体编码
+,tt46.VALUE_DESC  as  CSTM_MAIN_NAME     --定制主体描述     
+,MARA.gy02 AS  secondary_crafts_code     --次工艺编码
+,tt47.VALUE_DESC as  secondary_crafts_name--次工艺描述
+,MARA.gy03 AS  auxiliary_processes_code  --辅工艺编码
+,tt48.VALUE_DESC as auxiliary_processes_name --辅工艺描述
+,MARA.pt02 AS  embryo_whiteness_code     --胚体白度编码
+,tt49.VALUE_DESC as embryo_whiteness_name  --胚体白度描述
+,MARA.qd02 AS  tow_lev_channel_code           --二级渠道编码
+,tt50.VALUE_DESC as tow_lev_channel_name     --二级渠道描述
+,MARA.SX02 AS color_temp_code --色温编码
+,tt51.VALUE_DESC as color_temp_name --色温名称
+,MARA.SX03 AS lightness_code  --明度编码
+,tt52.VALUE_DESC as lightness_name  --明度名称
+,MARA.LG01 AS light_sense_code --光感编码 
+,tt53.VALUE_DESC as light_sense_name --光感名称
+,MARA.WY01 AS dermat_pattern_code --纹样编码
+,tt54.VALUE_DESC as dermat_pattern_name --纹样名称 
+,MARA.CG01 AS touch_sense_code --触感编码
+,tt55.VALUE_DESC as touch_sense_name --触感名称
+from sdi.sdi_mara_1001 mara 
+left join sdi.sdi_makt_1001 makt on  mara.matnr = makt.matnr
+left join sdi.sdi_ttgrt_1001 tt  on  mara.mandt = tt.mandt  and mara.tragr = tt.tragr  and tt.spras  = '1'
+left join sdi.sdi_t137t_1001 tt1 on  mara.mandt = tt1.mandt and mara.mbrsh = tt1.mbrsh and tt1.spras = '1'
+left join sdi.sdi_t023t_1001 tt2 on mara.mandt =  tt2.mandt  and mara.matkl = tt2.matkl and tt2.spras = '1'
+left join sdi.sdi_t134t_1001 tt3 on mara.mandt =  tt3.mandt  and mara.mtart = tt3.mtart and tt3.spras = '1'
+left join sdi.sdi_twewt_1001 tt4 on mara.mandt =  tt4.mandt  and mara.extwg = tt4.extwg and tt4.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt5 on mara.mandt =  tt5.mandt  and mara.sx01 =  tt5.value_code and tt5.fieldname = 'SX01'
+left join sdi.sdi_tptmt_1001 tt6 on mara.mandt =  tt6.mandt  and mara.mtpos_mara = tt6.mtpos and tt6.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt7 on mara.mandt =  tt7.mandt  and mara.mx01 = tt7.value_code and tt7.fieldname = 'MX01'
+left join sdi.sdi_t141t_1001 tt8 on mara.mandt =  tt8.mandt  and mara.mstae = tt8.mmsta and tt8.spras = '1'
+left join sdi.sdi_tvmst_1001 tt9 on mara.mandt =  tt9.mandt  and mara.mstav = tt9.vmsta and tt9.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt10 on mara.mandt = tt10.mandt and mara.wlmc = tt10.value_code and tt10.fieldname = 'WLMC'
+left join sdi.sdi_tspat_1001 tt11 on mara.mandt = tt11.mandt and mara.spart = tt11.spart and tt11.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt12 on mara.gg01 =  tt12.value_code and mara.mandt = tt12.mandt and tt12.fieldname = 'GG01'
+left join sdi.sdi_ztyl07_1001 tt13 on mara.mandt = tt13.mandt and mara.yl07 = tt13.yl07 
+left join sdi.sdi_t024x_1001 tt14 on mara.mandt = tt14.mandt and mara.labor = tt14.labor and tt14.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt15 on mara.mandt = tt15.mandt and mara.dw01 = tt15.value_code and tt15.fieldname = 'DW01'
+left join sdi.sdi_t179t_1001 tt16 on mara.mandt = tt16.mandt and mara.prdha = tt16.prodh and tt16.spras = '1'
+left join SDI.SDI_ZMMT014_1001 tt17 on mara.mandt = tt17.mandt  and mara.wl01 =tt17.value_code and  tt17.fieldname = 'WL01'
+left join SDI.SDI_ZMMT014_1001 tt18 on mara.mandt = tt18.mandt  and mara.wl02 =tt18.value_code and tt18.fieldname = 'WL02'
+left join SDI.SDI_ZMMT014_1001 tt19 on mara.mandt = tt19.mandt  and mara.wlgg =tt19.value_code and tt19.fieldname = 'WLGG'
+left join SDI.SDI_ZMMT014_1001 tt20 on mara.mandt = tt20.mandt and mara.wlxh = tt20.value_code and tt20.fieldname = 'WLXH'
+left join SDI.SDI_ZMMT014_1001 tt21 on mara.mandt = tt21.mandt and mara.wlcz = tt21.value_code and tt21.fieldname = 'WLCZ'
+left join SDI.SDI_ZMMT014_1001 tt22 on mara.mandt =tt22.mandt and mara.yl01 = tt22.value_code and tt22.fieldname = 'YL01' 
+left join sdi.SDI_ZMMT014_1001 tt23 on mara.mandt =tt23.mandt and mara.yl02 = tt23.value_code and tt23.fieldname = 'YL02' 
+left join sdi.SDI_ZMMT014_1001 tt24 on mara.mandt =tt24.mandt and mara.yl03 = tt24.value_code and tt24.fieldname = 'YL03' 
+left join sdi.SDI_ZMMT014_1001 tt25 on mara.mandt =tt25.mandt and mara.yl04 = tt25.value_code and tt25.fieldname = 'YL04' 
+left join sdi.SDI_ZMMT014_1001 tt26 on mara.mandt =tt26.mandt and mara.yl05 = tt26.value_code and tt26.fieldname = 'YL05' 
+left join sdi.SDI_ZMMT014_1001 tt27 on mara.mandt =tt27.mandt and mara.yl06 = tt27.value_code and tt27.fieldname = 'YL06' 
+left join sdi.SDI_ZMMT014_1001 tt28 on mara.mandt =tt28.mandt and mara.yl07 = tt28.value_code and tt28.fieldname = 'YL07' 
+left join sdi.SDI_ZMMT014_1001 tt29 on mara.mandt =tt29.mandt and mara.yl08 = tt29.value_code and tt29.fieldname = 'YL08' 
+left join sdi.sdi_t179_1001 tt30 on mara.mandt = tt30.mandt and substr(MARA.PRDHA,0,2) = tt30.prodh and tt30.STUFE = '1'
+left join sdi.sdi_t179t_1001 tt31 on  tt30.PRODH = tt31.PRODH
+left join sdi.sdi_t179_1001 tt32 on mara.mandt = tt32.mandt and substr(MARA.PRDHA,0,4) = tt32.prodh and tt32.STUFE = '2'
+left join sdi.sdi_t179t_1001 tt33 on  tt32.PRODH = tt33.PRODH
+left join sdi.sdi_t179_1001 tt34 on mara.mandt = tt34.mandt and substr(MARA.PRDHA,0,7) = tt34.prodh and tt34.STUFE = '3'
+left join sdi.sdi_t179t_1001 tt35 on  tt34.PRODH = tt35.PRODH
+left join sdi.sdi_t179_1001 tt36 on mara.mandt = tt36.mandt and substr(MARA.PRDHA,0,10) = tt36.prodh and tt36.STUFE = '4'
+left join sdi.sdi_t179t_1001 tt37 on  tt36.PRODH = tt37.PRODH
+left join sdi.sdi_t179_1001 tt38 on mara.mandt = tt38.mandt and substr(MARA.PRDHA,0,15) = tt38.prodh and tt38.STUFE = '5'
+left join sdi.sdi_t179t_1001 tt39 on  tt38.PRODH = tt39.PRODH
+left join sdi.sdi_t179_1001 tt40 on mara.mandt = tt40.mandt and substr(MARA.PRDHA,0,18) = tt40.prodh and tt40.STUFE = '6'
+left join sdi.sdi_t179t_1001 tt41 on  tt40.PRODH = tt41.PRODH
+left join SDI.SDI_ZMMT014_1001 dd07t on mara.yl09 = dd07t.value_code and dd07t.fieldname = 'YL09'
+left join sdi.SDI_ZMMT014_1001 dd07t1 on mara.WLCD = dd07t1.value_code  and dd07t1.fieldname = 'WLCD'
+left join sdi.SDI_ZMMT014_1001 tt42 on mara.yl10 = tt42.value_code and tt42.fieldname = 'YL10'
+left join sdi.SDI_ZMMT014_1001 tt43 on mara.yl11 = tt43.value_code and tt43.fieldname = 'YL11'
+left join SDI.SDI_ZMMT014_1001 tt44 on MARA.WLPP = tt44.value_code  and tt44.mandt = 800 and tt44.fieldname = 'WLPP'
+left join sdi.sdi_zmmt014_1001 tt45 on tt45.TABNAME = 'MARA' AND tt45.FIELDNAME = 'WLXL' AND mara.wlxl = tt45.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt46 on tt46.TABNAME = 'MARA' AND tt46.FIELDNAME = 'DZ01' AND mara.DZ01 = tt46.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt47 on tt47.TABNAME = 'MARA' AND tt47.FIELDNAME = 'GY02' AND mara.GY02 = tt47.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt48 on tt48.TABNAME = 'MARA' AND tt48.FIELDNAME = 'GY03' AND mara.GY03 = tt48.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt49 on tt49.TABNAME = 'MARA' AND tt49.FIELDNAME = 'PT02' AND mara.PT02 = tt49.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt50 on tt50.TABNAME = 'MARA' AND tt50.FIELDNAME = 'QD02' AND mara.QD02 = tt50.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt51 on tt51.TABNAME = 'MARA' AND tt51.FIELDNAME = 'SX02' AND mara.SX02 = tt51.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt52 on tt52.TABNAME = 'MARA' AND tt52.FIELDNAME = 'SX03' AND mara.SX03 = tt52.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt53 on tt53.TABNAME = 'MARA' AND tt53.FIELDNAME = 'LG01' AND mara.LG01 = tt53.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt54 on tt54.TABNAME = 'MARA' AND tt54.FIELDNAME = 'WY01' AND mara.WY01 = tt54.VALUE_CODE
+left join sdi.sdi_zmmt014_1001 tt55 on tt55.TABNAME = 'MARA' AND tt55.FIELDNAME = 'CG01' AND mara.CG01 = tt55.VALUE_CODE
+
+) 
+
+,dwi as (
+SELECT 
+material_id
+,group_num 
+,material_num 
+,material_name 
+,matl_type_code 
+,matl_type_name 
+,product_group_code 
+,product_group_name 
+,product_classify_code 
+,product_classify_name 
+,basic_calc_unit_name 
+,batch_mngnt_require_flag 
+,size_unit 
+,length_1 
+,width 
+,height 
+,busi_volume 
+,volume_unit_name 
+,dimension 
+,gross_weight 
+,net_weight 
+,weight_unit 
+,trans_group_code 
+,trans_group_name 
+,matl_group_code 
+,matl_group_name 
+,external_matl_group_code 
+,external_matl_group_name 
+,product_level_code 
+,product_level_name 
+,product_level1_code 
+,product_level1_name 
+,product_level2_code 
+,product_level2_name 
+,product_level3_code 
+,product_level3_name 
+,product_level4_code 
+,product_level4_name 
+,product_level5_code 
+,product_level5_name 
+,product_level6_code 
+,product_level6_name 
+,product_brand_code 
+,product_brand_name 
+,product_place_code 
+,product_place_name 
+,general_item_ctgry_group_code 
+,general_item_ctgry_group_name 
+,product_position_code 
+,product_position_name 
+,color_code 
+,color_name 
+,product_specify_code 
+,product_specify_name 
+,faces_code 
+,faces_name 
+,texture_1 
+,texture_1_name 
+,texture_2 
+,texture_2_name 
+,new_product_code 
+,new_product_name 
+,menu_desc_code 
+,menu_desc_name 
+,height2_code 
+,height2_name 
+,matl_texture 
+,matl_texture_name 
+,reserved_field_1 
+,reserved_field1_name 
+,reserved_field_2 
+,reserved_field2_name 
+,reserved_field_3 
+,reserved_field3_name 
+,reserved_field_4 
+,reserved_field4_name 
+,reserved_field_5 
+,reserved_field5_name 
+,reserved_field_6 
+,reserved_field6_name 
+,reserved_field_7 
+,reserved_field7_name 
+,reserved_field_8 
+,reserved_field8_name 
+,x_dstrb_c_mm_status_code 
+,x_dstrb_c_mm_status_name 
+,industry_field_code 
+,industry_field_name 
+,product_listed_date 
+,min_remain_shelf_life 
+,total_shelf_life 
+,create_date
+,start_date 
+,end_date 
+,del_flag 
+,update_date
+,DATA_TYPE
+,X_plant_matl_status
+,X_plant_matl_status_name
+,prod_property
+,prod_property_name
+,sales_code --销售代码
+,category --品类
+,category_name --品类名称
+,product_position1 --产品定位
+,product_position_name1 --产品定位名称
+,old_material_num --旧物料编码
+,unit_area --单位面积（瓷砖）
+,product_series_name --瓷砖产品系列1
+,product_subclass_code --物料小类代码
+,product_subclass_name --物料小类名称
+,CSTM_MAIN_CODE--定制主体编码
+,CSTM_MAIN_NAME--定制主体名称
+,secondary_crafts_code     --次工艺编码
+,secondary_crafts_name--次工艺描述
+,auxiliary_processes_code  --辅工艺编码
+,auxiliary_processes_name --辅工艺描述
+,embryo_whiteness_code     --胚体白度编码
+,embryo_whiteness_name  --胚体白度描述
+,tow_lev_channel_code       --二级渠道编码
+,tow_lev_channel_name      --二级渠道描述
+,color_temp_code --色温编码
+,color_temp_name --色温名称
+,lightness_code  --明度编码
+,lightness_name  --明度名称
+,light_sense_code --光感编码 
+,light_sense_name --光感名称
+,dermat_pattern_code --纹样编码
+,dermat_pattern_name --纹样名称 
+,touch_sense_code --触感编码
+,touch_sense_name --触感名称
+ FROM dwimd.dwi_md_data_material_general_t_his where DATA_TYPE <> '初始化数据'
+ 
+)
+,max_rk as (
+select max(material_id) rk  from dwimd.dwi_md_data_material_general_t_his
+)
+-- 插入初始化的数据
+-- 当 sdi 存在 dwi 不存在. 		则判断是新增的数据. 新增排序.
+-- 当 dwi = 4712 且 sdi update > dwi update.则把end_Date设置为最新SDI的UPDATE
+-- 当 dwi <> 4712 且 sdi update > dwi update.则取旧的DWI的数据
+-- 当 dwi 存在 sdi 不存在. 		则判断是删除的数据. 
+-- 当sdi = dwi 且dwi = 4712  不变
+insert overwrite table dwimd.dwi_md_data_material_general_t_his
+--插入初始化的数据
+SELECT 
+material_id
+,group_num 
+,material_num 
+,material_name 
+,matl_type_code 
+,matl_type_name 
+,product_group_code 
+,product_group_name 
+,product_classify_code 
+,product_classify_name 
+,basic_calc_unit_name 
+,batch_mngnt_require_flag 
+,size_unit 
+,length_1 
+,width 
+,height 
+,busi_volume 
+,volume_unit_name 
+,dimension 
+,gross_weight 
+,net_weight 
+,weight_unit 
+,trans_group_code 
+,trans_group_name 
+,matl_group_code 
+,matl_group_name 
+,external_matl_group_code 
+,external_matl_group_name 
+,product_level_code 
+,product_level_name 
+,product_level1_code 
+,product_level1_name 
+,product_level2_code 
+,product_level2_name 
+,product_level3_code 
+,product_level3_name 
+,product_level4_code 
+,product_level4_name 
+,product_level5_code 
+,product_level5_name 
+,product_level6_code 
+,product_level6_name 
+,product_brand_code 
+,product_brand_name 
+,product_place_code 
+,product_place_name 
+,general_item_ctgry_group_code 
+,general_item_ctgry_group_name 
+,product_position_code 
+,product_position_name 
+,color_code 
+,color_name 
+,product_specify_code 
+,product_specify_name 
+,faces_code 
+,faces_name 
+,texture_1 
+,texture_1_name 
+,texture_2 
+,texture_2_name 
+,new_product_code 
+,new_product_name 
+,menu_desc_code 
+,menu_desc_name 
+,height2_code 
+,height2_name 
+,matl_texture 
+,matl_texture_name 
+,reserved_field_1 
+,reserved_field1_name 
+,reserved_field_2 
+,reserved_field2_name 
+,reserved_field_3 
+,reserved_field3_name 
+,reserved_field_4 
+,reserved_field4_name 
+,reserved_field_5 
+,reserved_field5_name 
+,reserved_field_6 
+,reserved_field6_name 
+,reserved_field_7 
+,reserved_field7_name 
+,reserved_field_8 
+,reserved_field8_name 
+,x_dstrb_c_mm_status_code 
+,x_dstrb_c_mm_status_name 
+,industry_field_code 
+,industry_field_name 
+,product_listed_date 
+,min_remain_shelf_life 
+,total_shelf_life 
+,create_date
+,start_date 
+,end_date 
+,del_flag 
+,update_date 
+,DW_LAST_UPDATE_DATE
+,DATA_TYPE
+,X_plant_matl_status
+,X_plant_matl_status_name
+,prod_property
+,prod_property_name
+,sales_code --销售代码
+,category --品类
+,category_name --品类名称
+,product_position1 --产品定位
+,product_position_name1 --产品定位名称
+,old_material_num --旧物料编码
+,unit_area --单位面积（瓷砖）
+,product_series_name --瓷砖产品系列1
+,product_subclass_code --物料小类代码
+,product_subclass_name --物料小类名称
+,CSTM_MAIN_CODE--定制主体编码
+,CSTM_MAIN_NAME--定制主体名称
+,secondary_crafts_code     --次工艺编码
+,secondary_crafts_name--次工艺描述
+,auxiliary_processes_code  --辅工艺编码
+,auxiliary_processes_name --辅工艺描述
+,embryo_whiteness_code     --胚体白度编码
+,embryo_whiteness_name  --胚体白度描述
+,tow_lev_channel_code       --二级渠道编码
+,tow_lev_channel_name      --二级渠道描述
+,color_temp_code --色温编码
+,color_temp_name --色温名称
+,lightness_code  --明度编码
+,lightness_name  --明度名称
+,light_sense_code --光感编码 
+,light_sense_name --光感名称
+,dermat_pattern_code --纹样编码
+,dermat_pattern_name --纹样名称 
+,touch_sense_code --触感编码
+,touch_sense_name --触感名称
+ FROM dwimd.dwi_md_data_material_general_t_his where DATA_TYPE = '初始化数据'
+UNION ALL
+-- 当 sdi 存在 dwi 不存在. or sdi = dwi and sdi update > dwi update 则判断新增. 
+select  
+  COALESCE(t1.rk,0) + ROW_NUMBER() over() material_id
+,sdi.group_num 
+,sdi.material_num 
+,sdi.material_name 
+,sdi.matl_type_code 
+,sdi.matl_type_name 
+,sdi.product_group_code 
+,sdi.product_group_name 
+,sdi.product_classify_code 
+,sdi.product_classify_name 
+,sdi.basic_calc_unit_name 
+,sdi.batch_mngnt_require_flag 
+,sdi.size_unit 
+,sdi.length_1 
+,sdi.width 
+,sdi.height 
+,sdi.busi_volume 
+,sdi.volume_unit_name 
+,sdi.dimension 
+,sdi.gross_weight 
+,sdi.net_weight 
+,sdi.weight_unit 
+,sdi.trans_group_code 
+,sdi.trans_group_name 
+,sdi.matl_group_code 
+,sdi.matl_group_name 
+,sdi.external_matl_group_code 
+,sdi.external_matl_group_name 
+,sdi.product_level_code 
+,sdi.product_level_name 
+,sdi.product_level1_code 
+,sdi.product_level1_name 
+,sdi.product_level2_code 
+,sdi.product_level2_name 
+,sdi.product_level3_code 
+,sdi.product_level3_name 
+,sdi.product_level4_code 
+,sdi.product_level4_name 
+,sdi.product_level5_code 
+,sdi.product_level5_name 
+,sdi.product_level6_code 
+,sdi.product_level6_name 
+,sdi.product_brand_code 
+,sdi.product_brand_name 
+,sdi.product_place_code 
+,sdi.product_place_name 
+,sdi.general_item_ctgry_group_code 
+,sdi.general_item_ctgry_group_name 
+,sdi.product_position_code 
+,sdi.product_position_name 
+,sdi.color_code 
+,sdi.color_name 
+,sdi.product_specify_code 
+,sdi.product_specify_name 
+,sdi.faces_code 
+,sdi.faces_name 
+,sdi.texture_1 
+,sdi.texture_1_name 
+,sdi.texture_2 
+,sdi.texture_2_name 
+,sdi.new_product_code 
+,sdi.new_product_name 
+,sdi.menu_desc_code 
+,sdi.menu_desc_name 
+,sdi.height2_code 
+,sdi.height2_name 
+,sdi.matl_texture 
+,sdi.matl_texture_name 
+,sdi.reserved_field_1 
+,sdi.reserved_field1_name 
+,sdi.reserved_field_2 
+,sdi.reserved_field2_name 
+,sdi.reserved_field_3 
+,sdi.reserved_field3_name 
+,sdi.reserved_field_4 
+,sdi.reserved_field4_name 
+,sdi.reserved_field_5 
+,sdi.reserved_field5_name 
+,sdi.reserved_field_6 
+,sdi.reserved_field6_name 
+,sdi.reserved_field_7 
+,sdi.reserved_field7_name 
+,sdi.reserved_field_8 
+,sdi.reserved_field8_name 
+,sdi.x_dstrb_c_mm_status_code 
+,sdi.x_dstrb_c_mm_status_name 
+,sdi.industry_field_code 
+,sdi.industry_field_name 
+,sdi.product_listed_date 
+,sdi.min_remain_shelf_life 
+,sdi.total_shelf_life 
+,sdi.create_date
+,sdi.start_date 
+,sdi.end_date 
+,sdi.del_flag 
+,sdi.update_date 
+,from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss')
+,SDI.DATA_TYPE
+,sdi.X_plant_matl_status
+,sdi.X_plant_matl_status_name
+,sdi.prod_property
+,sdi.prod_property_name
+,sdi.sales_code --销售代码
+,sdi.category --品类
+,sdi.category_name --品类名称
+,sdi.product_position1 --产品定位
+,sdi.product_position_name1 --产品定位名称
+,sdi.old_material_num --旧物料编码
+,sdi.unit_area --单位面积（瓷砖）
+,sdi.product_series_name --瓷砖产品系列1
+,sdi.product_subclass_code --物料小类代码
+,sdi.product_subclass_name --物料小类名称
+,sdi.CSTM_MAIN_CODE--定制主体编码
+,sdi.CSTM_MAIN_NAME--定制主体名称
+,sdi.secondary_crafts_code     --次工艺编码
+,sdi.secondary_crafts_name--次工艺描述
+,sdi.auxiliary_processes_code  --辅工艺编码
+,sdi.auxiliary_processes_name --辅工艺描述
+,sdi.embryo_whiteness_code     --胚体白度编码
+,sdi.embryo_whiteness_name  --胚体白度描述
+,sdi.tow_lev_channel_code       --二级渠道编码
+,sdi.tow_lev_channel_name      --二级渠道描述
+,sdi.color_temp_code --色温编码
+,sdi.color_temp_name --色温名称
+,sdi.lightness_code  --明度编码
+,sdi.lightness_name  --明度名称
+,sdi.light_sense_code --光感编码 
+,sdi.light_sense_name --光感名称
+,sdi.dermat_pattern_code --纹样编码
+,sdi.dermat_pattern_name --纹样名称 
+,sdi.touch_sense_code --触感编码
+,sdi.touch_sense_name --触感名称
+from sdi left join dwi on sdi.material_num = dwi.material_num 
+join max_rk t1 on 1=1 
+where dwi.material_num is null  or (dwi.end_date = '4712-12-31'  and dwi.update_date < sdi.update_date)
+union all 
+-- 当 dwi = 4712 且 sdi update > dwi update.则把end_Date设置为最新SDI的UPDATE
+select  
+ dwi.material_id
+,dwi.group_num 
+,dwi.material_num 
+,dwi.material_name 
+,dwi.matl_type_code 
+,dwi.matl_type_name 
+,dwi.product_group_code 
+,dwi.product_group_name 
+,dwi.product_classify_code 
+,dwi.product_classify_name 
+,dwi.basic_calc_unit_name 
+,dwi.batch_mngnt_require_flag 
+,dwi.size_unit 
+,dwi.length_1 
+,dwi.width 
+,dwi.height 
+,dwi.busi_volume 
+,dwi.volume_unit_name 
+,dwi.dimension 
+,dwi.gross_weight 
+,dwi.net_weight 
+,dwi.weight_unit 
+,dwi.trans_group_code 
+,dwi.trans_group_name 
+,dwi.matl_group_code 
+,dwi.matl_group_name 
+,dwi.external_matl_group_code 
+,dwi.external_matl_group_name 
+,dwi.product_level_code 
+,dwi.product_level_name 
+,dwi.product_level1_code 
+,dwi.product_level1_name 
+,dwi.product_level2_code 
+,dwi.product_level2_name 
+,dwi.product_level3_code 
+,dwi.product_level3_name 
+,dwi.product_level4_code 
+,dwi.product_level4_name 
+,dwi.product_level5_code 
+,dwi.product_level5_name 
+,dwi.product_level6_code 
+,dwi.product_level6_name 
+,dwi.product_brand_code 
+,dwi.product_brand_name 
+,dwi.product_place_code 
+,dwi.product_place_name 
+,dwi.general_item_ctgry_group_code 
+,dwi.general_item_ctgry_group_name 
+,dwi.product_position_code 
+,dwi.product_position_name 
+,dwi.color_code 
+,dwi.color_name 
+,dwi.product_specify_code 
+,dwi.product_specify_name 
+,dwi.faces_code 
+,dwi.faces_name 
+,dwi.texture_1 
+,dwi.texture_1_name 
+,dwi.texture_2 
+,dwi.texture_2_name 
+,dwi.new_product_code 
+,dwi.new_product_name 
+,dwi.menu_desc_code 
+,dwi.menu_desc_name 
+,dwi.height2_code 
+,dwi.height2_name 
+,dwi.matl_texture 
+,dwi.matl_texture_name 
+,dwi.reserved_field_1 
+,dwi.reserved_field1_name 
+,dwi.reserved_field_2 
+,dwi.reserved_field2_name 
+,dwi.reserved_field_3 
+,dwi.reserved_field3_name 
+,dwi.reserved_field_4 
+,dwi.reserved_field4_name 
+,dwi.reserved_field_5 
+,dwi.reserved_field5_name 
+,dwi.reserved_field_6 
+,dwi.reserved_field6_name 
+,dwi.reserved_field_7 
+,dwi.reserved_field7_name 
+,dwi.reserved_field_8 
+,dwi.reserved_field8_name 
+,dwi.x_dstrb_c_mm_status_code 
+,dwi.x_dstrb_c_mm_status_name 
+,dwi.industry_field_code 
+,dwi.industry_field_name 
+,dwi.product_listed_date 
+,dwi.min_remain_shelf_life 
+,dwi.total_shelf_life 
+,dwi.create_date
+,dwi.start_date 
+,sdi.update_date end_date 
+,dwi.del_flag 
+,sdi.update_date 
+,from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') 
+,DWI.DATA_TYPE
+,dwi.X_plant_matl_status
+,dwi.X_plant_matl_status_name
+,dwi.prod_property
+,dwi.prod_property_name
+,dwi.sales_code --销售代码
+,dwi.category --品类
+,dwi.category_name --品类名称
+,dwi.product_position1 --产品定位
+,dwi.product_position_name1 --产品定位名称
+,dwi.old_material_num --旧物料编码
+,dwi.unit_area --单位面积（瓷砖）
+,dwi.product_series_name --瓷砖产品系列1
+,dwi.product_subclass_code --物料小类代码
+,dwi.product_subclass_name --物料小类名称
+,dwi.CSTM_MAIN_CODE--定制主体编码
+,dwi.CSTM_MAIN_NAME--定制主体名称
+,dwi.secondary_crafts_code     --次工艺编码
+,dwi.secondary_crafts_name--次工艺描述
+,dwi.auxiliary_processes_code  --辅工艺编码
+,dwi.auxiliary_processes_name --辅工艺描述
+,dwi.embryo_whiteness_code     --胚体白度编码
+,dwi.embryo_whiteness_name  --胚体白度描述
+,dwi.tow_lev_channel_code       --二级渠道编码
+,dwi.tow_lev_channel_name      --二级渠道描述
+,dwi.color_temp_code --色温编码
+,dwi.color_temp_name --色温名称
+,dwi.lightness_code  --明度编码
+,dwi.lightness_name  --明度名称
+,dwi.light_sense_code --光感编码 
+,dwi.light_sense_name --光感名称
+,dwi.dermat_pattern_code --纹样编码
+,dwi.dermat_pattern_name --纹样名称 
+,dwi.touch_sense_code --触感编码
+,dwi.touch_sense_name --触感名称
+from dwi join sdi on dwi.material_num = sdi.material_num  
+where dwi.end_date = '4712-12-31'  and dwi.update_date < sdi.update_date
+UNION ALL   
+-- 当 dwi <> 4712 且 sdi update > dwi update.则取旧的DWI的数据
+select  
+ dwi.material_id
+,dwi.group_num 
+,dwi.material_num 
+,dwi.material_name 
+,dwi.matl_type_code 
+,dwi.matl_type_name 
+,dwi.product_group_code 
+,dwi.product_group_name 
+,dwi.product_classify_code 
+,dwi.product_classify_name 
+,dwi.basic_calc_unit_name 
+,dwi.batch_mngnt_require_flag 
+,dwi.size_unit 
+,dwi.length_1 
+,dwi.width 
+,dwi.height 
+,dwi.busi_volume 
+,dwi.volume_unit_name 
+,dwi.dimension 
+,dwi.gross_weight 
+,dwi.net_weight 
+,dwi.weight_unit 
+,dwi.trans_group_code 
+,dwi.trans_group_name 
+,dwi.matl_group_code 
+,dwi.matl_group_name 
+,dwi.external_matl_group_code 
+,dwi.external_matl_group_name 
+,dwi.product_level_code 
+,dwi.product_level_name 
+,dwi.product_level1_code 
+,dwi.product_level1_name 
+,dwi.product_level2_code 
+,dwi.product_level2_name 
+,dwi.product_level3_code 
+,dwi.product_level3_name 
+,dwi.product_level4_code 
+,dwi.product_level4_name 
+,dwi.product_level5_code 
+,dwi.product_level5_name 
+,dwi.product_level6_code 
+,dwi.product_level6_name 
+,dwi.product_brand_code 
+,dwi.product_brand_name 
+,dwi.product_place_code 
+,dwi.product_place_name 
+,dwi.general_item_ctgry_group_code 
+,dwi.general_item_ctgry_group_name 
+,dwi.product_position_code 
+,dwi.product_position_name 
+,dwi.color_code 
+,dwi.color_name 
+,dwi.product_specify_code 
+,dwi.product_specify_name 
+,dwi.faces_code 
+,dwi.faces_name 
+,dwi.texture_1 
+,dwi.texture_1_name 
+,dwi.texture_2 
+,dwi.texture_2_name 
+,dwi.new_product_code 
+,dwi.new_product_name 
+,dwi.menu_desc_code 
+,dwi.menu_desc_name 
+,dwi.height2_code 
+,dwi.height2_name 
+,dwi.matl_texture 
+,dwi.matl_texture_name 
+,dwi.reserved_field_1 
+,dwi.reserved_field1_name 
+,dwi.reserved_field_2 
+,dwi.reserved_field2_name 
+,dwi.reserved_field_3 
+,dwi.reserved_field3_name 
+,dwi.reserved_field_4 
+,dwi.reserved_field4_name 
+,dwi.reserved_field_5 
+,dwi.reserved_field5_name 
+,dwi.reserved_field_6 
+,dwi.reserved_field6_name 
+,dwi.reserved_field_7 
+,dwi.reserved_field7_name 
+,dwi.reserved_field_8 
+,dwi.reserved_field8_name 
+,dwi.x_dstrb_c_mm_status_code 
+,dwi.x_dstrb_c_mm_status_name 
+,dwi.industry_field_code 
+,dwi.industry_field_name 
+,dwi.product_listed_date 
+,dwi.min_remain_shelf_life 
+,dwi.total_shelf_life 
+,dwi.create_date
+,dwi.start_date 
+,dwi.end_date 
+,dwi.del_flag 
+,dwi.update_date 
+,from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss') 
+,DWI.DATA_TYPE
+,dwi.X_plant_matl_status
+,dwi.X_plant_matl_status_name
+,dwi.prod_property
+,dwi.prod_property_name
+,dwi.sales_code --销售代码
+,dwi.category --品类
+,dwi.category_name --品类名称
+,dwi.product_position1 --产品定位
+,dwi.product_position_name1 --产品定位名称
+,dwi.old_material_num --旧物料编码
+,dwi.unit_area --单位面积（瓷砖）
+,dwi.product_series_name --瓷砖产品系列1
+,dwi.product_subclass_code --物料小类代码
+,dwi.product_subclass_name --物料小类名称
+,dwi.CSTM_MAIN_CODE--定制主体编码
+,dwi.CSTM_MAIN_NAME--定制主体名称
+,dwi.secondary_crafts_code     --次工艺编码
+,dwi.secondary_crafts_name--次工艺描述
+,dwi.auxiliary_processes_code  --辅工艺编码
+,dwi.auxiliary_processes_name --辅工艺描述
+,dwi.embryo_whiteness_code     --胚体白度编码
+,dwi.embryo_whiteness_name  --胚体白度描述
+,dwi.tow_lev_channel_code       --二级渠道编码
+,dwi.tow_lev_channel_name      --二级渠道描述
+,dwi.color_temp_code --色温编码
+,dwi.color_temp_name --色温名称
+,dwi.lightness_code  --明度编码
+,dwi.lightness_name  --明度名称
+,dwi.light_sense_code --光感编码 
+,dwi.light_sense_name --光感名称
+,dwi.dermat_pattern_code --纹样编码
+,dwi.dermat_pattern_name --纹样名称 
+,dwi.touch_sense_code --触感编码
+,dwi.touch_sense_name --触感名称
+from dwi join sdi on dwi.material_num = sdi.material_num  
+where dwi.end_date <> '4712-12-31'  and dwi.update_date < sdi.update_date
+union all 
+-- 当 dwi 存在 sdi 不存在. 		则判断是删除的数据. 
+select  
+ dwi.material_id
+,dwi.group_num 
+,dwi.material_num 
+,dwi.material_name 
+,dwi.matl_type_code 
+,dwi.matl_type_name 
+,dwi.product_group_code 
+,dwi.product_group_name 
+,dwi.product_classify_code 
+,dwi.product_classify_name 
+,dwi.basic_calc_unit_name 
+,dwi.batch_mngnt_require_flag 
+,dwi.size_unit 
+,dwi.length_1 
+,dwi.width 
+,dwi.height 
+,dwi.busi_volume 
+,dwi.volume_unit_name 
+,dwi.dimension 
+,dwi.gross_weight 
+,dwi.net_weight 
+,dwi.weight_unit 
+,dwi.trans_group_code 
+,dwi.trans_group_name 
+,dwi.matl_group_code 
+,dwi.matl_group_name 
+,dwi.external_matl_group_code 
+,dwi.external_matl_group_name 
+,dwi.product_level_code 
+,dwi.product_level_name 
+,dwi.product_level1_code 
+,dwi.product_level1_name 
+,dwi.product_level2_code 
+,dwi.product_level2_name 
+,dwi.product_level3_code 
+,dwi.product_level3_name 
+,dwi.product_level4_code 
+,dwi.product_level4_name 
+,dwi.product_level5_code 
+,dwi.product_level5_name 
+,dwi.product_level6_code 
+,dwi.product_level6_name 
+,dwi.product_brand_code 
+,dwi.product_brand_name 
+,dwi.product_place_code 
+,dwi.product_place_name 
+,dwi.general_item_ctgry_group_code 
+,dwi.general_item_ctgry_group_name 
+,dwi.product_position_code 
+,dwi.product_position_name 
+,dwi.color_code 
+,dwi.color_name 
+,dwi.product_specify_code 
+,dwi.product_specify_name 
+,dwi.faces_code 
+,dwi.faces_name 
+,dwi.texture_1 
+,dwi.texture_1_name 
+,dwi.texture_2 
+,dwi.texture_2_name 
+,dwi.new_product_code 
+,dwi.new_product_name 
+,dwi.menu_desc_code 
+,dwi.menu_desc_name 
+,dwi.height2_code 
+,dwi.height2_name 
+,dwi.matl_texture 
+,dwi.matl_texture_name 
+,dwi.reserved_field_1 
+,dwi.reserved_field1_name 
+,dwi.reserved_field_2 
+,dwi.reserved_field2_name 
+,dwi.reserved_field_3 
+,dwi.reserved_field3_name 
+,dwi.reserved_field_4 
+,dwi.reserved_field4_name 
+,dwi.reserved_field_5 
+,dwi.reserved_field5_name 
+,dwi.reserved_field_6 
+,dwi.reserved_field6_name 
+,dwi.reserved_field_7 
+,dwi.reserved_field7_name 
+,dwi.reserved_field_8 
+,dwi.reserved_field8_name 
+,dwi.x_dstrb_c_mm_status_code 
+,dwi.x_dstrb_c_mm_status_name 
+,dwi.industry_field_code 
+,dwi.industry_field_name 
+,dwi.product_listed_date 
+,dwi.min_remain_shelf_life 
+,dwi.total_shelf_life 
+,dwi.create_date
+,dwi.start_date 
+,dwi.end_date 
+,'Y' del_flag 
+,dwi.update_date 
+,from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss')
+,DWI.DATA_TYPE
+,dwi.X_plant_matl_status
+,dwi.X_plant_matl_status_name
+,dwi.prod_property
+,dwi.prod_property_name
+,dwi.sales_code --销售代码
+,dwi.category --品类
+,dwi.category_name --品类名称
+,dwi.product_position1 --产品定位
+,dwi.product_position_name1 --产品定位名称
+,dwi.old_material_num --旧物料编码
+,dwi.unit_area --单位面积（瓷砖）
+,dwi.product_series_name --瓷砖产品系列1
+,dwi.product_subclass_code --物料小类代码
+,dwi.product_subclass_name --物料小类名称
+,dwi.CSTM_MAIN_CODE--定制主体编码
+,dwi.CSTM_MAIN_NAME--定制主体名称
+,dwi.secondary_crafts_code     --次工艺编码
+,dwi.secondary_crafts_name--次工艺描述
+,dwi.auxiliary_processes_code  --辅工艺编码
+,dwi.auxiliary_processes_name --辅工艺描述
+,dwi.embryo_whiteness_code     --胚体白度编码
+,dwi.embryo_whiteness_name  --胚体白度描述
+,dwi.tow_lev_channel_code       --二级渠道编码
+,dwi.tow_lev_channel_name      --二级渠道描述
+,dwi.color_temp_code --色温编码
+,dwi.color_temp_name --色温名称
+,dwi.lightness_code  --明度编码
+,dwi.lightness_name  --明度名称
+,dwi.light_sense_code --光感编码 
+,dwi.light_sense_name --光感名称
+,dwi.dermat_pattern_code --纹样编码
+,dwi.dermat_pattern_name --纹样名称 
+,dwi.touch_sense_code --触感编码
+,dwi.touch_sense_name --触感名称
+from dwi left join sdi on dwi.material_num = sdi.material_num  
+where sdi.material_num  is null --and  dwi.end_date = '4712-12-31' 
+-- 当sdi = dwi 且 dwi.update_date = sdi.update_date 不变
+union all 
+select  
+ dwi.material_id
+,dwi.group_num 
+,dwi.material_num 
+,dwi.material_name 
+,dwi.matl_type_code 
+,dwi.matl_type_name 
+,dwi.product_group_code 
+,dwi.product_group_name 
+,dwi.product_classify_code 
+,dwi.product_classify_name 
+,dwi.basic_calc_unit_name 
+,dwi.batch_mngnt_require_flag 
+,dwi.size_unit 
+,dwi.length_1 
+,dwi.width 
+,dwi.height 
+,dwi.busi_volume 
+,dwi.volume_unit_name 
+,dwi.dimension 
+,dwi.gross_weight 
+,dwi.net_weight 
+,dwi.weight_unit 
+,dwi.trans_group_code 
+,dwi.trans_group_name 
+,dwi.matl_group_code 
+,dwi.matl_group_name 
+,dwi.external_matl_group_code 
+,dwi.external_matl_group_name 
+,dwi.product_level_code 
+,dwi.product_level_name 
+,dwi.product_level1_code 
+,dwi.product_level1_name 
+,dwi.product_level2_code 
+,dwi.product_level2_name 
+,dwi.product_level3_code 
+,dwi.product_level3_name 
+,dwi.product_level4_code 
+,dwi.product_level4_name 
+,dwi.product_level5_code 
+,dwi.product_level5_name 
+,dwi.product_level6_code 
+,dwi.product_level6_name 
+,dwi.product_brand_code 
+,dwi.product_brand_name 
+,dwi.product_place_code 
+,dwi.product_place_name 
+,dwi.general_item_ctgry_group_code 
+,dwi.general_item_ctgry_group_name 
+,dwi.product_position_code 
+,dwi.product_position_name 
+,dwi.color_code 
+,dwi.color_name 
+,dwi.product_specify_code 
+,dwi.product_specify_name 
+,dwi.faces_code 
+,dwi.faces_name 
+,dwi.texture_1 
+,dwi.texture_1_name 
+,dwi.texture_2 
+,dwi.texture_2_name 
+,dwi.new_product_code 
+,dwi.new_product_name 
+,dwi.menu_desc_code 
+,dwi.menu_desc_name 
+,dwi.height2_code 
+,dwi.height2_name 
+,dwi.matl_texture 
+,dwi.matl_texture_name 
+,dwi.reserved_field_1 
+,dwi.reserved_field1_name 
+,dwi.reserved_field_2 
+,dwi.reserved_field2_name 
+,dwi.reserved_field_3 
+,dwi.reserved_field3_name 
+,dwi.reserved_field_4 
+,dwi.reserved_field4_name 
+,dwi.reserved_field_5 
+,dwi.reserved_field5_name 
+,dwi.reserved_field_6 
+,dwi.reserved_field6_name 
+,dwi.reserved_field_7 
+,dwi.reserved_field7_name 
+,dwi.reserved_field_8 
+,dwi.reserved_field8_name 
+,dwi.x_dstrb_c_mm_status_code 
+,dwi.x_dstrb_c_mm_status_name 
+,dwi.industry_field_code 
+,dwi.industry_field_name 
+,dwi.product_listed_date 
+,dwi.min_remain_shelf_life 
+,dwi.total_shelf_life 
+,dwi.create_date
+,dwi.start_date 
+,dwi.end_date 
+,dwi.del_flag 
+,dwi.update_date  
+,from_unixtime(unix_timestamp() ,'yyyy-MM-dd HH:mm:ss')
+,DWI.DATA_TYPE
+,dwi.X_plant_matl_status
+,dwi.X_plant_matl_status_name
+,dwi.prod_property
+,dwi.prod_property_name
+,dwi.sales_code --销售代码
+,dwi.category --品类
+,dwi.category_name --品类名称
+,dwi.product_position1 --产品定位
+,dwi.product_position_name1 --产品定位名称
+,dwi.old_material_num --旧物料编码
+,dwi.unit_area --单位面积（瓷砖）
+,dwi.product_series_name --瓷砖产品系列1
+,dwi.product_subclass_code --物料小类代码
+,dwi.product_subclass_name --物料小类名称
+,dwi.CSTM_MAIN_CODE--定制主体编码
+,dwi.CSTM_MAIN_NAME--定制主体名称
+,dwi.secondary_crafts_code     --次工艺编码
+,dwi.secondary_crafts_name--次工艺描述
+,dwi.auxiliary_processes_code  --辅工艺编码
+,dwi.auxiliary_processes_name --辅工艺描述
+,dwi.embryo_whiteness_code     --胚体白度编码
+,dwi.embryo_whiteness_name  --胚体白度描述
+,dwi.tow_lev_channel_code       --二级渠道编码
+,dwi.tow_lev_channel_name      --二级渠道描述
+,dwi.color_temp_code --色温编码
+,dwi.color_temp_name --色温名称
+,dwi.lightness_code  --明度编码
+,dwi.lightness_name  --明度名称
+,dwi.light_sense_code --光感编码 
+,dwi.light_sense_name --光感名称
+,dwi.dermat_pattern_code --纹样编码
+,dwi.dermat_pattern_name --纹样名称 
+,dwi.touch_sense_code --触感编码
+,dwi.touch_sense_name --触感名称
+from dwi join sdi on dwi.material_num = sdi.material_num and dwi.update_date = sdi.update_date;
+
+

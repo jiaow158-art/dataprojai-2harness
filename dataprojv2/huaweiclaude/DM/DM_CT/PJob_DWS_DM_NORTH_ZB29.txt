@@ -1,0 +1,65 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/07/09 14:47:58 GMT+08:00
+-- description:产成品库存周转次数（瓷砖事业部）ZB29
+-- history list:PJob_DWS_DM_NORTH_ZB29
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--产成品库存周转次数（瓷砖事业部）ZB29
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB29';
+
+with zcpkc as (
+select
+stat_month as calmonth,
+'ZB29' as zb_code,
+turnover_times  as 当月实绩,
+turnover_times as 累计实绩,
+turnover_times as 季度累计实绩
+from 
+dm.dm_otd_wm_stock_turnover_m
+where stat_month = '${PERIOD_ID_M}'
+
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) as CM_STAT_AMT,
+sum(累计实绩) as ACC_STAT_AMT,
+sum(季度累计实绩) as QTR_TGT_AMT
+from 
+zcpkc
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month

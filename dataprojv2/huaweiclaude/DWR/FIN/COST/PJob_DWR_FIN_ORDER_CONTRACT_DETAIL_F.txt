@@ -1,0 +1,80 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/09/13 11:34:22 GMT+08:00
+-- description:共享服务订单关联合同支付信息
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--	DWRFIN.DWR_FIN_ORDER_CONTRACT_DETAIL_F   共享服务订单关联合同支付信息
+
+INSERT OVERWRITE TABLE 	DWRFIN.DWR_FIN_ORDER_CONTRACT_DETAIL_F 
+select
+m.id AS id,--合同唯一号,
+m.contract_no AS contract_no,--`合同编号`,
+m.contract_name AS contract_name,--`合同名称`,
+h.order_no AS order_no,--共享服务单号,
+i.item_number AS item_number,--共享服务单行号,
+ip.payment_amount AS payment_amount,--申请支付金额,
+CASE
+		
+		WHEN ip.payment_channel = 'BANK_ENTERPRISE_PAYMENT' THEN
+		'银企转账' 
+		WHEN ip.payment_channel = 'BANK_ACCEPTANCE_DRAFT' THEN
+		'银行承兑汇票' 
+		WHEN ip.payment_channel = 'OFFLINE_PAYMENT' THEN
+		'线下支付' 
+		WHEN ip.payment_channel = 'TRADE_ACCEPTANCE_DRAFT' THEN
+		'商业承兑汇票' ELSE ip.payment_channel 
+	END AS Pay_channels,--支付渠道,
+CASE
+		
+		WHEN ip.payment_status = 'INIT' THEN
+		'初始状态' 
+		WHEN ip.payment_status = 'SUCCESS' THEN
+		'支付成功' 
+		WHEN ip.payment_status = 'PAYING' THEN
+		'支付中' 
+		WHEN ip.payment_status = 'SUBMITTED' THEN
+		'已提交' 
+		WHEN ip.payment_status = 'INVALID' THEN
+		'已注销' 
+		WHEN ip.payment_status = 'FAILED' THEN
+		'支付失败' 
+		WHEN ip.payment_status = 'SUBMIT_FAILED' THEN
+		'提交失败' 
+		WHEN ip.payment_status = 'WAIT_SUBMIT' THEN
+		'等待提交' ELSE ip.payment_status 
+	END AS PAY_STATE,--支付状态,
+CASE
+		
+		WHEN ip.payment_status = 'SUCCESS' 
+	AND 
+		 ( ip.payment_channel = 'BANK_ACCEPTANCE_DRAFT' OR ip.payment_channel = 'TRADE_ACCEPTANCE_DRAFT' ) THEN
+			ip.payment_amount ELSE ip.actual_payment_amount 
+		END AS pay_amount_act,--实际支付金额 
+		 current_timestamp() as dw_last_update_date -- 最后更新时间
+FROM SDI.SDI_SHARE_ORDER_ITEM_ELEMENT_1039 ie
+	LEFT JOIN SDI.SDI_CSM_CONTRACT_HEAD_1039 m ON m.id = ie.element_value
+	LEFT JOIN SDI.SDI_SHARE_ORDER_ITEM_PAYMENT_1039 ip ON ip.share_order_item_id = ie.share_order_item_id
+	LEFT JOIN SDI.SDI_SHARE_ORDER_ITEM_1039 i ON i.id = ie.share_order_item_id
+	LEFT JOIN SDI.SDI_SHARE_ORDER_HEAD_1039 h ON h.id = i.share_order_head_id
+	WHERE
+		ie.element_field = 'contract_id' 
+		AND ie.element_value IS NOT NULL 
+		AND m.id IS NOT NULL 
+		AND h.canceled = 0 
+
+		
+-- CREATE TABLE DWRFIN.DWR_FIN_ORDER_CONTRACT_DETAIL_F (
+--     id NUMERIC(38,10) COMMENT '合同唯一号',
+--     contract_no STRING COMMENT '合同编号',
+--     contract_name STRING COMMENT '合同名称',
+--     order_no STRING COMMENT '共享服务单号',
+--     item_number NUMERIC(38,10) COMMENT '共享服务单行号',
+--     payment_amount NUMERIC(38,10) COMMENT '申请支付金额',
+--     Pay_channels STRING COMMENT '支付渠道',
+--     PAY_STATE STRING COMMENT '支付状态',
+--     pay_amount_act NUMERIC(38,10) COMMENT '实际支付金额',
+--     dw_last_update_date TIMESTAMP COMMENT '最后更新时间'
+-- );

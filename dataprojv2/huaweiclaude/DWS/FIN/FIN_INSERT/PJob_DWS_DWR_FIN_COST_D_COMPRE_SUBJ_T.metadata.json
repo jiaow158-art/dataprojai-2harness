@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_FIN_COST_D_COMPRE_SUBJ_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "费用明细、综合科目表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,160 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 15:08:13 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--主菜单SKU平均销值同比增长率（工程渠道）ZB81
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB81';
+with SKUTB as (
+select 
+t1.calmonth 
+,sum(    
+case when 
+case when t1.calday = '00000000' then concat(SUBSTRING (t1.calmonth,1,7) ,'01') else t1.calday end  >= t2.datab 
+and
+case when t1.calday = '00000000' then concat(SUBSTRING (t1.calmonth,1,7) ,'01') else t1.calday end  <= t2.datbi 
+then coalesce (t1.ambperformance,0) end ) as "主菜单SKU平均销值同比增长率（工程渠道）"
+,0 as "同期主菜单SKU平均销值同比增长率（工程渠道）" 
+from 
+dm.dm_ambv2_zzt_xssr_t t1
+left join 
+ DWIMD.DWI_MD_MATERIAL_MENU_T t2
+on  t1.material = t2.matnr
+left join dm.dm_rpt_sales_group_t  t3
+on t1.sales_grp = t3.node_name9
+where 
+t3.node_name3 ='H03230618'		 
+and T1.data_source in ('S','T''D','U')
+and coalesce (t3.NODE_NAME4,'#') <> 'H04240301'
+and coalesce (t3.node_name5,'#') not in ('H03230605','H03230612') 
+and coalesce (t3.NODE_name5,'#') <> 'H03230627'
+and t1.integrate_channel ='GD03'
+group by 
+t1.calmonth
+union all 
+select 
+SUBSTR(concat(SUBSTRING (t1.calmonth,1,7) ,'-01')+ INTERVAL '1 YEAR', 1, 7)
+,0 as "主菜单SKU平均销值同比增长率（工程渠道）"
+,sum(    
+case when 
+case when t1.calday = '00000000' then concat(SUBSTRING (t1.calmonth,1,7) ,'01') else t1.calday end  >= t2.datab 
+and
+case when t1.calday = '00000000' then concat(SUBSTRING (t1.calmonth,1,7) ,'01') else t1.calday end  <= t2.datbi 
+then coalesce (t1.ambperformance,0) end ) as "同期主菜单SKU平均销值同比增长率（工程渠道）"
+from 
+dm.dm_ambv2_zzt_xssr_t t1
+left join 
+ DWIMD.DWI_MD_MATERIAL_MENU_T t2
+on  t1.material = t2.matnr
+left join dm.dm_rpt_sales_group_t  t3
+on t1.sales_grp = t3.node_name9
+where 
+t3.node_name3 = 'H03230618'
+and T1.data_source in ('S','T''D','U')
+and coalesce (t3.NODE_NAME4,'#') <> 'H04240301'
+and coalesce (t3.node_name5,'#') not in ('H03230605','H03230612') 
+and coalesce (t3.NODE_name5,'#') <> 'ART+'
+and t1.integrate_channel ='GD03'
+group by 
+SUBSTR(concat(SUBSTRING (t1.calmonth,1,7) ,'-01')+ INTERVAL '1 YEAR', 1, 7)
+)
+,skutb2 as (
+select 
+calmonth ,
+sum("主菜单SKU平均销值同比增长率（工程渠道）") as "主菜单SKU平均销值同比增长率（工程渠道）",
+sum( "同期主菜单SKU平均销值同比增长率（工程渠道）") as "同期主菜单SKU平均销值同比增长率（工程渠道）"
+from 
+SKUTB
+group by 
+calmonth
+)
+,SKUTB3 as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB81' as zb_code,
+ "主菜单SKU平均销值同比增长率（工程渠道）"/ "同期主菜单SKU平均销值同比增长率（工程渠道）"-1 as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+skutb2
+where calmonth = '${PERIOD_ID_M}' 
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB81' as zb_code,
+0 as 当月实绩,
+SUM( "主菜单SKU平均销值同比增长率（工程渠道）")/SUM( "同期主菜单SKU平均销值同比增长率（工程渠道）")-1  as 累计实绩,
+0 as 季度累计实绩
+from 
+skutb2
+where  
+SUBSTRING(calmonth,1,7) between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB81' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM( "主菜单SKU平均销值同比增长率（工程渠道）")/SUM( "同期主菜单SKU平均销值同比增长率（工程渠道）")-1 as 季度累计实绩
+from 
+skutb2
+where  
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+)
+
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) * 100 as CM_STAT_AMT,
+sum(累计实绩) * 100 as ACC_STAT_AMT,
+sum(季度累计实绩)* 100 as QTR_TGT_AMT
+from 
+skutb3
+group by 
+calmonth,
+zb_code
+)
+
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.PJFX
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+  
+
+ 

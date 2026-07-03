@@ -1,0 +1,15 @@
+insert overwrite table sdi.sdi_bd_config_1007
+select 
+id,
+create_by,
+create_date,
+entity_type,
+inv_org_id,
+is_phantom,
+sync_id,
+type_name,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_bd_config_1007;

@@ -1,0 +1,2018 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/07/30 09:25:03 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+with tmp as (
+select 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,ofr_num
+,ofr_line_num
+,source_system
+,sum(qty) as qty
+from DWROTD.DWR_OTD_SO_SALE_OFR_ORDER_F A
+where source_system = 'OSS' and (order_line_st_name in ('评审通过','已提交','已完成','审核中','') or order_line_st_name is null) 
+and order_st_name in ('部分转单','评审通过','已完成','部分完成','处理中','审批成功','评审中','已提交','') and (opportunity_number is not null or opportunity_number <> '')
+and (denial_reason not in ('57','54','52','CR','11','59') or denial_reason is null or deliver_status in ('B','C')) --存在有拒绝原因但已发货数据
+and sap_order_num||sap_order_line_num in (select order_num||order_item_num from DWROTD.DWR_SAP_ORDER_INFO_T )
+group by 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,ofr_num
+,ofr_line_num
+,source_system
+)
+--OSS 自营要货单有价审数据
+,tmp1 as (
+select 
+ a.busi_code     
+,a.material_num
+,a.material_name
+,a.ofr_order_id
+,a.ofr_order_item_id
+,a.dmand_num
+,a.DMAND_LINE_ID
+,a.data_src_code
+,a.plan_item_num
+,sum(a.dmand_qty) as dmand_qty  --要货单数
+from DWRLTC.DWR_BO_DMAND_ORDER_F a
+where data_src_code = 'OSS' and ofr_order_id is not null 
+and dmand_st_code in ('Purchase Draw Bill','Part CheckOrder','Created CheckOrder') 
+group by 
+ a.busi_code     
+,a.material_num
+,a.material_name
+,a.ofr_order_id
+,a.ofr_order_item_id
+,a.dmand_num
+,a.DMAND_LINE_ID
+,a.data_src_code
+,a.plan_item_num
+)
+--OSS 自营要货单无价审数据
+,tmp2 as (
+select 
+ a.busi_code  
+,a.plan_item_num
+,a.material_num
+,a.material_name
+--,data_src_code
+,a.dmand_num
+,a.DMAND_LINE_ID
+,sum(a.dmand_qty) as dmand_qty  --要货单数
+from DWRLTC.DWR_BO_DMAND_ORDER_F a
+where data_src_code = 'OSS' and ofr_order_id is null 
+and dmand_st_code in ('Purchase Draw Bill','Part CheckOrder','Created CheckOrder') 
+group by 
+ a.busi_code  
+,a.plan_item_num
+,a.material_num
+,a.material_name
+,a.dmand_num
+,a.DMAND_LINE_ID
+--,data_src_code
+)
+--sap 自营价审订单数量
+,tmp3 as (
+select 
+ opportunity_number  
+,order_num
+,order_line_num
+,sap_order_num
+,sap_order_line_num
+,ofr_num
+,ofr_line_num
+,material_code
+,material_name
+,sum(qty) as qty
+from DWROTD.DWR_OTD_SO_SALE_OFR_ORDER_F A
+where source_system = 'SAP' and (denial_reason not in ('57','54','52','CR','11','59') or denial_reason is null or deliver_status in ('B','C'))
+and (opportunity_number is not null or opportunity_number <> '') 
+group by
+ opportunity_number   
+,order_num
+,order_line_num
+,sap_order_num
+,sap_order_line_num
+,ofr_num
+,ofr_line_num
+,material_code
+,material_name
+)
+,tmp4 as (  --LTC经销工程(有合同ID)
+select 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,project_line_id
+,contract_line_id
+,project_id
+,contract_id
+,source_system
+,sum(qty) as qty
+from DWROTD.DWR_OTD_SO_SALE_OFR_ORDER_F A
+where source_system = 'OMS' and (order_line_st_name in ('评审通过','审核通过','审核不通过','审核中') or deliver_status in ('B','C'))
+and (opportunity_number is not null or opportunity_number <> '') and (contract_line_id <> '' or contract_line_id is not null)
+group by 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,project_line_id
+,contract_line_id
+,project_id
+,contract_id
+,source_system
+)
+,tmp12 as (  --LTC经销工程(无合同ID)
+select 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,project_line_id as proj_item_id
+,contract_line_id
+,project_id as proj_id
+,contract_id
+,source_system
+,sum(qty) as qty
+from DWROTD.DWR_OTD_SO_SALE_OFR_ORDER_F A
+where source_system = 'OMS' and (order_line_st_name in ('评审通过','审核通过','审核不通过','审核中') or deliver_status in ('B','C'))
+and (opportunity_number is not null or opportunity_number <> '') and (contract_line_id = '' or contract_line_id is null)
+group by 
+ opportunity_number
+,order_num
+,order_line_num
+,sap_order_num            
+,sap_order_line_num       
+,material_code
+,material_name
+,project_line_id
+,contract_line_id
+,project_id
+,contract_id
+,source_system
+)
+--LTC 自营要货单有评审数据
+,tmp5 as (
+select 
+ busi_code     
+,material_num
+,material_name
+,cntc_id
+,cntc_item_id
+,proj_id
+,proj_item_id
+,a.dmand_num
+,DMAND_LINE_ID
+,data_src_code
+,plan_item_num
+,sum(a.dmand_qty) as dmand_qty  --要货单数
+from DWRLTC.DWR_BO_DMAND_ORDER_F a
+where data_src_code = 'LTC'  and dmand_st_code = 'SUBMIT' and cntc_item_id is not null 
+group by 
+ busi_code     
+,material_num
+,material_name
+,cntc_id
+,cntc_item_id
+,proj_id
+,proj_item_id
+,a.dmand_num
+,DMAND_LINE_ID
+,data_src_code
+,plan_item_num
+)
+--LTC 自营要货单无评审数据
+,tmp6 as (
+select 
+ busi_code     
+,material_num
+,material_name 
+,data_src_code
+,plan_item_num
+,dmand_num
+,DMAND_LINE_ID
+,proj_id
+,proj_item_id
+,sum(a.dmand_qty) as dmand_qty  --要货单数
+from DWRLTC.DWR_BO_DMAND_ORDER_F a
+where data_src_code = 'LTC'  and dmand_st_code = 'SUBMIT' and cntc_item_id is null 
+group by 
+ busi_code     
+,material_num
+,material_name
+,data_src_code
+,plan_item_num
+,dmand_num
+,DMAND_LINE_ID
+,proj_id
+,proj_item_id
+)
+,tmp7 as ( --oss,ltc工程计划单项目留货数
+select 
+ a.engr_code as busi_num 
+,a.plan_num
+,a.plan_item_num
+,a.order_item_id
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+,sum(a.order_qty) as plan_ord_qty
+,sum(b.rmn_qty) as rmn_qty--项目留货数
+from DWRLTC.DWR_BO_PLAN_ORDER_F a
+left join (select long_wbs_element as wbs_num,material_num,sum(available_proinventory_quantity) as rmn_qty
+from dm.dm_wm_all_type_stock_t group by long_wbs_element,material_num) b
+on a.plan_item_num = b.wbs_num and a.material_num = b.material_num
+where plan_status_code in ('approved','Success Pass Review') --and REF_PLAN_ITEM_CODE not like '%现货'
+group by
+ a.engr_code  
+,a.plan_num
+,a.plan_item_num
+,a.order_item_id
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+)
+,tmp8 as (--ltc出货计划订单数(有合同id)
+select 
+ a.busi_code
+,b.sap_order_num
+,LPAD(b.sap_order_line_num, 6, '0') as sap_order_line_num
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+,a.cntc_item_id
+,sum(coalesce(b.actl_ship_qty,0)) as qty 
+from DWRLTC.DWR_BO_DELV_SHIP_ORDER_F a
+left join DWROTD.DWR_BO_DELV_SHIP_BILL_F b
+on a.delv_ship_line_id = b.delv_ship_line_id
+and a.delv_ship_id = b.delv_ship_id
+where b.sap_order_num is not null and a.delv_ship_st_code in ('OPENED')  
+and a.data_src_code = 'LTC' and  a.cntc_item_id is not null 
+group by 
+ a.busi_code
+,b.sap_order_num
+,LPAD(b.sap_order_line_num, 6, '0')
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+,a.cntc_item_id
+)
+,tmp13 as (--ltc出货计划订单数(无合同id)
+select 
+ a.busi_code
+,b.sap_order_num
+,LPAD(b.sap_order_line_num, 6, '0') as sap_order_line_num
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+,a.proj_id
+,a.proj_pic_line_id as proj_item_id
+,sum(coalesce(b.actl_ship_qty,0)) as qty 
+from DWRLTC.DWR_BO_DELV_SHIP_ORDER_F a
+left join DWROTD.DWR_BO_DELV_SHIP_BILL_F b
+on a.delv_ship_line_id = b.delv_ship_line_id
+and a.delv_ship_id = b.delv_ship_id
+where b.sap_order_num is not null and a.delv_ship_st_code in ('OPENED')  
+and a.data_src_code = 'LTC' and a.cntc_item_id is null
+group by 
+ a.busi_code
+,b.sap_order_num
+,LPAD(b.sap_order_line_num, 6, '0')
+,a.material_num 
+,a.material_name 
+,a.data_src_code
+,a.proj_id
+,a.proj_pic_line_id
+)
+-- ,tmp9 as (--oss出货计划订单数
+-- select 
+--  a.busi_code
+-- ,a.sap_order_num
+-- ,a.material_num 
+-- ,a.material_name 
+-- ,a.data_src_code
+-- ,a.ofr_order_num
+-- ,a.ofr_order_item_id
+-- ,substr(a.wbs_num,1,10) as wbs_num
+-- ,sum(coalesce(a.actl_ship_qty,0)) as qty 
+-- from DWRLTC.DWR_BO_DELV_SHIP_ORDER_F a
+-- where a.sap_order_num is not null and a.delv_ship_st_code in ('Purchase Draw Bill')
+-- and a.data_src_code = 'OSS'
+-- group by 
+--  a.busi_code
+-- ,a.sap_order_num
+-- ,a.material_num 
+-- ,a.material_name 
+-- ,a.data_src_code
+-- ,a.ofr_order_num
+-- ,a.ofr_order_item_id
+-- ,substr(a.wbs_num,1,10) 
+-- )
+,remain as ( --订单留货数
+select 
+ sales_num
+,sales_item
+,sum(rmn_qty) as rmn_qty
+from DWROTD.DWR_OTD_SO_REMAIN_GOODS_T
+group by 
+ sales_num
+,sales_item
+)
+,remain1 as ( --留货数
+select 
+ material_num
+,substr(long_wbs_element,1,10) AS WBS
+,sum(available_proinventory_quantity) as rmn_qty
+from DM.DM_WM_ALL_TYPE_STOCK_T
+group by 
+ long_wbs_element
+,material_num
+)
+,prod_ord as ( --生产单
+select 
+ sale_num 
+,sale_line_num
+,min(rlse_start_time) as rlse_start_time
+,max(close_time) as close_time
+from DM.DM_PS_PRCS_PRCH_PLAN_T
+group by 
+ sale_num 
+,sale_line_num
+)
+--oss数据-----
+,ord_data as (
+select
+ b.opportunity_number as busi_num
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,a.ofr_num  --oss報價單
+,a.ofr_item_num --oss報價單行
+,a.sap_order_num as sap_ofr_num --sap报价单号
+,a.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,b.order_num  --oss订单号
+,b.order_line_num --oss订单行
+,b.sap_order_num --sap订单号       
+,b.sap_order_line_num  --sap订单行号
+,'' as cntc_id  --合同ID
+,'' as cntc_item_id --合同行ID
+,'' as proj_id  --项目ID
+,'' as proj_item_id --项目行ID
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_code as material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,coalesce(b.qty,0) as qty --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,0 as proj_rmn_qty -- 项目留货数 
+,0 as plan_ord_qty --计划单数量
+,0 as flag
+from tmp b 
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T a
+on b.ofr_num = a.ofr_num and b.ofr_line_num = a.ofr_item_num
+left join remain c
+on b.sap_order_num = c.sales_num and b.sap_order_line_num = c.sales_item
+-- where a.data_src_code = 'OSS' and a.ofr_type_name = 'OSS' 
+union all
+select 
+ b.busi_code as busi_num 
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,a.ofr_num  --oss報價單
+,a.ofr_item_num --oss報價單行
+,a.sap_order_num as sap_ofr_num --sap报价单号
+,a.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,'' as sap_order_num --sap订单号       
+,'' as sap_order_line_num  --sap订单行号
+,'' as cntc_id  --合同ID
+,'' as cntc_item_id --合同行ID
+,'' as proj_id  --项目ID
+,'' as proj_item_id --项目行ID
+,b.plan_item_num --计划单行号
+,b.dmand_num --要货单号
+,b.dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,coalesce(b.dmand_qty,0) as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,1 as flag
+from tmp1 b 
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T a
+on b.ofr_order_id = a.ofr_num and b.ofr_order_item_id = a.ofr_item_num
+-- where a.data_src_code = 'OSS' and a.ofr_type_name = 'OSS'
+union all 
+select 
+ a.busi_code as busi_num
+,'' as cntc_num  --合同编号
+,'' as proj_num  --项目评审编号
+,'' as stage_name  --合同阶段数据类型
+,'OSS' as data_src_code --合同阶段数据来源
+,'' as ser_num  --流水号
+,'' as ofr_type_name  --报价单类型
+,'' as ofr_num  --oss報價單
+,'' as ofr_item_num --oss報價單行
+,'' as sap_ofr_num --sap报价单号
+,'' as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,'' as sap_order_num --sap订单号       
+,'' as sap_order_line_num  --sap订单行号
+,'' as cntc_id  --合同ID
+,'' as cntc_item_id --合同行ID
+,'' as proj_id  --项目ID
+,'' as proj_item_id --项目行ID
+,a.plan_item_num --计划单行号
+,a.dmand_num --要货单号
+,a.dmand_line_id  --要货单行号
+,'' as cust_num   --客户编码
+,'' as cust_name  --客户名称
+,'' as dstr_cust_num  --经销商客编
+,'' as dstr_cust_name  --经销商名称
+,'' as is_sub_co_name --是否子公司描述
+,'' as is_pltf_name --是否运营平台描述
+,'' as is_algr_name --是否代签描述
+,'' as is_coop_name --是否厂商合作描述
+,'' as is_spec_proj_name --是否特殊工程
+,'' as seal_date --盖章日期
+,'' as new_flag  --最新标识
+,'' as version_flag --版本标识
+,'' as rcpts_st_name --单据状态描述
+,'' as div_name  --事业部描述
+,'' as cntc_st_name --合同状态描述
+,'' as cntc_vers  --合同版本号
+,'' as eff_date  --生效日期
+,'' as inval_date --失效日期
+,'' as delv_per  --预计供货周期
+,'' as delv_start_date  --预计供货开始日期
+,'' as delv_end_date  --预计供货结束日期
+,'' as material_src_name --产品来源描述
+,a.material_num  --物料编码
+,a.material_name  --物料名称
+,'' as material_cat_name --品类描述
+,'' as dimension  --规格
+,'' as material_chnl_name  --产品渠道描述
+,'' as gcf_prc  --工程方价格
+,'' as aply_prc --申请价格 
+,'' as aply_qty  --申请数量
+,'' as appr_nak_prc  --审批裸价
+,'' as appr_prc  --审批价格
+,'' as amb_cost  --阿米巴成本
+,'' as amt_prft_amt  --阿米巴毛利额
+,'' as amt_prft_rate  --阿米巴毛利率
+,'' as std_a_cost  --标A成本
+,'' as std_a_amt  --标A成本毛利额
+,'' as std_a_rate  --标A成本毛利率
+,'' as dstr_grs_rate  --经销商毛利率
+,'' as sale_amt  --销售额
+,'' as cntc_prc --合同单价
+,'' as unit  --单位
+,'' as wt_vol --重量体积
+,'' as dealer_prc  --经销商提货价
+,'' as ep_prc  --EP价
+,'' as disc_rate  --折扣率
+,'' as cntc_qty  -- 合同用量
+,'' as is_instl_name  --是否包安装描述
+,'' as instl_prc  --安装单价
+,'' as ctrl_srvc_rate  --集采服务费率
+,'' as order_srvc_rate  --抢单服务费率
+,'' as grnd_srvc_rate  --落地服务费率
+,'' as advn_srvc_rate  --垫资服务费率
+,'' as srvc_rate   --综合费率
+,'' as srvc_rate2  --综合费率2
+,'' as busi_coms_rate  --业务提成率
+,'' as material_st_name  --物料状态
+,'' as unit_area  --单片面积
+,'' as price_type -- 价格类型
+,'' as buyout_price --一口价
+,'' as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,coalesce(a.dmand_qty,0) as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,2 as flag
+from tmp2 a
+union all 
+select 
+ b.opportunity_number as busi_num 
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,a.ofr_num  --oss報價單
+,a.ofr_item_num --oss報價單行
+,a.sap_order_num as sap_ofr_num --sap报价单号
+,a.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,b.order_num  --oss订单号
+,b.order_line_num --oss订单行
+,b.sap_order_num --sap订单号       
+,b.sap_order_line_num  --sap订单行号
+,'' as cntc_id  --合同ID
+,'' as cntc_item_id --合同行ID
+,'' as proj_id  --项目ID
+,'' as proj_item_id --项目行ID
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_code as material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,b.qty --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,3 as flag
+from tmp3 b 
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T a 
+on b.ofr_num = a.sap_order_num and b.ofr_line_num = a.sap_order_item_num
+left join remain c
+on b.sap_order_num = c.sales_num and b.sap_order_line_num = c.sales_item
+-- where a.data_src_code = 'OA' 
+---LTC数据-----------
+union all 
+select 
+ b.opportunity_number as busi_num
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,'' as ofr_num  --oss報價單
+,'' as ofr_item_num --oss報價單行
+,'' as sap_ofr_num --sap报价单号
+,'' as sap_ofr_item_num--sap报价单行
+,b.order_num  --oss订单号
+,b.order_line_num --oss订单行
+,b.sap_order_num --sap订单号       
+,b.sap_order_line_num  --sap订单行号
+,a.cntc_id  --合同ID
+,a.cntc_item_id --合同行ID
+,a.proj_id  --项目ID
+,a.proj_item_id --项目行ID
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_code as material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,coalesce(b.qty,0) as qty  --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数 
+,'' as plan_ord_qty --计划单数量
+,4 as flag
+from tmp4 b  
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T a 
+on a.cntc_item_id = b.contract_line_id
+left join remain c 
+on b.sap_order_num = c.sales_num and b.sap_order_line_num = c.sales_item
+union all 
+select 
+ b.opportunity_number as busi_num
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,'' as ofr_num  --oss報價單
+,'' as ofr_item_num --oss報價單行
+,'' as sap_ofr_num --sap报价单号
+,'' as sap_ofr_item_num--sap报价单行
+,b.order_num  --oss订单号
+,b.order_line_num --oss订单行
+,b.sap_order_num --sap订单号       
+,b.sap_order_line_num  --sap订单行号
+,a.cntc_id  --合同ID
+,a.cntc_item_id --合同行ID
+,a.proj_id  --项目ID
+,a.proj_item_id --项目行ID
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_code as material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,coalesce(b.qty,0) as qty  --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数 
+,'' as plan_ord_qty --计划单数量
+,12 as flag
+from tmp12 b  
+left join (select * from DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T where case when version_flag is null then rcpts_st_name = '审批通过' and new_flag = 'NEW'
+	    else 1=1 end and cntc_item_id is null ) a 
+on a.proj_id = b.proj_id
+and a.proj_item_id = b.proj_item_id
+left join remain c 
+on b.sap_order_num = c.sales_num and b.sap_order_line_num = c.sales_item
+union all 
+select
+ b.busi_code as busi_num
+,a.cntc_num  --合同编号
+,a.proj_num  --项目评审编号
+,a.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,a.ser_num  --流水号
+,a.ofr_type_name  --报价单类型
+,'' as ofr_num  --oss報價單
+,'' as ofr_item_num --oss報價單行
+,'' as sap_ofr_num --sap报价单号
+,'' as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,'' as sap_order_num --sap订单号       
+,'' as sap_order_line_num  --sap订单行号
+,a.cntc_id  --合同ID
+,a.cntc_item_id --合同行ID
+,a.proj_id  --项目ID
+,a.proj_item_id --项目行ID
+,b.plan_item_num --计划单行号
+,b.dmand_num --要货单号
+,b.dmand_line_id  --要货单行号
+,a.cust_num   --客户编码
+,a.cust_name  --客户名称
+,a.dstr_cust_num  --经销商客编
+,a.dstr_cust_name  --经销商名称
+,a.is_sub_co_name --是否子公司描述
+,a.is_pltf_name --是否运营平台描述
+,a.is_algr_name --是否代签描述
+,a.is_coop_name --是否厂商合作描述
+,a.is_spec_proj_name --是否特殊工程
+,a.seal_date --盖章日期
+,a.new_flag  --最新标识
+,a.version_flag --版本标识
+,a.rcpts_st_name --单据状态描述
+,a.div_name  --事业部描述
+,a.cntc_st_name --合同状态描述
+,a.cntc_vers  --合同版本号
+,a.eff_date  --生效日期
+,a.inval_date --失效日期
+,a.delv_per  --预计供货周期
+,a.delv_start_date  --预计供货开始日期
+,a.delv_end_date  --预计供货结束日期
+,a.material_src_name --产品来源描述
+,b.material_num  --物料编码
+,b.material_name  --物料名称
+,a.material_cat_name --品类描述
+,a.dimension  --规格
+,a.material_chnl_name  --产品渠道描述
+,a.gcf_prc  --工程方价格
+,a.aply_prc --申请价格 
+,a.aply_qty  --申请数量
+,a.appr_nak_prc  --审批裸价
+,a.appr_prc  --审批价格
+,a.amb_cost  --阿米巴成本
+,a.amt_prft_amt  --阿米巴毛利额
+,a.amt_prft_rate  --阿米巴毛利率
+,a.std_a_cost  --标A成本
+,a.std_a_amt  --标A成本毛利额
+,a.std_a_rate  --标A成本毛利率
+,a.dstr_grs_rate  --经销商毛利率
+,a.sale_amt  --销售额
+,a.cntc_prc --合同单价
+,a.unit  --单位
+,a.wt_vol --重量体积
+,a.dealer_prc  --经销商提货价
+,a.ep_prc  --EP价
+,a.disc_rate  --折扣率
+,a.cntc_qty  -- 合同用量
+,a.is_instl_name  --是否包安装描述
+,a.instl_prc  --安装单价
+,a.ctrl_srvc_rate  --集采服务费率
+,a.order_srvc_rate  --抢单服务费率
+,a.grnd_srvc_rate  --落地服务费率
+,a.advn_srvc_rate  --垫资服务费率
+,a.srvc_rate   --综合费率
+,a.srvc_rate2  --综合费率2
+,a.busi_coms_rate  --业务提成率
+,a.material_st_name  --物料状态
+,a.unit_area  --单片面积
+,a.price_type -- 价格类型
+,a.buyout_price --一口价
+,a.create_date as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,coalesce(b.dmand_qty,0) as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,5 as flag
+from tmp5 b  
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T a 
+on a.cntc_item_id = b.cntc_item_id
+-- where a.data_src_code = 'LTC'
+union all 
+select
+ a.busi_code as busi_num
+,b.cntc_num  --合同编号
+,b.proj_num  --项目评审编号
+,b.stage_name  --合同阶段数据类型
+,'LTC' as data_src_code --合同阶段数据来源
+,b.ser_num  --流水号
+,b.ofr_type_name  --报价单类型
+,b.ofr_num  --oss報價單
+,b.ofr_item_num --oss報價單行
+,b.sap_order_num as sap_ofr_num --sap报价单号
+,b.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,'' as sap_order_num --sap订单号       
+,'' as sap_order_line_num  --sap订单行号
+,b.cntc_id
+,b.cntc_item_id
+,b.proj_id
+,b.proj_item_id
+,a.plan_item_num --计划单行号
+,a.dmand_num --要货单号
+,a.dmand_line_id  --要货单行号
+,b.cust_num   --客户编码
+,b.cust_name  --客户名称
+,b.dstr_cust_num  --经销商客编
+,b.dstr_cust_name  --经销商名称
+,b.is_sub_co_name --是否子公司描述
+,b.is_pltf_name --是否运营平台描述
+,b.is_algr_name --是否代签描述
+,b.is_coop_name --是否厂商合作描述
+,b.is_spec_proj_name --是否特殊工程
+,b.seal_date --盖章日期
+,b.new_flag  --最新标识
+,b.version_flag --版本标识
+,b.rcpts_st_name --单据状态描述
+,b.div_name  --事业部描述
+,b.cntc_st_name --合同状态描述
+,b.cntc_vers  --合同版本号
+,b.eff_date  --生效日期
+,b.inval_date --失效日期
+,b.delv_per  --预计供货周期
+,b.delv_start_date  --预计供货开始日期
+,b.delv_end_date  --预计供货结束日期
+,b.material_src_name --产品来源描述
+,a.material_num  --物料编码
+,a.material_name  --物料名称
+,b.material_cat_name --品类描述
+,b.dimension  --规格
+,b.material_chnl_name  --产品渠道描述
+,b.gcf_prc  --工程方价格
+,b.aply_prc --申请价格 
+,b.aply_qty  --申请数量
+,b.appr_nak_prc  --审批裸价
+,b.appr_prc  --审批价格
+,b.amb_cost  --阿米巴成本
+,b.amt_prft_amt  --阿米巴毛利额
+,b.amt_prft_rate  --阿米巴毛利率
+,b.std_a_cost  --标A成本
+,b.std_a_amt  --标A成本毛利额
+,b.std_a_rate  --标A成本毛利率
+,b.dstr_grs_rate  --经销商毛利率
+,b.sale_amt  --销售额
+,b.cntc_prc --合同单价
+,b.unit  --单位
+,b.wt_vol --重量体积
+,b.dealer_prc  --经销商提货价
+,b.ep_prc  --EP价
+,b.disc_rate  --折扣率
+,b.cntc_qty  -- 合同用量
+,b.is_instl_name  --是否包安装描述
+,b.instl_prc  --安装单价
+,b.ctrl_srvc_rate  --集采服务费率
+,b.order_srvc_rate  --抢单服务费率
+,b.grnd_srvc_rate  --落地服务费率
+,b.advn_srvc_rate  --垫资服务费率
+,b.srvc_rate   --综合费率
+,b.srvc_rate2  --综合费率2
+,b.busi_coms_rate  --业务提成率
+,b.material_st_name  --物料状态
+,b.unit_area  --单片面积
+,b.price_type -- 价格类型
+,b.buyout_price --一口价
+,b.create_date as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,coalesce(a.dmand_qty,0) as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,6 as flag
+from tmp6 a
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T b
+on a.proj_id = b.proj_id
+and a.proj_item_id = b.proj_item_id
+union all  --oss,ltc自营工程项目留货数
+select
+ a.busi_num
+,'' as cntc_num  --合同编号
+,'' as proj_num  --项目评审编号
+,'' as stage_name  --合同阶段数据类型
+,a.data_src_code as data_src_code --合同阶段数据来源
+,'' as ser_num  --流水号
+,'' as ofr_type_name  --报价单类型
+,'' as ofr_num  --oss/ltc報價單
+,'' as ofr_item_num --oss/ltc報價單行
+,'' as sap_ofr_num --sap报价单号
+,'' as sap_ofr_item_num--sap报价单行
+,a.plan_num as order_num  --oss/ltc订单号
+,case when a.data_src_code = 'LTC' then a.plan_item_num  
+	  when a.data_src_code = 'OSS' then a.order_item_id else '' end as order_line_num --oss/ltc订单行
+,'' as sap_order_num --sap订单号       
+,'' as sap_order_line_num  --sap订单行号
+,'' as cntc_id
+,'' as cntc_item_id
+,'' as proj_id
+,'' as proj_item_id
+,a.plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,'' as cust_num   --客户编码
+,'' as cust_name  --客户名称
+,'' as dstr_cust_num  --经销商客编
+,'' as dstr_cust_name  --经销商名称
+,'' as is_sub_co_name --是否子公司描述
+,'' as is_pltf_name --是否运营平台描述
+,'' as is_algr_name --是否代签描述
+,'' as is_coop_name --是否厂商合作描述
+,'' as is_spec_proj_name --是否特殊工程
+,'' as seal_date --盖章日期
+,'' as new_flag  --最新标识
+,'' as version_flag --版本标识
+,'' as rcpts_st_name --单据状态描述
+,'' as div_name  --事业部描述
+,'' as cntc_st_name --合同状态描述
+,'' as cntc_vers  --合同版本号
+,'' as eff_date  --生效日期
+,'' as inval_date --失效日期
+,'' as delv_per  --预计供货周期
+,'' as delv_start_date  --预计供货开始日期
+,'' as delv_end_date  --预计供货结束日期
+,'' as material_src_name --产品来源描述
+,a.material_num  --物料编码
+,a.material_name  --物料名称
+,'' as material_cat_name --品类描述
+,'' as dimension  --规格
+,'' as material_chnl_name  --产品渠道描述
+,'' as gcf_prc  --工程方价格
+,'' as aply_prc --申请价格 
+,'' as aply_qty  --申请数量
+,'' as appr_nak_prc  --审批裸价
+,'' as appr_prc  --审批价格
+,'' as amb_cost  --阿米巴成本
+,'' as amt_prft_amt  --阿米巴毛利额
+,'' as amt_prft_rate  --阿米巴毛利率
+,'' as std_a_cost  --标A成本
+,'' as std_a_amt  --标A成本毛利额
+,'' as std_a_rate  --标A成本毛利率
+,'' as dstr_grs_rate  --经销商毛利率
+,'' as sale_amt  --销售额
+,'' as cntc_prc --合同单价
+,'' as unit  --单位
+,'' as wt_vol --重量体积
+,'' as dealer_prc  --经销商提货价
+,'' as ep_prc  --EP价
+,'' as disc_rate  --折扣率
+,'' as cntc_qty  -- 合同用量
+,'' as is_instl_name  --是否包安装描述
+,'' as instl_prc  --安装单价
+,'' as ctrl_srvc_rate  --集采服务费率
+,'' as order_srvc_rate  --抢单服务费率
+,'' as grnd_srvc_rate  --落地服务费率
+,'' as advn_srvc_rate  --垫资服务费率
+,'' as srvc_rate   --综合费率
+,'' as srvc_rate2  --综合费率2
+,'' as busi_coms_rate  --业务提成率
+,'' as material_st_name  --物料状态
+,'' as unit_area  --单片面积
+,'' as price_type -- 价格类型
+,'' as buyout_price --一口价
+,'' as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,'' as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,a.rmn_qty as proj_rmn_qty -- 项目留货数
+,a.plan_ord_qty --计划单数量
+,7 as flag
+from tmp7 a
+union all
+--自营工程LTC订单数及留货数(出货计划)
+select
+ a.busi_code as busi_num
+,b.cntc_num  --合同编号
+,b.proj_num  --项目评审编号
+,b.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,b.ser_num  --流水号
+,b.ofr_type_name  --报价单类型
+,b.ofr_num  --oss報價單
+,b.ofr_item_num --oss報價單行
+,b.sap_order_num as sap_ofr_num --sap报价单号
+,b.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,a.sap_order_num --sap订单号       
+,a.sap_order_line_num  --sap订单行号
+,b.cntc_id
+,b.cntc_item_id
+,b.proj_id
+,b.proj_item_id
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,b.cust_num   --客户编码
+,b.cust_name  --客户名称
+,b.dstr_cust_num  --经销商客编
+,b.dstr_cust_name  --经销商名称
+,b.is_sub_co_name --是否子公司描述
+,b.is_pltf_name --是否运营平台描述
+,b.is_algr_name --是否代签描述
+,b.is_coop_name --是否厂商合作描述
+,b.is_spec_proj_name --是否特殊工程
+,b.seal_date --盖章日期
+,b.new_flag  --最新标识
+,b.version_flag --版本标识
+,b.rcpts_st_name --单据状态描述
+,b.div_name  --事业部描述
+,b.cntc_st_name --合同状态描述
+,b.cntc_vers  --合同版本号
+,b.eff_date  --生效日期
+,b.inval_date --失效日期
+,b.delv_per  --预计供货周期
+,b.delv_start_date  --预计供货开始日期
+,b.delv_end_date  --预计供货结束日期
+,b.material_src_name --产品来源描述
+,a.material_num  --物料编码
+,a.material_name  --物料名称
+,b.material_cat_name --品类描述
+,b.dimension  --规格
+,b.material_chnl_name  --产品渠道描述
+,b.gcf_prc  --工程方价格
+,b.aply_prc --申请价格 
+,b.aply_qty  --申请数量
+,b.appr_nak_prc  --审批裸价
+,b.appr_prc  --审批价格
+,b.amb_cost  --阿米巴成本
+,b.amt_prft_amt  --阿米巴毛利额
+,b.amt_prft_rate  --阿米巴毛利率
+,b.std_a_cost  --标A成本
+,b.std_a_amt  --标A成本毛利额
+,b.std_a_rate  --标A成本毛利率
+,b.dstr_grs_rate  --经销商毛利率
+,b.sale_amt  --销售额
+,b.cntc_prc --合同单价
+,b.unit  --单位
+,b.wt_vol --重量体积
+,b.dealer_prc  --经销商提货价
+,b.ep_prc  --EP价
+,b.disc_rate  --折扣率
+,b.cntc_qty  -- 合同用量
+,b.is_instl_name  --是否包安装描述
+,b.instl_prc  --安装单价
+,b.ctrl_srvc_rate  --集采服务费率
+,b.order_srvc_rate  --抢单服务费率
+,b.grnd_srvc_rate  --落地服务费率
+,b.advn_srvc_rate  --垫资服务费率
+,b.srvc_rate   --综合费率
+,b.srvc_rate2  --综合费率2
+,b.busi_coms_rate  --业务提成率
+,b.material_st_name  --物料状态
+,b.unit_area  --单片面积
+,b.price_type -- 价格类型
+,b.buyout_price --一口价
+,b.create_date as cntc_create_date--合同创建日期
+,coalesce(a.qty,0) as qty --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,8 as flag
+from tmp8 a
+left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T b 
+on a.cntc_item_id = b.cntc_item_id
+left join remain c 
+on a.sap_order_num = c.sales_num
+and a.sap_order_line_num = c.sales_item
+union all
+--自营工程LTC订单数及留货数(出货计划无合同ID)
+select
+ a.busi_code as busi_num
+,b.cntc_num  --合同编号
+,b.proj_num  --项目评审编号
+,b.stage_name  --合同阶段数据类型
+,a.data_src_code --合同阶段数据来源
+,b.ser_num  --流水号
+,b.ofr_type_name  --报价单类型
+,b.ofr_num  --oss報價單
+,b.ofr_item_num --oss報價單行
+,b.sap_order_num as sap_ofr_num --sap报价单号
+,b.sap_order_item_num as sap_ofr_item_num--sap报价单行
+,'' as order_num  --oss订单号
+,'' as order_line_num --oss订单行
+,a.sap_order_num --sap订单号       
+,a.sap_order_line_num  --sap订单行号
+,b.cntc_id
+,b.cntc_item_id
+,b.proj_id
+,b.proj_item_id
+,'' as plan_item_num --计划单行号
+,'' as dmand_num --要货单号
+,'' as dmand_line_id  --要货单行号
+,b.cust_num   --客户编码
+,b.cust_name  --客户名称
+,b.dstr_cust_num  --经销商客编
+,b.dstr_cust_name  --经销商名称
+,b.is_sub_co_name --是否子公司描述
+,b.is_pltf_name --是否运营平台描述
+,b.is_algr_name --是否代签描述
+,b.is_coop_name --是否厂商合作描述
+,b.is_spec_proj_name --是否特殊工程
+,b.seal_date --盖章日期
+,b.new_flag  --最新标识
+,b.version_flag --版本标识
+,b.rcpts_st_name --单据状态描述
+,b.div_name  --事业部描述
+,b.cntc_st_name --合同状态描述
+,b.cntc_vers  --合同版本号
+,b.eff_date  --生效日期
+,b.inval_date --失效日期
+,b.delv_per  --预计供货周期
+,b.delv_start_date  --预计供货开始日期
+,b.delv_end_date  --预计供货结束日期
+,b.material_src_name --产品来源描述
+,a.material_num  --物料编码
+,a.material_name  --物料名称
+,b.material_cat_name --品类描述
+,b.dimension  --规格
+,b.material_chnl_name  --产品渠道描述
+,b.gcf_prc  --工程方价格
+,b.aply_prc --申请价格 
+,b.aply_qty  --申请数量
+,b.appr_nak_prc  --审批裸价
+,b.appr_prc  --审批价格
+,b.amb_cost  --阿米巴成本
+,b.amt_prft_amt  --阿米巴毛利额
+,b.amt_prft_rate  --阿米巴毛利率
+,b.std_a_cost  --标A成本
+,b.std_a_amt  --标A成本毛利额
+,b.std_a_rate  --标A成本毛利率
+,b.dstr_grs_rate  --经销商毛利率
+,b.sale_amt  --销售额
+,b.cntc_prc --合同单价
+,b.unit  --单位
+,b.wt_vol --重量体积
+,b.dealer_prc  --经销商提货价
+,b.ep_prc  --EP价
+,b.disc_rate  --折扣率
+,b.cntc_qty  -- 合同用量
+,b.is_instl_name  --是否包安装描述
+,b.instl_prc  --安装单价
+,b.ctrl_srvc_rate  --集采服务费率
+,b.order_srvc_rate  --抢单服务费率
+,b.grnd_srvc_rate  --落地服务费率
+,b.advn_srvc_rate  --垫资服务费率
+,b.srvc_rate   --综合费率
+,b.srvc_rate2  --综合费率2
+,b.busi_coms_rate  --业务提成率
+,b.material_st_name  --物料状态
+,b.unit_area  --单片面积
+,b.price_type -- 价格类型
+,b.buyout_price --一口价
+,b.create_date as cntc_create_date--合同创建日期
+,coalesce(a.qty,0) as qty --订单数量
+,'' as dmand_qty-- 要货单数量
+,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+,'' as proj_rmn_qty -- 项目留货数
+,'' as plan_ord_qty --计划单数量
+,13 as flag
+from tmp13 a
+left join (select * from DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T where case when version_flag is null then rcpts_st_name = '审批通过' and new_flag = 'NEW'
+	    else 1=1 end and cntc_item_id is null )b 
+on a.proj_id = b.proj_id
+and a.proj_item_id = b.proj_item_id
+left join remain c 
+on a.sap_order_num = c.sales_num
+and a.sap_order_line_num = c.sales_item
+-- union all
+--自营工程OSS订单数及留货数(出货计划)
+-- select
+--  a.busi_code as busi_num
+-- ,b.cntc_num  --合同编号
+-- ,b.proj_num  --项目评审编号
+-- ,b.stage_name  --合同阶段数据类型
+-- ,a.data_src_code --合同阶段数据来源
+-- ,b.ser_num  --流水号
+-- ,b.ofr_type_name  --报价单类型
+-- ,a.ofr_order_num as ofr_num  --oss報價單
+-- ,a.ofr_order_item_id as ofr_item_num --oss報價單行
+-- ,b.sap_order_num as sap_ofr_num --sap报价单号
+-- ,b.sap_order_item_num as sap_ofr_item_num--sap报价单行
+-- ,'' as order_num  --oss订单号
+-- ,'' as order_line_num --oss订单行
+-- ,a.sap_order_num --sap订单号       
+-- ,'' as sap_order_line_num  --sap订单行号
+-- ,b.cntc_id
+-- ,b.cntc_item_id
+-- ,b.proj_id
+-- ,b.proj_item_id
+-- ,'' as plan_item_num --计划单行号
+-- ,'' as dmand_num --要货单号
+-- ,'' as dmand_line_id  --要货单行号
+-- ,b.cust_num   --客户编码
+-- ,b.cust_name  --客户名称
+-- ,b.dstr_cust_num  --经销商客编
+-- ,b.dstr_cust_name  --经销商名称
+-- ,b.is_sub_co_name --是否子公司描述
+-- ,b.is_pltf_name --是否运营平台描述
+-- ,b.is_algr_name --是否代签描述
+-- ,b.is_coop_name --是否厂商合作描述
+-- ,b.is_spec_proj_name --是否特殊工程
+-- ,b.seal_date --盖章日期
+-- ,b.new_flag  --最新标识
+-- ,b.version_flag --版本标识
+-- ,b.rcpts_st_name --单据状态描述
+-- ,b.div_name  --事业部描述
+-- ,b.cntc_st_name --合同状态描述
+-- ,b.cntc_vers  --合同版本号
+-- ,b.eff_date  --生效日期
+-- ,b.inval_date --失效日期
+-- ,b.delv_per  --预计供货周期
+-- ,b.delv_start_date  --预计供货开始日期
+-- ,b.delv_end_date  --预计供货结束日期
+-- ,b.material_src_name --产品来源描述
+-- ,a.material_num  --物料编码
+-- ,a.material_name  --物料名称
+-- ,b.material_cat_name --品类描述
+-- ,b.dimension  --规格
+-- ,b.material_chnl_name  --产品渠道描述
+-- ,b.gcf_prc  --工程方价格
+-- ,b.aply_prc --申请价格 
+-- ,b.aply_qty  --申请数量
+-- ,b.appr_nak_prc  --审批裸价
+-- ,b.appr_prc  --审批价格
+-- ,b.amb_cost  --阿米巴成本
+-- ,b.amt_prft_amt  --阿米巴毛利额
+-- ,b.amt_prft_rate  --阿米巴毛利率
+-- ,b.std_a_cost  --标A成本
+-- ,b.std_a_amt  --标A成本毛利额
+-- ,b.std_a_rate  --标A成本毛利率
+-- ,b.dstr_grs_rate  --经销商毛利率
+-- ,b.sale_amt  --销售额
+-- ,b.cntc_prc --合同单价
+-- ,b.unit  --单位
+-- ,b.wt_vol --重量体积
+-- ,b.dealer_prc  --经销商提货价
+-- ,b.ep_prc  --EP价
+-- ,b.disc_rate  --折扣率
+-- ,b.cntc_qty  -- 合同用量
+-- ,b.is_instl_name  --是否包安装描述
+-- ,b.instl_prc  --安装单价
+-- ,b.ctrl_srvc_rate  --集采服务费率
+-- ,b.order_srvc_rate  --抢单服务费率
+-- ,b.grnd_srvc_rate  --落地服务费率
+-- ,b.advn_srvc_rate  --垫资服务费率
+-- ,b.srvc_rate   --综合费率
+-- ,b.srvc_rate2  --综合费率2
+-- ,b.busi_coms_rate  --业务提成率
+-- ,b.material_st_name  --物料状态
+-- ,b.unit_area  --单片面积
+-- ,coalesce(a.qty,0) as qty --订单数量
+-- ,'' as dmand_qty-- 要货单数量
+-- ,coalesce(c.rmn_qty,0) as rmn_qty --留货数
+-- ,'' as proj_rmn_qty -- 项目留货数
+-- ,'' as plan_ord_qty --计划单数量
+-- ,9 as flag
+-- from tmp9 a
+-- left join DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T b 
+-- on b.ofr_num = a.OFR_ORDER_NUM and a.ofr_order_item_id = b.ofr_item_num
+-- left join remain1 c 
+-- on a.wbs_num = c.WBS
+-- and a.material_num = c.material_num
+)
+,TMPP AS (
+SELECT 
+ T.busi_num --商机号
+,T.cntc_num  --合同编号
+,T.proj_num  --项目评审编号
+,T.stage_name  --合同阶段数据类型
+,T.data_src_code --合同阶段数据来源
+,T.ser_num  --流水号
+,T.ofr_type_name  --报价单类型
+,T.ofr_num  --oss/ltc報價單
+,T.ofr_item_num --oss/ltc報價單行
+,T.sap_ofr_num --sap报价单号
+,T.sap_ofr_item_num--sap报价单行
+,T.order_num  --oss/ltc订单号
+,T.order_line_num --oss/ltc订单行
+,T.sap_order_num --sap订单号       
+,T.sap_order_line_num  --sap订单行号
+,T.cntc_id  --合同ID
+,T.cntc_item_id --合同行ID
+,T.proj_id  --项目ID
+,T.proj_item_id --项目行ID
+,T.plan_item_num --计划单行号
+,T.dmand_num --要货单号
+,T.dmand_line_id  --要货单行号
+,T.cust_num   --客户编码
+,T.cust_name  --客户名称
+,T.dstr_cust_num  --经销商客编
+,T.dstr_cust_name  --经销商名称
+,T.is_sub_co_name --是否子公司描述
+,T.is_pltf_name --是否运营平台描述
+,T.is_algr_name --是否代签描述
+,T.is_coop_name --是否厂商合作描述
+,T.is_spec_proj_name --是否特殊工程
+,T.seal_date --盖章日期
+,T.new_flag  --最新标识
+,T.version_flag --版本标识
+,T.rcpts_st_name --单据状态描述
+,T.div_name  --事业部描述
+,T.cntc_st_name --合同状态描述
+,T.cntc_vers  --合同版本号
+,T.eff_date  --生效日期
+,T.inval_date --失效日期
+,T.delv_per  --预计供货周期
+,T.delv_start_date  --预计供货开始日期
+,T.delv_end_date  --预计供货结束日期
+,T.material_src_name --产品来源描述
+,T.material_num  --物料编码
+,T.material_name  --物料名称
+,T.material_cat_name --品类描述
+,T.dimension  --规格
+,T.material_chnl_name  --产品渠道描述
+,T.gcf_prc  --工程方价格
+,T.aply_prc --申请价格 
+,T.aply_qty  --申请数量
+,T.appr_nak_prc  --审批裸价
+,T.appr_prc  --审批价格
+,T.amb_cost  --阿米巴成本
+,T.amt_prft_amt  --阿米巴毛利额
+,T.amt_prft_rate  --阿米巴毛利率
+,T.std_a_cost  --标A成本
+,T.std_a_amt  --标A成本毛利额
+,T.std_a_rate  --标A成本毛利率
+,T.dstr_grs_rate  --经销商毛利率
+,T.sale_amt  --销售额
+,T.cntc_prc --合同单价
+,T.unit  --单位
+,T.wt_vol --重量体积
+,T.dealer_prc  --经销商提货价
+,T.ep_prc  --EP价
+,T.disc_rate  --折扣率
+,T.cntc_qty  -- 合同用量
+,T.is_instl_name  --是否包安装描述
+,T.instl_prc  --安装单价
+,T.ctrl_srvc_rate  --集采服务费率
+,T.order_srvc_rate  --抢单服务费率
+,T.grnd_srvc_rate  --落地服务费率
+,T.advn_srvc_rate  --垫资服务费率
+,T.srvc_rate   --综合费率
+,T.srvc_rate2  --综合费率2
+,T.busi_coms_rate  --业务提成率
+,T.material_st_name  --物料状态
+,T.unit_area  --单片面积
+,T.price_type -- 价格类型
+,T.buyout_price --一口价
+,T.cntc_create_date--合同创建日期
+,T.qty --订单数量
+,'' as t_qty --退货订单数量
+,T.dmand_qty-- 要货单数量
+,T.rmn_qty --留货数
+,'' as t_rmn_qty --退货留货数
+,T.proj_rmn_qty -- 项目留货数
+,T.plan_ord_qty --计划单数量
+,T.FLAG
+FROM ord_data T 
+UNION ALL --退货订单
+SELECT 
+ T.busi_num --商机号
+,T.cntc_num  --合同编号
+,T.proj_num  --项目评审编号
+,T.stage_name  --合同阶段数据类型
+,T.data_src_code --合同阶段数据来源
+,T.ser_num  --流水号
+,T.ofr_type_name  --报价单类型
+,T.ofr_num  --oss/ltc報價單
+,T.ofr_item_num --oss/ltc報價單行
+,T.sap_ofr_num --sap报价单号
+,T.sap_ofr_item_num--sap报价单行
+,T.order_num  --oss/ltc订单号
+,T.order_line_num --oss/ltc订单行
+,T1.VBELN AS sap_order_num --sap订单号       
+,T1.POSNN AS sap_order_line_num  --sap订单行号
+,T.cntc_id  --合同ID
+,T.cntc_item_id --合同行ID
+,T.proj_id  --项目ID
+,T.proj_item_id --项目行ID
+,T.plan_item_num --计划单行号
+,T.dmand_num --要货单号
+,T.dmand_line_id  --要货单行号
+,T.cust_num   --客户编码
+,T.cust_name  --客户名称
+,T.dstr_cust_num  --经销商客编
+,T.dstr_cust_name  --经销商名称
+,T.is_sub_co_name --是否子公司描述
+,T.is_pltf_name --是否运营平台描述
+,T.is_algr_name --是否代签描述
+,T.is_coop_name --是否厂商合作描述
+,T.is_spec_proj_name --是否特殊工程
+,T.seal_date --盖章日期
+,T.new_flag  --最新标识
+,T.version_flag --版本标识
+,T.rcpts_st_name --单据状态描述
+,T.div_name  --事业部描述
+,T.cntc_st_name --合同状态描述
+,T.cntc_vers  --合同版本号
+,T.eff_date  --生效日期
+,T.inval_date --失效日期
+,T.delv_per  --预计供货周期
+,T.delv_start_date  --预计供货开始日期
+,T.delv_end_date  --预计供货结束日期
+,T.material_src_name --产品来源描述
+,T.material_num  --物料编码
+,T.material_name  --物料名称
+,T.material_cat_name --品类描述
+,T.dimension  --规格
+,T.material_chnl_name  --产品渠道描述
+,T.gcf_prc  --工程方价格
+,T.aply_prc --申请价格 
+,T.aply_qty  --申请数量
+,T.appr_nak_prc  --审批裸价
+,T.appr_prc  --审批价格
+,T.amb_cost  --阿米巴成本
+,T.amt_prft_amt  --阿米巴毛利额
+,T.amt_prft_rate  --阿米巴毛利率
+,T.std_a_cost  --标A成本
+,T.std_a_amt  --标A成本毛利额
+,T.std_a_rate  --标A成本毛利率
+,T.dstr_grs_rate  --经销商毛利率
+,T.sale_amt  --销售额
+,T.cntc_prc --合同单价
+,T.unit  --单位
+,T.wt_vol --重量体积
+,T.dealer_prc  --经销商提货价
+,T.ep_prc  --EP价
+,T.disc_rate  --折扣率
+,T.cntc_qty  -- 合同用量
+,T.is_instl_name  --是否包安装描述
+,T.instl_prc  --安装单价
+,T.ctrl_srvc_rate  --集采服务费率
+,T.order_srvc_rate  --抢单服务费率
+,T.grnd_srvc_rate  --落地服务费率
+,T.advn_srvc_rate  --垫资服务费率
+,T.srvc_rate   --综合费率
+,T.srvc_rate2  --综合费率2
+,T.busi_coms_rate  --业务提成率
+,T.material_st_name  --物料状态
+,T.unit_area  --单片面积
+,T.price_type -- 价格类型
+,T.buyout_price --一口价
+,T.cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,-T1.RFMNG as t_qty --退货订单数量
+,'' AS dmand_qty-- 要货单数量
+,'' AS rmn_qty --留货数
+,-T2.rmn_qty as t_rmn_qty --退货留货数
+,'' AS proj_rmn_qty -- 项目留货数
+,'' AS plan_ord_qty --计划单数量
+,10 AS FLAG
+FROM ord_data T 
+join (select * from sdi.sdi_vbfa_1001 where VBTYP_N = 'H' AND VBTYP_V = 'C') T1
+ON T.sap_order_num = T1.VBELV
+AND T.sap_order_line_num = T1.POSNV
+left join remain T2 
+on T1.VBELN = T2.sales_num
+and T1.POSNN = T2.sales_item
+union all --项目价审数（主要看只到评审价审环节的订单，不好剔除，所以取全部）
+SELECT 
+ T.busi_num
+,T.cntc_num  --合同编号
+,T.proj_num  --项目评审编号
+,T.stage_name  --合同阶段数据类型
+,T.data_src_code --合同阶段数据来源
+,T.ser_num  --流水号
+,T.ofr_type_name  --报价单类型
+,T.ofr_num  --oss報價單
+,T.ofr_item_num --oss報價單行
+,T.sap_order_num AS sap_ofr_num --sap报价单号
+,T.sap_order_item_num AS sap_ofr_item_num--sap报价单行
+,'' AS order_num  --oss订单号
+,'' AS order_line_num --oss订单行
+,'' AS sap_order_num --sap订单号       
+,'' AS sap_order_line_num  --sap订单行号
+,T.cntc_id  --合同ID
+,T.cntc_item_id --合同行ID
+,T.proj_id  --项目ID
+,T.proj_item_id --项目行ID
+,'' AS plan_item_num --计划单行号
+,'' AS dmand_num --要货单号
+,'' AS dmand_line_id  --要货单行号
+,T.cust_num   --客户编码
+,T.cust_name  --客户名称
+,T.dstr_cust_num  --经销商客编
+,T.dstr_cust_name  --经销商名称
+,T.is_sub_co_name --是否子公司描述
+,T.is_pltf_name --是否运营平台描述
+,T.is_algr_name --是否代签描述
+,T.is_coop_name --是否厂商合作描述
+,T.is_spec_proj_name --是否特殊工程
+,T.seal_date --盖章日期
+,T.new_flag  --最新标识
+,T.version_flag --版本标识
+,T.rcpts_st_name --单据状态描述
+,T.div_name  --事业部描述
+,T.cntc_st_name --合同状态描述
+,T.cntc_vers  --合同版本号
+,T.eff_date  --生效日期
+,T.inval_date --失效日期
+,T.delv_per  --预计供货周期
+,T.delv_start_date  --预计供货开始日期
+,T.delv_end_date  --预计供货结束日期
+,T.material_src_name --产品来源描述
+,T.material_num  --物料编码
+,T.material_name  --物料名称
+,T.material_cat_name --品类描述
+,T.dimension  --规格
+,T.material_chnl_name  --产品渠道描述
+,T.gcf_prc  --工程方价格
+,T.aply_prc --申请价格 
+,T.aply_qty  --申请数量
+,T.appr_nak_prc  --审批裸价
+,T.appr_prc  --审批价格
+,T.amb_cost  --阿米巴成本
+,T.amt_prft_amt  --阿米巴毛利额
+,T.amt_prft_rate  --阿米巴毛利率
+,T.std_a_cost  --标A成本
+,T.std_a_amt  --标A成本毛利额
+,T.std_a_rate  --标A成本毛利率
+,T.dstr_grs_rate  --经销商毛利率
+,T.sale_amt  --销售额
+,T.cntc_prc --合同单价
+,T.unit  --单位
+,T.wt_vol --重量体积
+,T.dealer_prc  --经销商提货价
+,T.ep_prc  --EP价
+,T.disc_rate  --折扣率
+,T.cntc_qty  -- 合同用量
+,T.is_instl_name  --是否包安装描述
+,T.instl_prc  --安装单价
+,T.ctrl_srvc_rate  --集采服务费率
+,T.order_srvc_rate  --抢单服务费率
+,T.grnd_srvc_rate  --落地服务费率
+,T.advn_srvc_rate  --垫资服务费率
+,T.srvc_rate   --综合费率
+,T.srvc_rate2  --综合费率2
+,T.busi_coms_rate  --业务提成率
+,T.material_st_name  --物料状态
+,T.unit_area  --单片面积
+,T.price_type -- 价格类型
+,T.buyout_price --一口价
+,T.create_date as cntc_create_date--合同创建日期
+,'' as qty --订单数量
+,'' as t_qty --退货订单数量
+,'' as dmand_qty-- 要货单数量
+,'' as rmn_qty --留货数
+,'' as t_rmn_qty --退货留货数
+,'' as proj_rmn_qty -- 项目留货数 
+,'' as plan_ord_qty --计划单数量
+,11 AS FLAG
+FROM DWRLTC.DWR_LTC_PROJ_CNTC_INFO_T T
+)
+insert overwrite table dwrltc.dwr_busi_cont_tran_demo_t
+select 
+ TRIM(T.busi_num) AS busi_num --商机号
+,T2.busi_name	--商机名称
+,T2.cust_num	--经销商客编
+,T2.cust_name	--经销商名称
+,T2.erp_type_name	--企业类型名称
+,T2.emp_num	--业务员工号
+,T2.emp_name	--业务员名称
+,T2.busi_owner_code	--商机负责人工号
+,T2.busi_owner_name	--商机负责人名称
+,T2.busi_follower	--商机跟进人
+,T2.busi_belong_name	--商机归属方名称
+,T2.sales_area_code	--销售区域（编码）
+,T2.sales_area_name	--销售区域
+,T2.sales_dept_code	--销售部门（编码）
+,T2.sales_dept_name	--销售部门
+,T2.sales_grp_code	--销售组编码
+,T2.sales_grp_name	--销售组名称
+,T2.sales_org	--销售组织
+,T2.comp_code	--公司代码
+,T2.wbs_code	--WBS号
+,T2.dept_name	--事业部名称
+,T2.devel_org_name	--建设单位全称
+,T2.const_org_name	--施工单位全称
+,T2.design_org_name	--设计单位全称
+,T2.address	--详细地址
+,T2.province_name	--省名称
+,T2.city_name	--市名称
+,T2.region_name	--区名称
+,T2.busi_type_name	--业务类型名称
+,T2.busi_stage_name	--商机阶段名称
+,T2.proj_major_cate_name	--工程大类名称
+,T2.proj_sub_cate_name	--工程小类名称
+,T2.busi_source_name	--商机来源名称
+,T2.source_org_name	--来源单位名称
+,T.is_spec_proj_name --是否特殊工程	
+,T2.is_bro_busi	--是否兄弟商机
+,T2.quto_busi	--引用商机
+,T2.is_long_proj	--是否长周期项目
+,T2.is_xa	--是否雄安
+,T2.is_free_busi	--是否免费商机
+,T2.is_repet_busi	--是否重复商机
+,T2.relat_repet_busi	--关联重复商机
+,T2.state_value_end_date	--阶段有效结束日期
+,T2.state_value_start_date	--阶段有效开始日期
+,T2.state_staus_name	--阶段状态名称（系统预设）
+,T2.state_value_days	--阶段有效天数
+,T2.proj_nature_name	--项目性质名称
+,T2.prod_cate_name	--产品品类名称
+,T2.source_clue_name	--源线索名称
+,T2.busi_rep_status_name	--商机报备状态名称
+,T2.busi_succ_date	--报备成功日期
+,T2.busi_pay_style_name	--报备费缴纳方式名称
+,T2.busi_fee_status_name	--报备费状态名称
+,T2.busi_pay_end_date	--报备费缴费截止时间
+,T2.pur_way_name	--采购方式名称
+,T2.pur_scale_name	--采购规模名称
+,T2.bid_mode_name	--竞价方式名称
+,T2.is_take_bid_grt	--是否已交投标保证金
+,T2.is_need_pri_review	--是否需要价审
+,T2.proj_payer_code	--项目付款方
+,T2.proj_payer_name	--项目付款方全称
+,T2.btr_result_name	--报价或投标或入库结果反馈名称
+,T2.sign_org_name	--签约单位全称
+,T2.is_sign_org_same	--签约单位是否与付款单位一致
+,T2.sign_way_name	--签约/入库方式名称
+,T2.sign_value_start_date	--签约有效开始日期
+,T2.sign_value_end_date	--签约有效结束日期
+,T2.apply_way_code	--供货方式名称
+,T2.apply_staus_name	--供货状态名称
+,T2.is_delay_apply	--是否延迟供货
+,T2.predict_apply_fin_date	--预计供货完成日期
+,T2.renew_staus_name	--续签状态名称
+,T2.s01_tran_time	--S0-S1转化时间
+,T2.s12_tran_time	--S1-S2转化时间
+,T2.s23_tran_time	--S2-S3转化时间
+,T2.s34_tran_time	--S3-S4转化时间
+,T2.s45_tran_time	--S4-S5转化时间
+,T2.sx_tran_time	--SX转化时间
+,T2.par_busi_code	 --母商机编码
+,T2.par_busi_name	--母商机名称
+,T2.is_share_tactic	--是否共享战略
+,T2.belong_tactic_cust_name	--所属战略客户客编编码名称
+,T2.is_chain	--是否连锁
+,T2.chain_type_name	--连锁类型名称
+,T2.tactic_style_name	--战略类型名称
+,T2.cust_type_name	--客户类型名称
+,T2.belong_role_name	--所属角色名称
+,T2.second_role_name	--二级角色名称
+,T2.cus_lev_name	--客户级别名称
+,T2.cus_star_lev_name	--客户星级名称
+,T2.expand_staus_name	--开拓状态名称
+,T2.ope_staus_name	--运营状态名称
+,T2.up_org_name	--上级单位名称
+,T2.cust_risk_lev_name	--客户风险等级名称
+,T2.user_group_name	--用户群体名称
+,T2.busi_1_lev_desc	--商机一级节点描述
+,T2.busi_2_lev_desc	--商机二级节点描述
+,T2.busi_3_lev_desc	--商机三级节点描述
+,T2.busi_4_lev_desc	--商机四级节点描述
+,T2.busi_5_lev_desc	--商机五级节点描述
+,T2.busi_6_lev_desc	--商机六级节点描述
+,T2.busi_7_lev_desc	--商机七级节点描述
+,T2.busi_8_lev_desc	--商机八级节点描述
+,T2.busi_9_lev_desc	--商机九级节点描述
+,T.cntc_num  --合同编号
+,T.proj_num  --项目评审编号
+,T.stage_name  --合同阶段数据类型
+,T.data_src_code --合同阶段数据来源
+,T.ser_num  --流水号
+,T.ofr_type_name  --报价单类型
+,T.ofr_num  --oss/ltc報價單
+,T.ofr_item_num --oss/ltc報價單行
+,T.sap_ofr_num --sap报价单号
+,T.sap_ofr_item_num--sap报价单行
+,T.order_num  --oss/ltc订单号
+,T.order_line_num --oss/ltc订单行
+,T.sap_order_num --sap订单号       
+,T.sap_order_line_num  --sap订单行号
+,T.cntc_id  --合同ID
+,T.cntc_item_id --合同行ID
+,T.proj_id  --项目ID
+,T.proj_item_id --项目行ID
+,T.plan_item_num --计划单行号
+,T.dmand_num --要货单号
+,T.dmand_line_id  --要货单行号
+,T.cust_num   --客户编码
+,T.cust_name  --客户名称
+,T.dstr_cust_num  --经销商客编
+,T.dstr_cust_name  --经销商名称
+,T.is_sub_co_name --是否子公司描述
+,T.is_pltf_name --是否运营平台描述
+,T.is_algr_name --是否代签描述
+,T.is_coop_name --是否厂商合作描述
+,T.seal_date --盖章日期
+,T.new_flag  --最新标识
+,T.version_flag --版本标识
+,T.rcpts_st_name --单据状态描述
+,T.div_name  --事业部描述
+,T.cntc_st_name --合同状态描述
+,T.cntc_vers  --合同版本号
+,T.eff_date  --生效日期
+,T.inval_date --失效日期
+,T.delv_per  --预计供货周期
+,T.delv_start_date  --预计供货开始日期
+,T.delv_end_date  --预计供货结束日期
+,T.material_src_name --产品来源描述
+,T.material_num  --物料编码
+,T.material_name  --物料名称
+,T.material_cat_name --品类描述
+,T.dimension  --规格
+,T.material_chnl_name  --产品渠道描述
+,T.gcf_prc  --工程方价格
+,T.aply_prc --申请价格 
+,T.aply_qty  --申请数量
+,T.appr_nak_prc  --审批裸价
+,T.appr_prc  --审批价格
+,T.amb_cost  --阿米巴成本
+,T.amt_prft_amt  --阿米巴毛利额
+,T.amt_prft_rate  --阿米巴毛利率
+,T.std_a_cost  --标A成本
+,T.std_a_amt  --标A成本毛利额
+,T.std_a_rate  --标A成本毛利率
+,T.dstr_grs_rate  --经销商毛利率
+,T.sale_amt  --销售额
+,T.cntc_prc --合同单价
+,T.unit  --单位
+,T.wt_vol --重量体积
+,T.dealer_prc  --经销商提货价
+,T.ep_prc  --EP价
+,T.disc_rate  --折扣率
+,T.cntc_qty  -- 合同用量
+,T.is_instl_name  --是否包安装描述
+,T.instl_prc  --安装单价
+,T.ctrl_srvc_rate  --集采服务费率
+,T.order_srvc_rate  --抢单服务费率
+,T.grnd_srvc_rate  --落地服务费率
+,T.advn_srvc_rate  --垫资服务费率
+,T.srvc_rate   --综合费率
+,T.srvc_rate2  --综合费率2
+,T.busi_coms_rate  --业务提成率
+,T.material_st_name  --物料状态
+,T.unit_area  --单片面积
+,T.price_type -- 价格类型
+,T.buyout_price --一口价
+,T.cntc_create_date--合同创建日期
+,case when CAST(COALESCE(T.qty,0) AS DOUBLE) < CAST(COALESCE(T.rmn_qty,0) AS DOUBLE) then T.rmn_qty else T.qty end qty --订单数量
+,T.t_qty --退货订单数量
+,T.dmand_qty-- 要货单数量
+,T.rmn_qty --留货数
+,T.t_rmn_qty --退货留货数
+,case when CAST(COALESCE(T.proj_rmn_qty,0) AS DOUBLE) < 0 then 0 else T.proj_rmn_qty end proj_rmn_qty-- 项目留货数
+,T.plan_ord_qty --计划单数量
+,T1.rlse_start_time --生产下达时间
+,T1.close_time --生产关闭时间
+,T.FLAG
+,current_timestamp() as dw_last_upate_date --最后更新时间
+,T2.PAR_CUST_NUM --母客编(主档)
+,T2.PAR_CUST_NAME --母客编名称(主档)
+,T2.BUSI_BELONG_FLAG --商机归属方类型
+from TMPP T
+left join prod_ord T1
+on T.order_num = T1.sale_num
+and T.order_line_num = T1.sale_line_num
+left join DWRLTC.DWR_PROJ_BUSI_GATHER_T T2
+on TRIM(T.busi_num) = T2.busi_code

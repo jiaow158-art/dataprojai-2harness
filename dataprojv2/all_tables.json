@@ -1,0 +1,5792 @@
+{
+  "dm.DM_RPT_ZMASTER_CUS_TEST": {
+    "schema": "dm",
+    "name": "DM_RPT_ZMASTER_CUS_TEST",
+    "size": "0 bytes"
+  },
+  "dm.DM_RPT_ZOA_GCBBSPB_TAB_T": {
+    "schema": "dm",
+    "name": "DM_RPT_ZOA_GCBBSPB_TAB_T",
+    "size": "0 bytes"
+  },
+  "dm.RESERVATION_RECORD_DM": {
+    "schema": "dm",
+    "name": "RESERVATION_RECORD_DM",
+    "size": "24 KB"
+  },
+  "dm.RESERVATION_VENUE_LOG_DM": {
+    "schema": "dm",
+    "name": "RESERVATION_VENUE_LOG_DM",
+    "size": "24 KB"
+  },
+  "dm.STG_BIC_AZSFI_O0342_1009": {
+    "schema": "dm",
+    "name": "STG_BIC_AZSFI_O0342_1009",
+    "size": "712 KB"
+  },
+  "dm.ct_sales_performance_daily_t": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t",
+    "size": "7045 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20241021": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20241021",
+    "size": "1493 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250225": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250225",
+    "size": "6808 KB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250428": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250428",
+    "size": "190 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250523": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250523",
+    "size": "183 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250612": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250612",
+    "size": "9024 KB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250619": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250619",
+    "size": "9144 KB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20250716": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20250716",
+    "size": "392 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20251024": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20251024",
+    "size": "210 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20251104": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20251104",
+    "size": "9952 KB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20251216": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20251216",
+    "size": "147 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20260319": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20260319",
+    "size": "131 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20260331": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20260331",
+    "size": "223 MB"
+  },
+  "dm.ct_sales_performance_daily_t_bak20260401": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_bak20260401",
+    "size": "225 MB"
+  },
+  "dm.ct_sales_performance_daily_t_new": {
+    "schema": "dm",
+    "name": "ct_sales_performance_daily_t_new",
+    "size": "389 MB"
+  },
+  "dm.ct_sales_performance_material_daily_t": {
+    "schema": "dm",
+    "name": "ct_sales_performance_material_daily_t",
+    "size": "11 GB"
+  },
+  "dm.ct_sales_performance_t": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t",
+    "size": "9561 MB"
+  },
+  "dm.ct_sales_performance_t_bak20250224": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20250224",
+    "size": "7952 KB"
+  },
+  "dm.ct_sales_performance_t_bak20250428": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20250428",
+    "size": "225 MB"
+  },
+  "dm.ct_sales_performance_t_bak20250612": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20250612",
+    "size": "9880 KB"
+  },
+  "dm.ct_sales_performance_t_bak20250716": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20250716",
+    "size": "428 MB"
+  },
+  "dm.ct_sales_performance_t_bak20251028": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20251028",
+    "size": "272 MB"
+  },
+  "dm.ct_sales_performance_t_bak20251104": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20251104",
+    "size": "314 MB"
+  },
+  "dm.ct_sales_performance_t_bak20260331": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20260331",
+    "size": "256 MB"
+  },
+  "dm.ct_sales_performance_t_bak20260401": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_bak20260401",
+    "size": "258 MB"
+  },
+  "dm.ct_sales_performance_t_new": {
+    "schema": "dm",
+    "name": "ct_sales_performance_t_new",
+    "size": "319 MB"
+  },
+  "dm.dba_table_column_desc": {
+    "schema": "dm",
+    "name": "dba_table_column_desc",
+    "size": "31 MB"
+  },
+  "dm.dba_table_column_desc_test": {
+    "schema": "dm",
+    "name": "dba_table_column_desc_test",
+    "size": "0 bytes"
+  },
+  "dm.dm_0714_test": {
+    "schema": "dm",
+    "name": "dm_0714_test",
+    "size": "8192 bytes"
+  },
+  "dm.dm_ambv2_apnt_result_t": {
+    "schema": "dm",
+    "name": "dm_ambv2_apnt_result_t",
+    "size": "28 MB"
+  },
+  "dm.dm_ambv2_chdj_grp_t": {
+    "schema": "dm",
+    "name": "dm_ambv2_chdj_grp_t",
+    "size": "2461 MB"
+  },
+  "dm.dm_ambv2_chdj_grp_t1": {
+    "schema": "dm",
+    "name": "dm_ambv2_chdj_grp_t1",
+    "size": "16 MB"
+  },
+  "dm.dm_ambv2_profit_t": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t",
+    "size": "6138 MB"
+  },
+  "dm.dm_ambv2_profit_t_202501_bak_20250224": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_202501_bak_20250224",
+    "size": "1244 MB"
+  },
+  "dm.dm_ambv2_profit_t_20260429_qyj_250101hou": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_20260429_qyj_250101hou",
+    "size": "2273 MB"
+  },
+  "dm.dm_ambv2_profit_t_20260602_qyj_260101_hou": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_20260602_qyj_260101_hou",
+    "size": "11 GB"
+  },
+  "dm.dm_ambv2_profit_t_ext": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_ext",
+    "size": "9560 KB"
+  },
+  "dm.dm_ambv2_profit_t_init": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_init",
+    "size": "2399 MB"
+  },
+  "dm.dm_ambv2_profit_t_temp": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_temp",
+    "size": "131 MB"
+  },
+  "dm.dm_ambv2_profit_t_test": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_test",
+    "size": "5180 MB"
+  },
+  "dm.dm_ambv2_profit_t_tmp": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_tmp",
+    "size": "126 MB"
+  },
+  "dm.dm_ambv2_profit_t_tmp1": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_tmp1",
+    "size": "372 MB"
+  },
+  "dm.dm_ambv2_profit_t_tmp2": {
+    "schema": "dm",
+    "name": "dm_ambv2_profit_t_tmp2",
+    "size": "193 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t",
+    "size": "11 GB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20240309": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20240309",
+    "size": "253 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20240411bak2023": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20240411bak2023",
+    "size": "329 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20240520bak": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20240520bak",
+    "size": "296 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20240612_wjh": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20240612_wjh",
+    "size": "754 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20250314_bak": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20250314_bak",
+    "size": "9590 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20250605bak": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20250605bak",
+    "size": "764 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20260429": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20260429",
+    "size": "3122 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_20260505": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_20260505",
+    "size": "1581 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_2503_20250421bak": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_2503_20250421bak",
+    "size": "378 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_bak202512": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_bak202512",
+    "size": "406 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_bak20260402": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_bak20260402",
+    "size": "4898 MB"
+  },
+  "dm.dm_ambv2_zzt_xssr_t_bak20260603_2026hou": {
+    "schema": "dm",
+    "name": "dm_ambv2_zzt_xssr_t_bak20260603_2026hou",
+    "size": "1477 MB"
+  },
+  "dm.dm_apartment_stay_apply_flow_t": {
+    "schema": "dm",
+    "name": "dm_apartment_stay_apply_flow_t",
+    "size": "1600 KB"
+  },
+  "dm.dm_api_sale_stat_t": {
+    "schema": "dm",
+    "name": "dm_api_sale_stat_t",
+    "size": "62 MB"
+  },
+  "dm.dm_aps_daily_schedule_dtl": {
+    "schema": "dm",
+    "name": "dm_aps_daily_schedule_dtl",
+    "size": "244 MB"
+  },
+  "dm.dm_aps_doubler_index_t": {
+    "schema": "dm",
+    "name": "dm_aps_doubler_index_t",
+    "size": "360 KB"
+  },
+  "dm.dm_ar_analysis_rpt_f": {
+    "schema": "dm",
+    "name": "dm_ar_analysis_rpt_f",
+    "size": "1863 MB"
+  },
+  "dm.dm_ar_analysis_rpt_f_20251027_wjh": {
+    "schema": "dm",
+    "name": "dm_ar_analysis_rpt_f_20251027_wjh",
+    "size": "88 MB"
+  },
+  "dm.dm_ar_analysis_rpt_f_20251124_wjh": {
+    "schema": "dm",
+    "name": "dm_ar_analysis_rpt_f_20251124_wjh",
+    "size": "927 MB"
+  },
+  "dm.dm_ar_analysis_rpt_f_260202": {
+    "schema": "dm",
+    "name": "dm_ar_analysis_rpt_f_260202",
+    "size": "1129 MB"
+  },
+  "dm.dm_ar_analysis_rpt_f_test": {
+    "schema": "dm",
+    "name": "dm_ar_analysis_rpt_f_test",
+    "size": "48 MB"
+  },
+  "dm.dm_ar_overdue_receivables_t": {
+    "schema": "dm",
+    "name": "dm_ar_overdue_receivables_t",
+    "size": "92 MB"
+  },
+  "dm.dm_ar_rcvbl_stat_t": {
+    "schema": "dm",
+    "name": "dm_ar_rcvbl_stat_t",
+    "size": "66 MB"
+  },
+  "dm.dm_ar_receivable_accage_close_t": {
+    "schema": "dm",
+    "name": "dm_ar_receivable_accage_close_t",
+    "size": "82 MB"
+  },
+  "dm.dm_ar_receivable_accage_t": {
+    "schema": "dm",
+    "name": "dm_ar_receivable_accage_t",
+    "size": "82 MB"
+  },
+  "dm.dm_ar_return_payment_close_t": {
+    "schema": "dm",
+    "name": "dm_ar_return_payment_close_t",
+    "size": "291 MB"
+  },
+  "dm.dm_ar_return_payment_t": {
+    "schema": "dm",
+    "name": "dm_ar_return_payment_t",
+    "size": "41 MB"
+  },
+  "dm.dm_asprocess_detail_t": {
+    "schema": "dm",
+    "name": "dm_asprocess_detail_t",
+    "size": "96 KB"
+  },
+  "dm.dm_b1_customer_data_t": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t",
+    "size": "24 KB"
+  },
+  "dm.dm_b1_customer_data_t0203": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t0203",
+    "size": "16 KB"
+  },
+  "dm.dm_b1_customer_data_t0923": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t0923",
+    "size": "16 KB"
+  },
+  "dm.dm_b1_customer_data_t_0206": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t_0206",
+    "size": "16 KB"
+  },
+  "dm.dm_b1_customer_data_t_20221202": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t_20221202",
+    "size": "16 KB"
+  },
+  "dm.dm_b1_customer_data_t_bak": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t_bak",
+    "size": "16 KB"
+  },
+  "dm.dm_b1_customer_data_t_bak20230209": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t_bak20230209",
+    "size": "24 KB"
+  },
+  "dm.dm_b1_customer_data_t_bak2023020901": {
+    "schema": "dm",
+    "name": "dm_b1_customer_data_t_bak2023020901",
+    "size": "24 KB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t",
+    "size": "1276 MB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t_20260604_240601_260101": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t_20260604_240601_260101",
+    "size": "76 MB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t_bak20260107": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t_bak20260107",
+    "size": "112 MB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t_tmp01": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t_tmp01",
+    "size": "31 MB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t_tmp02": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t_tmp02",
+    "size": "182 MB"
+  },
+  "dm.dm_b1_kl_wyjx_inventory_t_tmp03": {
+    "schema": "dm",
+    "name": "dm_b1_kl_wyjx_inventory_t_tmp03",
+    "size": "47 MB"
+  },
+  "dm.dm_b1_pur_intowh_pre_t": {
+    "schema": "dm",
+    "name": "dm_b1_pur_intowh_pre_t",
+    "size": "40 MB"
+  },
+  "dm.dm_b1_pur_intowh_t": {
+    "schema": "dm",
+    "name": "dm_b1_pur_intowh_t",
+    "size": "446 MB"
+  },
+  "dm.dm_b1_sales_outgoods_t": {
+    "schema": "dm",
+    "name": "dm_b1_sales_outgoods_t",
+    "size": "351 MB"
+  },
+  "dm.dm_b1_transit_inventory_t": {
+    "schema": "dm",
+    "name": "dm_b1_transit_inventory_t",
+    "size": "328 MB"
+  },
+  "dm.dm_b1_wyjx_inventory_tat_t": {
+    "schema": "dm",
+    "name": "dm_b1_wyjx_inventory_tat_t",
+    "size": "1888 MB"
+  },
+  "dm.dm_bic_zgsdg_t": {
+    "schema": "dm",
+    "name": "dm_bic_zgsdg_t",
+    "size": "0 bytes"
+  },
+  "dm.dm_bill_in_apply_detail": {
+    "schema": "dm",
+    "name": "dm_bill_in_apply_detail",
+    "size": "1647 MB"
+  },
+  "dm.dm_bill_out_apply_detail": {
+    "schema": "dm",
+    "name": "dm_bill_out_apply_detail",
+    "size": "3853 MB"
+  },
+  "dm.dm_bkpf_or_bseg_check_t": {
+    "schema": "dm",
+    "name": "dm_bkpf_or_bseg_check_t",
+    "size": "0 bytes"
+  },
+  "dm.dm_bo_business_deal_t": {
+    "schema": "dm",
+    "name": "dm_bo_business_deal_t",
+    "size": "39 MB"
+  },
+  "dm.dm_bo_dspt_order_t": {
+    "schema": "dm",
+    "name": "dm_bo_dspt_order_t",
+    "size": "239 MB"
+  },
+  "dm.dm_bo_engin_ct_t": {
+    "schema": "dm",
+    "name": "dm_bo_engin_ct_t",
+    "size": "4720 KB"
+  },
+  "dm.dm_bo_plan_order_op_t": {
+    "schema": "dm",
+    "name": "dm_bo_plan_order_op_t",
+    "size": "11 MB"
+  },
+  "dm.dm_bo_project_stat_t": {
+    "schema": "dm",
+    "name": "dm_bo_project_stat_t",
+    "size": "1307 MB"
+  },
+  "dm.dm_bo_tms_ship_order_t": {
+    "schema": "dm",
+    "name": "dm_bo_tms_ship_order_t",
+    "size": "272 MB"
+  },
+  "dm.dm_brt_bic_azmfi_o0072": {
+    "schema": "dm",
+    "name": "dm_brt_bic_azmfi_o0072",
+    "size": "2850 MB"
+  },
+  "dm.dm_brt_bic_azmfi_o0112": {
+    "schema": "dm",
+    "name": "dm_brt_bic_azmfi_o0112",
+    "size": "2328 KB"
+  },
+  "dm.dm_brt_bic_azmfi_o0201": {
+    "schema": "dm",
+    "name": "dm_brt_bic_azmfi_o0201",
+    "size": "2264 KB"
+  },
+  "dm.dm_brt_bic_azmfi_o0212": {
+    "schema": "dm",
+    "name": "dm_brt_bic_azmfi_o0212",
+    "size": "313 MB"
+  },
+  "dm.dm_budget_f": {
+    "schema": "dm",
+    "name": "dm_budget_f",
+    "size": "3464 KB"
+  },
+  "dm.dm_busi_cont_tran_demo_t": {
+    "schema": "dm",
+    "name": "dm_busi_cont_tran_demo_t",
+    "size": "2944 MB"
+  },
+  "dm.dm_car_use_apply_flow_t": {
+    "schema": "dm",
+    "name": "dm_car_use_apply_flow_t",
+    "size": "7664 KB"
+  },
+  "dm.dm_cost_grossprofit_diff_analysis_t": {
+    "schema": "dm",
+    "name": "dm_cost_grossprofit_diff_analysis_t",
+    "size": "36 MB"
+  },
+  "dm.dm_cost_sales_gross_profit_d": {
+    "schema": "dm",
+    "name": "dm_cost_sales_gross_profit_d",
+    "size": "20 MB"
+  },
+  "dm.dm_cs_emp_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_cs_emp_order_stat_t",
+    "size": "456 KB"
+  },
+  "dm.dm_cs_sale_tgt_t": {
+    "schema": "dm",
+    "name": "dm_cs_sale_tgt_t",
+    "size": "528 KB"
+  },
+  "dm.dm_cs_zdj_city_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_cs_zdj_city_order_stat_t",
+    "size": "384 KB"
+  },
+  "dm.dm_cs_zdj_order_amt_stat_t": {
+    "schema": "dm",
+    "name": "dm_cs_zdj_order_amt_stat_t",
+    "size": "240 KB"
+  },
+  "dm.dm_cs_zdj_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_cs_zdj_order_stat_t",
+    "size": "264 KB"
+  },
+  "dm.dm_cs_zdj_order_status_stat_t": {
+    "schema": "dm",
+    "name": "dm_cs_zdj_order_status_stat_t",
+    "size": "456 KB"
+  },
+  "dm.dm_ct_amb_performance_a_cost_ni_tax_income_lg_d": {
+    "schema": "dm",
+    "name": "dm_ct_amb_performance_a_cost_ni_tax_income_lg_d",
+    "size": "8928 KB"
+  },
+  "dm.dm_ct_b1_last3month_inventory_t": {
+    "schema": "dm",
+    "name": "dm_ct_b1_last3month_inventory_t",
+    "size": "360 KB"
+  },
+  "dm.dm_ct_bus_all_new_t": {
+    "schema": "dm",
+    "name": "dm_ct_bus_all_new_t",
+    "size": "3536 KB"
+  },
+  "dm.dm_ct_bus_all_t": {
+    "schema": "dm",
+    "name": "dm_ct_bus_all_t",
+    "size": "27 MB"
+  },
+  "dm.dm_ct_cockpit_gsa_t": {
+    "schema": "dm",
+    "name": "dm_ct_cockpit_gsa_t",
+    "size": "384 KB"
+  },
+  "dm.dm_ct_dealer_inventory_analyse_t": {
+    "schema": "dm",
+    "name": "dm_ct_dealer_inventory_analyse_t",
+    "size": "4650 MB"
+  },
+  "dm.dm_ct_dealer_inventory_analyse_t_041201": {
+    "schema": "dm",
+    "name": "dm_ct_dealer_inventory_analyse_t_041201",
+    "size": "72 KB"
+  },
+  "dm.dm_ct_income_cost_t": {
+    "schema": "dm",
+    "name": "dm_ct_income_cost_t",
+    "size": "11 GB"
+  },
+  "dm.dm_ct_ls_sales_performance_daily_t": {
+    "schema": "dm",
+    "name": "dm_ct_ls_sales_performance_daily_t",
+    "size": "3973 MB"
+  },
+  "dm.dm_ct_mobile_strong_customer_inventory_t": {
+    "schema": "dm",
+    "name": "dm_ct_mobile_strong_customer_inventory_t",
+    "size": "7008 KB"
+  },
+  "dm.dm_ct_pam_category_cost_full_t": {
+    "schema": "dm",
+    "name": "dm_ct_pam_category_cost_full_t",
+    "size": "936 KB"
+  },
+  "dm.dm_ct_region_org_tree_t": {
+    "schema": "dm",
+    "name": "dm_ct_region_org_tree_t",
+    "size": "72 KB"
+  },
+  "dm.dm_ct_so_month_analysis_t": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_analysis_t",
+    "size": "175 MB"
+  },
+  "dm.dm_ct_so_month_analysis_t_260415_wjh": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_analysis_t_260415_wjh",
+    "size": "71 MB"
+  },
+  "dm.dm_ct_so_month_analysis_t_260416_wjh": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_analysis_t_260416_wjh",
+    "size": "71 MB"
+  },
+  "dm.dm_ct_so_month_category_dimension_t": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_category_dimension_t",
+    "size": "14 MB"
+  },
+  "dm.dm_ct_so_month_main_category_dimension_t": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_main_category_dimension_t",
+    "size": "9144 KB"
+  },
+  "dm.dm_ct_so_month_t": {
+    "schema": "dm",
+    "name": "dm_ct_so_month_t",
+    "size": "14 MB"
+  },
+  "dm.dm_cust_busi_transform_t": {
+    "schema": "dm",
+    "name": "dm_cust_busi_transform_t",
+    "size": "98 MB"
+  },
+  "dm.dm_cust_busi_transform_t_bak20260515zhz": {
+    "schema": "dm",
+    "name": "dm_cust_busi_transform_t_bak20260515zhz",
+    "size": "66 MB"
+  },
+  "dm.dm_cust_busi_transform_t_tmp": {
+    "schema": "dm",
+    "name": "dm_cust_busi_transform_t_tmp",
+    "size": "75 MB"
+  },
+  "dm.dm_cust_defect_statis": {
+    "schema": "dm",
+    "name": "dm_cust_defect_statis",
+    "size": "112 KB"
+  },
+  "dm.dm_cust_quality_statis": {
+    "schema": "dm",
+    "name": "dm_cust_quality_statis",
+    "size": "80 KB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t",
+    "size": "65 MB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t_bak20251017": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t_bak20251017",
+    "size": "7888 KB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t_bak20251030": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t_bak20251030",
+    "size": "7880 KB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t_new": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t_new",
+    "size": "30 MB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t_new_t3": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t_new_t3",
+    "size": "864 KB"
+  },
+  "dm.dm_cz_cust_rebt_diff_t_test": {
+    "schema": "dm",
+    "name": "dm_cz_cust_rebt_diff_t_test",
+    "size": "7448 KB"
+  },
+  "dm.dm_cz_gxc_cust_rebt_diff_t": {
+    "schema": "dm",
+    "name": "dm_cz_gxc_cust_rebt_diff_t",
+    "size": "6432 KB"
+  },
+  "dm.dm_cz_gxc_cust_rebt_diff_t_bak20251018": {
+    "schema": "dm",
+    "name": "dm_cz_gxc_cust_rebt_diff_t_bak20251018",
+    "size": "232 KB"
+  },
+  "dm.dm_cz_gxc_cust_rebt_diff_t_bak20251118": {
+    "schema": "dm",
+    "name": "dm_cz_gxc_cust_rebt_diff_t_bak20251118",
+    "size": "256 KB"
+  },
+  "dm.dm_cz_gxc_cust_rebt_diff_t_bak20260105": {
+    "schema": "dm",
+    "name": "dm_cz_gxc_cust_rebt_diff_t_bak20260105",
+    "size": "280 KB"
+  },
+  "dm.dm_cz_gxc_cust_rebt_diff_t_test": {
+    "schema": "dm",
+    "name": "dm_cz_gxc_cust_rebt_diff_t_test",
+    "size": "2400 KB"
+  },
+  "dm.dm_daily_appointment_status": {
+    "schema": "dm",
+    "name": "dm_daily_appointment_status",
+    "size": "816 KB"
+  },
+  "dm.dm_daily_appointment_status_20240410": {
+    "schema": "dm",
+    "name": "dm_daily_appointment_status_20240410",
+    "size": "144 KB"
+  },
+  "dm.dm_daily_appointment_status_t": {
+    "schema": "dm",
+    "name": "dm_daily_appointment_status_t",
+    "size": "104 KB"
+  },
+  "dm.dm_dc_email_log_t": {
+    "schema": "dm",
+    "name": "dm_dc_email_log_t",
+    "size": "14 MB"
+  },
+  "dm.dm_dealer_sales_t": {
+    "schema": "dm",
+    "name": "dm_dealer_sales_t",
+    "size": "29 MB"
+  },
+  "dm.dm_demand_analyse_t": {
+    "schema": "dm",
+    "name": "dm_demand_analyse_t",
+    "size": "180 MB"
+  },
+  "dm.dm_demand_analyse_t_01": {
+    "schema": "dm",
+    "name": "dm_demand_analyse_t_01",
+    "size": "3136 KB"
+  },
+  "dm.dm_demand_analyse_t_202403": {
+    "schema": "dm",
+    "name": "dm_demand_analyse_t_202403",
+    "size": "3928 KB"
+  },
+  "dm.dm_demand_analyse_t_202404": {
+    "schema": "dm",
+    "name": "dm_demand_analyse_t_202404",
+    "size": "3928 KB"
+  },
+  "dm.dm_dim_date_d": {
+    "schema": "dm",
+    "name": "dm_dim_date_d",
+    "size": "3176 KB"
+  },
+  "dm.dm_dim_date_d_20221024": {
+    "schema": "dm",
+    "name": "dm_dim_date_d_20221024",
+    "size": "2248 KB"
+  },
+  "dm.dm_dim_hr_org_test0819": {
+    "schema": "dm",
+    "name": "dm_dim_hr_org_test0819",
+    "size": "312 KB"
+  },
+  "dm.dm_dim_integrate_channel_d": {
+    "schema": "dm",
+    "name": "dm_dim_integrate_channel_d",
+    "size": "24 KB"
+  },
+  "dm.dm_dmt_cust_stat_t": {
+    "schema": "dm",
+    "name": "dm_dmt_cust_stat_t",
+    "size": "13 MB"
+  },
+  "dm.dm_dmt_dealer_jch_t": {
+    "schema": "dm",
+    "name": "dm_dmt_dealer_jch_t",
+    "size": "107 MB"
+  },
+  "dm.dm_dmt_prod_event_t": {
+    "schema": "dm",
+    "name": "dm_dmt_prod_event_t",
+    "size": "11 MB"
+  },
+  "dm.dm_dmt_store_stat_d_t": {
+    "schema": "dm",
+    "name": "dm_dmt_store_stat_d_t",
+    "size": "528 KB"
+  },
+  "dm.dm_dmt_store_stat_t": {
+    "schema": "dm",
+    "name": "dm_dmt_store_stat_t",
+    "size": "896 KB"
+  },
+  "dm.dm_dmt_tc_cust_stat_t": {
+    "schema": "dm",
+    "name": "dm_dmt_tc_cust_stat_t",
+    "size": "27 MB"
+  },
+  "dm.dm_dmt_user_stat_t": {
+    "schema": "dm",
+    "name": "dm_dmt_user_stat_t",
+    "size": "47 MB"
+  },
+  "dm.dm_dp_api_base_area": {
+    "schema": "dm",
+    "name": "dm_dp_api_base_area",
+    "size": "30 MB"
+  },
+  "dm.dm_dp_api_cust_general": {
+    "schema": "dm",
+    "name": "dm_dp_api_cust_general",
+    "size": "264 KB"
+  },
+  "dm.dm_dp_api_cust_sales_throught_sum": {
+    "schema": "dm",
+    "name": "dm_dp_api_cust_sales_throught_sum",
+    "size": "129 MB"
+  },
+  "dm.dm_dp_api_cust_stock_det": {
+    "schema": "dm",
+    "name": "dm_dp_api_cust_stock_det",
+    "size": "39 MB"
+  },
+  "dm.dm_dp_api_material_general": {
+    "schema": "dm",
+    "name": "dm_dp_api_material_general",
+    "size": "9072 KB"
+  },
+  "dm.dm_dp_api_no_deliver_sum": {
+    "schema": "dm",
+    "name": "dm_dp_api_no_deliver_sum",
+    "size": "312 KB"
+  },
+  "dm.dm_dp_api_order_det": {
+    "schema": "dm",
+    "name": "dm_dp_api_order_det",
+    "size": "5896 KB"
+  },
+  "dm.dm_dp_api_order_det_pat": {
+    "schema": "dm",
+    "name": "dm_dp_api_order_det_pat",
+    "size": "43 MB"
+  },
+  "dm.dm_dp_api_pred_org": {
+    "schema": "dm",
+    "name": "dm_dp_api_pred_org",
+    "size": "24 KB"
+  },
+  "dm.dm_dp_api_prepare_stock_sum": {
+    "schema": "dm",
+    "name": "dm_dp_api_prepare_stock_sum",
+    "size": "480 KB"
+  },
+  "dm.dm_dp_api_res_stock_sum": {
+    "schema": "dm",
+    "name": "dm_dp_api_res_stock_sum",
+    "size": "2824 KB"
+  },
+  "dm.dm_dp_api_sales_group_struct": {
+    "schema": "dm",
+    "name": "dm_dp_api_sales_group_struct",
+    "size": "120 KB"
+  },
+  "dm.dm_dp_api_sales_group_struct_his": {
+    "schema": "dm",
+    "name": "dm_dp_api_sales_group_struct_his",
+    "size": "120 KB"
+  },
+  "dm.dm_dp_api_sales_sum": {
+    "schema": "dm",
+    "name": "dm_dp_api_sales_sum",
+    "size": "6505 MB"
+  },
+  "dm.dm_dp_api_sales_target": {
+    "schema": "dm",
+    "name": "dm_dp_api_sales_target",
+    "size": "55 MB"
+  },
+  "dm.dm_dp_api_stockout_oudue": {
+    "schema": "dm",
+    "name": "dm_dp_api_stockout_oudue",
+    "size": "808 KB"
+  },
+  "dm.dm_dp_api_warehouse_stock": {
+    "schema": "dm",
+    "name": "dm_dp_api_warehouse_stock",
+    "size": "2512 KB"
+  },
+  "dm.dm_dss_operate_monitor_index_t": {
+    "schema": "dm",
+    "name": "dm_dss_operate_monitor_index_t",
+    "size": "264 KB"
+  },
+  "dm.dm_dws_ztco08class_t": {
+    "schema": "dm",
+    "name": "dm_dws_ztco08class_t",
+    "size": "2968 KB"
+  },
+  "dm.dm_ele_contract_sign_task_info_t": {
+    "schema": "dm",
+    "name": "dm_ele_contract_sign_task_info_t",
+    "size": "3992 KB"
+  },
+  "dm.dm_engchannelpolicyreview": {
+    "schema": "dm",
+    "name": "dm_engchannelpolicyreview",
+    "size": "9120 KB"
+  },
+  "dm.dm_expense_prediction_fsreclass_t": {
+    "schema": "dm",
+    "name": "dm_expense_prediction_fsreclass_t",
+    "size": "1433 MB"
+  },
+  "dm.dm_fact_finance_cost_f": {
+    "schema": "dm",
+    "name": "dm_fact_finance_cost_f",
+    "size": "2070 MB"
+  },
+  "dm.dm_fact_finance_cost_f_wjh_260127": {
+    "schema": "dm",
+    "name": "dm_fact_finance_cost_f_wjh_260127",
+    "size": "1564 MB"
+  },
+  "dm.dm_fact_finance_salesnetamt_f": {
+    "schema": "dm",
+    "name": "dm_fact_finance_salesnetamt_f",
+    "size": "14 MB"
+  },
+  "dm.dm_fault_workorder_t": {
+    "schema": "dm",
+    "name": "dm_fault_workorder_t",
+    "size": "94 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_listed_t": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_listed_t",
+    "size": "57 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_listed_t_20260505_qyj": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_listed_t_20260505_qyj",
+    "size": "39 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t",
+    "size": "337 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_2023bak_20251015": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_2023bak_20251015",
+    "size": "6784 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240110": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240110",
+    "size": "552 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_202401_03": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_202401_03",
+    "size": "1936 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240304": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240304",
+    "size": "7776 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240327": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240327",
+    "size": "8248 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240409": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240409",
+    "size": "8488 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240503bak": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240503bak",
+    "size": "8600 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240704bak": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240704bak",
+    "size": "10 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20240819-勿删": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20240819-勿删",
+    "size": "11 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20241004bak": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20241004bak",
+    "size": "14 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20250209": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20250209",
+    "size": "17 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20250501_qyj": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20250501_qyj",
+    "size": "19 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20260430_qyj": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20260430_qyj",
+    "size": "33 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_20260505_qyj": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_20260505_qyj",
+    "size": "34 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak040109": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak040109",
+    "size": "7128 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak1106-勿删": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak1106-勿删",
+    "size": "6616 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak20240314": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak20240314",
+    "size": "8208 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak20250403": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak20250403",
+    "size": "19 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak20250604": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak20250604",
+    "size": "21 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak20260402": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak20260402",
+    "size": "13 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak_202506": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak_202506",
+    "size": "21 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_bak_202506_wjh": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_bak_202506_wjh",
+    "size": "21 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_new": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_new",
+    "size": "824 KB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_wjh_20250213": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_wjh_20250213",
+    "size": "17 MB"
+  },
+  "dm.dm_fi_ambv2_profit_sum_t_wjh_241210": {
+    "schema": "dm",
+    "name": "dm_fi_ambv2_profit_sum_t_wjh_241210",
+    "size": "16 MB"
+  },
+  "dm.dm_fin_ar_nodeexception_ltc_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexception_ltc_t",
+    "size": "425 MB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_business_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_business_t",
+    "size": "8960 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_contract_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_contract_t",
+    "size": "656 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_demand_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_demand_t",
+    "size": "976 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_despatch_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_despatch_t",
+    "size": "1408 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_formal_check_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_formal_check_t",
+    "size": "456 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_open_ticket_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_open_ticket_t",
+    "size": "632 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_request_payout_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_request_payout_t",
+    "size": "384 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_settlement_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_settlement_t",
+    "size": "304 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_t",
+    "size": "72 KB"
+  },
+  "dm.dm_fin_ar_nodeexcpt_ltc_virtual_check_t": {
+    "schema": "dm",
+    "name": "dm_fin_ar_nodeexcpt_ltc_virtual_check_t",
+    "size": "1944 KB"
+  },
+  "dm.dm_fin_budget_condition_t": {
+    "schema": "dm",
+    "name": "dm_fin_budget_condition_t",
+    "size": "432 KB"
+  },
+  "dm.dm_fin_cost_bathroom_t": {
+    "schema": "dm",
+    "name": "dm_fin_cost_bathroom_t",
+    "size": "22 MB"
+  },
+  "dm.dm_fin_cost_return_t": {
+    "schema": "dm",
+    "name": "dm_fin_cost_return_t",
+    "size": "34 MB"
+  },
+  "dm.dm_fin_ct_business_briefing_2023_prodtype_t": {
+    "schema": "dm",
+    "name": "dm_fin_ct_business_briefing_2023_prodtype_t",
+    "size": "312 MB"
+  },
+  "dm.dm_fin_ct_business_briefing_2023_t": {
+    "schema": "dm",
+    "name": "dm_fin_ct_business_briefing_2023_t",
+    "size": "516 MB"
+  },
+  "dm.dm_fin_ct_business_briefing_2023_t0702": {
+    "schema": "dm",
+    "name": "dm_fin_ct_business_briefing_2023_t0702",
+    "size": "2472 KB"
+  },
+  "dm.dm_fin_ct_business_briefing_2023_t20240303": {
+    "schema": "dm",
+    "name": "dm_fin_ct_business_briefing_2023_t20240303",
+    "size": "13 MB"
+  },
+  "dm.dm_fin_gl_profit_t": {
+    "schema": "dm",
+    "name": "dm_fin_gl_profit_t",
+    "size": "15 MB"
+  },
+  "dm.dm_fin_group_daily_detail": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_detail",
+    "size": "6630 MB"
+  },
+  "dm.dm_fin_group_daily_detail20240305": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_detail20240305",
+    "size": "724 MB"
+  },
+  "dm.dm_fin_group_daily_t": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_t",
+    "size": "49 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t",
+    "size": "617 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t_20250212": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_20250212",
+    "size": "20 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t_20250707_bak": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_20250707_bak",
+    "size": "23 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t_260520_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_260520_wjh",
+    "size": "38 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak0927": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak0927",
+    "size": "40 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20250516": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20250516",
+    "size": "22 MB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20250604": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20250604",
+    "size": "848 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20250904": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20250904",
+    "size": "136 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20251224": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20251224",
+    "size": "1200 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20260108": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20260108",
+    "size": "248 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20260318": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20260318",
+    "size": "3784 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20260328": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20260328",
+    "size": "1352 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20260331": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20260331",
+    "size": "1504 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_bak20260420": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_bak20260420",
+    "size": "976 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_test": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_test",
+    "size": "2664 KB"
+  },
+  "dm.dm_fin_group_daily_v3_t_wjh_20250808": {
+    "schema": "dm",
+    "name": "dm_fin_group_daily_v3_t_wjh_20250808",
+    "size": "24 MB"
+  },
+  "dm.dm_fin_marketdept_goal_m": {
+    "schema": "dm",
+    "name": "dm_fin_marketdept_goal_m",
+    "size": "24 KB"
+  },
+  "dm.dm_fin_marketdept_goal_m_0402": {
+    "schema": "dm",
+    "name": "dm_fin_marketdept_goal_m_0402",
+    "size": "24 KB"
+  },
+  "dm.dm_fin_mobile_card_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_card_t",
+    "size": "311 MB"
+  },
+  "dm.dm_fin_mobile_card_t_wjh_260108": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_card_t_wjh_260108",
+    "size": "1655 MB"
+  },
+  "dm.dm_fin_mobile_channel_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_channel_t",
+    "size": "926 MB"
+  },
+  "dm.dm_fin_mobile_channel_t_260422_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_channel_t_260422_wjh",
+    "size": "4504 KB"
+  },
+  "dm.dm_fin_mobile_cust_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_cust_t",
+    "size": "6112 MB"
+  },
+  "dm.dm_fin_mobile_org_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_org_t",
+    "size": "1857 MB"
+  },
+  "dm.dm_fin_mobile_prod_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_prod_t",
+    "size": "4580 MB"
+  },
+  "dm.dm_fin_mobile_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_t",
+    "size": "6251 MB"
+  },
+  "dm.dm_fin_mobile_t_bak20250730": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_t_bak20250730",
+    "size": "8404 MB"
+  },
+  "dm.dm_fin_mobile_trend_t": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_trend_t",
+    "size": "915 MB"
+  },
+  "dm.dm_fin_mobile_trend_t_bak_0929": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_trend_t_bak_0929",
+    "size": "856 MB"
+  },
+  "dm.dm_fin_mobile_trend_t_tmp01": {
+    "schema": "dm",
+    "name": "dm_fin_mobile_trend_t_tmp01",
+    "size": "6736 MB"
+  },
+  "dm.dm_fin_operations_mix_sum_t": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_sum_t",
+    "size": "9877 MB"
+  },
+  "dm.dm_fin_operations_mix_sum_t_20251129_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_sum_t_20251129_wjh",
+    "size": "0 bytes"
+  },
+  "dm.dm_fin_operations_mix_sum_t_new": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_sum_t_new",
+    "size": "15 GB"
+  },
+  "dm.dm_fin_operations_mix_t": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t",
+    "size": "5217 MB"
+  },
+  "dm.dm_fin_operations_mix_t_20250314_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_20250314_wjh",
+    "size": "266 MB"
+  },
+  "dm.dm_fin_operations_mix_t_20260429qyj": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_20260429qyj",
+    "size": "5129 MB"
+  },
+  "dm.dm_fin_operations_mix_t_20260505qyj": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_20260505qyj",
+    "size": "4980 MB"
+  },
+  "dm.dm_fin_operations_mix_t_20260603_2026hou": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_20260603_2026hou",
+    "size": "2767 MB"
+  },
+  "dm.dm_fin_operations_mix_t_260331_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_260331_wjh",
+    "size": "8188 MB"
+  },
+  "dm.dm_fin_operations_mix_t_bak20260422": {
+    "schema": "dm",
+    "name": "dm_fin_operations_mix_t_bak20260422",
+    "size": "2407 MB"
+  },
+  "dm.dm_fin_raw_material_abnormal_t": {
+    "schema": "dm",
+    "name": "dm_fin_raw_material_abnormal_t",
+    "size": "72 KB"
+  },
+  "dm.dm_fin_stock_capital_cost_t": {
+    "schema": "dm",
+    "name": "dm_fin_stock_capital_cost_t",
+    "size": "8913 MB"
+  },
+  "dm.dm_fin_stock_capital_cost_t_260331_wjh": {
+    "schema": "dm",
+    "name": "dm_fin_stock_capital_cost_t_260331_wjh",
+    "size": "1723 MB"
+  },
+  "dm.dm_fin_stock_capital_cost_t_huishuahive": {
+    "schema": "dm",
+    "name": "dm_fin_stock_capital_cost_t_huishuahive",
+    "size": "7335 MB"
+  },
+  "dm.dm_fin_stock_capital_cost_t_whj_260402": {
+    "schema": "dm",
+    "name": "dm_fin_stock_capital_cost_t_whj_260402",
+    "size": "2312 MB"
+  },
+  "dm.dm_fin_stock_capital_m1_t": {
+    "schema": "dm",
+    "name": "dm_fin_stock_capital_m1_t",
+    "size": "1278 MB"
+  },
+  "dm.dm_fin_stock_d_accage_list_c_t_2023": {
+    "schema": "dm",
+    "name": "dm_fin_stock_d_accage_list_c_t_2023",
+    "size": "16 GB"
+  },
+  "dm.dm_fin_stock_d_accage_list_c_t_2023_bak20260331": {
+    "schema": "dm",
+    "name": "dm_fin_stock_d_accage_list_c_t_2023_bak20260331",
+    "size": "18 GB"
+  },
+  "dm.dm_fin_stock_detail_accage_others_t": {
+    "schema": "dm",
+    "name": "dm_fin_stock_detail_accage_others_t",
+    "size": "4387 MB"
+  },
+  "dm.dm_fin_stock_detail_accage_t": {
+    "schema": "dm",
+    "name": "dm_fin_stock_detail_accage_t",
+    "size": "3490 MB"
+  },
+  "dm.dm_fin_stock_detail_accage_t_2023": {
+    "schema": "dm",
+    "name": "dm_fin_stock_detail_accage_t_2023",
+    "size": "22 GB"
+  },
+  "dm.dm_fin_stock_detail_accage_t_2023_20120922_05": {
+    "schema": "dm",
+    "name": "dm_fin_stock_detail_accage_t_2023_20120922_05",
+    "size": "146 MB"
+  },
+  "dm.dm_fin_stock_detail_accage_t_2023_20120922_2023": {
+    "schema": "dm",
+    "name": "dm_fin_stock_detail_accage_t_2023_20120922_2023",
+    "size": "3127 MB"
+  },
+  "dm.dm_fin_tax_rpt_t": {
+    "schema": "dm",
+    "name": "dm_fin_tax_rpt_t",
+    "size": "1312 KB"
+  },
+  "dm.dm_fin_tr_cost_t": {
+    "schema": "dm",
+    "name": "dm_fin_tr_cost_t",
+    "size": "2440 KB"
+  },
+  "dm.dm_forecast1_m": {
+    "schema": "dm",
+    "name": "dm_forecast1_m",
+    "size": "24 KB"
+  },
+  "dm.dm_gl_account_occupationfee_t": {
+    "schema": "dm",
+    "name": "dm_gl_account_occupationfee_t",
+    "size": "58 MB"
+  },
+  "dm.dm_gl_account_occupationfee_t_0315": {
+    "schema": "dm",
+    "name": "dm_gl_account_occupationfee_t_0315",
+    "size": "48 KB"
+  },
+  "dm.dm_gl_account_occupationfee_tmp": {
+    "schema": "dm",
+    "name": "dm_gl_account_occupationfee_tmp",
+    "size": "312 KB"
+  },
+  "dm.dm_gl_group_structure_d": {
+    "schema": "dm",
+    "name": "dm_gl_group_structure_d",
+    "size": "320 KB"
+  },
+  "dm.dm_gl_out_invoice_t": {
+    "schema": "dm",
+    "name": "dm_gl_out_invoice_t",
+    "size": "1306 MB"
+  },
+  "dm.dm_gl_property_balance_t": {
+    "schema": "dm",
+    "name": "dm_gl_property_balance_t",
+    "size": "9896 MB"
+  },
+  "dm.dm_gl_property_balance_t_wjh_260330": {
+    "schema": "dm",
+    "name": "dm_gl_property_balance_t_wjh_260330",
+    "size": "1000 MB"
+  },
+  "dm.dm_hr_sap_dept_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_dept_stat_t",
+    "size": "27 MB"
+  },
+  "dm.dm_hr_sap_emp_class_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_emp_class_stat_t",
+    "size": "4216 KB"
+  },
+  "dm.dm_hr_sap_emp_entry_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_emp_entry_stat_t",
+    "size": "672 KB"
+  },
+  "dm.dm_hr_sap_emp_sale_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_emp_sale_stat_t",
+    "size": "360 KB"
+  },
+  "dm.dm_hr_sap_emp_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_emp_stat_t",
+    "size": "23 MB"
+  },
+  "dm.dm_hr_sap_emp_trmnt_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_emp_trmnt_stat_t",
+    "size": "4136 KB"
+  },
+  "dm.dm_hr_sap_mng_stat_t": {
+    "schema": "dm",
+    "name": "dm_hr_sap_mng_stat_t",
+    "size": "1248 KB"
+  },
+  "dm.dm_huilianyi_application_file_form_history": {
+    "schema": "dm",
+    "name": "dm_huilianyi_application_file_form_history",
+    "size": "1217 MB"
+  },
+  "dm.dm_huilianyi_application_form_history": {
+    "schema": "dm",
+    "name": "dm_huilianyi_application_form_history",
+    "size": "21 MB"
+  },
+  "dm.dm_huilianyi_borrow_form_history": {
+    "schema": "dm",
+    "name": "dm_huilianyi_borrow_form_history",
+    "size": "15 MB"
+  },
+  "dm.dm_huilianyi_reimbursement_form_history": {
+    "schema": "dm",
+    "name": "dm_huilianyi_reimbursement_form_history",
+    "size": "39 MB"
+  },
+  "dm.dm_item_status_t": {
+    "schema": "dm",
+    "name": "dm_item_status_t",
+    "size": "3600 KB"
+  },
+  "dm.dm_local_reporting_t": {
+    "schema": "dm",
+    "name": "dm_local_reporting_t",
+    "size": "1488 KB"
+  },
+  "dm.dm_logdb_t": {
+    "schema": "dm",
+    "name": "dm_logdb_t",
+    "size": "7400 KB"
+  },
+  "dm.dm_logistics_repair_apply_flow_t": {
+    "schema": "dm",
+    "name": "dm_logistics_repair_apply_flow_t",
+    "size": "1344 KB"
+  },
+  "dm.dm_ltc_bid_list_t": {
+    "schema": "dm",
+    "name": "dm_ltc_bid_list_t",
+    "size": "792 KB"
+  },
+  "dm.dm_ltc_bo_rpt_t": {
+    "schema": "dm",
+    "name": "dm_ltc_bo_rpt_t",
+    "size": "53 MB"
+  },
+  "dm.dm_ltc_busi_manage_t": {
+    "schema": "dm",
+    "name": "dm_ltc_busi_manage_t",
+    "size": "3038 MB"
+  },
+  "dm.dm_ltc_business_cost_flow_t": {
+    "schema": "dm",
+    "name": "dm_ltc_business_cost_flow_t",
+    "size": "1368 KB"
+  },
+  "dm.dm_ltc_business_list": {
+    "schema": "dm",
+    "name": "dm_ltc_business_list",
+    "size": "0 bytes"
+  },
+  "dm.dm_ltc_business_list_t": {
+    "schema": "dm",
+    "name": "dm_ltc_business_list_t",
+    "size": "4240 KB"
+  },
+  "dm.dm_ltc_business_op_list_detail_t": {
+    "schema": "dm",
+    "name": "dm_ltc_business_op_list_detail_t",
+    "size": "13 MB"
+  },
+  "dm.dm_ltc_customer_list_t": {
+    "schema": "dm",
+    "name": "dm_ltc_customer_list_t",
+    "size": "424 KB"
+  },
+  "dm.dm_ltc_engi_cust_prod_target_t": {
+    "schema": "dm",
+    "name": "dm_ltc_engi_cust_prod_target_t",
+    "size": "3184 KB"
+  },
+  "dm.dm_ltc_engi_dlr_rebate_dtl_t": {
+    "schema": "dm",
+    "name": "dm_ltc_engi_dlr_rebate_dtl_t",
+    "size": "2240 KB"
+  },
+  "dm.dm_ltc_gc_order_t": {
+    "schema": "dm",
+    "name": "dm_ltc_gc_order_t",
+    "size": "130 MB"
+  },
+  "dm.dm_ltc_gc_order_t_0916": {
+    "schema": "dm",
+    "name": "dm_ltc_gc_order_t_0916",
+    "size": "0 bytes"
+  },
+  "dm.dm_ltc_order_plan_instock_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_instock_t",
+    "size": "21 MB"
+  },
+  "dm.dm_ltc_order_plan_keepgoods_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_keepgoods_t",
+    "size": "167 MB"
+  },
+  "dm.dm_ltc_order_plan_product_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_product_t",
+    "size": "21 MB"
+  },
+  "dm.dm_ltc_order_plan_ps_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_ps_t",
+    "size": "19 MB"
+  },
+  "dm.dm_ltc_order_plan_sign_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_sign_t",
+    "size": "1490 MB"
+  },
+  "dm.dm_ltc_order_plan_stockup_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_plan_stockup_t",
+    "size": "1148 MB"
+  },
+  "dm.dm_ltc_order_source_tot_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_source_tot_t",
+    "size": "10 GB"
+  },
+  "dm.dm_ltc_order_transport_fee_t": {
+    "schema": "dm",
+    "name": "dm_ltc_order_transport_fee_t",
+    "size": "67 MB"
+  },
+  "dm.dm_ltc_plan_order_flc_t": {
+    "schema": "dm",
+    "name": "dm_ltc_plan_order_flc_t",
+    "size": "26 MB"
+  },
+  "dm.dm_ltc_plan_order_t": {
+    "schema": "dm",
+    "name": "dm_ltc_plan_order_t",
+    "size": "28 MB"
+  },
+  "dm.dm_ltc_points_pool_test": {
+    "schema": "dm",
+    "name": "dm_ltc_points_pool_test",
+    "size": "8192 bytes"
+  },
+  "dm.dm_ltc_proj_ctrct_rel_t": {
+    "schema": "dm",
+    "name": "dm_ltc_proj_ctrct_rel_t",
+    "size": "9760 KB"
+  },
+  "dm.dm_ltc_review_t": {
+    "schema": "dm",
+    "name": "dm_ltc_review_t",
+    "size": "23 MB"
+  },
+  "dm.dm_ltc_sale_order_t": {
+    "schema": "dm",
+    "name": "dm_ltc_sale_order_t",
+    "size": "239 MB"
+  },
+  "dm.dm_ltc_wbs_item_info_find_t": {
+    "schema": "dm",
+    "name": "dm_ltc_wbs_item_info_find_t",
+    "size": "4080 KB"
+  },
+  "dm.dm_mara_tmp": {
+    "schema": "dm",
+    "name": "dm_mara_tmp",
+    "size": "100 MB"
+  },
+  "dm.dm_marc_tmp": {
+    "schema": "dm",
+    "name": "dm_marc_tmp",
+    "size": "1207 MB"
+  },
+  "dm.dm_mard_tmp": {
+    "schema": "dm",
+    "name": "dm_mard_tmp",
+    "size": "1044 MB"
+  },
+  "dm.dm_md_dept_recent_visit_frreport_t": {
+    "schema": "dm",
+    "name": "dm_md_dept_recent_visit_frreport_t",
+    "size": "408 KB"
+  },
+  "dm.dm_md_emp_recent_visit_frreport_t": {
+    "schema": "dm",
+    "name": "dm_md_emp_recent_visit_frreport_t",
+    "size": "720 KB"
+  },
+  "dm.dm_md_fr_fine_authority_t": {
+    "schema": "dm",
+    "name": "dm_md_fr_fine_authority_t",
+    "size": "1736 MB"
+  },
+  "dm.dm_md_fr_month_stat_t": {
+    "schema": "dm",
+    "name": "dm_md_fr_month_stat_t",
+    "size": "7184 KB"
+  },
+  "dm.dm_md_fr_report_info_t": {
+    "schema": "dm",
+    "name": "dm_md_fr_report_info_t",
+    "size": "192 KB"
+  },
+  "dm.dm_md_fr_stat_ind_t": {
+    "schema": "dm",
+    "name": "dm_md_fr_stat_ind_t",
+    "size": "7232 KB"
+  },
+  "dm.dm_md_frreport_lc_stat_t": {
+    "schema": "dm",
+    "name": "dm_md_frreport_lc_stat_t",
+    "size": "912 KB"
+  },
+  "dm.dm_md_frreport_visit_stat_t": {
+    "schema": "dm",
+    "name": "dm_md_frreport_visit_stat_t",
+    "size": "568 KB"
+  },
+  "dm.dm_md_material_info_t": {
+    "schema": "dm",
+    "name": "dm_md_material_info_t",
+    "size": "2728 KB"
+  },
+  "dm.dm_md_sale_grp_reset_t": {
+    "schema": "dm",
+    "name": "dm_md_sale_grp_reset_t",
+    "size": "768 KB"
+  },
+  "dm.dm_md_system_stat_d": {
+    "schema": "dm",
+    "name": "dm_md_system_stat_d",
+    "size": "734 MB"
+  },
+  "dm.dm_md_wbs_sale_grp_d": {
+    "schema": "dm",
+    "name": "dm_md_wbs_sale_grp_d",
+    "size": "75 MB"
+  },
+  "dm.dm_mos_cust_order_info_t": {
+    "schema": "dm",
+    "name": "dm_mos_cust_order_info_t",
+    "size": "136 MB"
+  },
+  "dm.dm_mos_cust_order_item_info_t": {
+    "schema": "dm",
+    "name": "dm_mos_cust_order_item_info_t",
+    "size": "294 MB"
+  },
+  "dm.dm_mos_cust_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_mos_cust_order_stat_t",
+    "size": "84 MB"
+  },
+  "dm.dm_mos_cust_order_title_t": {
+    "schema": "dm",
+    "name": "dm_mos_cust_order_title_t",
+    "size": "328 KB"
+  },
+  "dm.dm_mos_cust_stat_t": {
+    "schema": "dm",
+    "name": "dm_mos_cust_stat_t",
+    "size": "448 KB"
+  },
+  "dm.dm_mos_dxbz_org_tree_t": {
+    "schema": "dm",
+    "name": "dm_mos_dxbz_org_tree_t",
+    "size": "360 KB"
+  },
+  "dm.dm_mvke_tmp": {
+    "schema": "dm",
+    "name": "dm_mvke_tmp",
+    "size": "1747 MB"
+  },
+  "dm.dm_new_product_amt_t": {
+    "schema": "dm",
+    "name": "dm_new_product_amt_t",
+    "size": "56 KB"
+  },
+  "dm.dm_north_indexlibrary": {
+    "schema": "dm",
+    "name": "dm_north_indexlibrary",
+    "size": "0 bytes"
+  },
+  "dm.dm_north_sm_t": {
+    "schema": "dm",
+    "name": "dm_north_sm_t",
+    "size": "70 MB"
+  },
+  "dm.dm_north_sm_t_20260604": {
+    "schema": "dm",
+    "name": "dm_north_sm_t_20260604",
+    "size": "624 KB"
+  },
+  "dm.dm_oa_car_use_evaluate_t": {
+    "schema": "dm",
+    "name": "dm_oa_car_use_evaluate_t",
+    "size": "456 KB"
+  },
+  "dm.dm_oa_logistics_maintenance_t": {
+    "schema": "dm",
+    "name": "dm_oa_logistics_maintenance_t",
+    "size": "1224 KB"
+  },
+  "dm.dm_oa_uf_indexlibrary_t": {
+    "schema": "dm",
+    "name": "dm_oa_uf_indexlibrary_t",
+    "size": "712 KB"
+  },
+  "dm.dm_office_supplies_purchase_flow_t": {
+    "schema": "dm",
+    "name": "dm_office_supplies_purchase_flow_t",
+    "size": "768 KB"
+  },
+  "dm.dm_oms_top10_achievement_t": {
+    "schema": "dm",
+    "name": "dm_oms_top10_achievement_t",
+    "size": "29 MB"
+  },
+  "dm.dm_oms_user_daily_d": {
+    "schema": "dm",
+    "name": "dm_oms_user_daily_d",
+    "size": "208 KB"
+  },
+  "dm.dm_oms_user_daily_d_wjh_20251017": {
+    "schema": "dm",
+    "name": "dm_oms_user_daily_d_wjh_20251017",
+    "size": "72 KB"
+  },
+  "dm.dm_oms_user_monthly_d": {
+    "schema": "dm",
+    "name": "dm_oms_user_monthly_d",
+    "size": "16 KB"
+  },
+  "dm.dm_oms_user_monthly_d_wjh_20251017": {
+    "schema": "dm",
+    "name": "dm_oms_user_monthly_d_wjh_20251017",
+    "size": "16 KB"
+  },
+  "dm.dm_oms_user_monthly_d_wjh_260107": {
+    "schema": "dm",
+    "name": "dm_oms_user_monthly_d_wjh_260107",
+    "size": "16 KB"
+  },
+  "dm.dm_operat_profit_statement_t": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t",
+    "size": "2363 MB"
+  },
+  "dm.dm_operat_profit_statement_t_20260429_qyj": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_20260429_qyj",
+    "size": "26 MB"
+  },
+  "dm.dm_operat_profit_statement_t_20260505_qyj": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_20260505_qyj",
+    "size": "26 MB"
+  },
+  "dm.dm_operat_profit_statement_t_wjh_20251010": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_wjh_20251010",
+    "size": "111 MB"
+  },
+  "dm.dm_operat_profit_statement_t_wjh_20260304": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_wjh_20260304",
+    "size": "125 MB"
+  },
+  "dm.dm_operat_profit_statement_t_wjh_260115": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_wjh_260115",
+    "size": "120 MB"
+  },
+  "dm.dm_operat_profit_statement_t_wjh_260402": {
+    "schema": "dm",
+    "name": "dm_operat_profit_statement_t_wjh_260402",
+    "size": "135 MB"
+  },
+  "dm.dm_order_deliver_day_report": {
+    "schema": "dm",
+    "name": "dm_order_deliver_day_report",
+    "size": "354 MB"
+  },
+  "dm.dm_org_structure_entwechat_d": {
+    "schema": "dm",
+    "name": "dm_org_structure_entwechat_d",
+    "size": "115 MB"
+  },
+  "dm.dm_org_structure_entwechat_d_test": {
+    "schema": "dm",
+    "name": "dm_org_structure_entwechat_d_test",
+    "size": "3128 KB"
+  },
+  "dm.dm_org_structure_tiled_d": {
+    "schema": "dm",
+    "name": "dm_org_structure_tiled_d",
+    "size": "130 MB"
+  },
+  "dm.dm_org_structure_tiled_d_test": {
+    "schema": "dm",
+    "name": "dm_org_structure_tiled_d_test",
+    "size": "3632 KB"
+  },
+  "dm.dm_original_product_inout_stock_hunan_t": {
+    "schema": "dm",
+    "name": "dm_original_product_inout_stock_hunan_t",
+    "size": "308 MB"
+  },
+  "dm.dm_oss_use_power_t": {
+    "schema": "dm",
+    "name": "dm_oss_use_power_t",
+    "size": "3512 KB"
+  },
+  "dm.dm_otd_area_delivery_detail_m": {
+    "schema": "dm",
+    "name": "dm_otd_area_delivery_detail_m",
+    "size": "1551 MB"
+  },
+  "dm.dm_otd_no_deliver_order_dtl": {
+    "schema": "dm",
+    "name": "dm_otd_no_deliver_order_dtl",
+    "size": "752 KB"
+  },
+  "dm.dm_otd_sales_order_det_t": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_det_t",
+    "size": "1123 MB"
+  },
+  "dm.dm_otd_sales_order_overview_current_d": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_overview_current_d",
+    "size": "651 MB"
+  },
+  "dm.dm_otd_sales_order_overview_current_m": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_overview_current_m",
+    "size": "32 MB"
+  },
+  "dm.dm_otd_sales_order_overview_m": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_overview_m",
+    "size": "5160 KB"
+  },
+  "dm.dm_otd_sales_order_overview_m_fin": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_overview_m_fin",
+    "size": "79 MB"
+  },
+  "dm.dm_otd_sales_order_timespan_m": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_timespan_m",
+    "size": "50 MB"
+  },
+  "dm.dm_otd_sales_order_timespan_m_260416_wjh": {
+    "schema": "dm",
+    "name": "dm_otd_sales_order_timespan_m_260416_wjh",
+    "size": "860 MB"
+  },
+  "dm.dm_otd_sku_manage_analyse_m": {
+    "schema": "dm",
+    "name": "dm_otd_sku_manage_analyse_m",
+    "size": "0 bytes"
+  },
+  "dm.dm_otd_so_order_not_user_t": {
+    "schema": "dm",
+    "name": "dm_otd_so_order_not_user_t",
+    "size": "846 MB"
+  },
+  "dm.dm_otd_so_res_stock_dtl": {
+    "schema": "dm",
+    "name": "dm_otd_so_res_stock_dtl",
+    "size": "109 MB"
+  },
+  "dm.dm_otd_wbs_plan_order_det_t": {
+    "schema": "dm",
+    "name": "dm_otd_wbs_plan_order_det_t",
+    "size": "22 MB"
+  },
+  "dm.dm_otd_wbs_stock_detail": {
+    "schema": "dm",
+    "name": "dm_otd_wbs_stock_detail",
+    "size": "8928 KB"
+  },
+  "dm.dm_otd_wm_stock_stat_month_t": {
+    "schema": "dm",
+    "name": "dm_otd_wm_stock_stat_month_t",
+    "size": "1840 MB"
+  },
+  "dm.dm_otd_wm_stock_turnover_m": {
+    "schema": "dm",
+    "name": "dm_otd_wm_stock_turnover_m",
+    "size": "1112 KB"
+  },
+  "dm.dm_own_inventory_t": {
+    "schema": "dm",
+    "name": "dm_own_inventory_t",
+    "size": "5721 MB"
+  },
+  "dm.dm_own_inventory_t_tmp": {
+    "schema": "dm",
+    "name": "dm_own_inventory_t_tmp",
+    "size": "90 MB"
+  },
+  "dm.dm_own_inventory_t_tmp2": {
+    "schema": "dm",
+    "name": "dm_own_inventory_t_tmp2",
+    "size": "86 MB"
+  },
+  "dm.dm_own_vs_oem_cost_t": {
+    "schema": "dm",
+    "name": "dm_own_vs_oem_cost_t",
+    "size": "31 MB"
+  },
+  "dm.dm_pam_base_capacity_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_capacity_t",
+    "size": "118 MB"
+  },
+  "dm.dm_pam_base_cost_detail_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_cost_detail_t",
+    "size": "111 MB"
+  },
+  "dm.dm_pam_base_divideyield_s": {
+    "schema": "dm",
+    "name": "dm_pam_base_divideyield_s",
+    "size": "605 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t",
+    "size": "265 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t0619": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t0619",
+    "size": "54 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t0708": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t0708",
+    "size": "36 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t20240815": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t20240815",
+    "size": "42 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t20240826": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t20240826",
+    "size": "43 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t20240903": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t20240903",
+    "size": "45 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0613": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0613",
+    "size": "105 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0618": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0618",
+    "size": "155 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0620": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0620",
+    "size": "54 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0621": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0621",
+    "size": "33 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0624": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0624",
+    "size": "33 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0625": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0625",
+    "size": "33 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_0629": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_0629",
+    "size": "33 MB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_bak052301": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_bak052301",
+    "size": "408 KB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_bak052401": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_bak052401",
+    "size": "1456 KB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_bak052402": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_bak052402",
+    "size": "1456 KB"
+  },
+  "dm.dm_pam_base_energyconsume_d_t_test": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_d_t_test",
+    "size": "576 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t",
+    "size": "111 MB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t0701": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t0701",
+    "size": "1256 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t0708": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t0708",
+    "size": "1424 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t0912": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t0912",
+    "size": "1784 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t20240815": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t20240815",
+    "size": "1608 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t20240826": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t20240826",
+    "size": "1608 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t20240903": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t20240903",
+    "size": "1784 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0613": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0613",
+    "size": "3704 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0618": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0618",
+    "size": "5160 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0620": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0620",
+    "size": "1848 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0621": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0621",
+    "size": "1144 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0624": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0624",
+    "size": "1136 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0625": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0625",
+    "size": "1136 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0626": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0626",
+    "size": "1112 KB"
+  },
+  "dm.dm_pam_base_energyconsume_m_t_0629": {
+    "schema": "dm",
+    "name": "dm_pam_base_energyconsume_m_t_0629",
+    "size": "1120 KB"
+  },
+  "dm.dm_pam_base_grade_work_no_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_grade_work_no_t",
+    "size": "56 KB"
+  },
+  "dm.dm_pam_base_lockout_cost_rec_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_lockout_cost_rec_t",
+    "size": "105 MB"
+  },
+  "dm.dm_pam_base_lockout_deg_loss_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_lockout_deg_loss_t",
+    "size": "168 KB"
+  },
+  "dm.dm_pam_base_non_prod_lockout_fee_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_non_prod_lockout_fee_t",
+    "size": "12 MB"
+  },
+  "dm.dm_pam_base_prod_daily_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_prod_daily_t",
+    "size": "307 MB"
+  },
+  "dm.dm_pam_base_prod_daily_t_20240823bak": {
+    "schema": "dm",
+    "name": "dm_pam_base_prod_daily_t_20240823bak",
+    "size": "7104 KB"
+  },
+  "dm.dm_pam_base_prod_daily_t_20241214bak": {
+    "schema": "dm",
+    "name": "dm_pam_base_prod_daily_t_20241214bak",
+    "size": "30 MB"
+  },
+  "dm.dm_pam_base_prod_lockout_fee_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_prod_lockout_fee_t",
+    "size": "4376 KB"
+  },
+  "dm.dm_pam_base_prod_month_s": {
+    "schema": "dm",
+    "name": "dm_pam_base_prod_month_s",
+    "size": "3496 KB"
+  },
+  "dm.dm_pam_base_spr_lockout_cost_rec_t": {
+    "schema": "dm",
+    "name": "dm_pam_base_spr_lockout_cost_rec_t",
+    "size": "3216 KB"
+  },
+  "dm.dm_pam_cq_base_prod_daily_t": {
+    "schema": "dm",
+    "name": "dm_pam_cq_base_prod_daily_t",
+    "size": "16 MB"
+  },
+  "dm.dm_pam_energy_conversion_coefficient_t": {
+    "schema": "dm",
+    "name": "dm_pam_energy_conversion_coefficient_t",
+    "size": "8192 bytes"
+  },
+  "dm.dm_pam_energyconsume_target_t": {
+    "schema": "dm",
+    "name": "dm_pam_energyconsume_target_t",
+    "size": "8192 bytes"
+  },
+  "dm.dm_pam_energyconsume_target_t0704": {
+    "schema": "dm",
+    "name": "dm_pam_energyconsume_target_t0704",
+    "size": "8192 bytes"
+  },
+  "dm.dm_pam_energyconsume_target_t20240826": {
+    "schema": "dm",
+    "name": "dm_pam_energyconsume_target_t20240826",
+    "size": "8192 bytes"
+  },
+  "dm.dm_pam_energyconsume_target_t_bak": {
+    "schema": "dm",
+    "name": "dm_pam_energyconsume_target_t_bak",
+    "size": "8192 bytes"
+  },
+  "dm.dm_pam_hn_base_prod_daily_t": {
+    "schema": "dm",
+    "name": "dm_pam_hn_base_prod_daily_t",
+    "size": "16 KB"
+  },
+  "dm.dm_pam_jx_base_energy_use_daily_t": {
+    "schema": "dm",
+    "name": "dm_pam_jx_base_energy_use_daily_t",
+    "size": "1384 KB"
+  },
+  "dm.dm_pam_lockout_cost_price_month": {
+    "schema": "dm",
+    "name": "dm_pam_lockout_cost_price_month",
+    "size": "96 KB"
+  },
+  "dm.dm_pam_lockout_cost_price_t": {
+    "schema": "dm",
+    "name": "dm_pam_lockout_cost_price_t",
+    "size": "4848 KB"
+  },
+  "dm.dm_pam_lockout_spr_cost_price_t": {
+    "schema": "dm",
+    "name": "dm_pam_lockout_spr_cost_price_t",
+    "size": "4848 KB"
+  },
+  "dm.dm_pam_lockout_spr_unit_price_month": {
+    "schema": "dm",
+    "name": "dm_pam_lockout_spr_unit_price_month",
+    "size": "80 KB"
+  },
+  "dm.dm_pam_make_preparedelivery_t": {
+    "schema": "dm",
+    "name": "dm_pam_make_preparedelivery_t",
+    "size": "206 MB"
+  },
+  "dm.dm_pam_production_target_maintenance_table_t": {
+    "schema": "dm",
+    "name": "dm_pam_production_target_maintenance_table_t",
+    "size": "72 KB"
+  },
+  "dm.dm_pam_standard_manage_t": {
+    "schema": "dm",
+    "name": "dm_pam_standard_manage_t",
+    "size": "56 KB"
+  },
+  "dm.dm_pdm_fleeing_inspection_1040": {
+    "schema": "dm",
+    "name": "dm_pdm_fleeing_inspection_1040",
+    "size": "24 KB"
+  },
+  "dm.dm_performance_chart_s": {
+    "schema": "dm",
+    "name": "dm_performance_chart_s",
+    "size": "401 MB"
+  },
+  "dm.dm_product_area_d": {
+    "schema": "dm",
+    "name": "dm_product_area_d",
+    "size": "216 KB"
+  },
+  "dm.dm_product_inout_stock_hunan_t": {
+    "schema": "dm",
+    "name": "dm_product_inout_stock_hunan_t",
+    "size": "106 MB"
+  },
+  "dm.dm_product_inout_stock_t": {
+    "schema": "dm",
+    "name": "dm_product_inout_stock_t",
+    "size": "186 MB"
+  },
+  "dm.dm_product_level_co_rank_t": {
+    "schema": "dm",
+    "name": "dm_product_level_co_rank_t",
+    "size": "144 KB"
+  },
+  "dm.dm_profit_forecast_fill_t": {
+    "schema": "dm",
+    "name": "dm_profit_forecast_fill_t",
+    "size": "2144 KB"
+  },
+  "dm.dm_profit_forecast_fill_t_wjh_260304": {
+    "schema": "dm",
+    "name": "dm_profit_forecast_fill_t_wjh_260304",
+    "size": "16 KB"
+  },
+  "dm.dm_proj_profit_search_t": {
+    "schema": "dm",
+    "name": "dm_proj_profit_search_t",
+    "size": "116 MB"
+  },
+  "dm.dm_ps_base_quasi_delivery_t": {
+    "schema": "dm",
+    "name": "dm_ps_base_quasi_delivery_t",
+    "size": "32 MB"
+  },
+  "dm.dm_ps_base_quasi_delivery_t_bak20240528": {
+    "schema": "dm",
+    "name": "dm_ps_base_quasi_delivery_t_bak20240528",
+    "size": "16 MB"
+  },
+  "dm.dm_ps_base_quasi_delivery_t_test20250211": {
+    "schema": "dm",
+    "name": "dm_ps_base_quasi_delivery_t_test20250211",
+    "size": "20 MB"
+  },
+  "dm.dm_ps_base_quasi_delivery_tmp": {
+    "schema": "dm",
+    "name": "dm_ps_base_quasi_delivery_tmp",
+    "size": "7872 KB"
+  },
+  "dm.dm_ps_oem_purchase_t": {
+    "schema": "dm",
+    "name": "dm_ps_oem_purchase_t",
+    "size": "624 KB"
+  },
+  "dm.dm_ps_order_plan_t": {
+    "schema": "dm",
+    "name": "dm_ps_order_plan_t",
+    "size": "8372 MB"
+  },
+  "dm.dm_ps_order_plan_t_tmp": {
+    "schema": "dm",
+    "name": "dm_ps_order_plan_t_tmp",
+    "size": "44 MB"
+  },
+  "dm.dm_ps_prcs_prch_plan_t": {
+    "schema": "dm",
+    "name": "dm_ps_prcs_prch_plan_t",
+    "size": "9616 KB"
+  },
+  "dm.dm_ps_purchase_plan_dtl_t": {
+    "schema": "dm",
+    "name": "dm_ps_purchase_plan_dtl_t",
+    "size": "18 MB"
+  },
+  "dm.dm_ps_purchase_plan_dtl_tmp": {
+    "schema": "dm",
+    "name": "dm_ps_purchase_plan_dtl_tmp",
+    "size": "13 MB"
+  },
+  "dm.dm_ps_sale_order_blan_t": {
+    "schema": "dm",
+    "name": "dm_ps_sale_order_blan_t",
+    "size": "13 GB"
+  },
+  "dm.dm_ps_sale_order_blan_tmp": {
+    "schema": "dm",
+    "name": "dm_ps_sale_order_blan_tmp",
+    "size": "69 MB"
+  },
+  "dm.dm_pur_order_zj_pre_t": {
+    "schema": "dm",
+    "name": "dm_pur_order_zj_pre_t",
+    "size": "12 MB"
+  },
+  "dm.dm_pur_order_zj_pre_t_20230428": {
+    "schema": "dm",
+    "name": "dm_pur_order_zj_pre_t_20230428",
+    "size": "736 KB"
+  },
+  "dm.dm_pur_order_zj_pre_t_bak_20221225": {
+    "schema": "dm",
+    "name": "dm_pur_order_zj_pre_t_bak_20221225",
+    "size": "512 KB"
+  },
+  "dm.dm_px_cust_rel_t": {
+    "schema": "dm",
+    "name": "dm_px_cust_rel_t",
+    "size": "3640 KB"
+  },
+  "dm.dm_px_cust_stat_t": {
+    "schema": "dm",
+    "name": "dm_px_cust_stat_t",
+    "size": "246 MB"
+  },
+  "dm.dm_recognize_qty": {
+    "schema": "dm",
+    "name": "dm_recognize_qty",
+    "size": "968 KB"
+  },
+  "dm.dm_recognize_rate": {
+    "schema": "dm",
+    "name": "dm_recognize_rate",
+    "size": "160 KB"
+  },
+  "dm.dm_recognize_rate_t": {
+    "schema": "dm",
+    "name": "dm_recognize_rate_t",
+    "size": "24 KB"
+  },
+  "dm.dm_recognize_rate_t1": {
+    "schema": "dm",
+    "name": "dm_recognize_rate_t1",
+    "size": "24 KB"
+  },
+  "dm.dm_recognize_rate_v2": {
+    "schema": "dm",
+    "name": "dm_recognize_rate_v2",
+    "size": "352 KB"
+  },
+  "dm.dm_recvplandtl_f": {
+    "schema": "dm",
+    "name": "dm_recvplandtl_f",
+    "size": "576 KB"
+  },
+  "dm.dm_restaurant_order_flow_t": {
+    "schema": "dm",
+    "name": "dm_restaurant_order_flow_t",
+    "size": "1960 KB"
+  },
+  "dm.dm_rm_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_rm_order_stat_t",
+    "size": "39 MB"
+  },
+  "dm.dm_rm_order_stat_t_20240320": {
+    "schema": "dm",
+    "name": "dm_rm_order_stat_t_20240320",
+    "size": "24 KB"
+  },
+  "dm.dm_rm_order_stat_t_bak20240223": {
+    "schema": "dm",
+    "name": "dm_rm_order_stat_t_bak20240223",
+    "size": "40 KB"
+  },
+  "dm.dm_rm_order_stat_t_bak20250304": {
+    "schema": "dm",
+    "name": "dm_rm_order_stat_t_bak20250304",
+    "size": "6624 KB"
+  },
+  "dm.dm_rm_order_stat_t_bak20250311": {
+    "schema": "dm",
+    "name": "dm_rm_order_stat_t_bak20250311",
+    "size": "6608 KB"
+  },
+  "dm.dm_rpt_azmsd_o2251_t": {
+    "schema": "dm",
+    "name": "dm_rpt_azmsd_o2251_t",
+    "size": "293 MB"
+  },
+  "dm.dm_rpt_b1_operation_center_t": {
+    "schema": "dm",
+    "name": "dm_rpt_b1_operation_center_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bathroom_amb_sales_data_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_amb_sales_data_t",
+    "size": "857 MB"
+  },
+  "dm.dm_rpt_bathroom_amb_sales_data_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_amb_sales_data_t_01",
+    "size": "842 MB"
+  },
+  "dm.dm_rpt_bathroom_commercial_center_sales_report_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_commercial_center_sales_report_t",
+    "size": "84 MB"
+  },
+  "dm.dm_rpt_bathroom_commercial_center_sales_report_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_commercial_center_sales_report_t_01",
+    "size": "307 MB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s",
+    "size": "104 MB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s_20240622_wjh": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s_20240622_wjh",
+    "size": "363 MB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s_20240628_wjh": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s_20240628_wjh",
+    "size": "367 MB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s_bak0304": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s_bak0304",
+    "size": "348 MB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s_tmp": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s_tmp",
+    "size": "10112 KB"
+  },
+  "dm.dm_rpt_bathroom_prodsales_s_tmp1": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_prodsales_s_tmp1",
+    "size": "2344 KB"
+  },
+  "dm.dm_rpt_bathroom_risk_inventory_list": {
+    "schema": "dm",
+    "name": "dm_rpt_bathroom_risk_inventory_list",
+    "size": "1280 KB"
+  },
+  "dm.dm_rpt_bi0_hcostcenter_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_hcostcenter_t",
+    "size": "27 MB"
+  },
+  "dm.dm_rpt_bi0_hgl_account_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_hgl_account_t",
+    "size": "416 KB"
+  },
+  "dm.dm_rpt_bi0_hsales_grp_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_hsales_grp_t",
+    "size": "5104 KB"
+  },
+  "dm.dm_rpt_bi0_hsales_grp_t20240301": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_hsales_grp_t20240301",
+    "size": "3960 KB"
+  },
+  "dm.dm_rpt_bi0_hsales_grp_t_2024_wu": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_hsales_grp_t_2024_wu",
+    "size": "3896 KB"
+  },
+  "dm.dm_rpt_bi0_pmaterial_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_pmaterial_t",
+    "size": "77 MB"
+  },
+  "dm.dm_rpt_bi0_psales_grp_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_psales_grp_t",
+    "size": "216 KB"
+  },
+  "dm.dm_rpt_bi0_pwbs_elemt_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_pwbs_elemt_t",
+    "size": "424 MB"
+  },
+  "dm.dm_rpt_bi0_qcostcenter_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_qcostcenter_t",
+    "size": "2016 KB"
+  },
+  "dm.dm_rpt_bi0_tcomp_code_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tcomp_code_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tcostcenter_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tcostcenter_t",
+    "size": "9752 KB"
+  },
+  "dm.dm_rpt_bi0_tcustomer_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tcustomer_t",
+    "size": "2144 KB"
+  },
+  "dm.dm_rpt_bi0_tdistr_chan_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tdistr_chan_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tdivision_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tdivision_t",
+    "size": "16 KB"
+  },
+  "dm.dm_rpt_bi0_tgl_account_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tgl_account_t",
+    "size": "3888 KB"
+  },
+  "dm.dm_rpt_bi0_tmaterial_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tmaterial_t",
+    "size": "44 MB"
+  },
+  "dm.dm_rpt_bi0_tmatl_group_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tmatl_group_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tmatl_grp_1_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tmatl_grp_1_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tmatl_grp_2_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tmatl_grp_2_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tplant_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tplant_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tsales_grp_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tsales_grp_t",
+    "size": "240 KB"
+  },
+  "dm.dm_rpt_bi0_tsales_grp_t20240301": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tsales_grp_t20240301",
+    "size": "224 KB"
+  },
+  "dm.dm_rpt_bi0_tsales_off_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tsales_off_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bi0_tsalesorg_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tsalesorg_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bi0_tstor_loc_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_tstor_loc_t",
+    "size": "240 KB"
+  },
+  "dm.dm_rpt_bi0_twbs_elemt_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bi0_twbs_elemt_t",
+    "size": "122 MB"
+  },
+  "dm.dm_rpt_bic_azcopad032_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azcopad032_t",
+    "size": "1876 MB"
+  },
+  "dm.dm_rpt_bic_azcopad052_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azcopad052_t",
+    "size": "18 MB"
+  },
+  "dm.dm_rpt_bic_azeam_o0132_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azeam_o0132_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_azegy_o0042_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azegy_o0042_t",
+    "size": "112 KB"
+  },
+  "dm.dm_rpt_bic_azemm_o0032_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azemm_o0032_t",
+    "size": "139 MB"
+  },
+  "dm.dm_rpt_bic_azesd_o0592_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azesd_o0592_t",
+    "size": "17 MB"
+  },
+  "dm.dm_rpt_bic_azfisgd022_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azfisgd022_t",
+    "size": "5552 KB"
+  },
+  "dm.dm_rpt_bic_azmam_o0042_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmam_o0042_t",
+    "size": "120 KB"
+  },
+  "dm.dm_rpt_bic_azmam_o0062_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmam_o0062_t",
+    "size": "256 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0072_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0072_t",
+    "size": "48 MB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0101_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0101_t",
+    "size": "15 MB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0112_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0112_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0121_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0121_t",
+    "size": "48 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0122_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0122_t",
+    "size": "271 MB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0141_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0141_t",
+    "size": "792 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0152_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0152_t",
+    "size": "10184 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0201_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0201_t",
+    "size": "2904 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o0212_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o0212_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o2121_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o2121_t",
+    "size": "1152 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o2131_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o2131_t",
+    "size": "1104 KB"
+  },
+  "dm.dm_rpt_bic_azmfi_o3041_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmfi_o3041_t",
+    "size": "137 MB"
+  },
+  "dm.dm_rpt_bic_azmmm_o0091": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmmm_o0091",
+    "size": "47 MB"
+  },
+  "dm.dm_rpt_bic_azmmm_o0101_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmmm_o0101_t",
+    "size": "11 GB"
+  },
+  "dm.dm_rpt_bic_azmmm_o0111_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmmm_o0111_t",
+    "size": "2075 MB"
+  },
+  "dm.dm_rpt_bic_azmmm_o0121_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmmm_o0121_t",
+    "size": "7784 KB"
+  },
+  "dm.dm_rpt_bic_azmmm_o2081_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmmm_o2081_t",
+    "size": "1080 KB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0172_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0172_t",
+    "size": "812 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0202_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0202_t",
+    "size": "2348 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0202_t_20230304": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0202_t_20230304",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0231_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0231_t",
+    "size": "552 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0251_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0251_t",
+    "size": "15 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o0272_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o0272_t",
+    "size": "1992 KB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2281_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2281_t",
+    "size": "679 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2292_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2292_t",
+    "size": "4376 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2292_t0715": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2292_t0715",
+    "size": "20 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2292_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2292_t_01",
+    "size": "3971 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2302_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2302_t",
+    "size": "600 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2312_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2312_t",
+    "size": "3054 MB"
+  },
+  "dm.dm_rpt_bic_azmsd_o2312_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azmsd_o2312_t_01",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azsfi_o0042_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azsfi_o0042_t",
+    "size": "158 MB"
+  },
+  "dm.dm_rpt_bic_azsfi_o0252_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azsfi_o0252_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azsfi_o0342_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azsfi_o0342_t",
+    "size": "488 KB"
+  },
+  "dm.dm_rpt_bic_azsmm_o0012_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azsmm_o0012_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_bic_azssd_o0042_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0042_t",
+    "size": "53 MB"
+  },
+  "dm.dm_rpt_bic_azssd_o0052_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0052_t",
+    "size": "1634 MB"
+  },
+  "dm.dm_rpt_bic_azssd_o0082_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0082_t",
+    "size": "1776 KB"
+  },
+  "dm.dm_rpt_bic_azssd_o0182_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0182_t",
+    "size": "644 MB"
+  },
+  "dm.dm_rpt_bic_azssd_o0282_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0282_t",
+    "size": "11 MB"
+  },
+  "dm.dm_rpt_bic_azssd_o0312_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_azssd_o0312_t",
+    "size": "9888 KB"
+  },
+  "dm.dm_rpt_bic_hzprodh2_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_hzprodh2_t",
+    "size": "168 KB"
+  },
+  "dm.dm_rpt_bic_hzprodh3_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_hzprodh3_t",
+    "size": "848 KB"
+  },
+  "dm.dm_rpt_bic_pzambbatch_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_pzambbatch_t",
+    "size": "150 MB"
+  },
+  "dm.dm_rpt_bic_pzambcpbm_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_pzambcpbm_t",
+    "size": "35 MB"
+  },
+  "dm.dm_rpt_bic_pzbatchmd_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_pzbatchmd_t",
+    "size": "170 MB"
+  },
+  "dm.dm_rpt_bic_pzcustcomp_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_pzcustcomp_t",
+    "size": "19 MB"
+  },
+  "dm.dm_rpt_bic_pzcustsale_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_pzcustsale_t",
+    "size": "5768 KB"
+  },
+  "dm.dm_rpt_bic_tza_jdamb_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tza_jdamb_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_tzdpsyb_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzdpsyb_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_tzdpxt_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzdpxt_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_tzdpzgsdq_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzdpzgsdq_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_tzprodh1_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzprodh1_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_bic_tzprodh2_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzprodh2_t",
+    "size": "32 KB"
+  },
+  "dm.dm_rpt_bic_tzprodh3_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzprodh3_t",
+    "size": "752 KB"
+  },
+  "dm.dm_rpt_bic_tzprodh4_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzprodh4_t",
+    "size": "856 KB"
+  },
+  "dm.dm_rpt_bic_tzzyqd_t": {
+    "schema": "dm",
+    "name": "dm_rpt_bic_tzzyqd_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_cabinet_with_basin_t": {
+    "schema": "dm",
+    "name": "dm_rpt_cabinet_with_basin_t",
+    "size": "32 KB"
+  },
+  "dm.dm_rpt_category_budget_t": {
+    "schema": "dm",
+    "name": "dm_rpt_category_budget_t",
+    "size": "888 KB"
+  },
+  "dm.dm_rpt_cost_chart_s": {
+    "schema": "dm",
+    "name": "dm_rpt_cost_chart_s",
+    "size": "4351 MB"
+  },
+  "dm.dm_rpt_cost_gl_subject_t": {
+    "schema": "dm",
+    "name": "dm_rpt_cost_gl_subject_t",
+    "size": "696 KB"
+  },
+  "dm.dm_rpt_ct_1plusn_roll_plan_list_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_1plusn_roll_plan_list_t",
+    "size": "246 MB"
+  },
+  "dm.dm_rpt_ct_achievement_amb_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_achievement_amb_t",
+    "size": "216 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_2023_group_caliber_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_2023_group_caliber_t",
+    "size": "438 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_2023_group_caliber_t_040": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_2023_group_caliber_t_040",
+    "size": "20 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_2023_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_2023_t",
+    "size": "341 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_2023_test_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_2023_test_t",
+    "size": "14 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_dealer_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_dealer_t",
+    "size": "519 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_engineeringdesign_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_engineeringdesign_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_retaildesign_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_retaildesign_t",
+    "size": "31 MB"
+  },
+  "dm.dm_rpt_ct_department_sales_performance_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_department_sales_performance_t",
+    "size": "100 MB"
+  },
+  "dm.dm_rpt_ct_profit_t": {
+    "schema": "dm",
+    "name": "dm_rpt_ct_profit_t",
+    "size": "1920 KB"
+  },
+  "dm.dm_rpt_dealer_instock_t": {
+    "schema": "dm",
+    "name": "dm_rpt_dealer_instock_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_demand_forecast_deliver_t": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_deliver_t",
+    "size": "72 MB"
+  },
+  "dm.dm_rpt_demand_forecast_material_t": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_material_t",
+    "size": "168 MB"
+  },
+  "dm.dm_rpt_demand_forecast_t": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_t",
+    "size": "72 MB"
+  },
+  "dm.dm_rpt_demand_forecast_t_20230418": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_t_20230418",
+    "size": "3320 KB"
+  },
+  "dm.dm_rpt_demand_forecast_t_2025": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_t_2025",
+    "size": "94 MB"
+  },
+  "dm.dm_rpt_demand_forecast_target_t": {
+    "schema": "dm",
+    "name": "dm_rpt_demand_forecast_target_t",
+    "size": "0 bytes"
+  },
+  "dm.dm_rpt_dept_structure_t": {
+    "schema": "dm",
+    "name": "dm_rpt_dept_structure_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_forecast_data_t": {
+    "schema": "dm",
+    "name": "dm_rpt_forecast_data_t",
+    "size": "48 KB"
+  },
+  "dm.dm_rpt_group_achievement_amb_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_achievement_amb_t",
+    "size": "1853 MB"
+  },
+  "dm.dm_rpt_group_achievement_amb_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_group_achievement_amb_t_01",
+    "size": "10047 MB"
+  },
+  "dm.dm_rpt_group_achievement_amb_t_bak_1000002384": {
+    "schema": "dm",
+    "name": "dm_rpt_group_achievement_amb_t_bak_1000002384",
+    "size": "88 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_2023_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_2023_t",
+    "size": "3504 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_dimension_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_dimension_t",
+    "size": "400 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_t",
+    "size": "43 MB"
+  },
+  "dm.dm_rpt_group_daily_paper_target": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_target",
+    "size": "152 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_target_lastyear_month2022_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_target_lastyear_month2022_t",
+    "size": "11 MB"
+  },
+  "dm.dm_rpt_group_daily_paper_target_lastyear_month_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_target_lastyear_month_t",
+    "size": "9832 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_targetmonth_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_targetmonth_t",
+    "size": "8048 KB"
+  },
+  "dm.dm_rpt_group_daily_paper_targetyear_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_daily_paper_targetyear_t",
+    "size": "8040 KB"
+  },
+  "dm.dm_rpt_group_prodlevel3_t": {
+    "schema": "dm",
+    "name": "dm_rpt_group_prodlevel3_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_mastersale_prod_t": {
+    "schema": "dm",
+    "name": "dm_rpt_mastersale_prod_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_masteseries_prod_t": {
+    "schema": "dm",
+    "name": "dm_rpt_masteseries_prod_t",
+    "size": "40 KB"
+  },
+  "dm.dm_rpt_nodp_material_flag_t": {
+    "schema": "dm",
+    "name": "dm_rpt_nodp_material_flag_t",
+    "size": "680 KB"
+  },
+  "dm.dm_rpt_nodp_material_list_t": {
+    "schema": "dm",
+    "name": "dm_rpt_nodp_material_list_t",
+    "size": "1040 KB"
+  },
+  "dm.dm_rpt_parts_category_t": {
+    "schema": "dm",
+    "name": "dm_rpt_parts_category_t",
+    "size": "16 KB"
+  },
+  "dm.dm_rpt_pjobect_adpay_t": {
+    "schema": "dm",
+    "name": "dm_rpt_pjobect_adpay_t",
+    "size": "144 MB"
+  },
+  "dm.dm_rpt_prod_category_t": {
+    "schema": "dm",
+    "name": "dm_rpt_prod_category_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_prod_channel_t": {
+    "schema": "dm",
+    "name": "dm_rpt_prod_channel_t",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_prod_level_t": {
+    "schema": "dm",
+    "name": "dm_rpt_prod_level_t",
+    "size": "160 KB"
+  },
+  "dm.dm_rpt_prod_level_t_bak20230306": {
+    "schema": "dm",
+    "name": "dm_rpt_prod_level_t_bak20230306",
+    "size": "144 KB"
+  },
+  "dm.dm_rpt_prodline_class_t": {
+    "schema": "dm",
+    "name": "dm_rpt_prodline_class_t",
+    "size": "536 KB"
+  },
+  "dm.dm_rpt_product_budget_t": {
+    "schema": "dm",
+    "name": "dm_rpt_product_budget_t",
+    "size": "8336 KB"
+  },
+  "dm.dm_rpt_product_budget_tmp": {
+    "schema": "dm",
+    "name": "dm_rpt_product_budget_tmp",
+    "size": "1176 KB"
+  },
+  "dm.dm_rpt_receivable_devalue_close_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_devalue_close_t",
+    "size": "73 MB"
+  },
+  "dm.dm_rpt_receivable_devalue_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_devalue_t",
+    "size": "28 MB"
+  },
+  "dm.dm_rpt_receivable_quota_close_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_close_t",
+    "size": "106 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_af14d_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_af14d_t",
+    "size": "2705 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_af15d_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_af15d_t",
+    "size": "10085 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_af30d_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_af30d_t",
+    "size": "10064 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_af6d_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_af6d_t",
+    "size": "2711 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_af7d_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_af7d_t",
+    "size": "10066 MB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_t",
+    "size": "10 GB"
+  },
+  "dm.dm_rpt_receivable_quota_daily_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_daily_t_01",
+    "size": "20 GB"
+  },
+  "dm.dm_rpt_receivable_quota_t": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_t",
+    "size": "484 MB"
+  },
+  "dm.dm_rpt_receivable_quota_t_01": {
+    "schema": "dm",
+    "name": "dm_rpt_receivable_quota_t_01",
+    "size": "645 MB"
+  },
+  "dm.dm_rpt_region_performance_daily_report_t": {
+    "schema": "dm",
+    "name": "dm_rpt_region_performance_daily_report_t",
+    "size": "72 KB"
+  },
+  "dm.dm_rpt_roll_budget_t": {
+    "schema": "dm",
+    "name": "dm_rpt_roll_budget_t",
+    "size": "976 KB"
+  },
+  "dm.dm_rpt_roll_budget_t0609": {
+    "schema": "dm",
+    "name": "dm_rpt_roll_budget_t0609",
+    "size": "40 KB"
+  },
+  "dm.dm_rpt_rshiedir_t": {
+    "schema": "dm",
+    "name": "dm_rpt_rshiedir_t",
+    "size": "48 KB"
+  },
+  "dm.dm_rpt_rsthiernode_t": {
+    "schema": "dm",
+    "name": "dm_rpt_rsthiernode_t",
+    "size": "13 MB"
+  },
+  "dm.dm_rpt_rsthiernode_t20240301": {
+    "schema": "dm",
+    "name": "dm_rpt_rsthiernode_t20240301",
+    "size": "8264 KB"
+  },
+  "dm.dm_rpt_sale_forecast_2023_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_2023_t",
+    "size": "3671 MB"
+  },
+  "dm.dm_rpt_sale_forecast_2023_t_0506": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_2023_t_0506",
+    "size": "4136 KB"
+  },
+  "dm.dm_rpt_sale_forecast_2023_t_20240826": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_2023_t_20240826",
+    "size": "285 MB"
+  },
+  "dm.dm_rpt_sale_forecast_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_t",
+    "size": "64 MB"
+  },
+  "dm.dm_rpt_sale_forecast_t_0404": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_t_0404",
+    "size": "34 MB"
+  },
+  "dm.dm_rpt_sale_forecast_t_mid": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_forecast_t_mid",
+    "size": "11 GB"
+  },
+  "dm.dm_rpt_sale_grp_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sale_grp_t",
+    "size": "488 KB"
+  },
+  "dm.dm_rpt_sales_achievement_send_rpt_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_achievement_send_rpt_t",
+    "size": "886 MB"
+  },
+  "dm.dm_rpt_sales_channel": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_channel",
+    "size": "168 KB"
+  },
+  "dm.dm_rpt_sales_channel_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_channel_t",
+    "size": "512 KB"
+  },
+  "dm.dm_rpt_sales_deliver_2023_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_2023_t",
+    "size": "215 MB"
+  },
+  "dm.dm_rpt_sales_deliver_2023_t_bak20251023yjh": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_2023_t_bak20251023yjh",
+    "size": "7200 KB"
+  },
+  "dm.dm_rpt_sales_deliver_daily": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_daily",
+    "size": "40 KB"
+  },
+  "dm.dm_rpt_sales_deliver_jxgc_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_jxgc_t",
+    "size": "99 MB"
+  },
+  "dm.dm_rpt_sales_deliver_month_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_month_t",
+    "size": "31 MB"
+  },
+  "dm.dm_rpt_sales_deliver_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_t",
+    "size": "2587 MB"
+  },
+  "dm.dm_rpt_sales_deliver_t_041501": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_t_041501",
+    "size": "42 MB"
+  },
+  "dm.dm_rpt_sales_deliver_t_0415bak": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_deliver_t_0415bak",
+    "size": "11 MB"
+  },
+  "dm.dm_rpt_sales_group_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t",
+    "size": "15 MB"
+  },
+  "dm.dm_rpt_sales_group_t20240301": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t20240301",
+    "size": "744 KB"
+  },
+  "dm.dm_rpt_sales_group_t20240303": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t20240303",
+    "size": "744 KB"
+  },
+  "dm.dm_rpt_sales_group_t_2023_1": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t_2023_1",
+    "size": "720 KB"
+  },
+  "dm.dm_rpt_sales_group_t_2024": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t_2024",
+    "size": "744 KB"
+  },
+  "dm.dm_rpt_sales_group_t_2024_wu": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t_2024_wu",
+    "size": "736 KB"
+  },
+  "dm.dm_rpt_sales_group_t_bak20240130": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t_bak20240130",
+    "size": "744 KB"
+  },
+  "dm.dm_rpt_sales_group_t_bak20250314": {
+    "schema": "dm",
+    "name": "dm_rpt_sales_group_t_bak20250314",
+    "size": "776 KB"
+  },
+  "dm.dm_rpt_shipment_unitprice_t": {
+    "schema": "dm",
+    "name": "dm_rpt_shipment_unitprice_t",
+    "size": "840 KB"
+  },
+  "dm.dm_rpt_short_code_t": {
+    "schema": "dm",
+    "name": "dm_rpt_short_code_t",
+    "size": "848 KB"
+  },
+  "dm.dm_rpt_sskj_prod_level_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sskj_prod_level_t",
+    "size": "792 KB"
+  },
+  "dm.dm_rpt_stock_age_month_ct": {
+    "schema": "dm",
+    "name": "dm_rpt_stock_age_month_ct",
+    "size": "5112 KB"
+  },
+  "dm.dm_rpt_stock_place_t": {
+    "schema": "dm",
+    "name": "dm_rpt_stock_place_t",
+    "size": "16 KB"
+  },
+  "dm.dm_rpt_sw_department_sales_performance_channel_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sw_department_sales_performance_channel_t",
+    "size": "178 MB"
+  },
+  "dm.dm_rpt_sw_department_sales_performance_region_t": {
+    "schema": "dm",
+    "name": "dm_rpt_sw_department_sales_performance_region_t",
+    "size": "206 MB"
+  },
+  "dm.dm_rpt_sw_department_sales_performance_region_t_bak20250306": {
+    "schema": "dm",
+    "name": "dm_rpt_sw_department_sales_performance_region_t_bak20250306",
+    "size": "144 KB"
+  },
+  "dm.dm_rpt_tradeticket_accage_close_t": {
+    "schema": "dm",
+    "name": "dm_rpt_tradeticket_accage_close_t",
+    "size": "8712 KB"
+  },
+  "dm.dm_rpt_tradeticket_accage_t": {
+    "schema": "dm",
+    "name": "dm_rpt_tradeticket_accage_t",
+    "size": "14 MB"
+  },
+  "dm.dm_rpt_tradeticket_quota_close_t": {
+    "schema": "dm",
+    "name": "dm_rpt_tradeticket_quota_close_t",
+    "size": "5864 KB"
+  },
+  "dm.dm_rpt_tradeticket_quota_t": {
+    "schema": "dm",
+    "name": "dm_rpt_tradeticket_quota_t",
+    "size": "49 MB"
+  },
+  "dm.dm_rpt_wm_cxc_day_sum": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_cxc_day_sum",
+    "size": "134 MB"
+  },
+  "dm.dm_rpt_wm_cxc_day_sum0630": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_cxc_day_sum0630",
+    "size": "60 MB"
+  },
+  "dm.dm_rpt_wm_cxc_day_sum_20250303": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_cxc_day_sum_20250303",
+    "size": "212 MB"
+  },
+  "dm.dm_rpt_wm_cxc_day_sum_tmp": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_cxc_day_sum_tmp",
+    "size": "168 KB"
+  },
+  "dm.dm_rpt_wm_cxc_month_sum": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_cxc_month_sum",
+    "size": "56 MB"
+  },
+  "dm.dm_rpt_wm_lishi_cxc_day_sum": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_lishi_cxc_day_sum",
+    "size": "5112 KB"
+  },
+  "dm.dm_rpt_wm_safety_stock_sta": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_safety_stock_sta",
+    "size": "24 KB"
+  },
+  "dm.dm_rpt_wm_stockout_target_sta": {
+    "schema": "dm",
+    "name": "dm_rpt_wm_stockout_target_sta",
+    "size": "40 KB"
+  },
+  "dm.dm_rpt_zbp_taxnum_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zbp_taxnum_t",
+    "size": "1688 KB"
+  },
+  "dm.dm_rpt_zhr_oss_tab_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zhr_oss_tab_t",
+    "size": "1168 KB"
+  },
+  "dm.dm_rpt_zhrt_oa_pernr_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zhrt_oa_pernr_t",
+    "size": "1968 KB"
+  },
+  "dm.dm_rpt_zhrt_oa_pernr_t_test": {
+    "schema": "dm",
+    "name": "dm_rpt_zhrt_oa_pernr_t_test",
+    "size": "6888 KB"
+  },
+  "dm.dm_rpt_zmaster_cus_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zmaster_cus_t",
+    "size": "17 MB"
+  },
+  "dm.dm_rpt_zoa_gcbbspb_tab_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zoa_gcbbspb_tab_t",
+    "size": "33 MB"
+  },
+  "dm.dm_rpt_zoss_pri_record_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zoss_pri_record_t",
+    "size": "250 MB"
+  },
+  "dm.dm_rpt_zsd_sjxx_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zsd_sjxx_t",
+    "size": "72 MB"
+  },
+  "dm.dm_rpt_zzt_kcmx_t": {
+    "schema": "dm",
+    "name": "dm_rpt_zzt_kcmx_t",
+    "size": "12 GB"
+  },
+  "dm.dm_rpt_zzt_kcmx_t_20241225newlj": {
+    "schema": "dm",
+    "name": "dm_rpt_zzt_kcmx_t_20241225newlj",
+    "size": "650 MB"
+  },
+  "dm.dm_rpt_zzt_kcmx_t_tmp": {
+    "schema": "dm",
+    "name": "dm_rpt_zzt_kcmx_t_tmp",
+    "size": "2573 MB"
+  },
+  "dm.dm_rpt_zzt_kcmx_t_tmp1": {
+    "schema": "dm",
+    "name": "dm_rpt_zzt_kcmx_t_tmp1",
+    "size": "72 KB"
+  },
+  "dm.dm_rtm_basic_prod_tmp": {
+    "schema": "dm",
+    "name": "dm_rtm_basic_prod_tmp",
+    "size": "120 MB"
+  },
+  "dm.dm_rtm_operate_monitor_index_t": {
+    "schema": "dm",
+    "name": "dm_rtm_operate_monitor_index_t",
+    "size": "360 KB"
+  },
+  "dm.dm_sa_b1_inventort_t": {
+    "schema": "dm",
+    "name": "dm_sa_b1_inventort_t",
+    "size": "792 MB"
+  },
+  "dm.dm_sa_ct_channel_achievement_daily_t": {
+    "schema": "dm",
+    "name": "dm_sa_ct_channel_achievement_daily_t",
+    "size": "193 MB"
+  },
+  "dm.dm_sa_ct_integrated_head_manual_2022_t": {
+    "schema": "dm",
+    "name": "dm_sa_ct_integrated_head_manual_2022_t",
+    "size": "4736 KB"
+  },
+  "dm.dm_safestock_all_stock": {
+    "schema": "dm",
+    "name": "dm_safestock_all_stock",
+    "size": "80 KB"
+  },
+  "dm.dm_safestock_avil_stock": {
+    "schema": "dm",
+    "name": "dm_safestock_avil_stock",
+    "size": "299 MB"
+  },
+  "dm.dm_safestock_no_deliver": {
+    "schema": "dm",
+    "name": "dm_safestock_no_deliver",
+    "size": "12 MB"
+  },
+  "dm.dm_safestock_sales_sum": {
+    "schema": "dm",
+    "name": "dm_safestock_sales_sum",
+    "size": "104 MB"
+  },
+  "dm.dm_safestock_wip": {
+    "schema": "dm",
+    "name": "dm_safestock_wip",
+    "size": "21 MB"
+  },
+  "dm.dm_sales_performance_t": {
+    "schema": "dm",
+    "name": "dm_sales_performance_t",
+    "size": "744 KB"
+  },
+  "dm.dm_sap_adjust_data_t": {
+    "schema": "dm",
+    "name": "dm_sap_adjust_data_t",
+    "size": "808 KB"
+  },
+  "dm.dm_sap_hr_base_prod_t": {
+    "schema": "dm",
+    "name": "dm_sap_hr_base_prod_t",
+    "size": "336 KB"
+  },
+  "dm.dm_sap_hr_emp_cost_t": {
+    "schema": "dm",
+    "name": "dm_sap_hr_emp_cost_t",
+    "size": "576 KB"
+  },
+  "dm.dm_sdi_hrp1000_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_hrp1000_1001_t",
+    "size": "33 MB"
+  },
+  "dm.dm_sdi_hrp1000_1001_t_test": {
+    "schema": "dm",
+    "name": "dm_sdi_hrp1000_1001_t_test",
+    "size": "32 MB"
+  },
+  "dm.dm_sdi_hrp1001_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_hrp1001_1001_t",
+    "size": "11 MB"
+  },
+  "dm.dm_sdi_hrp1001_1001_t_test": {
+    "schema": "dm",
+    "name": "dm_sdi_hrp1001_1001_t_test",
+    "size": "10208 KB"
+  },
+  "dm.dm_sdi_mast_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_mast_1001_t",
+    "size": "4424 KB"
+  },
+  "dm.dm_sdi_new_opportunity_1046": {
+    "schema": "dm",
+    "name": "dm_sdi_new_opportunity_1046",
+    "size": "7824 KB"
+  },
+  "dm.dm_sdi_stpo_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_stpo_1001_t",
+    "size": "5504 KB"
+  },
+  "dm.dm_sdi_t001l_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_t001l_1001_t",
+    "size": "304 KB"
+  },
+  "dm.dm_sdi_tvkot_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_tvkot_1001_t",
+    "size": "24 KB"
+  },
+  "dm.dm_sdi_tvtwt_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_tvtwt_1001_t",
+    "size": "16 KB"
+  },
+  "dm.dm_sdi_zoa_gcbbspb_tab_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_zoa_gcbbspb_tab_1001_t",
+    "size": "33 MB"
+  },
+  "dm.dm_sdi_zsd_sjxx_1001_t": {
+    "schema": "dm",
+    "name": "dm_sdi_zsd_sjxx_1001_t",
+    "size": "205 MB"
+  },
+  "dm.dm_sfa_cust_channel_all_t": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_channel_all_t",
+    "size": "8192 bytes"
+  },
+  "dm.dm_sfa_cust_channel_all_t_sw": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_channel_all_t_sw",
+    "size": "0 bytes"
+  },
+  "dm.dm_sfa_cust_channel_t": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_channel_t",
+    "size": "8320 KB"
+  },
+  "dm.dm_sfa_cust_mes_main_t": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_mes_main_t",
+    "size": "4168 KB"
+  },
+  "dm.dm_sfa_cust_mes_main_t_20241017bak": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_mes_main_t_20241017bak",
+    "size": "712 KB"
+  },
+  "dm.dm_sfa_cust_mes_main_t_bak20251219": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_mes_main_t_bak20251219",
+    "size": "3976 KB"
+  },
+  "dm.dm_sfa_cust_mes_main_t_sw": {
+    "schema": "dm",
+    "name": "dm_sfa_cust_mes_main_t_sw",
+    "size": "120 KB"
+  },
+  "dm.dm_sfa_data_dict_t": {
+    "schema": "dm",
+    "name": "dm_sfa_data_dict_t",
+    "size": "32 KB"
+  },
+  "dm.dm_sfa_deliver_info_t": {
+    "schema": "dm",
+    "name": "dm_sfa_deliver_info_t",
+    "size": "42 MB"
+  },
+  "dm.dm_sfa_employee_info_t": {
+    "schema": "dm",
+    "name": "dm_sfa_employee_info_t",
+    "size": "352 KB"
+  },
+  "dm.dm_sfa_employee_info_t_sw": {
+    "schema": "dm",
+    "name": "dm_sfa_employee_info_t_sw",
+    "size": "24 KB"
+  },
+  "dm.dm_sfa_md_info_t": {
+    "schema": "dm",
+    "name": "dm_sfa_md_info_t",
+    "size": "2736 KB"
+  },
+  "dm.dm_sfa_md_info_t_20250607bak": {
+    "schema": "dm",
+    "name": "dm_sfa_md_info_t_20250607bak",
+    "size": "3840 KB"
+  },
+  "dm.dm_sfa_md_info_t_sw": {
+    "schema": "dm",
+    "name": "dm_sfa_md_info_t_sw",
+    "size": "1072 KB"
+  },
+  "dm.dm_sfa_ord_info_t": {
+    "schema": "dm",
+    "name": "dm_sfa_ord_info_t",
+    "size": "290 MB"
+  },
+  "dm.dm_sjzx_emp_send_stat_t": {
+    "schema": "dm",
+    "name": "dm_sjzx_emp_send_stat_t",
+    "size": "23 MB"
+  },
+  "dm.dm_sjzx_emp_visit_stat_t": {
+    "schema": "dm",
+    "name": "dm_sjzx_emp_visit_stat_t",
+    "size": "115 MB"
+  },
+  "dm.dm_sjzx_problem_list_t": {
+    "schema": "dm",
+    "name": "dm_sjzx_problem_list_t",
+    "size": "24 KB"
+  },
+  "dm.dm_so_fzl_order_jfzqbb_t": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_jfzqbb_t",
+    "size": "565 MB"
+  },
+  "dm.dm_so_fzl_order_pre_t": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_pre_t",
+    "size": "653 MB"
+  },
+  "dm.dm_so_fzl_order_pre_t_20231018": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_pre_t_20231018",
+    "size": "353 MB"
+  },
+  "dm.dm_so_fzl_order_t": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_t",
+    "size": "8045 MB"
+  },
+  "dm.dm_so_fzl_order_t_tmp": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_t_tmp",
+    "size": "72 KB"
+  },
+  "dm.dm_so_fzl_order_zj_pre_t": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_zj_pre_t",
+    "size": "1030 MB"
+  },
+  "dm.dm_so_fzl_order_zj_pre_t_20231018": {
+    "schema": "dm",
+    "name": "dm_so_fzl_order_zj_pre_t_20231018",
+    "size": "350 MB"
+  },
+  "dm.dm_so_oms_policy_t": {
+    "schema": "dm",
+    "name": "dm_so_oms_policy_t",
+    "size": "344 KB"
+  },
+  "dm.dm_so_org_perf_stat_t": {
+    "schema": "dm",
+    "name": "dm_so_org_perf_stat_t",
+    "size": "4619 MB"
+  },
+  "dm.dm_so_org_perf_stat_t_bak20250612": {
+    "schema": "dm",
+    "name": "dm_so_org_perf_stat_t_bak20250612",
+    "size": "369 MB"
+  },
+  "dm.dm_so_oss_order_t": {
+    "schema": "dm",
+    "name": "dm_so_oss_order_t",
+    "size": "72 KB"
+  },
+  "dm.dm_so_oss_plan_order_t": {
+    "schema": "dm",
+    "name": "dm_so_oss_plan_order_t",
+    "size": "31 MB"
+  },
+  "dm.dm_so_project_wbs_f": {
+    "schema": "dm",
+    "name": "dm_so_project_wbs_f",
+    "size": "33 MB"
+  },
+  "dm.dm_so_sales_group_level_t": {
+    "schema": "dm",
+    "name": "dm_so_sales_group_level_t",
+    "size": "14 MB"
+  },
+  "dm.dm_so_zl_order_pre_t": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_pre_t",
+    "size": "498 MB"
+  },
+  "dm.dm_so_zl_order_pre_t_20231018": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_pre_t_20231018",
+    "size": "25 MB"
+  },
+  "dm.dm_so_zl_order_pre_t_20240401": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_pre_t_20240401",
+    "size": "34 MB"
+  },
+  "dm.dm_so_zl_order_pre_t_20240709": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_pre_t_20240709",
+    "size": "7448 KB"
+  },
+  "dm.dm_so_zl_order_t": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_t",
+    "size": "1685 MB"
+  },
+  "dm.dm_so_zl_order_t_tmp": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_t_tmp",
+    "size": "422 MB"
+  },
+  "dm.dm_so_zl_order_zj_pre_t": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_zj_pre_t",
+    "size": "546 MB"
+  },
+  "dm.dm_so_zl_order_zj_pre_t_202306": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_zj_pre_t_202306",
+    "size": "2336 KB"
+  },
+  "dm.dm_so_zl_order_zj_pre_t_20240401": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_zj_pre_t_20240401",
+    "size": "40 MB"
+  },
+  "dm.dm_so_zl_order_zj_pre_t_20240709": {
+    "schema": "dm",
+    "name": "dm_so_zl_order_zj_pre_t_20240709",
+    "size": "8184 KB"
+  },
+  "dm.dm_stock_detail_jxgc_t": {
+    "schema": "dm",
+    "name": "dm_stock_detail_jxgc_t",
+    "size": "1004 MB"
+  },
+  "dm.dm_store_data_detail_f": {
+    "schema": "dm",
+    "name": "dm_store_data_detail_f",
+    "size": "144 KB"
+  },
+  "dm.dm_sub_company_city_retail_t": {
+    "schema": "dm",
+    "name": "dm_sub_company_city_retail_t",
+    "size": "24 KB"
+  },
+  "dm.dm_sub_job_deliver_t": {
+    "schema": "dm",
+    "name": "dm_sub_job_deliver_t",
+    "size": "66 MB"
+  },
+  "dm.dm_sub_job_deliver_t_01": {
+    "schema": "dm",
+    "name": "dm_sub_job_deliver_t_01",
+    "size": "720 KB"
+  },
+  "dm.dm_sw_1_add_n_achievement_daily_d": {
+    "schema": "dm",
+    "name": "dm_sw_1_add_n_achievement_daily_d",
+    "size": "73 MB"
+  },
+  "dm.dm_sw_business_center_achievement_daily_f": {
+    "schema": "dm",
+    "name": "dm_sw_business_center_achievement_daily_f",
+    "size": "2142 MB"
+  },
+  "dm.dm_sw_business_center_achievement_daily_t": {
+    "schema": "dm",
+    "name": "dm_sw_business_center_achievement_daily_t",
+    "size": "51 MB"
+  },
+  "dm.dm_sw_business_center_achievement_daily_t_wjh_20250226": {
+    "schema": "dm",
+    "name": "dm_sw_business_center_achievement_daily_t_wjh_20250226",
+    "size": "760 KB"
+  },
+  "dm.dm_sw_category_fi_ambv2_profit_sum_t": {
+    "schema": "dm",
+    "name": "dm_sw_category_fi_ambv2_profit_sum_t",
+    "size": "180 MB"
+  },
+  "dm.dm_sw_category_fi_ambv2_profit_sum_t_20241004bak": {
+    "schema": "dm",
+    "name": "dm_sw_category_fi_ambv2_profit_sum_t_20241004bak",
+    "size": "43 MB"
+  },
+  "dm.dm_sw_category_fi_ambv2_profit_sum_t_20250501_qyj": {
+    "schema": "dm",
+    "name": "dm_sw_category_fi_ambv2_profit_sum_t_20250501_qyj",
+    "size": "53 MB"
+  },
+  "dm.dm_sw_category_fi_ambv2_profit_sum_t_bak20250402": {
+    "schema": "dm",
+    "name": "dm_sw_category_fi_ambv2_profit_sum_t_bak20250402",
+    "size": "56 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t",
+    "size": "987 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t_20241004bak": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t_20241004bak",
+    "size": "30 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t_20250501_qyj": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t_20250501_qyj",
+    "size": "55 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t_20260430_qyj": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t_20260430_qyj",
+    "size": "101 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t_bak20250402": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t_bak20250402",
+    "size": "52 MB"
+  },
+  "dm.dm_sw_fi_ambv2_profit_sum_t_whj_260402": {
+    "schema": "dm",
+    "name": "dm_sw_fi_ambv2_profit_sum_t_whj_260402",
+    "size": "94 MB"
+  },
+  "dm.dm_sw_his_invoice_data_t": {
+    "schema": "dm",
+    "name": "dm_sw_his_invoice_data_t",
+    "size": "263 MB"
+  },
+  "dm.dm_sw_order_purchase_inventory_t": {
+    "schema": "dm",
+    "name": "dm_sw_order_purchase_inventory_t",
+    "size": "0 bytes"
+  },
+  "dm.dm_sw_out_in_rate_detail_t": {
+    "schema": "dm",
+    "name": "dm_sw_out_in_rate_detail_t",
+    "size": "3272 KB"
+  },
+  "dm.dm_sw_out_in_rate_t": {
+    "schema": "dm",
+    "name": "dm_sw_out_in_rate_t",
+    "size": "11 MB"
+  },
+  "dm.dm_sw_risk_inventory_loc_t": {
+    "schema": "dm",
+    "name": "dm_sw_risk_inventory_loc_t",
+    "size": "223 MB"
+  },
+  "dm.dm_sw_risk_inventory_loc_t_tmp": {
+    "schema": "dm",
+    "name": "dm_sw_risk_inventory_loc_t_tmp",
+    "size": "24 KB"
+  },
+  "dm.dm_sw_risk_inventory_t": {
+    "schema": "dm",
+    "name": "dm_sw_risk_inventory_t",
+    "size": "110 MB"
+  },
+  "dm.dm_system_role_all_d": {
+    "schema": "dm",
+    "name": "dm_system_role_all_d",
+    "size": "24 KB"
+  },
+  "dm.dm_system_role_monthly_d": {
+    "schema": "dm",
+    "name": "dm_system_role_monthly_d",
+    "size": "64 KB"
+  },
+  "dm.dm_system_user_daily_d": {
+    "schema": "dm",
+    "name": "dm_system_user_daily_d",
+    "size": "1360 KB"
+  },
+  "dm.dm_system_user_daily_d_wjh_1011": {
+    "schema": "dm",
+    "name": "dm_system_user_daily_d_wjh_1011",
+    "size": "2672 KB"
+  },
+  "dm.dm_system_user_monthly_d": {
+    "schema": "dm",
+    "name": "dm_system_user_monthly_d",
+    "size": "48 KB"
+  },
+  "dm.dm_table_column_desc": {
+    "schema": "dm",
+    "name": "dm_table_column_desc",
+    "size": "13 MB"
+  },
+  "dm.dm_table_column_desc_0517": {
+    "schema": "dm",
+    "name": "dm_table_column_desc_0517",
+    "size": "182 MB"
+  },
+  "dm.dm_table_column_desc_bak": {
+    "schema": "dm",
+    "name": "dm_table_column_desc_bak",
+    "size": "158 MB"
+  },
+  "dm.dm_target_achievement": {
+    "schema": "dm",
+    "name": "dm_target_achievement",
+    "size": "1848 KB"
+  },
+  "dm.dm_target_achievement_20240518": {
+    "schema": "dm",
+    "name": "dm_target_achievement_20240518",
+    "size": "64 KB"
+  },
+  "dm.dm_target_achievement_region": {
+    "schema": "dm",
+    "name": "dm_target_achievement_region",
+    "size": "178 MB"
+  },
+  "dm.dm_test_20221205001": {
+    "schema": "dm",
+    "name": "dm_test_20221205001",
+    "size": "0 bytes"
+  },
+  "dm.dm_test_20230905": {
+    "schema": "dm",
+    "name": "dm_test_20230905",
+    "size": "0 bytes"
+  },
+  "dm.dm_timeout_process_details_t": {
+    "schema": "dm",
+    "name": "dm_timeout_process_details_t",
+    "size": "6232 KB"
+  },
+  "dm.dm_tm_scan_out_in_daily_t": {
+    "schema": "dm",
+    "name": "dm_tm_scan_out_in_daily_t",
+    "size": "1176 KB"
+  },
+  "dm.dm_tms_reservation_kpi_month": {
+    "schema": "dm",
+    "name": "dm_tms_reservation_kpi_month",
+    "size": "1800 KB"
+  },
+  "dm.dm_tra_delv_dtl_t": {
+    "schema": "dm",
+    "name": "dm_tra_delv_dtl_t",
+    "size": "286 MB"
+  },
+  "dm.dm_tra_delv_ship_t": {
+    "schema": "dm",
+    "name": "dm_tra_delv_ship_t",
+    "size": "7184 KB"
+  },
+  "dm.dm_tra_resv_dtl_t": {
+    "schema": "dm",
+    "name": "dm_tra_resv_dtl_t",
+    "size": "35 MB"
+  },
+  "dm.dm_tra_ship_dtl_t": {
+    "schema": "dm",
+    "name": "dm_tra_ship_dtl_t",
+    "size": "10 MB"
+  },
+  "dm.dm_transit_inventory_t": {
+    "schema": "dm",
+    "name": "dm_transit_inventory_t",
+    "size": "19 MB"
+  },
+  "dm.dm_tvbvk_1001_t": {
+    "schema": "dm",
+    "name": "dm_tvbvk_1001_t",
+    "size": "88 KB"
+  },
+  "dm.dm_vm_tms_order_stat_t": {
+    "schema": "dm",
+    "name": "dm_vm_tms_order_stat_t",
+    "size": "240 KB"
+  },
+  "dm.dm_vm_worn_sign_t": {
+    "schema": "dm",
+    "name": "dm_vm_worn_sign_t",
+    "size": "92 MB"
+  },
+  "dm.dm_vw_eco_stock_stat_t": {
+    "schema": "dm",
+    "name": "dm_vw_eco_stock_stat_t",
+    "size": "149 MB"
+  },
+  "dm.dm_wf_dept_consuming_time_s_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_dept_consuming_time_s_tmp",
+    "size": "0 bytes"
+  },
+  "dm.dm_wf_dept_info_t": {
+    "schema": "dm",
+    "name": "dm_wf_dept_info_t",
+    "size": "280 KB"
+  },
+  "dm.dm_wf_dept_level_consuming_time_s": {
+    "schema": "dm",
+    "name": "dm_wf_dept_level_consuming_time_s",
+    "size": "475 MB"
+  },
+  "dm.dm_wf_dept_level_consuming_time_s_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_dept_level_consuming_time_s_tmp",
+    "size": "120 KB"
+  },
+  "dm.dm_wf_emp_consuming_time_s": {
+    "schema": "dm",
+    "name": "dm_wf_emp_consuming_time_s",
+    "size": "8960 KB"
+  },
+  "dm.dm_wf_emp_consuming_time_s_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_emp_consuming_time_s_tmp",
+    "size": "20 MB"
+  },
+  "dm.dm_wf_emp_info_t": {
+    "schema": "dm",
+    "name": "dm_wf_emp_info_t",
+    "size": "12 MB"
+  },
+  "dm.dm_wf_personal_requests_consuming_time_t": {
+    "schema": "dm",
+    "name": "dm_wf_personal_requests_consuming_time_t",
+    "size": "182 MB"
+  },
+  "dm.dm_wf_requests_consuming_gd_t": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_gd_t",
+    "size": "12 MB"
+  },
+  "dm.dm_wf_requests_consuming_overtime_t": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_overtime_t",
+    "size": "207 MB"
+  },
+  "dm.dm_wf_requests_consuming_time_pre_t": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_time_pre_t",
+    "size": "17 GB"
+  },
+  "dm.dm_wf_requests_consuming_time_s": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_time_s",
+    "size": "13 MB"
+  },
+  "dm.dm_wf_requests_consuming_time_s_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_time_s_tmp",
+    "size": "3264 KB"
+  },
+  "dm.dm_wf_requests_consuming_time_t": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_time_t",
+    "size": "13 GB"
+  },
+  "dm.dm_wf_requests_consuming_time_t_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_requests_consuming_time_t_tmp",
+    "size": "72 KB"
+  },
+  "dm.dm_wf_requests_node_efficiency_s": {
+    "schema": "dm",
+    "name": "dm_wf_requests_node_efficiency_s",
+    "size": "1928 KB"
+  },
+  "dm.dm_wf_requests_node_efficiency_s_tmp": {
+    "schema": "dm",
+    "name": "dm_wf_requests_node_efficiency_s_tmp",
+    "size": "3312 KB"
+  },
+  "dm.dm_wf_sngl_requests_consuming_time_s": {
+    "schema": "dm",
+    "name": "dm_wf_sngl_requests_consuming_time_s",
+    "size": "15 GB"
+  },
+  "dm.dm_wf_sngl_requests_consuming_time_t": {
+    "schema": "dm",
+    "name": "dm_wf_sngl_requests_consuming_time_t",
+    "size": "18 GB"
+  },
+  "dm.dm_wm_all_type_stock_t": {
+    "schema": "dm",
+    "name": "dm_wm_all_type_stock_t",
+    "size": "14 GB"
+  },
+  "dm.dm_wm_all_type_stock_t_his": {
+    "schema": "dm",
+    "name": "dm_wm_all_type_stock_t_his",
+    "size": "9086 MB"
+  },
+  "dm.dm_wm_all_type_stock_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_all_type_stock_tmp",
+    "size": "68 MB"
+  },
+  "dm.dm_wm_b1_inv_cate_match_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inv_cate_match_t",
+    "size": "504 KB"
+  },
+  "dm.dm_wm_b1_inventory_ct_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_ct_t",
+    "size": "668 MB"
+  },
+  "dm.dm_wm_b1_inventory_ct_t_d": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_ct_t_d",
+    "size": "29 GB"
+  },
+  "dm.dm_wm_b1_inventory_sw_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_sw_t",
+    "size": "7472 KB"
+  },
+  "dm.dm_wm_b1_inventory_sw_t0629": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_sw_t0629",
+    "size": "7016 KB"
+  },
+  "dm.dm_wm_b1_inventory_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t",
+    "size": "17 MB"
+  },
+  "dm.dm_wm_b1_inventory_t_d": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t_d",
+    "size": "5524 MB"
+  },
+  "dm.dm_wm_b1_inventory_t_d_100601": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t_d_100601",
+    "size": "1411 MB"
+  },
+  "dm.dm_wm_b1_inventory_t_d_20260604_240601_260101": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t_d_20260604_240601_260101",
+    "size": "2302 MB"
+  },
+  "dm.dm_wm_b1_inventory_t_mm": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t_mm",
+    "size": "5440 KB"
+  },
+  "dm.dm_wm_b1_inventory_t_mm_test": {
+    "schema": "dm",
+    "name": "dm_wm_b1_inventory_t_mm_test",
+    "size": "2296 KB"
+  },
+  "dm.dm_wm_b1_sales_order_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_sales_order_t",
+    "size": "250 MB"
+  },
+  "dm.dm_wm_b1_wyjx_inventory_t": {
+    "schema": "dm",
+    "name": "dm_wm_b1_wyjx_inventory_t",
+    "size": "9871 MB"
+  },
+  "dm.dm_wm_b1_wyjx_inventory_t_20260604_240601_260101": {
+    "schema": "dm",
+    "name": "dm_wm_b1_wyjx_inventory_t_20260604_240601_260101",
+    "size": "36 GB"
+  },
+  "dm.dm_wm_b1_wyjx_inventory_t_260331bak": {
+    "schema": "dm",
+    "name": "dm_wm_b1_wyjx_inventory_t_260331bak",
+    "size": "7269 MB"
+  },
+  "dm.dm_wm_b1_wyjx_inventory_t_tmp02": {
+    "schema": "dm",
+    "name": "dm_wm_b1_wyjx_inventory_t_tmp02",
+    "size": "22 MB"
+  },
+  "dm.dm_wm_ceramic_stock_t": {
+    "schema": "dm",
+    "name": "dm_wm_ceramic_stock_t",
+    "size": "1696 MB"
+  },
+  "dm.dm_wm_dealer_inventory_days_t": {
+    "schema": "dm",
+    "name": "dm_wm_dealer_inventory_days_t",
+    "size": "85 MB"
+  },
+  "dm.dm_wm_defective_product_month_sum": {
+    "schema": "dm",
+    "name": "dm_wm_defective_product_month_sum",
+    "size": "6216 KB"
+  },
+  "dm.dm_wm_defective_product_stock_detail": {
+    "schema": "dm",
+    "name": "dm_wm_defective_product_stock_detail",
+    "size": "289 MB"
+  },
+  "dm.dm_wm_defective_product_stockout_t": {
+    "schema": "dm",
+    "name": "dm_wm_defective_product_stockout_t",
+    "size": "885 MB"
+  },
+  "dm.dm_wm_defective_product_stockout_t_20240422": {
+    "schema": "dm",
+    "name": "dm_wm_defective_product_stockout_t_20240422",
+    "size": "37 MB"
+  },
+  "dm.dm_wm_eco_cost_rcvy_stat_t": {
+    "schema": "dm",
+    "name": "dm_wm_eco_cost_rcvy_stat_t",
+    "size": "392 KB"
+  },
+  "dm.dm_wm_invent_turno_day_chan_t": {
+    "schema": "dm",
+    "name": "dm_wm_invent_turno_day_chan_t",
+    "size": "2200 KB"
+  },
+  "dm.dm_wm_invent_turno_day_chan_t_bak20220923": {
+    "schema": "dm",
+    "name": "dm_wm_invent_turno_day_chan_t_bak20220923",
+    "size": "24 KB"
+  },
+  "dm.dm_wm_inventory_ct_t": {
+    "schema": "dm",
+    "name": "dm_wm_inventory_ct_t",
+    "size": "4799 MB"
+  },
+  "dm.dm_wm_inventory_ct_t_d": {
+    "schema": "dm",
+    "name": "dm_wm_inventory_ct_t_d",
+    "size": "22 GB"
+  },
+  "dm.dm_wm_low_turnover_stockout_detail_t": {
+    "schema": "dm",
+    "name": "dm_wm_low_turnover_stockout_detail_t",
+    "size": "862 MB"
+  },
+  "dm.dm_wm_order_analyse_t": {
+    "schema": "dm",
+    "name": "dm_wm_order_analyse_t",
+    "size": "920 KB"
+  },
+  "dm.dm_wm_prod_stock_s": {
+    "schema": "dm",
+    "name": "dm_wm_prod_stock_s",
+    "size": "18 GB"
+  },
+  "dm.dm_wm_prod_stock_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_prod_stock_tmp",
+    "size": "211 MB"
+  },
+  "dm.dm_wm_prodstock_in_t": {
+    "schema": "dm",
+    "name": "dm_wm_prodstock_in_t",
+    "size": "9301 MB"
+  },
+  "dm.dm_wm_prodstock_in_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_prodstock_in_tmp",
+    "size": "15 MB"
+  },
+  "dm.dm_wm_prodstock_out_jxgc_t": {
+    "schema": "dm",
+    "name": "dm_wm_prodstock_out_jxgc_t",
+    "size": "1101 MB"
+  },
+  "dm.dm_wm_prodstock_out_t": {
+    "schema": "dm",
+    "name": "dm_wm_prodstock_out_t",
+    "size": "8649 MB"
+  },
+  "dm.dm_wm_prodstock_out_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_prodstock_out_tmp",
+    "size": "44 MB"
+  },
+  "dm.dm_wm_proj_item_rmn_t": {
+    "schema": "dm",
+    "name": "dm_wm_proj_item_rmn_t",
+    "size": "512 KB"
+  },
+  "dm.dm_wm_rtm_ofr_order_t": {
+    "schema": "dm",
+    "name": "dm_wm_rtm_ofr_order_t",
+    "size": "15 MB"
+  },
+  "dm.dm_wm_stock_invalue_t": {
+    "schema": "dm",
+    "name": "dm_wm_stock_invalue_t",
+    "size": "500 MB"
+  },
+  "dm.dm_wm_stock_res_pre_salesgrp_t": {
+    "schema": "dm",
+    "name": "dm_wm_stock_res_pre_salesgrp_t",
+    "size": "23 MB"
+  },
+  "dm.dm_wm_stock_res_pre_t": {
+    "schema": "dm",
+    "name": "dm_wm_stock_res_pre_t",
+    "size": "200 KB"
+  },
+  "dm.dm_wm_stock_resp_class_sta": {
+    "schema": "dm",
+    "name": "dm_wm_stock_resp_class_sta",
+    "size": "9992 KB"
+  },
+  "dm.dm_wm_stock_responsibility_djzjkc_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_djzjkc_tmp",
+    "size": "160 KB"
+  },
+  "dm.dm_wm_stock_responsibility_dz1_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_dz1_tmp",
+    "size": "29 MB"
+  },
+  "dm.dm_wm_stock_responsibility_exclusive_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_exclusive_tmp",
+    "size": "17 MB"
+  },
+  "dm.dm_wm_stock_responsibility_mat_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_mat_tmp",
+    "size": "5136 KB"
+  },
+  "dm.dm_wm_stock_responsibility_others_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_others_tmp",
+    "size": "3464 KB"
+  },
+  "dm.dm_wm_stock_responsibility_overproduct_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_overproduct_tmp",
+    "size": "80 KB"
+  },
+  "dm.dm_wm_stock_responsibility_res_prepare_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_res_prepare_tmp",
+    "size": "4344 KB"
+  },
+  "dm.dm_wm_stock_responsibility_sum": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_sum",
+    "size": "24 KB"
+  },
+  "dm.dm_wm_stock_responsibility_total_tmp": {
+    "schema": "dm",
+    "name": "dm_wm_stock_responsibility_total_tmp",
+    "size": "1779 MB"
+  },
+  "dm.dm_wm_strategy_noorder_stock_t": {
+    "schema": "dm",
+    "name": "dm_wm_strategy_noorder_stock_t",
+    "size": "776 KB"
+  },
+  "dm.dm_wm_strategy_user_warehouse_t": {
+    "schema": "dm",
+    "name": "dm_wm_strategy_user_warehouse_t",
+    "size": "4928 KB"
+  },
+  "dm.dm_wms_encode_rate_t": {
+    "schema": "dm",
+    "name": "dm_wms_encode_rate_t",
+    "size": "272 KB"
+  },
+  "dm.dm_work_order_docu_t": {
+    "schema": "dm",
+    "name": "dm_work_order_docu_t",
+    "size": "2504 KB"
+  },
+  "dm.dm_wx_data_role_t": {
+    "schema": "dm",
+    "name": "dm_wx_data_role_t",
+    "size": "11 MB"
+  },
+  "dm.dm_xqyc_test": {
+    "schema": "dm",
+    "name": "dm_xqyc_test",
+    "size": "24 KB"
+  },
+  "dm.dm_zasd_p001_q066v2_t": {
+    "schema": "dm",
+    "name": "dm_zasd_p001_q066v2_t",
+    "size": "6722 MB"
+  },
+  "dm.dm_zasd_p001_q066v2_t_01": {
+    "schema": "dm",
+    "name": "dm_zasd_p001_q066v2_t_01",
+    "size": "25 MB"
+  },
+  "dm.dm_zcds_mat_zysacb_t": {
+    "schema": "dm",
+    "name": "dm_zcds_mat_zysacb_t",
+    "size": "712 KB"
+  },
+  "dm.dm_zdj_emp_type_stat_t": {
+    "schema": "dm",
+    "name": "dm_zdj_emp_type_stat_t",
+    "size": "208 KB"
+  },
+  "dm.dm_zmmt016_1001": {
+    "schema": "dm",
+    "name": "dm_zmmt016_1001",
+    "size": "8192 bytes"
+  },
+  "dm.dm_zmmt017_1001": {
+    "schema": "dm",
+    "name": "dm_zmmt017_1001",
+    "size": "8192 bytes"
+  },
+  "dm.dm_zzt_fy_t": {
+    "schema": "dm",
+    "name": "dm_zzt_fy_t",
+    "size": "3119 MB"
+  },
+  "dm.dm_zzt_qtxssr_t_bak": {
+    "schema": "dm",
+    "name": "dm_zzt_qtxssr_t_bak",
+    "size": "152 MB"
+  },
+  "dm.dm_zzt_qtywsz_t": {
+    "schema": "dm",
+    "name": "dm_zzt_qtywsz_t",
+    "size": "86 MB"
+  },
+  "dm.dm_zzt_xssr_close_t": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_close_t",
+    "size": "1527 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t",
+    "size": "1096 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_20240326": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_20240326",
+    "size": "1132 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_20240417bak": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_20240417bak",
+    "size": "198 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_20240617_wjh": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_20240617_wjh",
+    "size": "235 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_20260429qyj": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_20260429qyj",
+    "size": "49 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_260331_wjh": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_260331_wjh",
+    "size": "338 MB"
+  },
+  "dm.dm_zzt_xssr_qt_t_bak20250402": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_qt_t_bak20250402",
+    "size": "241 MB"
+  },
+  "dm.dm_zzt_xssr_t": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_t",
+    "size": "14 GB"
+  },
+  "dm.dm_zzt_xssr_t0604": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_t0604",
+    "size": "218 MB"
+  },
+  "dm.dm_zzt_xssr_t_czy": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_t_czy",
+    "size": "0 bytes"
+  },
+  "dm.dm_zzt_xssr_t_tmp": {
+    "schema": "dm",
+    "name": "dm_zzt_xssr_t_tmp",
+    "size": "255 MB"
+  },
+  "dm.table_dbs_20220824_01": {
+    "schema": "dm",
+    "name": "table_dbs_20220824_01",
+    "size": "130 MB"
+  },
+  "dm.test_0913": {
+    "schema": "dm",
+    "name": "test_0913",
+    "size": "8192 bytes"
+  },
+  "dm.test_20240306": {
+    "schema": "dm",
+    "name": "test_20240306",
+    "size": "8192 bytes"
+  },
+  "dm.test_20240307001": {
+    "schema": "dm",
+    "name": "test_20240307001",
+    "size": "16 KB"
+  },
+  "dm.test_20240412": {
+    "schema": "dm",
+    "name": "test_20240412",
+    "size": "0 bytes"
+  },
+  "dm.tmp_test_20220915_v01": {
+    "schema": "dm",
+    "name": "tmp_test_20220915_v01",
+    "size": "7416 KB"
+  },
+  "dm.wm_ceramic_stock_structure_t": {
+    "schema": "dm",
+    "name": "wm_ceramic_stock_structure_t",
+    "size": "152 KB"
+  },
+  "dwrfin.DWRFIN.DWR_CRE_CUST_CREDIT_TMP": {
+    "schema": "dwrfin",
+    "name": "DWRFIN.DWR_CRE_CUST_CREDIT_TMP",
+    "size": "3928 KB"
+  },
+  "dwrfin.DWR_GL_MANUAL_ADJ_F_TMP": {
+    "schema": "dwrfin",
+    "name": "DWR_GL_MANUAL_ADJ_F_TMP",
+    "size": "0 bytes"
+  },
+  "dwrfin.dwr_ap_sup_trans_rcsf_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_sup_trans_rcsf_aging_f",
+    "size": "4872 KB"
+  },
+  "dwrfin.dwr_ap_sup_trans_rcsf_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_sup_trans_rcsf_aging_f_01",
+    "size": "1104 KB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f",
+    "size": "213 MB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f1203": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f1203",
+    "size": "34 MB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f_01",
+    "size": "1112 KB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f_1010": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f_1010",
+    "size": "26 MB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f_20240514bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f_20240514bak",
+    "size": "53 MB"
+  },
+  "dwrfin.dwr_ap_supplier_trans_aging_f_bak20240702": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_trans_aging_f_bak20240702",
+    "size": "56 MB"
+  },
+  "dwrfin.dwr_ap_supplier_transaction_d": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_transaction_d",
+    "size": "200 MB"
+  },
+  "dwrfin.dwr_ap_supplier_transaction_est_d": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_transaction_est_d",
+    "size": "113 MB"
+  },
+  "dwrfin.dwr_ap_supplier_transaction_est_d_bak20240702": {
+    "schema": "dwrfin",
+    "name": "dwr_ap_supplier_transaction_est_d_bak20240702",
+    "size": "1212 MB"
+  },
+  "dwrfin.dwr_ar_account_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_account_detail_f",
+    "size": "4120 MB"
+  },
+  "dwrfin.dwr_ar_ap_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_ap_detail_f",
+    "size": "916 MB"
+  },
+  "dwrfin.dwr_ar_ap_detail_f_0329": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_ap_detail_f_0329",
+    "size": "916 MB"
+  },
+  "dwrfin.dwr_ar_ap_detail_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_ap_detail_f_tmp",
+    "size": "0 bytes"
+  },
+  "dwrfin.dwr_ar_bill_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f",
+    "size": "298 MB"
+  },
+  "dwrfin.dwr_ar_bill_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f_01",
+    "size": "1608 KB"
+  },
+  "dwrfin.dwr_ar_bill_aging_f_1104": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f_1104",
+    "size": "2768 KB"
+  },
+  "dwrfin.dwr_ar_bill_aging_f_2": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f_2",
+    "size": "1840 KB"
+  },
+  "dwrfin.dwr_ar_bill_aging_f_20251106_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f_20251106_wjh",
+    "size": "6016 KB"
+  },
+  "dwrfin.dwr_ar_bill_aging_f_wjh_260331": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_bill_aging_f_wjh_260331",
+    "size": "6464 KB"
+  },
+  "dwrfin.dwr_ar_collection_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_collection_detail_f",
+    "size": "364 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f",
+    "size": "47 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_01",
+    "size": "47 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_0120210109": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_0120210109",
+    "size": "84 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_01_20240116": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_01_20240116",
+    "size": "100 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_0404": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_0404",
+    "size": "25 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_20240116": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_20240116",
+    "size": "99 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_20240703bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_20240703bak",
+    "size": "118 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_260331_wjh",
+    "size": "27 MB"
+  },
+  "dwrfin.dwr_ar_commercial_bill_capital_cost_f_bak240109": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_commercial_bill_capital_cost_f_bak240109",
+    "size": "82 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f",
+    "size": "3195 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_01",
+    "size": "14 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_01_0910_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_01_0910_wjh",
+    "size": "60 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_01_test_0909": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_01_test_0909",
+    "size": "11 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_0910_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_0910_wjh",
+    "size": "1949 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_1104": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_1104",
+    "size": "815 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_20241004bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_20241004bak",
+    "size": "1436 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_20251106_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_20251106_wjh",
+    "size": "2930 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_test_20250909": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_test_20250909",
+    "size": "409 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_tmp",
+    "size": "156 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_tmp1": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_tmp1",
+    "size": "154 MB"
+  },
+  "dwrfin.dwr_ar_credit_devalue_f_wjh_260331": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_credit_devalue_f_wjh_260331",
+    "size": "4822 MB"
+  },
+  "dwrfin.dwr_ar_cust_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_cust_detail_f",
+    "size": "938 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_1104": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_1104",
+    "size": "234 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f",
+    "size": "568 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f2": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f2",
+    "size": "489 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f_01",
+    "size": "2520 KB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f_20241005bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f_20241005bak",
+    "size": "496 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f_20241122": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f_20241122",
+    "size": "518 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f_20251106_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f_20251106_wjh",
+    "size": "740 MB"
+  },
+  "dwrfin.dwr_ar_n_receivable_aging_f_wjh_260331": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_n_receivable_aging_f_wjh_260331",
+    "size": "825 MB"
+  },
+  "dwrfin.dwr_ar_other_receivable_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_other_receivable_aging_f",
+    "size": "181 MB"
+  },
+  "dwrfin.dwr_ar_other_receivable_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_other_receivable_aging_f_01",
+    "size": "936 KB"
+  },
+  "dwrfin.dwr_ar_other_receivable_aging_f_20231011": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_other_receivable_aging_f_20231011",
+    "size": "9064 KB"
+  },
+  "dwrfin.dwr_ar_other_receivable_aging_f_20240614_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_other_receivable_aging_f_20240614_wjh",
+    "size": "12 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_1104": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_1104",
+    "size": "225 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023_info_2": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023_info_2",
+    "size": "985 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023_info_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023_info_f",
+    "size": "2042 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023_info_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023_info_f_01",
+    "size": "5232 KB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023_info_f_01_20241014_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023_info_f_01_20241014_wjh",
+    "size": "32 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023_info_f_20241014_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023_info_f_20241014_wjh",
+    "size": "32 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_2023bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_2023bak",
+    "size": "2152 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f",
+    "size": "790 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f2": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f2",
+    "size": "486 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_01",
+    "size": "3240 KB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_20241005bak": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_20241005bak",
+    "size": "477 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_20241122": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_20241122",
+    "size": "498 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_20251106_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_20251106_wjh",
+    "size": "782 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_bak1102": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_bak1102",
+    "size": "265 MB"
+  },
+  "dwrfin.dwr_ar_receivable_aging_f_wjh_260331": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_aging_f_wjh_260331",
+    "size": "892 MB"
+  },
+  "dwrfin.dwr_ar_receivable_balance_currency_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_balance_currency_f",
+    "size": "154 MB"
+  },
+  "dwrfin.dwr_ar_receivable_balance_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_balance_f",
+    "size": "135 MB"
+  },
+  "dwrfin.dwr_ar_receivable_balance_f_01": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_balance_f_01",
+    "size": "136 MB"
+  },
+  "dwrfin.dwr_ar_receivable_balance_f_wjh_260331": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_balance_f_wjh_260331",
+    "size": "1104 MB"
+  },
+  "dwrfin.dwr_ar_receivable_dereceived_reclassify_d": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_dereceived_reclassify_d",
+    "size": "95 MB"
+  },
+  "dwrfin.dwr_ar_receivable_froecast_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_froecast_f",
+    "size": "376 KB"
+  },
+  "dwrfin.dwr_ar_receivable_froecast_result_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_froecast_result_f",
+    "size": "32 KB"
+  },
+  "dwrfin.dwr_ar_receivable_turnover_days_f": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_receivable_turnover_days_f",
+    "size": "48 KB"
+  },
+  "dwrfin.dwr_ar_risk_level_f_t": {
+    "schema": "dwrfin",
+    "name": "dwr_ar_risk_level_f_t",
+    "size": "12 MB"
+  },
+  "dwrfin.dwr_cost_fund_cost_asset_d": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_asset_d",
+    "size": "90 MB"
+  },
+  "dwrfin.dwr_cost_fund_cost_fixed_assets_1204": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_fixed_assets_1204",
+    "size": "333 MB"
+  },
+  "dwrfin.dwr_cost_fund_cost_fixed_assets_d": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_fixed_assets_d",
+    "size": "103 MB"
+  },
+  "dwrfin.dwr_cost_fund_cost_fixed_assets_d_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_fixed_assets_d_260331_wjh",
+    "size": "90 MB"
+  },
+  "dwrfin.dwr_cost_fund_cost_supplier_d": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_supplier_d",
+    "size": "7176 KB"
+  },
+  "dwrfin.dwr_cost_fund_cost_supplier_d_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_cost_supplier_d_260331_wjh",
+    "size": "41 MB"
+  },
+  "dwrfin.dwr_cost_fund_prepaid_lt_asset_1204": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_prepaid_lt_asset_1204",
+    "size": "8832 KB"
+  },
+  "dwrfin.dwr_cost_fund_prepaid_lt_asset_d": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_prepaid_lt_asset_d",
+    "size": "2976 KB"
+  },
+  "dwrfin.dwr_cost_fund_prepaid_lt_asset_d_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_fund_prepaid_lt_asset_d_260331_wjh",
+    "size": "31 MB"
+  },
+  "dwrfin.dwr_cost_recovery_research_t": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_recovery_research_t",
+    "size": "94 MB"
+  },
+  "dwrfin.dwr_cost_trvapp_f": {
+    "schema": "dwrfin",
+    "name": "dwr_cost_trvapp_f",
+    "size": "129 MB"
+  },
+  "dwrfin.dwr_cre_cust_credit_f": {
+    "schema": "dwrfin",
+    "name": "dwr_cre_cust_credit_f",
+    "size": "1322 MB"
+  },
+  "dwrfin.dwr_cre_cust_credit_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_cre_cust_credit_tmp",
+    "size": "6264 KB"
+  },
+  "dwrfin.dwr_cre_integral_change_f": {
+    "schema": "dwrfin",
+    "name": "dwr_cre_integral_change_f",
+    "size": "7532 MB"
+  },
+  "dwrfin.dwr_cre_sw_integral_report_f": {
+    "schema": "dwrfin",
+    "name": "dwr_cre_sw_integral_report_f",
+    "size": "40 KB"
+  },
+  "dwrfin.dwr_fin_aam_accrual_ledger_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_aam_accrual_ledger_f",
+    "size": "130 MB"
+  },
+  "dwrfin.dwr_fin_amortization_ledger_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_amortization_ledger_f",
+    "size": "6024 KB"
+  },
+  "dwrfin.dwr_fin_budget_operations_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_budget_operations_f",
+    "size": "696 MB"
+  },
+  "dwrfin.dwr_fin_contract_ledger_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_contract_ledger_detail_f",
+    "size": "75 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t",
+    "size": "8497 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_01": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_01",
+    "size": "18 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_01_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_01_tmp",
+    "size": "220 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_202401": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_202401",
+    "size": "485 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_20240326": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_20240326",
+    "size": "1431 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_20240528_w_2022": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_20240528_w_2022",
+    "size": "930 MB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_20260429": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_20260429",
+    "size": "30 GB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_260331_wjh",
+    "size": "11 GB"
+  },
+  "dwrfin.dwr_fin_cost_d_compre_subj_t_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_cost_d_compre_subj_t_tmp",
+    "size": "0 bytes"
+  },
+  "dwrfin.dwr_fin_expense_apply_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_expense_apply_f",
+    "size": "1909 MB"
+  },
+  "dwrfin.dwr_fin_expense_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_expense_detail_f",
+    "size": "240 MB"
+  },
+  "dwrfin.dwr_fin_expense_reimbursement_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_expense_reimbursement_detail_f",
+    "size": "1012 MB"
+  },
+  "dwrfin.dwr_fin_inv_tax_detail_t": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_inv_tax_detail_t",
+    "size": "1421 MB"
+  },
+  "dwrfin.dwr_fin_invoice_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_invoice_detail_f",
+    "size": "81 MB"
+  },
+  "dwrfin.dwr_fin_order_contract_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_order_contract_detail_f",
+    "size": "2104 KB"
+  },
+  "dwrfin.dwr_fin_polaris_target_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_polaris_target_f",
+    "size": "576 KB"
+  },
+  "dwrfin.dwr_fin_proj_budget_t": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_proj_budget_t",
+    "size": "64 KB"
+  },
+  "dwrfin.dwr_fin_settlement_contract_doc_f_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_settlement_contract_doc_f_f",
+    "size": "64 KB"
+  },
+  "dwrfin.dwr_fin_travel_detail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fin_travel_detail_f",
+    "size": "705 MB"
+  },
+  "dwrfin.dwr_fp_budget_voucher_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_budget_voucher_f",
+    "size": "7528 KB"
+  },
+  "dwrfin.dwr_fp_budget_voucher_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_budget_voucher_tmp",
+    "size": "76 MB"
+  },
+  "dwrfin.dwr_fp_commitment_proj_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_commitment_proj_f",
+    "size": "20 MB"
+  },
+  "dwrfin.dwr_fp_commitment_proj_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_commitment_proj_tmp",
+    "size": "96 KB"
+  },
+  "dwrfin.dwr_fp_ext_cust_sale_budget_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_ext_cust_sale_budget_f",
+    "size": "507 MB"
+  },
+  "dwrfin.dwr_fp_ext_cust_sale_budget_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_ext_cust_sale_budget_f_tmp",
+    "size": "1816 KB"
+  },
+  "dwrfin.dwr_fp_ext_cust_sale_budget_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_ext_cust_sale_budget_tmp",
+    "size": "2400 KB"
+  },
+  "dwrfin.dwr_fp_fm_item_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_fm_item_f",
+    "size": "21 GB"
+  },
+  "dwrfin.dwr_fp_fm_item_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_fm_item_f_tmp",
+    "size": "109 MB"
+  },
+  "dwrfin.dwr_fp_fund_center_f": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_fund_center_f",
+    "size": "61 MB"
+  },
+  "dwrfin.dwr_fp_fund_center_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_fund_center_f_tmp",
+    "size": "216 KB"
+  },
+  "dwrfin.dwr_fp_fund_center_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_fp_fund_center_tmp",
+    "size": "288 KB"
+  },
+  "dwrfin.dwr_gl_account_voucher_dtl_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_account_voucher_dtl_f",
+    "size": "11 GB"
+  },
+  "dwrfin.dwr_gl_account_voucher_dtl_f_tmp1": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_account_voucher_dtl_f_tmp1",
+    "size": "0 bytes"
+  },
+  "dwrfin.dwr_gl_accounting_voucher_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_accounting_voucher_f",
+    "size": "1048 KB"
+  },
+  "dwrfin.dwr_gl_draft_voucher_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_draft_voucher_f",
+    "size": "40 MB"
+  },
+  "dwrfin.dwr_gl_group_dayrpt_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_group_dayrpt_f",
+    "size": "424 KB"
+  },
+  "dwrfin.dwr_gl_group_dayrpt_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_group_dayrpt_f_tmp",
+    "size": "424 KB"
+  },
+  "dwrfin.dwr_gl_invoice_conditional_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_invoice_conditional_f",
+    "size": "6445 MB"
+  },
+  "dwrfin.dwr_gl_invoice_head_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_invoice_head_f",
+    "size": "843 MB"
+  },
+  "dwrfin.dwr_gl_invoice_item_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_invoice_item_f",
+    "size": "10 GB"
+  },
+  "dwrfin.dwr_gl_invoice_voucher_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_invoice_voucher_f",
+    "size": "457 MB"
+  },
+  "dwrfin.dwr_gl_invoice_voucher_f_t": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_invoice_voucher_f_t",
+    "size": "44 GB"
+  },
+  "dwrfin.dwr_gl_manual_adj_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_manual_adj_f",
+    "size": "70 MB"
+  },
+  "dwrfin.dwr_gl_manual_adj_f_tmp_01": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_manual_adj_f_tmp_01",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_gl_manual_adj_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_manual_adj_tmp",
+    "size": "1002 MB"
+  },
+  "dwrfin.dwr_gl_performance_target_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_performance_target_f",
+    "size": "307 MB"
+  },
+  "dwrfin.dwr_gl_performance_target_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_performance_target_f_tmp",
+    "size": "308 MB"
+  },
+  "dwrfin.dwr_gl_points_voucher_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_points_voucher_f",
+    "size": "16 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_collect_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_collect_f",
+    "size": "155 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_f",
+    "size": "4778 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_f_20250429_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_f_20250429_wjh",
+    "size": "852 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_f_20250501_qyj": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_f_20250501_qyj",
+    "size": "837 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_f_260331_wjh": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_f_260331_wjh",
+    "size": "3099 MB"
+  },
+  "dwrfin.dwr_gl_pointsdetail_f_t": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_pointsdetail_f_t",
+    "size": "4969 MB"
+  },
+  "dwrfin.dwr_gl_sales_dept_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_sales_dept_f",
+    "size": "16 MB"
+  },
+  "dwrfin.dwr_gl_sales_dept_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_sales_dept_f_tmp",
+    "size": "88 KB"
+  },
+  "dwrfin.dwr_gl_sales_group_f": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_sales_group_f",
+    "size": "49 MB"
+  },
+  "dwrfin.dwr_gl_sales_group_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_gl_sales_group_f_tmp",
+    "size": "240 KB"
+  },
+  "dwrfin.dwr_mat_period_price_r": {
+    "schema": "dwrfin",
+    "name": "dwr_mat_period_price_r",
+    "size": "705 MB"
+  },
+  "dwrfin.dwr_prc_conditional_price_f": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_conditional_price_f",
+    "size": "17 GB"
+  },
+  "dwrfin.dwr_prc_conditional_price_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_conditional_price_tmp",
+    "size": "54 MB"
+  },
+  "dwrfin.dwr_prc_price_condition_f": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_price_condition_f",
+    "size": "149 MB"
+  },
+  "dwrfin.dwr_prc_price_condition_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_price_condition_f_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_prc_price_condition_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_price_condition_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_prc_prod_price_f": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_prod_price_f",
+    "size": "239 MB"
+  },
+  "dwrfin.dwr_prc_prod_price_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_prod_price_f_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_prc_prod_price_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_prc_prod_price_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_pretake_prepayments_prepayable_d": {
+    "schema": "dwrfin",
+    "name": "dwr_pretake_prepayments_prepayable_d",
+    "size": "40 MB"
+  },
+  "dwrfin.dwr_procure_order_his_f": {
+    "schema": "dwrfin",
+    "name": "dwr_procure_order_his_f",
+    "size": "2785 MB"
+  },
+  "dwrfin.dwr_qt_receivable_payable_reclassify_d": {
+    "schema": "dwrfin",
+    "name": "dwr_qt_receivable_payable_reclassify_d",
+    "size": "64 MB"
+  },
+  "dwrfin.dwr_sap_adjust_data_t": {
+    "schema": "dwrfin",
+    "name": "dwr_sap_adjust_data_t",
+    "size": "2733 MB"
+  },
+  "dwrfin.dwr_tax_invoice_f": {
+    "schema": "dwrfin",
+    "name": "dwr_tax_invoice_f",
+    "size": "67 MB"
+  },
+  "dwrfin.dwr_tax_invoice_f_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_tax_invoice_f_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_tax_invoice_tmp": {
+    "schema": "dwrfin",
+    "name": "dwr_tax_invoice_tmp",
+    "size": "72 KB"
+  },
+  "dwrfin.dwr_tr_fixedassets_f": {
+    "schema": "dwrfin",
+    "name": "dwr_tr_fixedassets_f",
+    "size": "14 MB"
+  },
+  "dwrfin.dwrfin_cost_sales_gross_profit_d": {
+    "schema": "dwrfin",
+    "name": "dwrfin_cost_sales_gross_profit_d",
+    "size": "438 MB"
+  },
+  "dwrfin.dwrfin_cost_sales_gross_profit_sku_d": {
+    "schema": "dwrfin",
+    "name": "dwrfin_cost_sales_gross_profit_sku_d",
+    "size": "631 MB"
+  },
+  "dwrfin.tmp_20211222": {
+    "schema": "dwrfin",
+    "name": "tmp_20211222",
+    "size": "72 KB"
+  }
+}

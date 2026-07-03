@@ -1,0 +1,8 @@
+{
+    "name": "DWR_FP_FM_ITEM_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN",
+    "description": "在资金管理中的FI行项目",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

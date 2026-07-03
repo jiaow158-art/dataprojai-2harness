@@ -1,0 +1,8 @@
+{
+    "name": "HWB_TEST",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/COST",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

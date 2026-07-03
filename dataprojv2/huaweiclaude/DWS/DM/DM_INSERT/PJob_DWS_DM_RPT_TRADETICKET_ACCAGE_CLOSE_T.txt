@@ -1,0 +1,60 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：商票账龄、减值报表（定版）
+-- create time: 2022/09/29 17:06:29 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM dm.dm_rpt_tradeticket_accage_close_t
+ WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))
+ ;
+insert into dm.dm_rpt_tradeticket_accage_close_t
+  SELECT EDITION_DATE,	--定版日期	
+		 AC_DOC_NR,    --凭证 			
+		 CALDAY,     	--日历日  		
+		 CALMONTH,     --日历年/月			
+		 COMP_CODE,    --公司代码 			
+		 COMP_CODE___T,   --公司描述  		
+		 CUSTOMER,     	--客户编码		
+		 CUSTOMER___T,   --客户描述  		
+		 COSTCENTER,     --成本中心		
+		 COSTCENTER___T,   --成本中心描述  	
+		 GL_ACCOUNT,     	--总账科目	
+		 GL_ACCOUNT___T,  --科目描述   	
+		 PLANT,     	--工厂			
+		 PLANT___T,     	--工厂描述		
+		 SALES_GRP,   --销售组  			
+		 SALES_GRP___T,     --销售组描述		
+		 PSTNG_DATE,     	--凭证日期	
+		 ZAFI_P007_NETDUEDATE,   --到期日
+		 ZAFI_P007_WDATE,    	--汇票签发日
+		 ZPJJE,     		--票据金额		
+		 ZYSBJ_MYQ_AMT,  -- 总应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_B_1_Y_AMT,  -- 2020年前1年内应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_B_1_2_Y_AMT,  -- 2020年前1-2年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_B_2_3_Y_AMT,  -- 2020年前2-3年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_B_3_4_Y_AMT,  -- 2020年前3-4年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_B_4_Y_AMT,  -- 2020年前4年以上应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_A_1_Y_AMT,  -- 2020年后1年内应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_A_1_2_Y_AMT,  -- 2020年后1-2年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_A_2_3_Y_AMT,  -- 2020年后2-3年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_A_3_4_Y_AMT,  -- 2020年后3-4年应收票据金额-未逾期
+		 ZYSBJ_MYQ_2020_A_4_Y_AMT,  -- 2020年后4年以上应收票据金额-未逾期
+		 ZYSBJ_YQ_AMT , -- 总应收票据金额-逾期
+		 ZYSBJ_YQ_1_M_AMT , -- 应收票据金额-逾期超过一个月
+		 ZYSBJ_YQ_B_1_Y_AMT , -- 2020年前1年内应收票据金额-逾期
+		 ZYSBJ_YQ_B_1_2_Y_AMT , -- 2020年前1-2年应收票据金额-逾期
+		 ZYSBJ_YQ_B_2_3_Y_AMT , -- 2020年前2-3年应收票据金额-逾期
+		 ZYSBJ_YQ_B_3_4_Y_AMT , -- 2020年前3-4年应收票据金额-逾期
+		 ZYSBJ_YQ_B_4_Y_AMT , -- 2020年前4年以上应收票据金额-逾期
+		 ZYSBJ_YQ_A_1_Y_AMT , -- 2020年后1年内应收票据金额-逾期
+		 ZYSBJ_YQ_A_1_2_Y_AMT , -- 2020年后1-2年应收票据金额-逾期
+		 ZYSBJ_YQ_A_2_3_Y_AMT , -- 2020年后2-3年应收票据金额-逾期
+		 ZYSBJ_YQ_A_3_4_Y_AMT , -- 2020年后3-4年应收票据金额-逾期
+		 ZYSBJ_YQ_A_4_Y_AMT , -- 2020年后4年以上应收票据金额-逾期
+		 ZCJC_YSPJ_WYQ_JC_AMT, -- 资产减值-应收票据未逾期减值
+		 ZCJC_YSPJ_YQ_JC_AMT, -- 资产减值-应收票据逾期减值
+		 ZYSPJ_JC_AMT,-- 总应收票据减值
+		 current_timestamp as dw_last_update_date, -- 数据同步时间
+		 WBS_ELEMT	-- WBS元素
+    FROM dm.dm_rpt_tradeticket_accage_t
+   WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))

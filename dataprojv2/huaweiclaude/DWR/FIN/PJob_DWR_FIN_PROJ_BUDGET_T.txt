@@ -1,0 +1,53 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/12/12 10:21:24 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+with tmp1 as (
+select 
+ d.project_code -- 项目代码,
+,d.project_name
+,p.year --年度
+,d.period_name -- 期间
+,s.name --预算主体
+,p.code -- 预算池代码
+,p.inject_amount -- 注入金额
+from sdi.sdi_pool_1039 p
+join sdi.sdi_dimension_attribute_1039 d
+on p.subject_id = d.subject_id and p.attribute_code = d.attribute_code and d.project <> 'none'
+join sdi.sdi_subject_1039 s on p.subject_id = s.id and s.classification = 'PROJECT' and s.frozen_ = 0
+join sdi.sdi_corporation_project_1039 cp on d.project = cp.id
+where p.inject_amount <> 0
+)
+,tmp2 as (
+SELECT 
+ A.wbs_level3
+,A.wbs_level3_desc
+,B.WTGES
+FROM DWRDIM.DWR_DIM_WBS_BASIS_INFO_F A
+JOIN SDI.SDI_BPGE_1001 B
+ON A.WBS_level3_object = B.OBJNR
+WHERE B.VORGA = 'KBUD' AND B.WRTTP = '41'
+)
+insert overwrite table dwrfin.dwr_fin_proj_budget_t
+SELECT 
+ T1.project_code AS WBS_CODE -- WBS代码
+,T1.project_name AS WBS_NAME -- WBS名称
+,T1.inject_amount AS PROJ_BUDGET_AMT --项目金额
+,'FSSC' AS FLAG 
+,current_timestamp as dw_last_update_date
+from TMP1 T1
+UNION ALL 
+SELECT 
+ T2.wbs_level3 AS WBS_CODE -- WBS代码
+,T2.wbs_level3_desc AS WBS_NAME -- WBS名称
+,T2.WTGES AS PROJ_BUDGET_AMT --项目金额
+,'SAP' AS FLAG 
+,current_timestamp as dw_last_update_date
+FROM TMP2 T2
+
+

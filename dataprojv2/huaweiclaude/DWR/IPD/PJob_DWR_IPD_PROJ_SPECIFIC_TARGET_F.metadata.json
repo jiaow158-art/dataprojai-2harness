@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_IPD_PROJ_SPECIFIC_TARGET_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/IPD",
+    "description": "项目具体目标",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwripd"
+}

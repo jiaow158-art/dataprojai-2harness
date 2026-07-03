@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB43",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "大规格产品销售面积占比（整装头部）ZB43",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

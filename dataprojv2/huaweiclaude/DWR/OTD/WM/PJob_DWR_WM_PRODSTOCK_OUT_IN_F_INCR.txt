@@ -1,0 +1,12 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2024/06/18 10:57:18 GMT+08:00
+-- description:用于DWR_WM_PRODSTOCK_OUT_IN_F增量同步
+-- history list:
+-- UPDATE FROM 杨俊华  20240618 新增脚本
+-- ******************************************************************** -
+
+select concat_ws(",",collect_set(concat("'",period_id_m,"'"))) as min_period_id_m  
+from DWROTD.DWR_WM_PRODSTOCK_OUT_IN_F
+where DW_LAST_UPDATE_DATE>=current_date

@@ -1,0 +1,8 @@
+{
+    "name": "DWR_WM_PRODSTOCK_OUT_IN_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "SAP成品出入库表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

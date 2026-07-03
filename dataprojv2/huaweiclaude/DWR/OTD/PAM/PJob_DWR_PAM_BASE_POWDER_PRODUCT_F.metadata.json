@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PAM_BASE_POWDER_PRODUCT_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PAM",
+    "description": "粉料产量记录表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

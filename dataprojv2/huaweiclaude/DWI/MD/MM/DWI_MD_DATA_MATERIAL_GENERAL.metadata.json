@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_DATA_MATERIAL_GENERAL",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/MM",
+    "description": "产品基础主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

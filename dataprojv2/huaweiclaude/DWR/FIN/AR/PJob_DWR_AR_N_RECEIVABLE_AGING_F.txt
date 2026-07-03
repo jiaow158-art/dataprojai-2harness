@@ -1,0 +1,541 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/03/06 10:59:24 GMT+08:00
+-- table desc：应收未逾期账龄 DWRFIN.DWR_AR_N_RECEIVABLE_AGING_F
+-- update：2023/04/12 guzhengfeng 查询数据落到中间表
+-- update：2023/04/21 guzhengfeng 新增销售组-主档取数逻辑
+-- update：2023/05/29 guzhengfeng 1、在读取销售组的时候，增加一个条件，就是读取knvv的时候，限定读取销售组不为空的记录；2、更新事业部取值逻辑
+-- update：2023/06/14 guzhengfeng 在读取销售组的时候，增加一个条件，就是读取knvv的时候，按组织VKORG和客编KUNNR排序
+-- update：2023/06/30 guzhengfeng 1、修改销售组-主档取值逻辑，当WBS-销售组非空时，取WBS-销售组，否则取T1.VKGRP；2、组织架构树更换，事业部取值来源表同步更换
+-- update：2023/07/06 guzhengfeng 修改销售组-主档取值逻辑（非冻结KNVV-FAKSD为空）
+-- update：2023/09/11 guzhengfeng 统一传参格式为：yyyy-MM-dd
+-- update：2023/10/11 guzhengfeng 月结1-5号跑上月月底的数据
+-- update：2023/10/26 guzhengfeng 切换底表
+-- update：2023/11/03 zhangpeng 增加客户明细表字段SPECIAL_GENERAL_LEDGER空值的取数据
+-- update：2023/11/04 ZHANGPENG 月结1-3号跑上月月底的数据
+-- update：2023/11/30 ZHANGPENG 代码优化
+-- update 20240524 zhz 新增客户组、销售人员
+-- UPDATE: 20240905 ZHZ 修改月结3号不自动跑上月数
+-- UPDATE: 20241208 qyj 逻辑调整
+-- ******************************************************************** --
+-- 创建中间表 DWRFIN.DWR_AR_M2_F
+DROP TABLE IF EXISTS `DWRFIN.DWR_AR_M2_F`;
+CREATE TABLE IF NOT EXISTS `DWRFIN.DWR_AR_M2_F`(
+	`comp_code` string COMMENT '公司代码',
+	`cust_code` string COMMENT '客户编码',
+	`cust_name` string COMMENT '客户全称',
+	`sales_group_master_file` string COMMENT '销售组-主档',
+	`wbs` string COMMENT 'WBS',
+	`wbs_sales_group` string COMMENT 'WBS-销售组',
+	`special_general_ledger` string COMMENT '特别总账',
+	`general_ledger_account` string COMMENT '总账科目',
+	`currency` string COMMENT '货币',
+	`amt` decimal(38,2) COMMENT '金额',
+	`due_date` timestamp COMMENT '到期日',
+	`due_days` decimal(38,2) COMMENT '到期天数',
+	`bldat` timestamp COMMENT '凭证日期',
+	`n_overdue_due_days` decimal(38,2) COMMENT '未逾期到期天数',
+	`so_group_code` string COMMENT '订单组编码')
+COMMENT '应收未逾期账龄中间表'
+;
+
+-- 将数据插入中间表 DWRFIN.DWR_AR_M2_F
+WITH AGING AS (
+SELECT
+	T.COMP_CODE					    AS COMP_CODE					-- 公司代码                	
+	,T.CUST_CODE                    AS CUST_CODE                    -- 客户编码
+	,T.CUST_NAME                    AS CUST_NAME                    -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE      AS SALES_GROUP_MASTER_FILE      -- 销售组-主档
+	,T.WBS                          AS WBS                          -- WBS
+	,T.WBS_SALES_GROUP              AS WBS_SALES_GROUP              -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER       AS SPECIAL_GENERAL_LEDGER       -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT       AS GENERAL_LEDGER_ACCOUNT       -- 总账科目
+	,T.CUR_CURRENCY                 AS CURRENCY                     -- 货币
+	,T.CUR_CU_CLOS_BALANCE_AMT      AS AMT                          -- 金额
+	,T.DUE_DATE                     AS DUE_DATE                     -- 到期日
+	,to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+                                    AS DATE1						-- 查询日期
+	,T.VOUCHER_DATE					AS VOUCHER_DATE					-- 凭证日期
+	,T.SO_GROUP_CODE                AS SO_GROUP_CODE                -- 订单组编码
+	,row_number ()over(partition by t.COMP_CODE,t.CUST_CODE,t.WBS,t.SPECIAL_GENERAL_LEDGER,t.GENERAL_LEDGER_ACCOUNT,t.CUR_CURRENCY,t.SO_GROUP_CODE 
+	 order by t.DW_LAST_UPDATE_DATE desc) as rn
+FROM 
+	DWRFIN.DWR_AR_CUST_DETAIL_F T
+WHERE T.POSTING_DATE <= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+AND T.CLEAR_DATE > to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+AND (T.SPECIAL_GENERAL_LEDGER IN('','U','Q','M','&') OR T.SPECIAL_GENERAL_LEDGER IS NULL)
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_M2_F
+SELECT
+	T1.COMP_CODE					AS COMP_CODE					-- 公司代码                	
+	,T1.CUST_CODE                   AS CUST_CODE                   	-- 客户编码
+	,T2.CUST_NAME                   AS CUST_NAME                   	-- 客户全称
+	,T2.SALES_GROUP_MASTER_FILE     AS SALES_GROUP_MASTER_FILE     	-- 销售组-主档
+	,T1.WBS                         AS WBS                         	-- WBS
+	,T2.WBS_SALES_GROUP             AS WBS_SALES_GROUP             	-- WBS-销售组
+	,T1.SPECIAL_GENERAL_LEDGER      AS SPECIAL_GENERAL_LEDGER      	-- 特别总账
+	,T1.GENERAL_LEDGER_ACCOUNT      AS GENERAL_LEDGER_ACCOUNT      	-- 总账科目
+	,T1.CURRENCY                	AS CURRENCY                    	-- 货币
+	,T1.AMT     					AS AMT                         	-- 金额
+	,T1.DUE_DATE                    AS DUE_DATE                    	-- 到期日
+	,CASE WHEN day(T1.DATE1 - T1.DUE_DATE) >= 0 THEN day(T1.DATE1 - T1.DUE_DATE)
+		ELSE 0
+	END 							AS DUE_DAYS						-- 到期天数
+	,T1.VOUCHER_DATE				AS VOUCHER_DATE					-- 凭证日期
+	,CASE WHEN day(T1.DUE_DATE - T1.DATE1) >= 0 THEN
+			CASE WHEN day(T1.DATE1 - T1.VOUCHER_DATE) >= 0 THEN day(T1.DATE1 - T1.VOUCHER_DATE)
+				ELSE 0
+			END 
+		ELSE -1
+	END 							AS N_OVERDUE_DUE_DAYS			-- 未逾期到期天数
+	,T1.SO_GROUP_CODE				AS SO_GROUP_CODE				-- 订单组编码
+FROM 
+	AGING T1
+join AGING t2 on T1.COMP_CODE   = T2.COMP_CODE		    
+AND T1.CUST_CODE		        = T2.CUST_CODE
+AND NVL(T1.WBS,'SNULL')			= NVL(T2.WBS,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T2.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T2.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T2.SO_GROUP_CODE,'SNULL')
+and NVL(T1.CURRENCY,'SNULL')		    = NVL(T2.CURRENCY,'SNULL')
+and t2.rn=1
+;
+
+-- 创建目标表
+DROP TABLE IF EXISTS `DWRFIN.DWR_AR_N_RECEIVABLE_AGING_F`;
+CREATE TABLE IF NOT EXISTS `DWRFIN.DWR_AR_N_RECEIVABLE_AGING_F`(
+	`query_date` string COMMENT '查询日期',
+	`comp_code` string COMMENT '公司代码',
+	`cust_code` string COMMENT '客户编码',
+	`cust_name` string COMMENT '客户全称',
+	`sales_group_master_file` string COMMENT '销售组-主档',
+	`wbs` string COMMENT 'WBS',
+	`wbs_sales_group` string COMMENT 'WBS-销售组',
+	`special_general_ledger` string COMMENT '特别总账',
+	`general_ledger_account` string COMMENT '总账科目',
+	`currency` string COMMENT '货币',
+	`local_currency_balance_sum` decimal(38,2) COMMENT '本币累计余额',
+	`repay_amt` decimal(38,2) COMMENT '回款金额',
+	`overdue_receivables` decimal(38,2) COMMENT '逾期应收',
+	`n_overdue_receivables` decimal(38,2) COMMENT '未逾期应收余额',
+	`n_overdue_receivables_0_365` decimal(38,2) COMMENT '1年内未逾期应收余额',
+	`n_overdue_receivables_366_730` decimal(38,2) COMMENT '1-2年未逾期应收余额',
+	`n_overdue_receivables_731_1095` decimal(38,2) COMMENT '2-3年未逾期应收余额',
+	`n_overdue_receivables_1096_1460` decimal(38,2) COMMENT '3-4年未逾期应收余额',
+	`n_overdue_receivables_1461` decimal(38,2) COMMENT '4年以上未逾期应收余额',
+	`business_department` string COMMENT '事业部',
+	`dw_last_update_date` timestamp COMMENT '数据同步时间',
+	`so_group_code` string COMMENT '订单组编码',
+	`cust_grp_code` string COMMENT '客户组编码',
+	`sales_emp_code` string COMMENT '销售人员')
+COMMENT '应收未逾期账龄'
+;
+
+-- 取本币累计余额、回款金额、逾期应收、1年内未逾期应收、1-2年内未逾期应收、2-3年内未逾期应收、3-4年内未逾期应收、4年以上未逾期应收
+WITH ACDOCA4 AS(
+SELECT 
+	T1.COMP_CODE		    			            AS COMP_CODE                            -- 公司代码
+	,T1.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T1.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T1.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T1.WBS							                AS WBS                                  -- WBS
+	,T1.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T1.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T1.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T1.CURRENCY		    				        AS CURRENCY                             -- 货币
+	,T1.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,NVL(T1.LOCAL_CURRENCY_BALANCE_SUM,0)           AS LOCAL_CURRENCY_BALANCE_SUM           -- 本币累计余额
+	,NVL(T2.REPAY_AMT,0)                            AS REPAY_AMT                            -- 回款金额
+	,NVL(T3.OVERDUE_RECEIVABLES,0)                  AS OVERDUE_RECEIVABLES                  -- 逾期应收
+	,NVL(T4.N_OVERDUE_RECEIVABLES_0_365,0)	        AS N_OVERDUE_RECEIVABLES_0_365          -- 1年内未逾期应收余额
+	,NVL(T5.N_OVERDUE_RECEIVABLES_366_730,0)	    AS N_OVERDUE_RECEIVABLES_366_730        -- 1-2年未逾期应收余额
+	,NVL(T6.N_OVERDUE_RECEIVABLES_731_1095,0)	    AS N_OVERDUE_RECEIVABLES_731_1095       -- 2-3年未逾期应收余额
+	,NVL(T7.N_OVERDUE_RECEIVABLES_1096_1460,0)	    AS N_OVERDUE_RECEIVABLES_1096_1460      -- 3-4年未逾期应收余额
+	,NVL(T8.N_OVERDUE_RECEIVABLES_1461,0)	        AS N_OVERDUE_RECEIVABLES_1461           -- 4年以上未逾期应收余额
+FROM
+-- 取本币累计余额：按公司代码、客户编码、销售组-主档、WBS、特别总账、总账科目维度，过账日期（ACDOCA-BUDAT）小于等于‘查询日期’的本币金额汇总
+(SELECT
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS LOCAL_CURRENCY_BALANCE_SUM          	-- 本币累计余额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T1
+
+LEFT JOIN 
+-- 取回款金额：按公司代码、客户编码、销售组-主档、WBS、特别总账、总账科目维度，金额小于0的本币金额汇总
+(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS REPAY_AMT                			-- 回款金额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE T.AMT < 0
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T2
+ON 
+T1.COMP_CODE                    = T2.COMP_CODE		    
+AND T1.CUST_CODE		        = T2.CUST_CODE
+AND T1.CUST_NAME			    = T2.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T2.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T2.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T2.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T2.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T2.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T2.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 取逾期应收：按公司代码、客户编码、销售组-主档、WBS、特别总账、总账科目维度，金额大于0，而且“到期日”<“查询日期”的本币金额汇总,汇总金额与“回款金额”合计，当小于0时，值为0；
+(
+SELECT
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码 
+	,SUM(T.AMT) 									AS OVERDUE_RECEIVABLES      			-- 逾期应收
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE T.AMT > 0 AND T.DUE_DATE < to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd'))) 
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T3
+ON 
+T1.COMP_CODE                    = T3.COMP_CODE		    
+AND T1.CUST_CODE		        = T3.CUST_CODE
+AND T1.CUST_NAME			    = T3.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T3.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T3.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T3.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T3.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T3.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T3.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 0<=未逾期到期天数<=365，金额大于0
+(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS N_OVERDUE_RECEIVABLES_0_365			-- 1年内未逾期应收余额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE 1=1 
+-- and T.AMT > 0 
+AND T.DUE_DATE >= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))  
+AND 0 <= T.N_OVERDUE_DUE_DAYS AND T.N_OVERDUE_DUE_DAYS <= 365
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T4
+ON 
+T1.COMP_CODE                    = T4.COMP_CODE		    
+AND T1.CUST_CODE		        = T4.CUST_CODE
+AND T1.CUST_NAME			    = T4.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T4.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T4.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T4.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T4.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T4.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T4.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 366<=未逾期到期天数<=730，金额大于0
+(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS N_OVERDUE_RECEIVABLES_366_730		-- 1-2年未逾期应收余额
+FROM DWRFIN.DWR_AR_M2_F T
+WHERE 1=1 
+-- and T.AMT > 0 
+AND T.DUE_DATE >= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))  
+AND 366 <= T.N_OVERDUE_DUE_DAYS AND T.N_OVERDUE_DUE_DAYS <= 730
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T5
+ON 
+T1.COMP_CODE                    = T5.COMP_CODE		    
+AND T1.CUST_CODE		        = T5.CUST_CODE
+AND T1.CUST_NAME			    = T5.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T5.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T5.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T5.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T5.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T5.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T5.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 731<=未逾期到期天数<=1095，金额大于0
+(
+SELECT
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码 
+	,SUM(T.AMT) 									AS N_OVERDUE_RECEIVABLES_731_1095		-- 2-3年未逾期应收余额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE 1=1 
+-- and T.AMT > 0 
+AND T.DUE_DATE >= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))  
+AND 731 <= T.N_OVERDUE_DUE_DAYS AND T.N_OVERDUE_DUE_DAYS <= 1095
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T6
+ON 
+T1.COMP_CODE                    = T6.COMP_CODE		    
+AND T1.CUST_CODE		        = T6.CUST_CODE
+AND T1.CUST_NAME			    = T6.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T6.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T6.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T6.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T6.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T6.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T6.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 1096<=未逾期到期天数<=1460，金额大于0
+(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS N_OVERDUE_RECEIVABLES_1096_1460		-- 3-4年未逾期应收余额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE 1=1
+-- and T.AMT > 0 
+AND T.DUE_DATE >= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))  
+AND 1096 <= T.N_OVERDUE_DUE_DAYS AND T.N_OVERDUE_DUE_DAYS <= 1460
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T7
+ON 
+T1.COMP_CODE                    = T7.COMP_CODE		    
+AND T1.CUST_CODE		        = T7.CUST_CODE
+AND T1.CUST_NAME			    = T7.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T7.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T7.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T7.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T7.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T7.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T7.SO_GROUP_CODE,'SNULL')
+
+LEFT JOIN 
+-- 1461<=未逾期到期天数，金额大于0
+(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(T.AMT) 									AS N_OVERDUE_RECEIVABLES_1461			-- 4年以上未逾期应收余额
+FROM 
+	DWRFIN.DWR_AR_M2_F T
+WHERE 1=1 
+-- and T.AMT > 0 
+AND T.DUE_DATE >= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd'))) 
+AND T.N_OVERDUE_DUE_DAYS >= 1461
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+) T8
+ON 
+T1.COMP_CODE                    = T8.COMP_CODE		    
+AND T1.CUST_CODE		        = T8.CUST_CODE
+AND T1.CUST_NAME			    = T8.CUST_NAME
+AND NVL(T1.SALES_GROUP_MASTER_FILE,'SNULL')  = NVL(T8.SALES_GROUP_MASTER_FILE,'SNULL')
+AND NVL(T1.WBS,'SNULL')					    = NVL(T8.WBS,'SNULL')
+AND NVL(T1.WBS_SALES_GROUP,'SNULL')		    = NVL(T8.WBS_SALES_GROUP,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T8.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T8.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T8.SO_GROUP_CODE,'SNULL')
+)
+,
+-- 取本币累计余额、回款金额、逾期应收、1-90天逾期应收、91-275天逾期应收、276天-2年逾期应收、2-4年逾期应收、4年以上逾期应收
+ACDOCA40 AS(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,T.LOCAL_CURRENCY_BALANCE_SUM                   AS LOCAL_CURRENCY_BALANCE_SUM           -- 本币累计余额
+	,T.REPAY_AMT                                    AS REPAY_AMT                            -- 回款金额
+	,CASE WHEN T.OVERDUE_RECEIVABLES + T.REPAY_AMT >= 0 THEN T.OVERDUE_RECEIVABLES + T.REPAY_AMT
+		ELSE 0
+	END OVERDUE_RECEIVABLES                                                                	-- 逾期应收
+	,T.N_OVERDUE_RECEIVABLES_0_365	                AS N_OVERDUE_RECEIVABLES_0_365          -- 1年内未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_366_730	            AS N_OVERDUE_RECEIVABLES_366_730        -- 1-2年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_731_1095	            AS N_OVERDUE_RECEIVABLES_731_1095       -- 2-3年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1096_1460	            AS N_OVERDUE_RECEIVABLES_1096_1460      -- 3-4年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1461	                AS N_OVERDUE_RECEIVABLES_1461           -- 4年以上未逾期应收余额
+FROM 
+	ACDOCA4 T
+)
+,
+ACDOCA41 AS(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,T.LOCAL_CURRENCY_BALANCE_SUM                   AS LOCAL_CURRENCY_BALANCE_SUM           -- 本币累计余额
+	,T.REPAY_AMT                                    AS REPAY_AMT                            -- 回款金额
+	,T.OVERDUE_RECEIVABLES                          AS OVERDUE_RECEIVABLES                  -- 逾期应收
+	,CASE WHEN T.LOCAL_CURRENCY_BALANCE_SUM - T.OVERDUE_RECEIVABLES >= 0 THEN T.LOCAL_CURRENCY_BALANCE_SUM - T.OVERDUE_RECEIVABLES
+		ELSE 0
+	END N_OVERDUE_RECEIVABLES                                                              	-- 未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_0_365	                AS N_OVERDUE_RECEIVABLES_0_365          -- 1年内未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_366_730	            AS N_OVERDUE_RECEIVABLES_366_730        -- 1-2年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_731_1095	            AS N_OVERDUE_RECEIVABLES_731_1095       -- 2-3年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1096_1460	            AS N_OVERDUE_RECEIVABLES_1096_1460      -- 3-4年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1461	                AS N_OVERDUE_RECEIVABLES_1461           -- 4年以上未逾期应收余额
+FROM 
+	ACDOCA40 T
+)
+,ACDOCA5_pd as  
+(
+SELECT
+	T.COMP_CODE		    			    		AS COMP_CODE							-- 公司代码
+	,T.CUST_CODE		    					AS CUST_CODE							-- 客户编码
+	,T.WBS							        	AS WBS									-- WBS
+	,T.GENERAL_LEDGER_ACCOUNT		    		AS GENERAL_LEDGER_ACCOUNT				-- 总账科目
+	,T.SO_GROUP_CODE							AS SO_GROUP_CODE						-- 订单组编码 
+	,sum(T.LOCAL_CURRENCY_BALANCE_SUM)           	AS LOCAL_CURRENCY_BALANCE_SUM			-- 本币累计余额
+FROM ACDOCA4 T
+GROUP BY 
+	T.COMP_CODE	
+	,T.CUST_CODE
+	,T.WBS
+	,T.GENERAL_LEDGER_ACCOUNT
+	,T.SO_GROUP_CODE
+)
+,
+ACDOCA5 AS(
+SELECT 
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,T.LOCAL_CURRENCY_BALANCE_SUM           		AS LOCAL_CURRENCY_BALANCE_SUM			-- 本币累计余额
+	,T.REPAY_AMT                            		AS REPAY_AMT							-- 回款金额
+	,T.OVERDUE_RECEIVABLES                  		AS OVERDUE_RECEIVABLES					-- 逾期应收
+	,T.N_OVERDUE_RECEIVABLES                		AS N_OVERDUE_RECEIVABLES				-- 未逾期应收余额
+	,case when T1.LOCAL_CURRENCY_BALANCE_SUM > 0 then T.N_OVERDUE_RECEIVABLES_0_365	 else 0 end AS N_OVERDUE_RECEIVABLES_0_365        	-- 1年内未逾期应收余额
+	,case when T1.LOCAL_CURRENCY_BALANCE_SUM > 0 then T.N_OVERDUE_RECEIVABLES_366_730  else 0 end AS N_OVERDUE_RECEIVABLES_366_730       	-- 1-2年未逾期应收余额
+	,case when T1.LOCAL_CURRENCY_BALANCE_SUM > 0 then T.N_OVERDUE_RECEIVABLES_731_1095  else 0 end AS N_OVERDUE_RECEIVABLES_731_1095      	-- 2-3年未逾期应收余额
+	,case when T1.LOCAL_CURRENCY_BALANCE_SUM > 0 then T.N_OVERDUE_RECEIVABLES_1096_1460  else 0 end AS N_OVERDUE_RECEIVABLES_1096_1460     	-- 3-4年未逾期应收余额
+	,case when T1.LOCAL_CURRENCY_BALANCE_SUM > 0 then T.N_OVERDUE_RECEIVABLES_1461 else 0 end AS N_OVERDUE_RECEIVABLES_1461          	-- 4年以上未逾期应收余额
+ FROM 
+	ACDOCA41 T
+ left join ACDOCA5_pd T1 on T.COMP_CODE = T1.COMP_CODE and T.CUST_CODE = T1.CUST_CODE and T.WBS = T1.WBS and T.GENERAL_LEDGER_ACCOUNT = T1.GENERAL_LEDGER_ACCOUNT and T.SO_GROUP_CODE = T1.SO_GROUP_CODE
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_N_RECEIVABLE_AGING_F
+SELECT 
+	CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END 								AS QUERY_DATE							-- 查询日期
+	,T.COMP_CODE		    						AS COMP_CODE							-- 公司代码
+	,T.CUST_CODE		    						AS CUST_CODE							-- 客户编码
+	,T.CUST_NAME									AS CUST_NAME							-- 客户全称
+	,T.SALES_GROUP_MASTER_FILE						AS SALES_GROUP_MASTER_FILE				-- 销售组-主档
+	,T.WBS											AS WBS									-- WBS
+	,T.WBS_SALES_GROUP								AS WBS_SALES_GROUP						-- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    			AS SPECIAL_GENERAL_LEDGER				-- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    			AS GENERAL_LEDGER_ACCOUNT				-- 总账科目
+	,T.CURRENCY		    							AS CURRENCY								-- 货币
+	,T.LOCAL_CURRENCY_BALANCE_SUM					AS LOCAL_CURRENCY_BALANCE_SUM			-- 本币累计余额
+	,T.REPAY_AMT                            		AS REPAY_AMT                        	-- 回款金额
+	,T.OVERDUE_RECEIVABLES 							AS OVERDUE_RECEIVABLES					-- 逾期应收
+	,T.N_OVERDUE_RECEIVABLES                		AS N_OVERDUE_RECEIVABLES            	-- 未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_0_365        			AS N_OVERDUE_RECEIVABLES_0_365			-- 1年内未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_366_730       			AS N_OVERDUE_RECEIVABLES_366_730		-- 1-2年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_731_1095      			AS N_OVERDUE_RECEIVABLES_731_1095		-- 2-3年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1096_1460     			AS N_OVERDUE_RECEIVABLES_1096_1460		-- 3-4年未逾期应收余额
+	,T.N_OVERDUE_RECEIVABLES_1461          			AS N_OVERDUE_RECEIVABLES_1461			-- 4年以上未逾期应收余额
+	,CASE WHEN T.WBS_SALES_GROUP IS NULL OR T.WBS_SALES_GROUP = '' THEN T6.NODE_NAME2
+		ELSE T5.NODE_NAME2 
+	END                                    			AS BUSINESS_DEPARTMENT			    	-- 事业部
+	,CURRENT_TIMESTAMP()							AS DW_LAST_UPDATE_DATE					-- 数据同步时间
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,T7.CUST_GRP                                    AS CUST_GRP_CODE                        -- 客户组编码
+	,CASE WHEN T8.zxsry IS NULL OR T8.zxsry = '' THEN T7.sales_man ELSE T8.zxsry END AS SALES_EMP_CODE  ----销售人员
+FROM 
+	ACDOCA5 T
+LEFT JOIN DM.DM_RPT_SALES_GROUP_T T5
+ON T.WBS_SALES_GROUP = T5.NODE_NAME9
+LEFT JOIN DM.DM_RPT_SALES_GROUP_T T6
+ON T.SALES_GROUP_MASTER_FILE = T6.NODE_NAME9
+LEFT JOIN DWRDIM.DWR_CUST_LATEST_DIMENSION_T T7
+ON T.CUST_CODE = T7.CUST_NUM AND SUBSTR(T.COMP_CODE,1,2) = T7.SALES_ORG
+LEFT JOIN SDI.SDI_PROJ_1001 T8
+ON SUBSTR(T.WBS,1,10) = T8.pspid	
+ ;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_WM_RPT_WM_SW_CXC_DAY_STORE_F",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

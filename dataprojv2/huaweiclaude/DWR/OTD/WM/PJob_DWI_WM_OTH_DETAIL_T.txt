@@ -1,0 +1,633 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/07/09 17:03:31 GMT+08:00
+-- description:万维金蝶库存数据
+-- history list:
+-- UPDATE FROM 15000571 时间<10月15日> 新增郑州龙鹏建材有限公司库存数据
+-- ******************************************************************** -- --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+WITH TMP AS (
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_320098_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_313382_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_316040_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_315732_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_314175_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_313056_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_311957_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from
+SDI.SDI_KCDATA_310597_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_318887_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_310184_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_314852_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_310342_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_310541_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_322292_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_314995_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_312541_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union  all 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+FROM SDI.SDI_KCDATA_312397_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_320458_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_321714_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_311682_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_1000002570_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+union ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_310332_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+UNION ALL   
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_320345_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+UNION ALL   
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_1000001757_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+UNION ALL 
+SELECT 
+'WW' AS DATA_SOURCE_FALG,
+period_id_d AS DAY_DT, --日历日
+ppmc AS BRD_NAME,--品牌名称
+ck AS WH_NAME,--仓库
+spmc AS MATERIAL_NAME,--商品编码
+dw AS UNIT,--单位
+flag,--数据类型
+cw AS position,--仓位
+LPAD(project_id, 10, '0') AS CUSTOMER_CODE,--客户ID
+project_name AS CUSTOMER_NAME,--客户名称
+sync_flag,--
+spbm AS MATERIAL_NUM,--物料编码
+ph AS LEV,--等级
+sh AS COL_NUM,--色号
+gg AS DIM,--规格
+slye AS QM_QTY,--期末库存
+period_id_d
+from 
+SDI.SDI_KCDATA_310277_NEW_1037
+where period_id_d = '${PERIOD_ID_D}'
+UNION ALL 
+SELECT
+'JD' AS DATA_SOURCE_FALG
+,substr(current_timestamp,1,10) AS DAY_DT  --日期
+,'东鹏' as BRD_NAME --品牌名称
+,fstocknumber AS WH_NAME -- 仓库
+,fmaterialname AS MATERIAL_NAME --物料编码
+,'' AS UNIT --单位
+,'库存数据' AS datetype --数据类型
+,'' AS position --仓位
+,'0000317325' AS CUSTOMER_CODE --客户ID
+,'青岛创元达木业有限公司' AS CUSTOMER_NAME--客户名称
+,'' as sync_flag
+,fmaterialno as MATERIAL_NUM --物料编码   
+, '' as LEV -- 等级
+,'' as COL_NUM-- 色号
+,'' AS DIM --规格
+,sum(fstockinqty)-sum(fstockoutqty) as QM_QTY --期末库存
+,'${PERIOD_ID_D}' AS period_id_d
+FROM SDI.SDI_INVENTORYDATA_317325_1044   
+group by 
+fmaterialno,fstocknumber,fmaterialname
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_OTH_DETAIL_T PARTITION(PERIOD_ID_D)
+SELECT 
+data_source_falg,
+day_dt,
+brd_name,
+wh_name,
+material_name,
+unit,
+flag,
+position,
+customer_code,
+customer_name,
+sync_flag,
+material_num,
+lev,
+col_num,
+dim,
+qm_qty,
+current_timestamp as  dw_last_update_date,
+period_id_d
+FROM  
+TMP
+WHERE 
+flag  <> '验证数据'
+-- CREATE TABLE  DWIOTD.DWI_WM_OTH_DETAIL_T (
+-- DATA_SOURCE_FALG  STRING  COMMENT '数据来源',
+-- DAY_DT     STRING  COMMENT '日历日',
+-- BRD_NAME   STRING  COMMENT '品牌名称',
+-- WH_NAME    STRING  COMMENT '仓库',
+-- MATERIAL_NAME  STRING  COMMENT '物料名称',
+-- UNIT STRING  COMMENT '单位',
+-- flag   STRING  COMMENT '数据类型',
+-- position  STRING  COMMENT '仓位',
+-- CUSTOMER_CODE   STRING  COMMENT '客户ID',
+-- CUSTOMER_NAME  STRING  COMMENT '客户名称',
+-- sync_flag   STRING  ,
+-- MATERIAL_NUM   STRING   COMMENT '物料编码',
+-- LEV    STRING   COMMENT '等级',
+-- COL_NUM  STRING   COMMENT '色号',
+-- DIM  STRING   COMMENT '规格',
+-- QM_QTY   NUMERIC(38,10)  COMMENT '期末库存',
+-- dw_last_update_date   TIMESTAMP 
+-- )
+-- PARTITIONED BY (period_id_d VARCHAR(255));
+

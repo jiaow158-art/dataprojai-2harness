@@ -1,0 +1,37 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/08/18 10:31:44 GMT+08:00
+-- description:物料销售BOM明细数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--DROP TABLE DWRDIM.DWR_DIM_MATERIAL_SALES_BOM_F;
+--CREATE TABLE DWRDIM.DWR_DIM_MATERIAL_SALES_BOM_F AS
+with BOM_MATERIAL_DETAIL_DATA as
+(
+		select t.material_num,
+			   t2.matl_list ,
+			   t2.component_num ,
+			   t2.bom_component as bom_material_num,
+			   ROW_NUMBER() over(partition by material_num) as rn,
+			   current_timestamp() as dw_last_update_date
+	     from (
+				select t1.matl_list,
+					   t1.material_num
+				from (
+				    select matl_list,
+					   	   material_num,
+					   	   bom_use_code,
+				    	   row_number() over(partition by material_num order by rec_crt_date desc ) as RN
+					from dwimd.dwi_md_material_list_link_t 
+					) as t1
+				where t1.RN = 1 
+				and t1.bom_use_code = '5' 
+		) t
+		left join DWRDIM.DWR_DIM_BOM_ITEM_D t2 
+		on t2.matl_list = t.matl_list 
+)
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_MATERIAL_SALES_BOM_F
+select *
+from BOM_MATERIAL_DETAIL_DATA t;

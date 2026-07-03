@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CS_ZDJ_ORDER_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS/DMT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

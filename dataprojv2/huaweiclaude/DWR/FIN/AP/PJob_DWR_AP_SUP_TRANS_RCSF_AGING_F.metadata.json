@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_AP_SUP_TRANS_RCSF_AGING_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AP",
+    "description": "供应商往来重分类后自然账龄",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

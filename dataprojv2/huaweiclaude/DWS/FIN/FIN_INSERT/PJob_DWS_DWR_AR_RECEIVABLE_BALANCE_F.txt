@@ -1,0 +1,46 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/05/12 14:07:01 GMT+08:00
+-- desc：应收余额表(本币) DWRFIN.DWR_AR_RECEIVABLE_BALANCE_F
+-- 需求人：霍碧琪、林威
+-- update：2023/07/18 guzhengfeng 新加客户组编码字段 cust_group_code
+-- UPDATE 2024-03-02 16:50:44  修复名称扩散导致数据扩散
+-- UPDATE 20240523 ZHZ 新增销售人员字段
+-- ******************************************************************** --
+TRUNCATE TABLE DWRFIN.DWR_AR_RECEIVABLE_BALANCE_F;
+INSERT INTO DWRFIN.DWR_AR_RECEIVABLE_BALANCE_F
+SELECT
+ 	T."year" ,
+	T."month" ,
+	T.comp_code ,
+	T.cust_code ,
+	T3.match_code_srh_criteria ,
+	T.sales_group_master_file ,
+	T.wbs ,
+	T.wbs_sales_group ,
+	T.special_general_ledger ,
+	T.general_ledger_account ,
+	T.current_local_currency_balance ,
+	T.currency ,
+	T.local_currency_balance_sum ,
+	T.business_department ,
+	T.dw_last_update_date
+    ,CASE WHEN COALESCE (T1.DEL_FLAG,T2.DEL_FLAG) IS NOT NULL THEN COALESCE (T1.DEL_FLAG,T2.DEL_FLAG)
+		ELSE 'N'
+	 END IS_OVERDUE_CUST
+	,T.cust_group_code
+	,T.sales_emp_code
+FROM 
+	DWRFIN.DWR_AR_RECEIVABLE_BALANCE_F_01 T
+	LEFT JOIN UPLOAD.UPLOAD_AMB_CREDIT_CUSTCODE_T T1
+	ON T.CUST_CODE = T1.CUST_CODE 
+	AND T.COMP_CODE = T1.COMP_CODE 
+	AND TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T1.STAT_DATE AND T1.END_DATE
+	LEFT JOIN UPLOAD.UPLOAD_AMB_CREDIT_CUSTCODE_T T2
+	ON T.CUST_CODE = T2.CUST_CODE 
+	AND T2.COMP_CODE IS NULL
+	AND TO_DATE(T."month",'yyyy-MM-dd') BETWEEN T2.STAT_DATE AND T2.END_DATE 
+	left join DWRDIM.DWR_DIM_CUST_GENERAL_D  t3 on T.cust_code = t3.cust_num and substr(t3.end_date,1,10) = '4712-12-31'
+	
+

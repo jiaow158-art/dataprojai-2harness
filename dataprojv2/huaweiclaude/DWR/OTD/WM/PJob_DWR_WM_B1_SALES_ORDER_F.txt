@@ -1,0 +1,903 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/17 15:11:39 GMT+08:00
+-- UPDATE FROM CHENZHIYONG 20221123 将DWI_MD_DATA_MATERIAL_GENERAL_T_HIS修改成DWI_MD_DATA_MATERIAL_GENERAL_T
+-- UPDATE FROM CHENZHIYONG 20230530 310609-云南卫通（旧）→1000009075-云南鹏创（新）   2023-03-08
+--								    1000008859-永川文巧（旧）→1000009345-重庆星暿（新）  2023-03-23
+--									销售要一起看	
+-- update from chenzhiyong 20230710 新增瓷砖客户数据逻辑
+-- update from chenzhiyong 20230710 310597 洁具、321991 洁具，也要当做瓷砖客户处理
+-- update from chenzhiyong 20230731 新增瓷砖万维数据
+-- update from chenzhiyong 20230816 修改瓷砖字母客编
+-- update from chenzhiyong 20230817 修改瓷砖字母客编
+-- update from chenzhiyong 20230828 瓷砖 福州共享仓 业务查看部门为2384
+-- update from chenzhiyong 20231010 新增瓷砖其它经销商销售数据(外挂的经销商)
+-- update from chenzhiyong 20240101 瓷砖新增客编：1000009426 --> 0000310516
+-- update from chenzhiyong 20240102 新增BW的客户数据 0000352516 / 0000316827
+-- update from chenzhiyong 20240122 新增STORE_CODE --门店编码
+-- linw   2024-07-29 17:09:17   优化RTM-B1的逻辑
+-- linw  2024年11月14日 17:54:29 新增 活动编码,活动名称
+-- YJY   2025年01月03日 17:54:29 活动名称逻辑调整
+-- update from huagnwenbin 2025-09-01 经销商客编0000353852在9月1号以前为0000353852，以后的1000006263
+-- update from huangwenbin 2026-04-03 增加union all部分DWROTD.DWR_WM_B1_SALES_ORDER_F_HIS（因SAP B1服务器迁移，数据未迁移）
+-- ******************************************************************** --
+--性能优化SQL
+set hive.cbo.enable=true;				
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+-- 删除临时表
+DROP TABLE IF EXISTS DWROTD.DWR_WM_B1_SALES_ORDER_F_TMP001;
+--创建临时表并写入数据
+CREATE TABLE DWROTD.DWR_WM_B1_SALES_ORDER_F_TMP001 AS
+SELECT 
+		'SW'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       T0.customer_code as dealer_code,     -- 经销商编码
+       '出货' as 	out_return_goods,	--出退货 
+	   T1.docnum as doc_num, 			--单号
+ 	   T1.CardCode as cust_code,			--客户编码
+ 	   T1.CardName as cust_name_cn,			--客户名称
+ 	   T1.U_brand as  channel_name_cn, 		--渠道
+ 	   t2.Address as cust_address,		--客户地址
+	   T2_1.Name as sales_channel,		--销售渠道
+ 	   T1.DocDate as doc_date,			--单据日期       
+       T0.ItemCode as material_num, 				--物料编码
+	   T0.Dscription as material_name,			--物料描述
+	   T0.Quantity as material_qty,				--数量
+	   T0.u_distnumber as batch_num,			--批次
+	   T0.Price,					--单价
+	   T0.GTotal as line_total_amt,				--行合计
+	   T0.LineTotal as total_sales_amt,			--销售总额
+	   T0.unitMsr as unit,				--单位
+	   t4.CodeBars as bar_code,				--条形码
+	   T0.U_PriceBefDi as discount_price_ago_amt,			--折扣前价格
+	   T0.U_DiscPrcnt as discount_price_amt,			--折扣
+	   T0.StockPrice as cost_price_amt,			--成本价
+	   T0.StockPrice * T0.Quantity as cost_total_amt,	--成本合计
+	   T0.grssprofit as gross_profit_amt,				--毛利
+	   T0.OpenQty as no_clear_qty,					--未清数量
+	   T0.LineNum as line_num,					--行号
+	   T6.WhsName as wm_name,				-- 仓库
+	   '' as batch_num_stock,		-- 批次库存
+       t3.GroupName as group_name,					--客户组
+       t5.ItmsGrpNam as b1_material_group_name,					--b1物料组
+	   t2.U_ComeFrom as cust_from,				-- 客户来源
+	   t1.Address as bill_Address,				-- 单据地址
+	   case when nvl(t0.U_jtOrderId,'') <>'' then '是'
+	        when nvl(t0.U_jtOrderId,'') = '' then '否'
+	   end  as 		cloud_order_flag,					-- 云订货下单标识
+	   t0.U_jtOrderId as U_jtOrderId, --云订货单号
+	   t0.freetxt, --行备注
+       t0.WhsCode as WhsCode
+FROM DWIOTD.dwi_wm_b1_inv1_t T0   -- 销售发票行
+JOIN DWIOTD.dwi_wm_b1_OINV_t T1  -- 销售发票
+ON T0.DocEntry=T1.DocEntry 
+AND T0.customer_code = T1.customer_code
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRD_T T2 -- 客户
+ON t1.CardCode=t2.CardCode
+AND T1.customer_code = T2.customer_code
+AND T2.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_CARDCOMEFROM_T T2_1  -- 客户来源
+ON T2.U_ComeFrom=T2_1.Code
+AND T2.customer_code =  T2_1.customer_code
+AND T2_1.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRG_T T3  -- 客户组
+ON t2.GroupCode=t3.GroupCode 
+AND T1.customer_code = T3.customer_code
+AND T3.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITM_T T4 -- 物料
+on t0.ItemCode=t4.ItemCode
+AND T1.customer_code = T4.customer_code 
+AND T4.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITB_T T5 -- 物料组
+ON t4.ItmsGrpCod=t5.ItmsGrpCod
+AND T1.customer_code = T5.customer_code 
+AND T5.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OWHS_T T6  -- 仓库
+ON t0.WhsCode=T6.WhsCode
+AND T1.customer_code = T6.customer_code 
+AND T6.customer_type = 'SW'
+WHERE T0.customer_type = 'SW'
+AND T1.customer_type = 'SW'
+UNION ALL
+SELECT 'SW'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       T0.customer_code as dealer_code,     -- 经销商编码
+        '退货' as out_return_goods,	--出退货 
+		t1.docnum as doc_num, 			--单号
+		t1.CardCode as cust_code,			--客户编码
+		t1.CardName as cust_name_cn,			--客户名称
+		--t2.U_brandlist as channel_name_cn, 		--渠道
+		t1.U_brand as channel_name_cn, 		--渠道
+		t2.Address as cust_address,		--客户地址
+		T2_1.Name as sales_channel,		--销售渠道
+		t1.DocDate as doc_date,			--单据日期       
+		t0.ItemCode as material_num, 				--物料编码
+		t0.Dscription as material_name,			--物料描述
+		t0.Quantity * -1 as material_qty,				--数量
+		t0.u_distnumber as batch_num,			--批次
+		t0.Price * -1 as Price,					--单价
+		t0.GTotal * -1 as line_total_amt,				--行合计
+		T0.LineTotal * -1 as total_sales_amt,			--销售总额
+		t0.unitMsr as unit,				--单位
+		t4.CodeBars as bar_code,				--条形码
+		t0.U_PriceBefDi as discount_price_ago_amt,			--折扣前价格
+		t0.U_DiscPrcnt as discount_price_amt,			--折扣
+		t0.StockPrice * -1 as cost_price_amt,			--成本价
+		t0.StockPrice * t0.Quantity * -1 as cost_total_amt,	--成本合计
+		t0.grssprofit * -1 as gross_profit_amt,				--毛利
+		t0.OpenQty as no_clear_qty,					--未清数量
+		t0.LineNum as line_num,					--行号
+		t6.WhsName as wm_name,				-- 仓库
+		'' as batch_num_stock,		-- 批次库存
+		t3.GroupName as group_name,					--客户组
+		t5.ItmsGrpNam as b1_material_group_name,					--b1物料组
+		t2.U_ComeFrom as cust_from,				-- 客户来源
+		t1.Address as bill_Address,				-- 单据地址
+		CASE WHEN COALESCE(T0.U_jtOrderId,'') <> '' THEN '是'
+ 		     ELSE '否'
+			  END as cloud_order_flag, -- 云订货下单
+		T0.U_jtOrderId as U_jtOrderId, --云订货单号
+		null as freetxt,
+        t0.WhsCode as WhsCode
+FROM DWIOTD.DWI_WM_B1_RIN1_T T0  -- 销售贷项行
+JOIN DWIOTD.DWI_WM_B1_ORIN_T T1  -- 销售贷项
+on t0.DocEntry=t1.DocEntry 
+AND T0.customer_code = T1.customer_code
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRD_T T2  -- 客户
+on t1.CardCode=t2.CardCode 
+AND T1.customer_code = T2.customer_code
+AND T2.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_CARDCOMEFROM_T T2_1  -- 客户来源
+ON T2.U_ComeFrom=T2_1.Code
+AND T2.customer_code =  T2_1.customer_code
+AND T2_1.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRG_T T3  -- 客户组
+ON t2.GroupCode=t3.GroupCode 
+AND T1.customer_code = T3.customer_code
+AND T3.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITM_T T4  -- 物料
+on t0.ItemCode=t4.ItemCode
+AND T1.customer_code = T4.customer_code 
+AND T4.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITB_T T5 -- 物料组
+ON t4.ItmsGrpCod=t5.ItmsGrpCod
+AND T1.customer_code = T5.customer_code 
+AND T5.customer_type = 'SW'
+LEFT JOIN DWIOTD.DWI_WM_B1_OWHS_T T6 -- 仓库
+ON t0.WhsCode=t6.WhsCode
+AND T1.customer_code = T6.customer_code 
+AND T6.customer_type = 'SW'
+WHERE T0.customer_type = 'SW'
+AND T1.customer_type = 'SW'
+UNION ALL
+SELECT 
+		'CT'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       CASE WHEN LENGTH(T0.customer_code) < 10 THEN CONCAT('0000',T0.customer_code) ELSE T0.customer_code END as dealer_code,     -- 经销商编码
+       '出货' as 	out_return_goods,	--出退货 
+	   T1.docnum as doc_num, 			--单号
+ 	   T1.CardCode as cust_code,			--客户编码
+ 	   T1.CardName as cust_name_cn,			--客户名称
+ 	   T1.U_brand as  channel_name_cn, 		--渠道
+ 	   t2.Address as cust_address,		--客户地址
+	   T2_1.Name as sales_channel,		--销售渠道
+ 	   T1.DocDate as doc_date,			--单据日期       
+       T0.ItemCode as material_num, 				--物料编码
+	   T0.Dscription as material_name,			--物料描述
+	   T0.Quantity as material_qty,				--数量
+	   T0.u_distnumber as batch_num,			--批次
+	   T0.Price,					--单价
+	   T0.GTotal as line_total_amt,				--行合计
+	   T0.LineTotal as total_sales_amt,			--销售总额
+	   T0.unitMsr as unit,				--单位
+	   t4.CodeBars as bar_code,				--条形码
+	   T0.U_PriceBefDi as discount_price_ago_amt,			--折扣前价格
+	   T0.U_DiscPrcnt as discount_price_amt,			--折扣
+	   T0.StockPrice as cost_price_amt,			--成本价
+	   T0.StockPrice * T0.Quantity as cost_total_amt,	--成本合计
+	   T0.grssprofit as gross_profit_amt,				--毛利
+	   T0.OpenQty as no_clear_qty,					--未清数量
+	   T0.LineNum as line_num,					--行号
+	   T6.WhsName as wm_name,				-- 仓库
+	   '' as batch_num_stock,		-- 批次库存
+       t3.GroupName as group_name,					--客户组
+       t5.ItmsGrpNam as b1_material_group_name,					--b1物料组
+	   t2.U_ComeFrom as cust_from,				-- 客户来源
+	   t1.Address as bill_Address,				-- 单据地址
+	   case when nvl(t0.U_jtOrderId,'') <>'' then '是'
+	        when nvl(t0.U_jtOrderId,'') = '' then '否'
+	   end  as 		cloud_order_flag,					-- 云订货下单标识
+	   t0.U_jtOrderId AS U_jtOrderId, --云订货单号
+	   t0.freetxt,
+	   t0.WhsCode as WhsCode
+FROM DWIOTD.dwi_wm_b1_inv1_t T0   -- 销售发票行
+JOIN DWIOTD.dwi_wm_b1_OINV_t T1  -- 销售发票
+ON T0.DocEntry=T1.DocEntry 
+AND T0.customer_code = T1.customer_code
+AND T0.customer_type = T1.customer_type
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRD_T T2 -- 客户
+ON t1.CardCode=t2.CardCode
+AND T1.customer_code = T2.customer_code
+AND T2.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_CARDCOMEFROM_T T2_1  -- 客户来源
+ON T2.U_ComeFrom=T2_1.Code
+AND T2.customer_code =  T2_1.customer_code
+AND T2_1.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRG_T T3  -- 客户组
+ON t2.GroupCode=t3.GroupCode 
+AND T1.customer_code = T3.customer_code
+AND T3.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITM_T T4 -- 物料
+on t0.ItemCode=t4.ItemCode
+AND T1.customer_code = T4.customer_code 
+AND T4.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITB_T T5 -- 物料组
+ON t4.ItmsGrpCod=t5.ItmsGrpCod
+AND T1.customer_code = T5.customer_code 
+AND T5.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OWHS_T T6  -- 仓库
+ON t0.WhsCode=T6.WhsCode
+AND T1.customer_code = T6.customer_code 
+AND T6.customer_type = 'CT'
+JOIN (SELECT customer_code FROM SDI.SDI_CT_CUSTOMER_DATA_1037 WHERE data_source_falg = 'SAP_B1') T7  -- 瓷砖客户
+ON CASE WHEN LENGTH(T0.customer_code) < 10 THEN CONCAT('0000',T0.customer_code) ELSE T0.customer_code END = T7.customer_code
+WHERE 1 = 1 
+AND (T0.customer_type = 'CT' OR t0.customer_code IN('310597','321991'))
+--AND T1.customer_type = 'CT'
+UNION ALL
+SELECT 'CT'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+        CASE WHEN LENGTH(T0.customer_code) < 10 THEN CONCAT('0000',T0.customer_code) ELSE T0.customer_code END as dealer_code,     -- 经销商编码
+        '退货' as out_return_goods,	--出退货 
+		t1.docnum as doc_num, 			--单号
+		t1.CardCode as cust_code,			--客户编码
+		t1.CardName as cust_name_cn,			--客户名称
+		--t2.U_brandlist as channel_name_cn, 		--渠道
+		t1.U_brand as channel_name_cn, 		--渠道
+		t2.Address as cust_address,		--客户地址
+		T2_1.Name as sales_channel,		--销售渠道
+		t1.DocDate as doc_date,			--单据日期       
+		t0.ItemCode as material_num, 				--物料编码
+		t0.Dscription as material_name,			--物料描述
+		t0.Quantity * -1 as material_qty,				--数量
+		t0.u_distnumber as batch_num,			--批次
+		t0.Price * -1 as Price,					--单价
+		t0.GTotal * -1 as line_total_amt,				--行合计
+		T0.LineTotal * -1 as total_sales_amt,			--销售总额
+		t0.unitMsr as unit,				--单位
+		t4.CodeBars as bar_code,				--条形码
+		t0.U_PriceBefDi as discount_price_ago_amt,			--折扣前价格
+		t0.U_DiscPrcnt as discount_price_amt,			--折扣
+		t0.StockPrice * -1 as cost_price_amt,			--成本价
+		t0.StockPrice * t0.Quantity * -1 as cost_total_amt,	--成本合计
+		t0.grssprofit * -1 as gross_profit_amt,				--毛利
+		t0.OpenQty as no_clear_qty,					--未清数量
+		t0.LineNum as line_num,					--行号
+		t6.WhsName as wm_name,				-- 仓库
+		'' as batch_num_stock,		-- 批次库存
+		t3.GroupName as group_name,					--客户组
+		t5.ItmsGrpNam as b1_material_group_name,					--b1物料组
+		t2.U_ComeFrom as cust_from,				-- 客户来源
+		t1.Address as bill_Address,				-- 单据地址
+		CASE WHEN COALESCE(T0.U_jtOrderId,'') <> '' THEN '是'
+ 		     ELSE '否'
+			  END as cloud_order_flag,-- 云订货下单
+		T0.U_jtOrderId as U_jtOrderId, --云订货单号
+        null as freetxt,
+		t0.WhsCode as WhsCode
+FROM DWIOTD.DWI_WM_B1_RIN1_T T0  -- 销售贷项行
+JOIN DWIOTD.DWI_WM_B1_ORIN_T T1  -- 销售贷项
+on t0.DocEntry=t1.DocEntry 
+AND T0.customer_code = T1.customer_code
+AND T0.customer_type = T1.customer_type
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRD_T T2  -- 客户
+on t1.CardCode=t2.CardCode 
+AND T1.customer_code = T2.customer_code
+AND T2.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_CARDCOMEFROM_T T2_1  -- 客户来源
+ON T2.U_ComeFrom=T2_1.Code
+AND T2.customer_code =  T2_1.customer_code
+AND T2_1.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRG_T T3  -- 客户组
+ON t2.GroupCode=t3.GroupCode 
+AND T1.customer_code = T3.customer_code
+AND T3.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITM_T T4  -- 物料
+on t0.ItemCode=t4.ItemCode
+AND T1.customer_code = T4.customer_code 
+AND T4.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OITB_T T5 -- 物料组
+ON t4.ItmsGrpCod=t5.ItmsGrpCod
+AND T1.customer_code = T5.customer_code 
+AND T5.customer_type = 'CT'
+LEFT JOIN DWIOTD.DWI_WM_B1_OWHS_T T6 -- 仓库
+ON t0.WhsCode=t6.WhsCode
+AND T1.customer_code = T6.customer_code 
+AND T6.customer_type = 'CT'
+JOIN (SELECT customer_code FROM SDI.SDI_CT_CUSTOMER_DATA_1037 WHERE data_source_falg = 'SAP_B1') T7  -- 瓷砖客户
+ON CASE WHEN LENGTH(T0.customer_code) < 10 THEN CONCAT('0000',T0.customer_code) ELSE T0.customer_code END = T7.customer_code
+WHERE 1 = 1
+AND (T0.customer_type = 'CT' OR t0.customer_code IN('310597','321991'));
+-- 插入数据
+WITH SDI_CT_CUSTOMER_DATA_1037_DATA as(    -- RTM B1的客户数据
+    select case when length(CUSTOMER_CODE) = 10 then CUSTOMER_CODE  else concat('0000',CUSTOMER_CODE) end as CUSTOMER_CODE,
+           t.CUSTOMER_NAME,
+           t.data_source_falg ,
+           t.operation_center_name,
+           SHARE_FLAG
+    from SDI.SDI_CT_CUSTOMER_DATA_1037 t
+    where DATA_SOURCE_FALG = 'RTM_B1'
+),SDI_CT_CUSTOMER_DATA_1037_DATA1 as(    -- SAP B1的客户数据
+    select case when length(CUSTOMER_CODE) = 10 then CUSTOMER_CODE  else concat('0000',CUSTOMER_CODE) end as CUSTOMER_CODE,
+           t.CUSTOMER_NAME,
+           t.data_source_falg ,
+           t.operation_center_name,
+           SHARE_FLAG
+    from SDI.SDI_CT_CUSTOMER_DATA_1037 t
+    where DATA_SOURCE_FALG = 'SAP_B1'
+),
+SDI_CT_CUSTOMER_DATA_1037_WW as(    -- 万维的客户数据
+    select case when length(CUSTOMER_CODE) = 10 then CUSTOMER_CODE  else concat('0000',CUSTOMER_CODE) end as 		CUSTOMER_CODE,
+           t.CUSTOMER_NAME,
+           t.data_source_falg ,
+           t.operation_center_name,
+           SHARE_FLAG
+    from SDI.SDI_CT_CUSTOMER_DATA_1037 t
+    where DATA_SOURCE_FALG = '万维'
+),
+SDI_CT_CUSTOMER_DATA_1037_OTHER as(    -- 其它的客户数据
+    select case when length(CUSTOMER_CODE) = 10 then CUSTOMER_CODE  else concat('0000',CUSTOMER_CODE) end as 		CUSTOMER_CODE,
+           t.CUSTOMER_NAME,
+           t.data_source_falg ,
+           t.operation_center_name,
+           SHARE_FLAG
+    from SDI.SDI_CT_CUSTOMER_DATA_1037 t
+    where DATA_SOURCE_FALG = '其它'
+),
+SDI_CT_CUSTOMER_DATA_1037_BW as(    -- BW的客户数据
+    select case when length(CUSTOMER_CODE) = 10 then CUSTOMER_CODE  else concat('0000',CUSTOMER_CODE) end as 		CUSTOMER_CODE,
+           t.CUSTOMER_NAME,
+           t.data_source_falg ,
+           t.operation_center_name,
+           SHARE_FLAG
+    from SDI.SDI_CT_CUSTOMER_DATA_1037 t
+    where DATA_SOURCE_FALG = 'BW'
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_B1_SALES_ORDER_F
+SELECT 
+	   t1.customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       --t1.dealer_code,     -- 经销商编码
+	   CASE WHEN t1.dealer_code = '310609' THEN '1000009075'        -- 310609 --> 1000009075   --SW
+	        WHEN t1.dealer_code = '1000008859' THEN '1000009345'    -- 1000008859 -->  1000009345   --SW
+	        WHEN t1.dealer_code = '0000316366' THEN '1000000997'    -- 0000316366 -->  1000000997 -- CT
+	        WHEN t1.dealer_code = '0000310518' AND SUBSTR(t1.doc_date,1,10) <= '2025-08-31' THEN '0000353852'    -- 0000310518 -->  0000353852
+	        WHEN t1.dealer_code = '0000312180' THEN '0000352262'    -- 0000312180 -->  0000352262
+	        WHEN t1.dealer_code = '0000310374' THEN '0000353535'    -- 0000310374 -->  0000353535
+	        WHEN t1.dealer_code = '0000311645' THEN '0000321143'    -- 0000311645 -->  0000321143
+	        WHEN t1.dealer_code = '1000001255' THEN '1000001255'    -- 1000001255 -->  1000001255
+	        WHEN t1.dealer_code = '0000321991' THEN '1000005999'    -- 0000321991 -->  1000005999
+	       -- WHEN t1.dealer_code = '1000002384' THEN '0000310177'    -- 1000002384 -->  0000310177 
+	        WHEN t1.dealer_code = '0000315506' THEN '1000006008'    -- 0000315506 -->  1000006008
+	        WHEN t1.dealer_code = '1000009426' THEN '0000310516'    -- 1000009426 -->  0000310516
+			WHEN t1.dealer_code = '0000310518' AND SUBSTR(t1.doc_date,1,10) >= '2025-09-01' THEN '1000006263'
+		ELSE t1.dealer_code END AS dealer_code,     -- 经销商编码
+       t1.out_return_goods,	--出退货 
+	   t1.doc_num, 			--单号
+ 	   t1.cust_code,			--客户编码
+ 	   t1.cust_name_cn,			--客户名称
+ 	   t1.channel_name_cn, 		--渠道
+ 	   t1.cust_address,		--客户地址
+ 	   t1.doc_date,			--单据日期       
+       t1.material_num, 				--物料编码
+       NVL(t1.material_name,t2.material_name) as material_name,	--物料描述
+	   T2.matl_group_code, --物料组代码
+	   T2.matl_group_name, 		--物料组名称
+	   T2.external_matl_group_code, -- 外部物料组
+	   T2.external_matl_group_name, -- 外部物料组名称
+       T2.matl_type_code   , -- 物料类型
+  	   T2.matl_type_name   , --物料类型名称
+       T2.product_group_code  ,-- 产品组
+  	   T2.product_group_name  , --产品组名称 
+       T2.product_classify_code  ,-- 产品分级
+       T2.product_classify_name  ,-- 产品分级名称
+       T2.product_level_code ,--  '产品层次' 
+       T2.product_level_name ,--  '产品层次名称' 
+  	   T2.product_level1_code,--   '产品层次1' 
+       T2.product_level1_name,--   '产品层次1名称' 
+       T2.product_level2_code,--   '产品层次2' 
+       T2.product_level2_name,--   '产品层次2名称' 
+       T2.product_level3_code,--   '产品层次3' 
+       T2.product_level3_name,--   '产品层次3名称'
+       T2.product_level4_code,--   '产品层次4'
+       T2.product_level4_name,--   '产品层次4名称' 
+	   t1.material_qty,				--数量
+	   t1.batch_num,			--批次
+	   t1.Price,					--单价
+	   t1.line_total_amt,				--行合计
+	   t1.unit,				--单位
+	   t1.bar_code,				--条形码
+	   t1.discount_price_ago_amt,			--折扣前价格
+	   t1.discount_price_amt,			--折扣
+	   t1.cost_price_amt,			--成本价
+	   t1.cost_total_amt,	--成本合计
+	   t1.gross_profit_amt,				--毛利
+	   t1.no_clear_qty,					--未清数量
+	   t1.line_num,					--行号
+	   t1.wm_name,				-- 仓库
+	   t1.batch_num_stock,		-- 批次库存
+       t1.group_name,					--客户组
+       t1.b1_material_group_name,					--物料组
+	   t1.cust_from,				-- 客户来源
+	   t1.bill_Address,				-- 单据地址
+	   t1.cloud_order_flag,					-- 云订货下单标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   T2.MATERIAL_ID, -- 物料代理键
+	   T1.SALES_CHANNEL,		--销售渠道
+	   NVL(T2.length_1,0) AS length_1,  -- 长度
+	   NVL(T2.width,0) AS width,    -- 宽度
+	   NVL(T2.height,0) AS height,     --  高度
+	   T2.DIMENSION,         -- 规格(大小量纲)
+	   T1.total_sales_amt,			--销售总额
+	   T1.U_jtOrderId as cloud_order_id --云订货单号
+	   ,T2.MENU_DESC_NAME --是否主菜单
+	   ,'' AS IS_GZ --是否高值
+	   ,NVL((T2.LENGTH_1 * T2.WIDTH) / 1000000,0) AS UNIT_AREA --单位面积
+	   ,NVL((T2.LENGTH_1 * T2.WIDTH) / 1000000,0) * T1.MATERIAL_QTY AS SALE_AREA --销售面积
+       ,'SAP_B1' AS DATA_SOURCE_FALG --使用系统
+	   ,CASE WHEN T3.SHARE_FLAG = 'A' THEN '即是共享又是其它'
+             WHEN T3.SHARE_FLAG = 'Y' THEN '是'
+             WHEN T3.SHARE_FLAG = 'N' THEN '否'
+			  END AS SHARE_FLAG --共享仓标识
+	   ,T3.OPERATION_CENTER_NAME --运营中心
+	   ,T3.CUSTOMER_NAME AS DEALER_NAME --经销商名称
+	   ,'' AS STORE_CODE --门店编码
+	   , null activity_code  -- 活动编码
+	   ,freetxt as  activity_name    -- 活动名称
+	   ,WhsCode as WhsCode
+FROM DWROTD.DWR_WM_B1_SALES_ORDER_F_TMP001 T1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+ON t1.material_num = T2.material_num
+LEFT JOIN SDI_CT_CUSTOMER_DATA_1037_DATA1  T3  
+ON CASE WHEN T1.DEALER_CODE = '310609' THEN '1000009075'        -- 310609 --> 1000009075
+	    WHEN T1.DEALER_CODE = '1000008859' THEN '1000009345'    -- 1000008859 -->  1000009345
+		ELSE T1.DEALER_CODE END = T3.CUSTOMER_CODE
+WHERE 1 = 1
+and SUBSTRING(T1.doc_date,1,10) <= 
+      CASE WHEN T1.dealer_code  = '318109' THEN '2022-11-04'  -- 318109 -> 1000007207
+           WHEN T1.dealer_code  = '321104' THEN '2022-11-09'  -- 321104 -> 0000321104
+           ELSE '4712-12-31'
+          END
+UNION ALL
+--- RTM 销售数据
+SELECT  t.customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       --t.dealer_code,     -- 经销商编码
+	   CASE WHEN t.dealer_code = '310609' THEN '1000009075'        -- 310609 --> 1000009075   --sw
+	        WHEN t.dealer_code = '1000008859' THEN '1000009345'    -- 1000008859 -->  1000009345  --sw
+	        WHEN t.dealer_code = '1000002767' THEN '0000312559'    -- 1000002767 -->  0000312559  -- CT
+	        WHEN t.dealer_code = '1000003745' THEN '1000003745'    -- 1000003745 -->  1000003745  -- CT
+		ELSE t.dealer_code END AS dealer_code,     -- 经销商编码
+       t.out_return_goods,	--出退货 
+	   t.doc_num, 			--单号
+ 	   t.custom_code cust_code,			--客户编码
+ 	   t.cust_name_cn,			--客户名称
+ 	   t.channel_name_cn, 		--渠道
+ 	   t.cust_address,		--客户地址
+ 	   COALESCE(t.audit_time,t.doc_date) doc_date,			--先审批日期，后单据日期       
+       t.material_num, 				--物料编码
+       T.material_name,	--物料描述
+	   T2.matl_group_code, --物料组代码
+	   T2.matl_group_name, 		--物料组名称
+	   T2.external_matl_group_code, -- 外部物料组
+	   T2.external_matl_group_name, -- 外部物料组名称
+       T2.matl_type_code   , -- 物料类型
+  	   T2.matl_type_name   , --物料类型名称
+       T2.product_group_code  ,-- 产品组
+  	   T2.product_group_name  , --产品组名称 
+       T2.product_classify_code  ,-- 产品分级
+       T2.product_classify_name  ,-- 产品分级名称
+       T2.product_level_code ,--  '产品层次' 
+       T2.product_level_name ,--  '产品层次名称' 
+  	   T2.product_level1_code,--   '产品层次1' 
+       T2.product_level1_name,--   '产品层次1名称' 
+       T2.product_level2_code,--   '产品层次2' 
+       T2.product_level2_name,--   '产品层次2名称' 
+       T2.product_level3_code,--   '产品层次3' 
+       T2.product_level3_name,--   '产品层次3名称'
+       T2.product_level4_code,--   '产品层次4'
+       T2.product_level4_name,--   '产品层次4名称' 
+	   t.material_qty,				--数量
+	   t.batch_num,			--批次
+	   t.Price,					--单价
+	   t.line_total_amt,				--行合计
+	   t.unit,				--单位
+	   T2.product_level3_code bar_code,				--条形码
+	   t.discount_price_ago_amt,			--折扣前价格
+	   t.discount_price_amt,			--折扣
+	   t.cost_price_amt,			--成本价
+	   t.cost_total_amt,	--成本合计
+	   t.gross_profit_amt,				--毛利
+	   t3.not_delivered_qty no_clear_qty,	--未清数量
+	   t.line_num,					--行号
+	   t.wm_name,				-- 仓库
+	   t.batch_num_stock,		-- 批次库存
+       t.group_name,					--客户组
+       t.b1_material_group_name,					--物料组
+	   t.cust_from,				-- 客户来源
+	   t.bill_Address,				-- 单据地址
+	   t.cloud_order_flag,					-- 云订货下单标识
+	   T.DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   T2.MATERIAL_ID, -- 物料代理键
+	   T.channel_name_cn SALES_CHANNEL,		--销售渠道
+	   T2.length_1,  -- 长度
+	   T2.width,    -- 宽度
+	   T2.height,     --  高度
+	   T2.DIMENSION,         -- 规格(大小量纲)
+	   T.total_sales_amt,			--销售总额
+	   T.u_jtorderid cloud_order_id --云订货单号
+	   ,T2.MENU_DESC_NAME --是否主菜单
+	   ,'' AS IS_GZ --是否高值
+	   ,NVL((T2.LENGTH_1 * T2.WIDTH) / 1000000,0) AS UNIT_AREA --单位面积
+	   ,NVL((T2.LENGTH_1 * T2.WIDTH) / 1000000,0) * T.MATERIAL_QTY AS SALE_AREA --销售面积
+       ,'RTM_B1' AS DATA_SOURCE_FALG --使用系统
+	   ,CASE WHEN T1.SHARE_FLAG = 'A' THEN '即是共享又是其它'
+             WHEN T1.SHARE_FLAG = 'Y' THEN '是'
+             WHEN T1.SHARE_FLAG = 'N' THEN '否'
+			  END AS SHARE_FLAG --共享仓标识
+	   ,T1.OPERATION_CENTER_NAME --运营中心
+	   ,T1.CUSTOMER_NAME AS DEALER_NAME --经销商名称
+	   ,T4.STORE_CODE --门店编码
+	  ,T.activity_code  -- 活动编码
+	  ,T.activity_name    -- 活动名称
+      ,T.warehouse_code as WhsCode
+FROM DWROTD.DWR_WM_RTM_SALES_ORDER_F T
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+ON T.MATERIAL_NUM = T2.MATERIAL_NUM
+LEFT JOIN SDI_CT_CUSTOMER_DATA_1037_DATA  T1  
+ON CASE WHEN T.DEALER_CODE = '310609' THEN '1000009075'        -- 310609 --> 1000009075
+	    WHEN T.DEALER_CODE = '1000008859' THEN '1000009345'    -- 1000008859 -->  1000009345
+		ELSE LPAD(DEALER_CODE,10,'0') END = T1.CUSTOMER_CODE
+LEFT JOIN SDI.SDI_DTWMS_SO_LINE_1031  T3 ON T.line_num = T3.line_id 
+LEFT JOIN DWIMD.DWI_MD_STORE_DATA_T_HIS T4
+ON T.custom_code = T4.STORE_CODE AND T4.END_DATE = '4712-12-31'
+LEFT JOIN ( select t.customer_code, t.rtm_customer_code, t.customer_type
+	from(SELECT cust_code as customer_code, rtm_cust_code as rtm_customer_code,cust_type as customer_type,
+			 ROW_NUMBER() OVER(PARTITION BY rtm_cust_code ORDER BY CASE WHEN is_main = '是' THEN 1 ELSE 0 END DESC) AS RN
+			FROM sdi.SDI_B1_CUSTOMER_DATA_1037 
+						where cust_type = 'SW'   -- 卫浴
+						and is_rtm = 'Y'
+					) t
+					where t.rn = 1
+					UNION ALL
+					SELECT customer_code,
+						   customer_code as rtm_customer_code,
+						   'CT' AS customer_type   -- 瓷砖
+					FROM SDI.SDI_CT_CUSTOMER_DATA_1037 T
+					WHERE T.data_source_falg = 'RTM_B1'
+			    ) T12
+	 WHERE 1 = 1
+	   --and h.is_hot = 'N'
+	   and t.distributor_code = T12.rtm_customer_code
+       and t.order_status IN('delivered'
+,'complete'
+,'sign'
+,'reverse'
+)
+UNION ALL -- 瓷砖万维销售数据
+SELECT t.customer_type ,-- 客户类型 CT:瓷砖  SW:洁具
+	   t.dealer_code,	--   经销商编码
+	   t.out_return_goods,--出退货
+	   t.doc_num,
+		t.cust_code,
+		t.cust_name_cn,
+		t.channel_name_cn,
+		t.cust_address,
+		t.doc_date,
+		t.material_num,
+		t.material_name,
+		t.matl_group_code,
+		t.matl_group_name,
+		t.external_matl_group_code,
+		t.external_matl_group_name,
+		t.matl_type_code,
+		t.matl_type_name,
+		t.product_group_code,
+		t.product_group_name,
+		t.product_classify_code,
+		t.product_classify_name,
+		t.product_level_code,
+		t.product_level_name,
+		t.product_level1_code,
+		t.product_level1_name,
+		t.product_level2_code,
+		t.product_level2_name,
+		t.product_level3_code,
+		t.product_level3_name,
+		t.product_level4_code,
+		t.product_level4_name,
+		t.material_qty,
+		t.batch_num,
+		t.price,
+		t.line_total_amt,
+		t.unit,
+		t.bar_code,
+		t.discount_price_ago_amt,
+		t.discount_price_amt,
+		t.cost_price_amt,
+		t.cost_total_amt,
+		t.gross_profit_amt,
+		t.no_clear_qty,
+		t.line_num,
+		t.wm_name,
+		t.batch_num_stock,
+		t.group_name,
+		t.b1_material_group_name,
+		t.cust_from,
+		t.bill_address,
+		t.cloud_order_flag,
+		t.dw_last_update_date,
+		t.material_id,
+		t.sales_channel,
+		t.length_1,
+		t.width,
+		t.height,
+		t.dimension,
+		t.total_sales_amt,
+		t.u_jtorderid as cloud_order_id,--云订货单号
+		T2.MENU_DESC_NAME, --是否主菜单
+		'' AS IS_GZ, --是否高值
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) AS UNIT_AREA, --单位面积
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) * T.MATERIAL_QTY AS SALE_AREA, --销售面积
+		'万维' AS DATA_SOURCE_FALG, --使用系统
+		CASE WHEN T3.SHARE_FLAG = 'A' THEN '即是共享又是其它'
+             WHEN T3.SHARE_FLAG = 'Y' THEN '是'
+             WHEN T3.SHARE_FLAG = 'N' THEN '否'
+			  END AS SHARE_FLAG, --共享仓标识
+	    T3.OPERATION_CENTER_NAME, --运营中心
+	    T3.CUSTOMER_NAME AS DEALER_NAME, --经销商名称
+	    '' AS STORE_CODE, --门店编码
+		 null activity_code,  -- 活动编码
+	   null activity_name,    -- 活动名称
+       null as  WhsCode
+FROM DWROTD.DWR_WM_WW_SALES_ORDER_F T
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+ON T.MATERIAL_NUM = T2.MATERIAL_NUM
+LEFT JOIN SDI_CT_CUSTOMER_DATA_1037_WW T3
+ON t.dealer_code = T3.CUSTOMER_CODE
+UNION ALL -- 瓷砖其它销售数据
+SELECT t.customer_type ,-- 客户类型 CT:瓷砖  SW:洁具
+	   t.dealer_code,	--   经销商编码
+	   t.out_return_goods,--出退货
+	   t.doc_num,
+		t.cust_code,
+		t.cust_name_cn,
+		t.channel_name_cn,
+		t.cust_address,
+		t.doc_date,
+		t.material_num,
+		t.material_name,
+		t.matl_group_code,
+		t.matl_group_name,
+		t.external_matl_group_code,
+		t.external_matl_group_name,
+		t.matl_type_code,
+		t.matl_type_name,
+		t.product_group_code,
+		t.product_group_name,
+		t.product_classify_code,
+		t.product_classify_name,
+		t.product_level_code,
+		t.product_level_name,
+		t.product_level1_code,
+		t.product_level1_name,
+		t.product_level2_code,
+		t.product_level2_name,
+		t.product_level3_code,
+		t.product_level3_name,
+		t.product_level4_code,
+		t.product_level4_name,
+		t.material_qty,
+		t.batch_num,
+		t.price,
+		t.line_total_amt,
+		t.unit,
+		t.bar_code,
+		t.discount_price_ago_amt,
+		t.discount_price_amt,
+		t.cost_price_amt,
+		t.cost_total_amt,
+		t.gross_profit_amt,
+		t.no_clear_qty,
+		t.line_num,
+		t.wm_name,
+		t.batch_num_stock,
+		t.group_name,
+		t.b1_material_group_name,
+		t.cust_from,
+		t.bill_address,
+		t.cloud_order_flag,
+		t.dw_last_update_date,
+		t.material_id,
+		t.sales_channel,
+		t.length_1,
+		t.width,
+		t.height,
+		t.dimension,
+		t.total_sales_amt,
+		t.u_jtorderid as cloud_order_id,--云订货单号
+		T2.MENU_DESC_NAME, --是否主菜单
+		'' AS IS_GZ, --是否高值
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) AS UNIT_AREA, --单位面积
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) * T.MATERIAL_QTY AS SALE_AREA, --销售面积
+		'其它' AS DATA_SOURCE_FALG, --使用系统
+		CASE WHEN T3.SHARE_FLAG = 'A' THEN '即是共享又是其它'
+             WHEN T3.SHARE_FLAG = 'Y' THEN '是'
+             WHEN T3.SHARE_FLAG = 'N' THEN '否'
+			  END AS SHARE_FLAG, --共享仓标识
+	    T3.OPERATION_CENTER_NAME, --运营中心
+	    T3.CUSTOMER_NAME AS DEALER_NAME, --经销商名称
+	    '' AS STORE_CODE, --门店编码
+	    null activity_code,  -- 活动编码
+	   null activity_name,    -- 活动名称
+       null as WhsCode
+FROM DWROTD.DWR_WM_OTHER_SALES_ORDER_F T
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+ON T.MATERIAL_NUM = T2.MATERIAL_NUM
+LEFT JOIN SDI_CT_CUSTOMER_DATA_1037_OTHER T3
+ON t.dealer_code = T3.CUSTOMER_CODE
+UNION ALL -- 瓷砖BW销售数据
+SELECT t.customer_type ,-- 客户类型 CT:瓷砖  SW:洁具
+	   t.dealer_code,	--   经销商编码
+	   t.out_return_goods,--出退货
+	   t.doc_num,
+		t.cust_code,
+		t.cust_name_cn,
+		t.channel_name_cn,
+		t.cust_address,
+		t.doc_date,
+		t.material_num,
+		t.material_name,
+		t.matl_group_code,
+		t.matl_group_name,
+		t.external_matl_group_code,
+		t.external_matl_group_name,
+		t.matl_type_code,
+		t.matl_type_name,
+		t.product_group_code,
+		t.product_group_name,
+		t.product_classify_code,
+		t.product_classify_name,
+		t.product_level_code,
+		t.product_level_name,
+		t.product_level1_code,
+		t.product_level1_name,
+		t.product_level2_code,
+		t.product_level2_name,
+		t.product_level3_code,
+		t.product_level3_name,
+		t.product_level4_code,
+		t.product_level4_name,
+		t.material_qty,
+		t.batch_num,
+		t.price,
+		t.line_total_amt,
+		t.unit,
+		t.bar_code,
+		t.discount_price_ago_amt,
+		t.discount_price_amt,
+		t.cost_price_amt,
+		t.cost_total_amt,
+		t.gross_profit_amt,
+		t.no_clear_qty,
+		t.line_num,
+		t.wm_name,
+		t.batch_num_stock,
+		t.group_name,
+		t.b1_material_group_name,
+		t.cust_from,
+		t.bill_address,
+		t.cloud_order_flag,
+		t.dw_last_update_date,
+		t.material_id,
+		t.sales_channel,
+		t.length_1,
+		t.width,
+		t.height,
+		t.dimension,
+		t.total_sales_amt,
+		t.u_jtorderid as cloud_order_id,--云订货单号
+		T2.MENU_DESC_NAME, --是否主菜单
+		'' AS IS_GZ, --是否高值
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) AS UNIT_AREA, --单位面积
+		NVL((T.LENGTH_1 * T.WIDTH) / 1000000,0) * T.MATERIAL_QTY AS SALE_AREA, --销售面积
+		'BW' AS DATA_SOURCE_FALG, --使用系统
+		CASE WHEN T3.SHARE_FLAG = 'A' THEN '即是共享又是其它'
+             WHEN T3.SHARE_FLAG = 'Y' THEN '是'
+             WHEN T3.SHARE_FLAG = 'N' THEN '否'
+			  END AS SHARE_FLAG, --共享仓标识
+	    T3.OPERATION_CENTER_NAME, --运营中心
+	    T3.CUSTOMER_NAME AS DEALER_NAME, --经销商名称
+	    '' AS STORE_CODE, --门店编码
+	   null activity_code,  -- 活动编码
+	   null activity_name,    -- 活动名称
+       null as WhsCode
+FROM DWROTD.DWR_WM_BW_SALES_ORDER_F T
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+ON T.MATERIAL_NUM = T2.MATERIAL_NUM
+LEFT JOIN SDI_CT_CUSTOMER_DATA_1037_BW T3
+ON t.dealer_code = T3.CUSTOMER_CODE
+UNION ALL
+SELECT customer_type
+      ,dealer_code
+      ,out_return_goods
+      ,doc_num
+      ,cust_code
+      ,cust_name_cn
+      ,channel_name_cn
+      ,cust_address
+      ,doc_date
+      ,material_num
+      ,material_name
+      ,matl_group_code
+      ,matl_group_name
+      ,external_matl_group_code
+      ,external_matl_group_name
+      ,matl_type_code
+      ,matl_type_name
+      ,product_group_code
+      ,product_group_name
+      ,product_classify_code
+      ,product_classify_name
+      ,product_level_code
+      ,product_level_name
+      ,product_level1_code
+      ,product_level1_name
+      ,product_level2_code
+      ,product_level2_name
+      ,product_level3_code
+      ,product_level3_name
+      ,product_level4_code
+      ,product_level4_name
+      ,material_qty
+      ,batch_num
+      ,price
+      ,line_total_amt
+      ,unit
+      ,bar_code
+      ,discount_price_ago_amt
+      ,discount_price_amt
+      ,cost_price_amt
+      ,cost_total_amt
+      ,gross_profit_amt
+      ,no_clear_qty
+      ,line_num
+      ,wm_name
+      ,batch_num_stock
+      ,group_name
+      ,b1_material_group_name
+      ,cust_from
+      ,bill_address
+      ,cloud_order_flag
+      ,current_timestamp as dw_last_update_date
+      ,material_id
+      ,sales_channel
+      ,length_1
+      ,width
+      ,height
+      ,dimension
+      ,total_sales_amt
+      ,cloud_order_id
+      ,menu_desc_name
+      ,is_gz
+      ,unit_area
+      ,sale_area
+      ,data_source_falg
+      ,share_flag
+      ,operation_center_name
+      ,dealer_name
+      ,store_code
+      ,activity_code
+      ,activity_name
+      ,whscode
+  from DWROTD.DWR_WM_B1_SALES_ORDER_F_HIS
+ where DOC_DATE <= '2026-03-31'
+   AND doc_date >= '2023-01-01'
+;

@@ -1,0 +1,43 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/31 16:23:55 GMT+08:00
+-- update from chenzhiyong 20230202 DM_B1_CUSTOMER_DATA_T 去重
+-- ******************************************************************** --
+--性能优化SQL
+set hive.cbo.enable=true;				
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_B1_CUST_INFO_F
+SELECT 
+	A.CUSTOMER_TYPE , -- 客户类型 CT:瓷砖 SW：洁具
+	A.CUSTOMER_CODE AS DEALER_CODE, -- 经销商编码
+	E.CUSTOMER_NAME_CN AS DEALER_NAME, -- 经销商编码
+	A.CARDCODE AS CUSTOMER_CODE ,--客户代码
+	A.CARDNAME AS CUSTOMER_NAME ,--客户名称
+	A.CNTCTPRSN AS CONTACTS_PERSON,--联系人
+	A.PHONE1 ,--电话
+	A.U_BRANDLIST AS CHANNEL_LIST,        --渠道分类
+	A.MAILADDRES AS MAIL_ADDRES,       --收款方地址
+	C.GROUPNAME   AS GROUP_NAME,     --客户组
+	D.NAME AS CUSTOMER_FROM_INFO,--客户来源
+	A.CREATEDATE AS CREATE_DATE, --客户创建时间
+	CASE WHEN A.VALIDFOR = 'Y' THEN '激活' 
+	     WHEN A.VALIDFOR = 'N' THEN '未激活'
+	     ELSE A.VALIDFOR
+	END AS ACTIVATION_STATUS, --    客户是否激活 Y是激活，N是未激活
+	A.U_DPWY1  AS SHOP_CODE1,      --门店编码1
+	A.U_DPWY2  AS SHOP_CODE2,      --门店编码2
+	A.U_DPWY3  AS SHOP_CODE3,      --门店编码3
+	CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM DWIOTD.DWI_WM_B1_OCRD_T A
+LEFT JOIN DWIOTD.DWI_WM_B1_OCRG_T C
+ON A.GROUPCODE = C.GROUPCODE
+AND A.CUSTOMER_CODE = C.CUSTOMER_CODE 
+LEFT JOIN DWIOTD.DWI_WM_B1_CARDCOMEFROM_T D
+ON A.U_COMEFROM =D.CODE 
+AND A.CUSTOMER_CODE = D.CUSTOMER_CODE 
+JOIN (SELECT DISTINCT CUSTOMER_TYPE,CUSTOMER_CODE,CUSTOMER_NAME_CN  FROM DM.DM_B1_CUSTOMER_DATA_T  WHERE CUSTOMER_FLAG = 'N') E
+ON A.CUSTOMER_TYPE = E.CUSTOMER_TYPE
+AND A.CUSTOMER_CODE = E.CUSTOMER_CODE;

@@ -1,0 +1,99 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/09/13 17:29:23 GMT+08:00
+-- description:DWR_FIN_SETTLEMENT_CONTRACT_DOC_F_F 对公结算单仅关联整体合同（不关联支付条款）支付情况模型
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+
+INSERT OVERWRITE TABLE DWRFIN.DWR_FIN_SETTLEMENT_CONTRACT_DOC_F_F
+SELECT
+c.contract_no AS contract_no, --合同编号  
+c.contract_name AS contract_name, --合同名称  
+b.order_no AS order_no, --对公计算申请单号  
+d.item_no AS item_no, --支付明细行项目号  
+d.payment_amount AS payment_amount, --申请支付金额  
+CASE
+		
+		WHEN d.payment_channel = "BANK_ENTERPRISE_PAYMENT" THEN
+		"银企转账" 
+		WHEN d.payment_channel = "BANK_ACCEPTANCE_DRAFT" THEN
+		"银行承兑汇票" 
+		WHEN d.payment_channel = "OFFLINE_PAYMENT" THEN
+		"线下支付" 
+		WHEN d.payment_channel = "TRADE_ACCEPTANCE_DRAFT" THEN
+		"商业承兑汇票" ELSE d.payment_channel 
+	END AS payment_channel,--支付渠道
+CASE
+		
+		WHEN d.payment_status = "INIT" THEN
+		"初始状态" 
+		WHEN d.payment_status = "SUCCESS" THEN
+		"支付成功" 
+		WHEN d.payment_status = "PAYING" THEN
+		"支付中" 
+		WHEN d.payment_status = "SUBMITTED" THEN
+		"已提交" 
+		WHEN d.payment_status = "INVALID" THEN
+		"已注销" 
+		WHEN d.payment_status = "FAILED" THEN
+		"支付失败" 
+		WHEN d.payment_status = "SUBMIT_FAILED" THEN
+		"提交失败" 
+		WHEN d.payment_status = "WAIT_SUBMIT" THEN
+		"等待提交" ELSE d.payment_status 
+	END AS payment_status,--支付状态
+e.business_no AS business_no, --支付业务单号  
+e.currency_amount AS currency_amount, --支付业务金额  
+CASE
+		
+		WHEN e.payment_status = "INIT" THEN
+		"初始状态" 
+		WHEN e.payment_status = "SUCCESS" THEN
+		"支付成功" 
+		WHEN e.payment_status = "PAYING" THEN
+		"支付中" 
+		WHEN e.payment_status = "SUBMITTED" THEN
+		"已提交" 
+		WHEN e.payment_status = "INVALID" THEN
+		"已注销" 
+		WHEN e.payment_status = "FAILED" THEN
+		"支付失败" 
+		WHEN e.payment_status = "SUBMIT_FAILED" THEN
+		"提交失败" 
+		WHEN e.payment_status = "WAIT_SUBMIT" THEN
+		"等待提交" ELSE e.payment_status 
+	END AS payment_status,--支付结果 
+	current_timestamp() as dw_last_update_date -- 最后更新时间
+FROM
+	SDI.SDI_CSM_CORPORATE_SETTLEMENT_CONTRACT_ITEM_1039 a
+	LEFT JOIN SDI.SDI_CSM_CORPORATE_SETTLEMENT_HEAD_1039 b ON b.id = a.request_id
+	LEFT JOIN SDI.SDI_CSM_CONTRACT_HEAD_1039 c ON c.id = a.contract_head_id
+	LEFT JOIN SDI.SDI_BAF_PAYMENT_ITEM_1039 d ON d.request_id = b.id
+	LEFT JOIN SDI.SDI_BAF_BUSINESS_PAYMENT_RESULT_1039 e ON e.business_id = d.id
+WHERE
+	a.operation_type = "RELATION" 
+	AND d.payment_amount IS NOT NULL 
+	AND e.business_no IS NOT NULL 
+
+
+
+
+
+
+
+-- CREATE TABLE DWRFIN.DWR_FIN_SETTLEMENT_CONTRACT_DOC_F_F (
+--     contract_no STRING COMMENT '合同编号',
+--     contract_name STRING COMMENT '合同名称',
+--     order_no STRING COMMENT '对公计算申请单号',
+--     item_no STRING COMMENT '支付明细行项目号',
+--     payment_amount NUMERIC(38,10) COMMENT '申请支付金额',
+--     payment_channel STRING COMMENT '支付渠道',
+--     payment_status STRING COMMENT '支付状态',
+--     business_no STRING COMMENT '支付业务单号',
+--     currency_amount NUMERIC(38,10) COMMENT '支付业务金额',
+--     payment_result STRING COMMENT '支付结果',
+--     dw_last_update_date TIMESTAMP COMMENT '最后更新时间'
+-- );
+	

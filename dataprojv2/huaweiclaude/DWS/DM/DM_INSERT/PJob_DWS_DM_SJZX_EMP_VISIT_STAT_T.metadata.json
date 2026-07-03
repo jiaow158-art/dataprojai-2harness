@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_SJZX_EMP_VISIT_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "数据中心用户月访问统计表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

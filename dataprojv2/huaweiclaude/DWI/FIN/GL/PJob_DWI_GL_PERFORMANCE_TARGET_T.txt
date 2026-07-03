@@ -1,0 +1,51 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:业绩目标表(DWI)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWIFIN.DWI_GL_PERFORMANCE_TARGET_T
+SELECT
+  sales_grp , 
+  distr_chan , 
+  calday , 
+  `/bic/zqdzh` , 
+  recordmode , 
+  zqdzhdesc , 
+  zxsyjmb_qntq , 
+  zbhsxsjemb_qntq , 
+  zmlemb_qntq , 
+  distr_chandesc , 
+  zxsyj_dr , 
+  zmle_dr , 
+  zbhsxsje_dr , 
+  zxsyj_dy , 
+  zmle_dy , 
+  zbhsxsje_dy , 
+  zxsyjmb_dy , 
+  zmlemb_dy , 
+  zbhsxsjemb_dy , 
+  zxsyj_qntq , 
+  zmle_qntq , 
+  zbhsxsje_qntq , 
+  zxsyj_qntq_zy , 
+  zmle_qntq_zy , 
+  zbhsxsje_qntq_zy , 
+  zxsyj_dnlj , 
+  zmle_dnlj , 
+  zbhsxsje_dnlj , 
+  zxsyj_qnlj , 
+  zmle_qnlj , 
+  zbhsxsje_qnlj , 
+  zxsyjmb_dnlj , 
+  zmlemb_dnlj , 
+  zbhsxsjemb_dnlj , 
+  zxsyjmb_dn , 
+  zmlemb_dn , 
+  zbhsxsjemb_dn ,
+  'N' AS DEL_FLAG,
+   current_timestamp() as DW_LAST_UPDATE_DATE
+FROM SDI.SDI_AZMSD_O2242_1009
+WHERE DEL_FLAG = 'N';

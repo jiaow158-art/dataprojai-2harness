@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_TVAST",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "来源表TVAST",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

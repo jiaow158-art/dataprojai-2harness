@@ -1,0 +1,8 @@
+{
+    "name": "DWR_COST_CENTER_MAIN_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "成本中心主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

@@ -1,0 +1,17 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/05/23 11:47:13 GMT+08:00
+-- description:瓷砖基地单耗目标表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_PAM_ENERGYCONSUME_TARGET_T
+SELECT valid_year AS START_YEAR, -- 有效年份
+	   site AS SITE_CODE, -- 基地编码
+	   unit_consumption_type AS ENERGY_TYPE_NAME, -- 能源类型
+	   target_value AS TARGET_QTY, -- 目标值
+	   'N' AS del_flag, -- 删除数据标识
+	   current_timestamp() AS dw_last_update_date -- 最后更新日期
+FROM SDI.SDI_dp_energy_consumption_target_maintenance_1006
+WHERE delete_flag = 1;

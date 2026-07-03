@@ -1,0 +1,253 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/07/20 15:44:52 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_WM_CERAMIC_STOCK_T;
+INSERT INTO DM.DM_WM_CERAMIC_STOCK_T
+SELECT 
+ A."CALMONTH" AS STAT_MONTH --库存月
+,B."/BIC/ZPRODH3" AS PROD_LEVLE3_CODE --产品层次
+,C."TXTSH" AS PROD_LEVLE3_NAME --产品层次3描述
+,A."MATERIAL" AS MATERIAL_NUM --物料编码
+,D."TXTMD" AS MATERIAL_NAME --物料编码描述
+,B."LENGHT" AS LENGHT --长度
+,B."WIDTH" AS WIDTH --宽度
+,B."SIZE_DIM" AS DIMENSION --规格
+,A."PLANT" AS FACTORY_WERKS_CODE --工厂
+,E.TXTMD AS FACTORY_WERKS_NAME --工厂描述
+,A."STOR_LOC" AS INV_LOCATION --库存地点
+,F."TXTMD" AS INV_LOCATION_NAME --库存地点描述
+,G."/BIC/ZWW010" AS PRODUCT_AREA_CODE --产区
+,A."BATCH" AS BATCH_NUM --批次
+,(CASE WHEN (LEFT(H."/BIC/ZPCRK_AMB",1) = '0' OR H."/BIC/ZPCRK_AMB" IS NULL) 
+THEN '' ELSE TO_CHAR(TO_DATE(H."/BIC/ZPCRK_AMB",'YYYY/MM/DD'),'YYYY/MM/DD') END ) AS VOUCHER_POST_DATE --批次入库日期（阿米巴调整)
+,A."KCJE_YM" AS KCJE_YM --月末库存金额
+,A."KCSL_YM" AS KCSL_YM --月末库存数量
+,A."KCSL_YM" * B."LENGHT" * B."WIDTH" / 1000000 AS KCMJ_YM --月末库存面积
+,A."KCJE_YM_WX" AS KCJE_YM_WX --月末外协寄售金额
+,A."KCSL_YM_WX" AS KCSL_YM_WX --月末外协寄售数量
+,A."KCSL_YM_WX" * B."LENGHT" * B."WIDTH" / 1000000 AS KCMJ_YM_WX --月末外协寄售面积
+,CASE WHEN LEFT(A."PLANT",2) = '32' THEN '江西基地'
+ 	  WHEN LEFT(A."PLANT",2) = '33' THEN '堆龙德庆裕威'
+ 	  WHEN LEFT(A."PLANT",2) = '35' THEN '江门基地'
+ 	  WHEN LEFT(A."PLANT",2) = '36' THEN '佛山基地'
+ 	  WHEN LEFT(A."PLANT",2) = '37' THEN '高明基地' 
+ 	  WHEN LEFT(A."PLANT",2) = '39' THEN '鹏嘉'  ELSE '' END AS BASE --基地
+,CASE WHEN A."STOR_LOC" IS NOT NULL THEN I.LOCATION_CATEGORY  ELSE J.LOCATION_CATEGORY END AS LOCATION_CATEGORY --库位分类
+,K.LVE2_CODE AS CLASSIFY_NAME --分类
+,K.LVE2_CODE AS CATEGORY_NAME --品类
+,case when (case when left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-6) + 1)) then '半年以内'
+      when (case when left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-6) + 1)) and 
+           (case when left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) then '7-12个月'
+      when (case when left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) and 
+           (case when left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-24) + 1)) then '1-2年'
+ 	  else '2年以上' end as KL_DATE --库龄（按月倒推库龄段）
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE 
+,COALESCE(B1.BASE,'物流仓') AS BASE_NAME --基地名称
+,case when A."PLANT" LIKE '%80' and clearance_reason_code='QC19' then  '清仓小堆头' else C1.REJECTS_TYPE end AS REJECTS_TYPE --不良品类型  
+,T.FIRST_PROMOTE_DATE --首次维护促销原因日期
+,CASE WHEN A."BATCH"  LIKE '%888888' or A."BATCH" LIKE '%999999' THEN 0-- 虚拟入库批次不计算
+      WHEN A."PLANT" LIKE '%80' THEN 1
+      WHEN (C1.PROMOTION_REASON_CODE ='AC05'  and A."WBS_ELEMT" is not null ) THEN 0 -- AC05的项目库存不计算不良品
+      WHEN (C1.PROMOTION_REASON_CODE IS NOT NULL and "CALMONTH">=replace(substr(T.FIRST_PROMOTE_DATE,1,7),'-','')) THEN 1
+	  ELSE 0
+	   END AS IS_BLP --是否不良品
+--新增字段 20220907
+,A."SYB_ZJCB_KCCP" AS SYB_ZJCB_KCCP --库存产品利息
+,A."SYB_CHDJ_1_1_1" AS SYB_CHDJ_1_1_1 --[-] 减值损失-半年内-2020以前-金额
+,A."SYB_CHDJ_1_1_2" AS SYB_CHDJ_1_1_2 --减值损失-半年内-2020以后-金额
+,A."SYB_CHDJ_SL_1_1_1" AS SYB_CHDJ_SL_1_1_1 --减值损失-半年内-2020以前-数量
+,A."SYB_CHDJ_SL_1_1_2" AS SYB_CHDJ_SL_1_1_2 --减值损失-半年内-2020以后-数量
+,A."SYB_CHDJ_1_2_1" AS SYB_CHDJ_1_2_1 --[-] 减值损失-半年到一年-2020以前-金额
+,A."SYB_CHDJ_1_2_2" AS SYB_CHDJ_1_2_2 --减值损失-半年到一年-2020以后-金额
+,A."SYB_CHDJ_SL_1_2_1" AS SYB_CHDJ_SL_1_2_1 --减值损失-半年到一年-2020以前-数量
+,A."SYB_CHDJ_SL_1_2_2" AS SYB_CHDJ_SL_1_2_2 --减值损失-半年到一年-2020以后-数量
+,A."SYB_CHDJ_1_3_1" AS SYB_CHDJ_1_3_1 --[-] 减值损失-一年到两年-2020以前-金额
+,A."SYB_CHDJ_1_3_2" AS SYB_CHDJ_1_3_2 --减值损失-一年到两年-2020以后-金额
+,A."SYB_CHDJ_SL_1_3_1" AS SYB_CHDJ_SL_1_3_1 --减值损失-一年到两年-2020以前-数量
+,A."SYB_CHDJ_SL_1_3_2" AS SYB_CHDJ_SL_1_3_2 --减值损失-一年到两年-2020以后-数量
+,A."SYB_CHDJ_1_4_1" AS SYB_CHDJ_1_4_1 --[-] 减值损失-两年以上-2020以前-金额
+,A."SYB_CHDJ_1_4_2" AS SYB_CHDJ_1_4_2 --减值损失-两年以上-2020以后-金额
+,A."SYB_CHDJ_SL_1_4_1" AS SYB_CHDJ_SL_1_4_1 --减值损失-两年以上-2020以前-数量
+,A."SYB_CHDJ_SL_1_4_2" AS SYB_CHDJ_SL_1_4_2 --减值损失-两年以上-2020以后-数量
+,A."SYB_CHDJ_2" AS SYB_CHDJ_2 --减值损失"
+,A."SYB_CHDJ_3" AS SYB_CHDJ_3 --[-] 减值损失-外协寄售
+,A."SYB_CHDJ_3_1" AS SYB_CHDJ_3_1 --[-] 减值损失-半年以内-外协寄售
+,A."SYB_CHDJ_3_1_1" AS SYB_CHDJ_3_1_1 --库存金额-2020以前-半年内-外协寄售
+,A."SYB_CHDJ_3_1_2" AS SYB_CHDJ_3_1_2 --库存金额-2020以后-半年内-外协寄售
+,A."SYB_CHDJ_SL_3_1_1" AS SYB_CHDJ_SL_3_1_1 --库存金额-2020以前-半年内-外协寄售-数量
+,A."SYB_CHDJ_SL_3_1_2" AS SYB_CHDJ_SL_3_1_2 --库存金额-2020以后-半年内-外协寄售-数量
+,A."SYB_CHDJ_3_2" AS SYB_CHDJ_3_2 --[-] 减值损失-半年到一年内-外协寄售
+,A."SYB_CHDJ_3_2_1" AS SYB_CHDJ_3_2_1 --库存金额-2020以前-半年到一年-外协寄售
+,A."SYB_CHDJ_3_2_2" AS SYB_CHDJ_3_2_2 --库存金额-2020以后-半年到一年-外协寄售
+,A."SYB_CHDJ_SL_3_2_1" AS SYB_CHDJ_SL_3_2_1 --库存金额-2020以前-半年到一年-外协寄售-数量
+,A."SYB_CHDJ_SL_3_2_2" AS SYB_CHDJ_SL_3_2_2 --库存金额-2020以后-半年到一年-外协寄售-数量
+,A."SYB_CHDJ_3_3" AS SYB_CHDJ_3_3 --[-] 减值损失-一年到两年-外协寄售
+,A."SYB_CHDJ_3_3_1" AS SYB_CHDJ_3_3_1 --库存金额-2020以前-1年到两年-外协寄售
+,A."SYB_CHDJ_3_3_2" AS SYB_CHDJ_3_3_2 --库存金额-2020以后-1年到两年-外协寄售
+,A."SYB_CHDJ_SL_3_3_1" AS SYB_CHDJ_SL_3_3_1 --库存金额-2020以前-1年到两年-外协寄售-数量
+,A."SYB_CHDJ_SL_3_3_2" AS SYB_CHDJ_SL_3_3_2 --库存金额-2020以后-1年到两年-外协寄售-数量
+,A."SYB_CHDJ_3_4" AS SYB_CHDJ_3_4 --[-] 减值损失_两年以上-外协寄售
+,A."SYB_CHDJ_3_4_1" AS SYB_CHDJ_3_4_1 --库存金额-2020以前-两年以上-外协寄售
+,A."SYB_CHDJ_3_4_2" AS SYB_CHDJ_3_4_2 --库存金额-2020以后-两年以上-外协寄售
+,A."SYB_CHDJ_SL_3_4_1" AS SYB_CHDJ_SL_3_4_1 --库存金额-2020以前-两年以上-外协寄售-数量
+,A."SYB_CHDJ_SL_3_4_2" AS SYB_CHDJ_SL_3_4_2 --库存金额-2020以后-两年以上-外协寄售-数量
+,(A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_1_2" + A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_1_2") AS SYB_CHDJ_JE_10 --1-6个月金额
+,(A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_2_2" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_2_2") AS SYB_CHDJ_JE_11 --7-12个月金额
+,(A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2") AS SYB_CHDJ_JE_12 --1-2年金额
+,(A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2") AS SYB_CHDJ_JE_13 --2年以上金额
+,(A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_1_2" + A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_1_2"
++ A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_2_2" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_2_2" 
++ A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2"
++ A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2") AS SYB_CHDJ_JE_14 --库存总额（含寄售）
+,(A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_2_2" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_2_2" 
++ A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2"
++ A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2") AS SYB_CHDJ_JE_15 --库存金额-库龄半年以上
+,(A."SYB_CHDJ_SL_1_1_1" + A."SYB_CHDJ_SL_1_1_2" + A."SYB_CHDJ_SL_3_1_1" + A."SYB_CHDJ_SL_3_1_2") AS SYB_CHDJ_SL_10 --1-6个月数量
+,(A."SYB_CHDJ_SL_1_2_1" + A."SYB_CHDJ_SL_1_2_2" + A."SYB_CHDJ_SL_3_2_1" + A."SYB_CHDJ_SL_3_2_2") AS SYB_CHDJ_SL_11 --7-12个月数量
+,(A."SYB_CHDJ_SL_1_3_1" + A."SYB_CHDJ_SL_1_3_2" + A."SYB_CHDJ_SL_3_3_1" + A."SYB_CHDJ_SL_3_3_2") AS SYB_CHDJ_SL_12 --1-2年数量
+,(A."SYB_CHDJ_SL_1_4_1" + A."SYB_CHDJ_SL_1_4_2" + A."SYB_CHDJ_SL_3_4_1" + A."SYB_CHDJ_SL_3_4_2") AS SYB_CHDJ_SL_13 --2年以上数量
+,(A."SYB_CHDJ_SL_1_1_1" + A."SYB_CHDJ_SL_1_1_2" + A."SYB_CHDJ_SL_3_1_1" + A."SYB_CHDJ_SL_3_1_2"
++ A."SYB_CHDJ_SL_1_2_1" + A."SYB_CHDJ_SL_1_2_2" + A."SYB_CHDJ_SL_3_2_1" + A."SYB_CHDJ_SL_3_2_2"
++ A."SYB_CHDJ_SL_1_3_1" + A."SYB_CHDJ_SL_1_3_2" + A."SYB_CHDJ_SL_3_3_1" + A."SYB_CHDJ_SL_3_3_2"
++ A."SYB_CHDJ_SL_1_4_1" + A."SYB_CHDJ_SL_1_4_2" + A."SYB_CHDJ_SL_3_4_1" + A."SYB_CHDJ_SL_3_4_2") AS SYB_CHDJ_SL_14 --库存总数量（含寄售）
+,( A."SYB_CHDJ_SL_1_2_1" + A."SYB_CHDJ_SL_1_2_2" + A."SYB_CHDJ_SL_3_2_1" + A."SYB_CHDJ_SL_3_2_2"
++ A."SYB_CHDJ_SL_1_3_1" + A."SYB_CHDJ_SL_1_3_2" + A."SYB_CHDJ_SL_3_3_1" + A."SYB_CHDJ_SL_3_3_2"
++ A."SYB_CHDJ_SL_1_4_1" + A."SYB_CHDJ_SL_1_4_2" + A."SYB_CHDJ_SL_3_4_1" + A."SYB_CHDJ_SL_3_4_2") AS SYB_CHDJ_SL_15 --库存数量-库龄半年以上
+,(A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") AS SYB_CHDJ_SL_16 --2020年以前库存金额
+,case when (A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") = 0 then '否' else '是' end AS IS_2020_YEAR --是否2020年以前
+,case when (A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") <> 0 then '0' 
+else (A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_2_2" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_2_2") * 0.1 end AS SYB_CHDJ_DJ_10 --跌价金额-7-12个月
+,case when (A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") <> 0 
+then (A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2" - A."SYB_CHDJ_3_3_1") * 0.25
+else (A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2") * 0.4 end AS SYB_CHDJ_DJ_11 --跌价金额-1-2年
+,case when (A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") <> 0 
+then (A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2" - A."SYB_CHDJ_3_4_1") * 0.5
+else (A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2") * 0.7 end AS SYB_CHDJ_DJ_12 --跌价金额-2年以上
+,case when (A."SYB_CHDJ_1_1_1" + A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_4_1"
++ A."SYB_CHDJ_3_1_1" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_4_1") <> 0 
+then (A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2" - A."SYB_CHDJ_3_3_1") * 0.25 
++ (A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2" - A."SYB_CHDJ_3_4_1") * 0.5
+else (A."SYB_CHDJ_1_2_1" + A."SYB_CHDJ_1_2_2" + A."SYB_CHDJ_3_2_1" + A."SYB_CHDJ_3_2_2") * 0.1 
+   + (A."SYB_CHDJ_1_3_1" + A."SYB_CHDJ_1_3_2" + A."SYB_CHDJ_3_3_1" + A."SYB_CHDJ_3_3_2") * 0.4 
+   + (A."SYB_CHDJ_1_4_1" + A."SYB_CHDJ_1_4_2" + A."SYB_CHDJ_3_4_1" + A."SYB_CHDJ_3_4_2") * 0.7 end AS SYB_CHDJ_DJ_13 --跌价合计
+,A."SYB_CHDJ_SL_1_1_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_1_1 --减值损失-半年内-2020以前-面积
+,A."SYB_CHDJ_SL_1_1_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_1_2 --减值损失-半年内-2020以后-面积
+,A."SYB_CHDJ_SL_1_2_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_2_1 --减值损失-半年到一年-2020以前-面积
+,A."SYB_CHDJ_SL_1_2_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_2_2 --减值损失-半年到一年-2020以后-面积
+,A."SYB_CHDJ_SL_1_3_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_3_1 --减值损失-一年到两年-2020以前-面积
+,A."SYB_CHDJ_SL_1_3_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_3_2 --减值损失-一年到两年-2020以后-面积
+,A."SYB_CHDJ_SL_1_4_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_4_1 --减值损失-两年以上-2020以前-面积
+,A."SYB_CHDJ_SL_1_4_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_1_4_2 --减值损失-两年以上-2020以后-面积
+,A."SYB_CHDJ_SL_3_1_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_1_1 --库存金额-2020以前-半年内-外协寄售-面积
+,A."SYB_CHDJ_SL_3_1_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_1_2 --库存金额-2020以后-半年内-外协寄售-面积
+,A."SYB_CHDJ_SL_3_2_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_2_1 --库存金额-2020以前-半年到一年-外协寄售-面积
+,A."SYB_CHDJ_SL_3_2_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_2_2 --库存金额-2020以后-半年到一年-外协寄售-面积
+,A."SYB_CHDJ_SL_3_3_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_3_1 --库存金额-2020以前-1年到两年-外协寄售-面积
+,A."SYB_CHDJ_SL_3_3_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_3_2 --库存金额-2020以后-1年到两年-外协寄售-面积
+,A."SYB_CHDJ_SL_3_4_1" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_4_1 --库存金额-2020以前-两年以上-外协寄售-面积
+,A."SYB_CHDJ_SL_3_4_2" * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_3_4_2 --库存金额-2020以后-两年以上-外协寄售-面积
+,(A."SYB_CHDJ_SL_1_1_1" + A."SYB_CHDJ_SL_1_1_2" + A."SYB_CHDJ_SL_3_1_1" + A."SYB_CHDJ_SL_3_1_2") * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_10 --1-6个月面积
+,(A."SYB_CHDJ_SL_1_2_1" + A."SYB_CHDJ_SL_1_2_2" + A."SYB_CHDJ_SL_3_2_1" + A."SYB_CHDJ_SL_3_2_2") * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_11 --7-12个月面积
+,(A."SYB_CHDJ_SL_1_3_1" + A."SYB_CHDJ_SL_1_3_2" + A."SYB_CHDJ_SL_3_3_1" + A."SYB_CHDJ_SL_3_3_2") * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_12 --1-2年面积
+,(A."SYB_CHDJ_SL_1_4_1" + A."SYB_CHDJ_SL_1_4_2" + A."SYB_CHDJ_SL_3_4_1" + A."SYB_CHDJ_SL_3_4_2") * B."LENGHT" * B."WIDTH" / 1000000 AS SYB_CHDJ_MJ_13 --2年以上面积 
+,'' as wbs_element
+,last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)) as next_date
+,case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-6) + 1)) and 
+           (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 0 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.1 end ) else 0 end as SYB_CHDJ_DJ_10_N --"下月跌价金额-7-12个月"
+,case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) and 
+           (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-24) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 
+ 		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2" - a."KCJE_YM_WX") * 0.25 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.4 end ) else 0 end as SYB_CHDJ_DJ_11_N--"下月跌价金额-1-2年"
+,case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-24) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 
+ 		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2" - a."KCJE_YM_WX") * 0.5 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.7 end ) else 0 end as SYB_CHDJ_DJ_12_N--"下月跌价金额-2年以上"
+,( (case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-6) + 1)) and 
+           (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 0 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.1 end ) else 0 end) + 
+			(case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-12) + 1)) and 
+           (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) <= (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-24) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 
+ 		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2" - a."KCJE_YM_WX") * 0.25 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.4 end ) else 0 end) + 
+			( case when (case when  left(h."/BIC/ZPCRK_AMB",1) = '0' or h."/BIC/ZPCRK_AMB" is null then '999' else (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(to_date(h."/BIC/ZPCRK_AMB",'yyyy-mm-dd'))) end) > (date(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1))) - date(add_months(last_day(add_months(to_date(a."CALMONTH",'yyyy-mm-dd'),1)),-24) + 1)) then 
+           (case when (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_4_1"
+		     + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_4_1") <> 0  then 
+ 		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2" - a."KCJE_YM_WX") * 0.5 else 
+		     (a."SYB_CHDJ_1_1_1" + a."SYB_CHDJ_1_1_2" + a."SYB_CHDJ_3_1_1" + a."SYB_CHDJ_3_1_2"
+			  + a."SYB_CHDJ_1_2_1" + a."SYB_CHDJ_1_2_2" + a."SYB_CHDJ_3_2_1" + a."SYB_CHDJ_3_2_2" 
+			  + a."SYB_CHDJ_1_3_1" + a."SYB_CHDJ_1_3_2" + a."SYB_CHDJ_3_3_1" + a."SYB_CHDJ_3_3_2"
+			  + a."SYB_CHDJ_1_4_1" + a."SYB_CHDJ_1_4_2" + a."SYB_CHDJ_3_4_1" + a."SYB_CHDJ_3_4_2") * 0.7 end ) else 0 end )) as SYB_CHDJ_DJ_13_N--"下月跌价金额合计"
+			  	,case when B."/BIC/ZDW01" = 'A100' then '是' else '否' end as high_value --是否高值
+,A."SYB_CHDJ_1_1" AS SYB_CHDJ_1_1
+,A."SYB_CHDJ_1_2" AS SYB_CHDJ_1_2
+,A."SYB_CHDJ_1_3" AS SYB_CHDJ_1_3
+,A."SYB_CHDJ_1_4" AS SYB_CHDJ_1_4
+,B."MATL_GROUP" AS MATL_GROUP_CODE
+,B."EXTMATLGRP" AS EXTERNAL_MATL_GROUP_CODE
+FROM DM.DM_RPT_BIC_AZMMM_O0101_T AS A 
+LEFT JOIN DM.DM_RPT_BI0_PMATERIAL_T AS B ON A."MATERIAL" = B."MATERIAL" 
+LEFT JOIN DM.DM_RPT_BIC_TZPRODH3_T AS C ON B."/BIC/ZPRODH3" = C."/BIC/ZPRODH3" AND C."LANGU" = '1'
+LEFT JOIN DM.DM_RPT_BI0_TMATERIAL_T AS D ON D."MATERIAL" = A."MATERIAL" AND D."LANGU" = '1'
+LEFT JOIN DM.DM_RPT_BI0_TPLANT_T AS E ON A."PLANT" = E.PLANT 
+LEFT JOIN DM.DM_RPT_BI0_TSTOR_LOC_T AS F ON A."STOR_LOC" = F."STOR_LOC" AND A."PLANT" = F."PLANT"
+LEFT JOIN DM.DM_RPT_BIC_PZBATCHMD_T AS G ON A."MATERIAL" = G."MATERIAL"  AND A."BATCH" = G."/BIC/ZBATCHMD"  
+LEFT JOIN DM.DM_RPT_BIC_PZAMBBATCH_T AS H ON A."MATERIAL" = H."MATERIAL" AND (COALESCE (A."BATCH",'#') = COALESCE (H."/BIC/ZAMBBATCH",'#') )
+LEFT JOIN DM.DM_RPT_STOCK_PLACE_T AS I ON A."STOR_LOC" = I.STOCK_PLACE_NAME AND I.STOCK_PLACE_FLAG = '库存地点不为空' AND I.STOCK_PLACE_NAME IS NOT NULL
+LEFT JOIN DM.DM_RPT_STOCK_PLACE_T AS J ON A."PLANT" = J.FACTORY_CODE AND J.STOCK_PLACE_FLAG = '库存地点为空' AND J.STOCK_PLACE_NAME IS NULL
+LEFT JOIN DM.DM_RPT_PROD_LEVEL_T AS K ON B."/BIC/ZPRODH3" = K.PROD_CODE3 
+LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T T
+  ON A."MATERIAL" = T.MATERIAL_NUM
+ AND A."BATCH" = T.BATCH_NUM     
+LEFT JOIN (select INVENT_LOCAT_CODE,max(base) as base from UPLOAD.UPLOAD_INVENT_LOCAT_TYPE_T group by INVENT_LOCAT_CODE) B1
+  ON A."STOR_LOC" = B1.INVENT_LOCAT_CODE
+LEFT JOIN UPLOAD.UPLOAD_REJECTS_DEFINITION_T C1
+  ON T.PROMOTE_REASON_CODE = C1.PROMOTION_REASON_CODE
+WHERE A."/BIC/ZA_SYAMB" = 'ZAMBID11000001'
+AND A."CALMONTH" >= '202206'
+--AND B."MATL_GROUP" = '1000010'
+--AND B."EXTMATLGRP" = '10010'
+;

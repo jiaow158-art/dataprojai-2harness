@@ -1,0 +1,183 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/04/23 09:16:17 GMT+08:00
+-- UPDATE FROM 10004701 2024/03/05 下沉到销部销区
+-- UPDATE FROM 10004701 2024/04/01 新增新品标识、绿灯产品标识字段
+-- update from huangwenin 2025-12-29 新增字段：KA类型、NKA紧急订单标志
+-- ******************************************************************** --
+DELETE FROM DM.DM_SO_FZL_ORDER_PRE_T
+WHERE STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval'1 day',1,7),'-','')
+AND TJ_MONTH = SUBSTR(CURRENT_DATE - interval'1 day',1,7)
+;
+INSERT INTO DM.DM_SO_FZL_ORDER_PRE_T(
+vbeln
+,posnr
+,matnr
+,werks
+,lgort
+,charg
+,meins
+,kwmeng
+,kbmeng
+,mwsbp
+,arktx
+,pstyv
+,abgru
+,ps_psp_pnr
+,vkorg
+,vtweg
+,vkbur
+,kunnr
+,name1
+,knkli
+,vkgrp
+,erdat
+,audat
+,netpr
+,netwr
+,lfgsk
+,jhddlx
+,bzirk
+,bzirk_txt
+,auart
+,mvgr1
+,mvgr2
+,ihrez
+,submi
+,bstkd
+,last_name
+,sfzdjf
+,ernam
+,bstdk
+,def_dl_date
+,confirm_date
+,czjhdh
+,zcqmc
+,zcqbm
+,tsyqmx
+,vmeng
+,menge
+,wqrsl
+,mengef
+,mengefh
+,thdat
+,id_item
+,first_confirm_date
+,is_xh
+,prdha
+,last_bstdk
+,kz_date
+,cppc_period
+,is_hzj
+,is_hzt
+,is_zdzj
+,is_zdzt
+,is_zdjfzj
+,is_zdjfzt
+,tj_month
+,dw_last_update_date
+,stat_month
+,confirm_complete_date
+,zj_qty
+,yt_date
+,th_complete_date
+,zt_qty
+,unit_area
+,department
+,sale_region_name
+,sales_office_name
+,new_material_flag
+,grelight_material_flag
+,ka_type
+,is_ka_name
+)
+SELECT
+t1.vbeln
+,t1.posnr
+,t1.matnr
+,t1.werks
+,t1.lgort
+,t1.charg
+,t1.meins
+,t1.kwmeng
+,t1.kbmeng
+,t1.mwsbp
+,t1.arktx
+,t1.pstyv
+,t1.abgru
+,t1.ps_psp_pnr
+,t1.vkorg
+,t1.vtweg
+,t1.vkbur
+,t1.kunnr
+,t1.name1
+,t1.knkli
+,t1.vkgrp
+,t1.erdat
+,t1.audat
+,t1.netpr
+,t1.netwr
+,t1.lfgsk
+,t1.jhddlx
+,t1.bzirk
+,t1.bzirk_txt
+,t1.auart
+,t1.mvgr1
+,t1.mvgr2
+,t1.ihrez
+,t1.submi
+,t1.bstkd
+,t1.last_name
+,t1.sfzdjf
+,t1.ernam
+,t1.bstdk
+,t1.def_dl_date
+,t1.confirm_date
+,t1.czjhdh
+,t1.zcqmc
+,t1.zcqbm
+,t1.tsyqmx
+,t1.vmeng
+,t1.menge
+,t1.wqrsl
+,t1.mengef
+,t1.mengefh
+,t1.thdat
+,t1.id_item
+,t1.first_confirm_date
+,t1.is_xh
+,t1.prdha
+,t1.last_bstdk
+,t1.kz_date
+,t1.cppc_period
+,t1.is_hzj
+,t1.is_hzt
+,t1.is_zdzj
+,t1.is_zdzt
+,t1.is_zdjfzj
+,t1.is_zdjfzt
+,t1.tj_month
+,t1.dw_last_update_date
+,t1.stat_month
+,t1.confirm_complete_date
+,t1.zj_qty
+,t1.yt_date
+,t1.th_complete_date
+,t1.zt_qty
+,t1.unit_area
+,t1.department
+,t1.sale_region_name
+,t1.sales_office_name
+,t2.new_material_flag
+,t2.grelight_material_flag
+,t1.ka_type
+,t1.is_ka_name
+FROM DM.DM_SO_FZL_ORDER_T t1
+left join upload.upload_matertial_product_flag_t t2 on t1.matnr = t2.material_num
+WHERE ERDAT >= '20220101'
+--and is_zdjfzj in('是','否')
+AND STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval'1 day',1,7),'-','')
+AND TJ_MONTH = SUBSTR(CURRENT_DATE - interval'1 day',1,7)
+AND arktx not like '%转仓'
+;

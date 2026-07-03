@@ -1,0 +1,120 @@
+-- HIVE sql
+-- ******************************************************************** --
+-- author: zhangpeng
+-- create time: 2023/12/15 16:18:29 GMT+08:00
+--UPDATE 2023-12-27 ZHANGPENG 新增两个字段VOUCHER_CODE，VOUCHER_ITEM
+-- linw 2024-04-17 11:03:57  新增0021810150科目、清账日期
+-- linw 2024-04-28 16:18:04  新增清账凭证、凭证类型
+-- update by zhz 2024-05-24 新增客户组编码字段
+-- linw  2024-06-03 08:45:39  新增集间科目 0011310300 
+-- linw  2024-06-14 14:18:30  客户主档销售组保持最新
+-- ******************************************************************** --
+with ACCOUNT_DETAIL as(
+ select comp_code,year,voucher_code,
+   max(case when general_ledger_account like '%0021310400%'  then 1 else 0 end) as flag1, -- 未确定项金额
+   max(case when substr(general_ledger_account,1,6) in('001001','001002','001003','001009')
+        and general_ledger_account not in('0010090700','0010090710','0010090720') then 1 else 0 end) as flag2,-- 现金回款
+   max(case when general_ledger_account like '%0011110200%' then 1 else 0 end) as flag3,--收到银承(收银承即算回款)
+   max(case when general_ledger_account like '%0011110100%' then 1 else 0 end) as flag4, -- 收到商承(不核算回款)
+   max(case when (substr(general_ledger_account,1,6) in('001001','001002','001003','001009')  or general_ledger_account in ('0021310400','0021010100'))
+        and general_ledger_account not in('0010090700','0010090710','0010090720') then 1 else 0 end) as flag5, -- 商承兑付
+   max(case when general_ledger_account = '0011310110'  then 1 else 0 end) as flag6,  --抵房入账
+   sum(case when general_ledger_account in ('0011110100','0011110200') then cur_cu_clos_balance_amt else 0.001 end ) as flag7,  --调账回款  --判断对方科目是否一致
+   sum(case when general_ledger_account in ('0011310100','0011310600','0011310700','0011310800','0021810150') then cur_cu_clos_balance_amt else 0.001 end) as flag8  --调账回款
+   from dwrfin.DWR_AR_ACCOUNT_DETAIL_F
+group by comp_code,year,voucher_code
+),
+ACCOUNT_DETAIL2 as
+(select
+    T.year		    --年度
+	,T.month			-- 月度
+	,T.comp_code		-- 公司代码
+     ,D5.BUTXT         as comp_name      -- 公司名称
+	,T.general_ledger_account  -- 总账科目
+	,T.general_ledger_account_desc-- 总账科目描述
+	,T.special_general_ledger-- 特别总账
+	,T.cust_code		-- 客户编码
+	,T.cust_name		-- 客户全称
+	,T.WBS
+	,T.sales_group_master_file --销售组-主档
+	,T.sales_group_cust_master --销售组（客户主档）
+	,t.business_person--PROJ.ZXSRY --业务人员
+	,T.POSTING_DATE -- 过账日期
+	,T.VOUCHER_DATE -- 凭证日期
+    ,T.clear_date  -- 清账日期
+	,case when t.voucher_type='RV' then T.cur_cu_clos_balance_amt else 0 end as send_amt
+	,case when t2.flag1=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	       AND t.general_ledger_account not in ('0011110100','0011110200','0021810150') then -1*T.cur_cu_clos_balance_amt else 0
+		   end as non_confirm_amt
+	,case when t2.flag2=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	       AND t.general_ledger_account not in('0011110100','0011110200') then -1*T.cur_cu_clos_balance_amt else 0
+		   end as cash_collection_amt
+	,case when t2.flag3=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	       AND t.general_ledger_account not in('0011110100','0011110200','0021810150') then -1*T.cur_cu_clos_balance_amt else 0 end as collection_amt
+	,case when t2.flag4=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	       AND t.general_ledger_account not in('0011110100','0011110200','0021810150') then -1*T.cur_cu_clos_balance_amt else 0 end as non_calculate_collection_amt
+	,case when t2.flag5=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	       AND t.general_ledger_account in('0011110100') then -1*T.cur_cu_clos_balance_amt else 0 end as non_cash_collection_amt
+	,case when t2.flag6=1 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')=''
+	      then -1*T.cur_cu_clos_balance_amt else 0 end as non_house_collection_amt  --抵房入账
+	,case when t2.flag7=0 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')='' 
+	      and t.general_ledger_account = '0011110200' then T.cur_cu_clos_balance_amt 
+	      when t2.flag8=0 and t.voucher_type<>'AB' AND NVL(T.COVER_FLAG,'')='' 
+	      and t.general_ledger_account in ('0011310100','0011310600','0011310700','0011310800','0021810150') then -1*T.cur_cu_clos_balance_amt else 0 end as return_collection_amt--调账回款
+	,T.VOUCHER_CODE
+	,T.VOUCHER_ITEM
+	,T.voucher_type
+	,t.COVER_VOUCHER
+	,t.cust_group_code
+ from DWRFIN.DWR_AR_CUST_DETAIL_F t
+ left join ACCOUNT_DETAIL t2
+ on t.comp_code=t2.comp_code and t.year=t2.year and t.voucher_code=t2.voucher_code
+ LEFT JOIN SDI.SDI_T001_1001 D5
+          ON D5.BUKRS =T.comp_code
+ where t.general_ledger_account in(
+'0011310100',
+'0011310800',
+'0011310700',
+'0011310600',
+'0011110200',
+'0011110100',
+'0021810150',
+'0011310300'
+)   )
+
+INSERT OVERWRITE TABLE dwrfin.DWR_AR_COLLECTION_DETAIL_F
+select
+    T.year		    --年度
+	,T.month			-- 月度
+	,T.comp_code		-- 公司代码
+     ,T.comp_name      -- 公司名称
+	,T.general_ledger_account  -- 总账科目
+	,T.general_ledger_account_desc-- 总账科目描述
+	,T.special_general_ledger-- 特别总账
+	,T.cust_code		-- 客户编码
+	,T.cust_name		-- 客户全称
+	,T.WBS
+	,T.sales_group_master_file --销售组-主档
+	,T1.sales_grp   --销售组（客户主档）
+	,t.business_person--PROJ.ZXSRY --业务人员
+	,T.POSTING_DATE -- 过账日期
+	,T.VOUCHER_DATE -- 凭证日期
+	,T.non_confirm_amt+cash_collection_amt+collection_amt+non_cash_collection_amt+return_collection_amt AS all_collection_amt-- 本币期末余额
+	,T.send_amt
+	,T.non_confirm_amt
+	,T.cash_collection_amt
+	,T.collection_amt
+	,T.non_calculate_collection_amt
+	,T.non_cash_collection_amt
+	,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE				-- 数据同步时间
+	,T.VOUCHER_CODE
+	,T.VOUCHER_ITEM
+    ,T.clear_date
+    ,T.voucher_type
+    ,T.COVER_VOUCHER
+    ,T.cust_group_code
+    ,T.non_house_collection_amt
+    ,T.return_collection_amt
+ from ACCOUNT_DETAIL2 t
+ left join DWRDIM.DWR_CUST_LATEST_DIMENSION_T  t1 on t.cust_code = t1.cust_num 
+ and substr(t.cust_code,1,2) = t1.sales_org 

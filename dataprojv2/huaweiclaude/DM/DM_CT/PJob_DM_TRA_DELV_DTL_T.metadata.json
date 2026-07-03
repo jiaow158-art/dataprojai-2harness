@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_TRA_DELV_DTL_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "一单到底非自营工程提货单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

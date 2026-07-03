@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_COST_REIMBURSEMENT_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/COST",
+    "description": "汇联易-报销单报表-SDI到DWI层",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

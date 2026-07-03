@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_BO_PROJECT_CHARLEDGER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

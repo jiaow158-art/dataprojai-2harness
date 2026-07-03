@@ -1,0 +1,555 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/06 16:44:45 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 15000571 时间<2024年8月23日10:12:47> 增加店面渠道为大零售的 dmqd=0
+-- ******************************************************************** -- --
+--门店数量指标
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code IN ('ZB64','ZB65','ZB66','ZB67','ZB68','ZB69');
+
+with md_base as (
+select 
+'${PERIOD_ID_M}' as calmonth
+,count(
+distinct  
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and (substring(DMJDSJ,1,7) <= '${PERIOD_ID_M}' or  DMJDSJ is null )
+and (substring(MDCXGDRQ,1,7)  > '${PERIOD_ID_M}'  or  MDCXGDRQ is null)
+AND DMQD = 0
+then    XJMDBH end 
+)as "门店数量（零售渠道）" 
+
+
+,count(
+distinct  
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and (substring(DMJDSJ,1,7) <= '${PERIOD_ID_M}' or  DMJDSJ is null )
+and (substring(MDCXGDRQ,1,7)   > '${PERIOD_ID_M}'  or  MDCXGDRQ is null)
+and dt in ('0','1','7','22')
+AND DMQD = 0
+then    XJMDBH end 
+)as "专卖店及以上门店数量（零售渠道）" 
+
+,COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt in ('0','1','7','22')
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <='${PERIOD_ID_M}' or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > '${PERIOD_ID_M}' or MDCXGDRQ is null )
+then XJMDBH
+end 
+)
+-
+COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt in ('0','1','7','22')
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <= SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or MDCXGDRQ is null )
+then XJMDBH
+end 
+)  as  专卖店及以上门店净增数量
+
+
+
+
+,COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt = '0'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <='${PERIOD_ID_M}' or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > '${PERIOD_ID_M}' or MDCXGDRQ is null )
+then XJMDBH
+end 
+)
+-
+COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt ='0'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <= SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or MDCXGDRQ is null )
+then XJMDBH
+end 
+)  as  专卖店及以上门店净增数量（旗舰店）
+
+
+
+
+,COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt = '1'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <='${PERIOD_ID_M}' or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > '${PERIOD_ID_M}' or MDCXGDRQ is null )
+then XJMDBH
+end 
+)
+-
+COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt ='1'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <= SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or MDCXGDRQ is null )
+then XJMDBH
+end 
+)  as  "专卖店及以上门店净增数量（精品店）"
+
+
+
+
+,COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt = '22'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <='${PERIOD_ID_M}' or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > '${PERIOD_ID_M}' or MDCXGDRQ is null )
+then XJMDBH
+end 
+)
+-
+COUNT(distinct 
+case when  
+qdbm  in ('01','02') 
+and mdlx = '1'
+and xjmdbh like 'DPCZ%' 
+and  dt ='22'
+AND DMQD = 0
+and (substring(dmjdsj,1,7) <= SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or dmjdsj is null )
+and (substring(MDCXGDRQ,1,7) > SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}',1,7)) ,'-01')- INTERVAL '1 MONTH', 1, 7) or MDCXGDRQ is null )
+then XJMDBH
+end 
+)  as  "专卖店及以上门店净增数量（专卖店）"
+
+from  DWIMD.DWI_MD_SHOP_INFO_OA_T
+
+
+)
+
+,md_base2 as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB64' as  zb_code,
+"门店数量（零售渠道）" as 当月实绩,
+"门店数量（零售渠道）"   as 累计实绩,
+"门店数量（零售渠道）"   as 季度累计实绩
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB65' as  zb_code,
+"专卖店及以上门店数量（零售渠道）" as 当月实绩,
+"专卖店及以上门店数量（零售渠道）"   as ACC_STAT_AMT,
+"专卖店及以上门店数量（零售渠道）"  as QTR_TGT_AMT
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB66' as  zb_code,
+专卖店及以上门店净增数量 as 当月实绩,
+0   as 累计实绩,
+0   as 季度累计实绩
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量"
+else 
+t1."专卖店及以上门店净增数量"  + coalesce (t2.cm_stat_amt,0)  end as 累计实绩,
+0   as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB66' as  zb_code,
+"专卖店及以上门店净增数量"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB66'
+and 
+CALMONTH 
+between 
+substr('${PERIOD_ID_M}',1,4)||'-01' and 
+case when substring('${PERIOD_ID_M}',6,2) = '01' then '${PERIOD_ID_M}'
+else 
+TO_CHAR(ADD_MONTHS(TO_DATE('${PERIOD_ID_M}', 'YYYY-MM'), -1), 'YYYY-MM') 
+end 
+group by zb_code) T2
+on 1 = 1
+
+
+union all 
+
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+0   as 累计实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量"
+else 
+t1."专卖店及以上门店净增数量"  + coalesce (t2.cm_stat_amt,0) end  as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB66' as  zb_code,
+"专卖店及以上门店净增数量"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB66'
+and     
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01') - INTERVAL '1 day', 1, 10)
+group by zb_code) T2
+on 1 = 1
+
+
+
+
+union all 
+
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB67' as  zb_code,
+"专卖店及以上门店净增数量（旗舰店）" as 当月实绩,
+0   as 累计实绩,
+0   as 季度累计实绩
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（旗舰店）"
+else 
+t1."专卖店及以上门店净增数量（旗舰店）"  + coalesce (t2.cm_stat_amt,0)  end as 累计实绩,
+0   as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB67' as  zb_code,
+"专卖店及以上门店净增数量（旗舰店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB67'
+and 
+CALMONTH 
+between 
+substr('${PERIOD_ID_M}',1,4)||'-01' and 
+case when substring('${PERIOD_ID_M}',6,2) = '01' then '${PERIOD_ID_M}'
+else 
+TO_CHAR(ADD_MONTHS(TO_DATE('${PERIOD_ID_M}', 'YYYY-MM'), -1), 'YYYY-MM') 
+end 
+group by zb_code) T2
+on 1 = 1
+
+union all 
+
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+0   as 累计实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（旗舰店）"
+else 
+t1."专卖店及以上门店净增数量（旗舰店）"  + coalesce (t2.cm_stat_amt,0) end  as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB67' as  zb_code,
+"专卖店及以上门店净增数量（旗舰店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB67'
+and     
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01') - INTERVAL '1 day', 1, 10)
+group by zb_code) T2
+on 1 = 1
+
+
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB68' as  zb_code,
+"专卖店及以上门店净增数量（精品店）" as 当月实绩,
+0   as 累计实绩,
+0   as 季度累计实绩
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（精品店）"
+else 
+t1."专卖店及以上门店净增数量（精品店）"  + coalesce (t2.cm_stat_amt,0)  end as 累计实绩,
+0   as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB68' as  zb_code,
+"专卖店及以上门店净增数量（精品店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB68'
+and 
+CALMONTH 
+between 
+substr('${PERIOD_ID_M}',1,4)||'-01' and 
+case when substring('${PERIOD_ID_M}',6,2) = '01' then '${PERIOD_ID_M}'
+else 
+TO_CHAR(ADD_MONTHS(TO_DATE('${PERIOD_ID_M}', 'YYYY-MM'), -1), 'YYYY-MM') 
+end 
+group by zb_code) T2
+on 1 = 1
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+0   as 累计实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（精品店）"
+else 
+t1."专卖店及以上门店净增数量（精品店）"  + coalesce (t2.cm_stat_amt,0) end  as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB68' as  zb_code,
+"专卖店及以上门店净增数量（精品店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB68'
+and     
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01') - INTERVAL '1 day', 1, 10)
+group by zb_code) T2
+on 1 = 1
+
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB69' as  ZB_CODE,
+"专卖店及以上门店净增数量（专卖店）" as 当月实绩,
+0   as 累计实绩,
+0   as 季度累计实绩
+from 
+md_base
+where calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（专卖店）"
+else 
+t1."专卖店及以上门店净增数量（专卖店）"  + coalesce (t2.cm_stat_amt,0)  end as 累计实绩,
+0   as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB69' as  zb_code,
+"专卖店及以上门店净增数量（专卖店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB69'
+and 
+CALMONTH 
+between 
+substr('${PERIOD_ID_M}',1,4)||'-01' and 
+case when substring('${PERIOD_ID_M}',6,2) = '01' then '${PERIOD_ID_M}'
+else 
+TO_CHAR(ADD_MONTHS(TO_DATE('${PERIOD_ID_M}', 'YYYY-MM'), -1), 'YYYY-MM') 
+end 
+group by zb_code) T2
+on 1 = 1
+
+union all 
+
+select 
+ t1.calmonth,
+ t1.zb_code,
+0   as 当月实绩,
+0   as 累计实绩,
+case when t1.calmonth = '2024-01' then t1."专卖店及以上门店净增数量（专卖店）"
+else 
+t1."专卖店及以上门店净增数量（专卖店）"  + coalesce (t2.cm_stat_amt,0) end  as 季度累计实绩
+from 
+(select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB69' as  zb_code,
+"专卖店及以上门店净增数量（专卖店）"   
+from 
+md_base) t1 
+left join 
+(select  
+zb_code,
+SUM(cm_stat_amt ) as cm_stat_amt
+from 
+DM.DM_NORTH_SM_T 
+where
+ZB_CODE = 'ZB69'
+and     
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01') - INTERVAL '1 day', 1, 10)
+group by zb_code) T2
+on 1 = 1
+
+
+)
+,AMT as (
+select 
+calmonth,
+ZB_CODE,
+sum(当月实绩) as CM_STAT_AMT,
+sum(累计实绩)   as ACC_STAT_AMT,
+sum(季度累计实绩)  as QTR_TGT_AMT
+from 
+md_base2
+group by 
+calmonth,
+zb_code
+
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+

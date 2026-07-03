@@ -1,0 +1,268 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/04/20 16:51:46 GMT+08:00
+-- update from chenzhiyong 20230505 电商渠道由07调整为03渠道鹏嘉客户(0000003900)订单数据
+-- update from chenzhiyong 20230519 更改子公司逻辑
+-- update from yangjunhua  20231030 1、艺耐调账去除库存地点"NT" 2、子公司sto特殊逻辑去除
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with org as(
+select * from DM_SW.DM_SW_PREDICT_CUST_ORG 
+),
+DM_GL_OUT_INVOICE_T_DATA as(
+select  T1.bill_voucher_num , 
+		T1.acc_voucher_line_item_num , 
+		T1.bill_date , 
+		T1.bill_type, 
+		T1.voucher_currency_code , 
+		T1.payer_id , 
+		T1.sale_org_code , 
+		T1.distribution_channel_code, 
+		T1.cust_sal, 
+		T1.complete_code as material_num , 
+		T1.actual_billed_qty, 
+		T1.factory_code, 
+		T1.inv_location, 
+		T1.batch_num, 
+		T1.sale_unit, 
+		T1.vc_net_worth_amt, 
+		T1.sale_office_code, 
+		T1.sale_group , 
+		T1.doc_currency_tax , 
+		T1.create_date , 
+		T1.fin_acc_post_rate , 
+		T1.vch_term_num , 
+		T1.so_item_text , 
+		T1.sale_voucher_num , 
+		T1.prod_level , 
+		T1.sale_voucher_item_num , 
+		T1.cust_acct_assign_group , 
+		T1.term_setting_group , 
+		T1.cancel_bill_voucher_num , 
+		T1.reference_voucher_num , 
+		T1.account_check_status , 
+		T1.project_gross_weight , 
+		T1.proj_vol , 
+		T1.weight_unit , 
+		T1.vol_unit , 
+		T1.material_group1, 
+		T1.material_group2, 
+		T1.material_group3, 
+		T1.material_group4, 
+		T1.material_group5, 
+		T1.price_date , 
+		T1.ps_wbs_element , 
+		T1.last_update_date , 
+		T1.dw_last_update_date , 
+		T1.subtotal_price_process1 , 
+		T1.subtotal_price_process2 , 
+		T1.subtotal_price_process3 , 
+		T1.subtotal_price_process4 , 
+		T1.subtotal_price_process5 , 
+		T1.subtotal_price_process6 , 
+		T1.id_bom , 
+		T1.complete_code ,
+		T1.period_id_m
+FROM DM.DM_GL_OUT_INVOICE_T T1 
+join DWIMD.dwi_md_data_material_general_t T2
+on t1.material_num = t2.material_num
+and product_level3_code = '4002001'  -- 主柜
+where t1.id_bom is not null
+union all
+select  T1.bill_voucher_num , 
+		T1.acc_voucher_line_item_num , 
+		T1.bill_date , 
+		T1.bill_type, 
+		T1.voucher_currency_code , 
+		T1.payer_id , 
+		T1.sale_org_code , 
+		T1.distribution_channel_code, 
+		T1.cust_sal, 
+		T1.material_num , 
+		T1.actual_billed_qty, 
+		T1.factory_code, 
+		T1.inv_location, 
+		T1.batch_num, 
+		T1.sale_unit, 
+		T1.vc_net_worth_amt, 
+		T1.sale_office_code, 
+		T1.sale_group , 
+		T1.doc_currency_tax , 
+		T1.create_date , 
+		T1.fin_acc_post_rate , 
+		T1.vch_term_num , 
+		T1.so_item_text , 
+		T1.sale_voucher_num , 
+		T1.prod_level , 
+		T1.sale_voucher_item_num , 
+		T1.cust_acct_assign_group , 
+		T1.term_setting_group , 
+		T1.cancel_bill_voucher_num , 
+		T1.reference_voucher_num , 
+		T1.account_check_status , 
+		T1.project_gross_weight , 
+		T1.proj_vol , 
+		T1.weight_unit , 
+		T1.vol_unit , 
+		T1.material_group1, 
+		T1.material_group2, 
+		T1.material_group3, 
+		T1.material_group4, 
+		T1.material_group5, 
+		T1.price_date , 
+		T1.ps_wbs_element , 
+		T1.last_update_date , 
+		T1.dw_last_update_date , 
+		T1.subtotal_price_process1 , 
+		T1.subtotal_price_process2 , 
+		T1.subtotal_price_process3 , 
+		T1.subtotal_price_process4 , 
+		T1.subtotal_price_process5 , 
+		T1.subtotal_price_process6 , 
+		T1.id_bom , 
+		T1.complete_code ,
+		T1.period_id_m
+FROM DM.DM_GL_OUT_INVOICE_T T1 
+where t1.id_bom is null
+),
+fact as(
+-- 实际发票数据
+select
+	substr(a.bill_date,1,10) as STAT_DATE_D,
+	a.sale_org_code,
+	a.distribution_channel_code , 
+	a.cust_sal,
+	--d.operation_center_code ,   
+	case when a.sale_org_code = '3830' then '津冀子公司'
+	     when a.sale_org_code = '3831' then '贵州子公司'
+		 when a.sale_org_code = '3832' then '苏沪子公司'
+	else d.operation_center_code end as operation_center_code,
+	--d.operation_center_name,
+	case when a.sale_org_code = '3830' then '津冀子公司'
+	     when a.sale_org_code = '3831' then '贵州子公司'
+		 when a.sale_org_code = '3832' then '苏沪子公司'
+	else d.operation_center_name end as operation_center_name,
+	--d.area_code,
+	case when a.sale_org_code in ('3830','3831','3832') then '子公司'
+	else d.area_code end as area_code,
+	--d.area_name,
+	case when a.sale_org_code in ('3830','3831','3832') then '子公司'
+	else d.area_name end as area_name,
+	a.material_num,
+	sum(a.actual_billed_qty) as actual_billed_qty,   -- 开票数量
+	b.def_channel ,
+    sum(a.subtotal_price_process1) as actual_billed_amt -- 开票金额
+from DM_GL_OUT_INVOICE_T_DATA a  
+left join DM_SW.DM_SW_PREDICT_DEF_CHANNEL_D b On a.cust_sal  = b.cust_num 
+                                                                          and a.sale_org_code = b.sales_org_code 
+                                                                          and a.distribution_channel_code = b.distribution_chnl_code
+left join org d ON a.cust_sal = d.cust_num
+where a.sale_org_code between '3210' and '3920'  -- 卫浴供应链
+--and a.inv_location not in ('WX','GYCK','TJ') -- 排除 WX 苏沪  GYCK 贵州  TJ  津冀
+and a.payer_id not in ('0000003200','0000003300','0000003500','0000003600','0000003700','0000003800')  -- 去除内部发票(鹏嘉不能去掉)
+and bill_date >='2021-01-01'  -- 跑昨日所在月份1号数据 2022-11-01
+and a.distribution_channel_code <> '07' -- 20230519 排除渠道为07(鹏嘉卖出)的数据
+and a.inv_location not in ('NT')   -- 艺耐调账去除
+group by substr(a.bill_date,1,10) ,
+a.sale_org_code,
+a.distribution_channel_code , 
+a.cust_sal,
+--d.operation_center_code ,   
+case when a.sale_org_code = '3830' then '津冀子公司'
+	 when a.sale_org_code = '3831' then '贵州子公司'
+	 when a.sale_org_code = '3832' then '苏沪子公司'
+else d.operation_center_code end ,
+--d.operation_center_name,
+case when a.sale_org_code = '3830' then '津冀子公司'
+	 when a.sale_org_code = '3831' then '贵州子公司'
+	 when a.sale_org_code = '3832' then '苏沪子公司'
+else d.operation_center_name end ,
+--d.area_code,
+case when a.sale_org_code in ('3830','3831','3832') then '子公司'
+else d.area_code end ,
+--d.area_name,
+case when a.sale_org_code in ('3830','3831','3832') then '子公司'
+else d.area_name end ,
+a.material_num,
+b.def_channel
+),
+fact_data as(
+select def_channel,
+	   operation_center_code ,
+	   operation_center_name ,
+	   area_code,
+	   area_name,
+	   material_num,
+	   cust_sal,
+	   sum(actual_billed_qty) as actual_billed_qty,
+	   sum(actual_billed_amt) as actual_billed_amt,
+	   current_timestamp() as dw_last_update_date,
+	   STAT_DATE_D
+from fact
+group by STAT_DATE_D,
+		 def_channel,
+		 material_num,
+		 operation_center_code ,
+		 operation_center_name ,
+		 area_code,
+		 area_name,
+		 cust_sal
+having sum(actual_billed_qty)<>0
+),
+ITEMPLAN_EX_DATA as(
+	SELECT T2.code as material_num, -- 物料编码
+		   T2.name as material_name,   -- 物料名称
+		   case when t1.item_source_type = '0' then '外购'
+		        when t1.item_source_type = '1' then '自制'
+		        when t1.item_source_type = '2' then '外协'
+		        when t1.item_source_type = '3' then '自制和外购'
+		        else '' end as source_type_name  -- 来源类型名称
+	FROM SDI.SDI_WY_ITEMPLAN_EX_1007 T1
+	LEFT JOIN sdi.sdi_item_1007 T2
+	on T1.item_id = T2.ID
+	where t1.inv_org_id = '2'
+	and t1.is_default = '1'
+	and t1.is_phantom = '0'
+)
+INSERT OVERWRITE TABLE DM_SW.DM_OTD_SALES_FORECAST_FACT_T partition(stat_month)
+select  t1.def_channel,
+		t1.operation_center_code,
+		t1.operation_center_name,
+		t1.area_code,
+		t1.area_name,
+		t1.material_num,
+		T2.product_level2_code as PROD_CATEGORY_CODE,  -- 产品类别编码
+		T2.product_level2_name as PROD_CATEGORY_NAME,  -- 产品类别名称
+		CASE WHEN T3.matl_group4_code = 'TS' THEN 'TS'
+		  ELSE 'ZS' END AS PROD_STATUS_CODE,    -- 产品状态编码
+		CASE WHEN T3.matl_group4_code = 'TS' THEN '退市'
+		  ELSE '在市' END AS PROD_STATUS_NAME,    -- 产品状态名称
+		t1.actual_billed_amt, -- 开票金额
+		t1.actual_billed_qty, -- 开票数量
+		0 as sales_forecast_qty,
+		current_timestamp as dw_last_update_date,
+		T1.cust_sal, -- 售达方
+		T5.source_type_name,  -- 来源类型名称
+        t1.STAT_DATE_D,
+		substring(t1.STAT_DATE_D,1,7) as stat_month -- 分区月份
+from fact_data t1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2  -- 物料主数据
+ON t1.material_num = T2.material_num
+LEFT JOIN (
+   select material_num,
+		   max(matl_group4_code) as matl_group4_code ,
+		   max(matl_group4_name) as matl_group4_name
+	from dwimd.dwi_md_data_material_sales_t   -- 物料销售
+	group by material_num 
+)T3
+ON t1.material_num = T3.material_num
+LEFT JOIN ITEMPLAN_EX_DATA T5
+ON t1.material_num = T5.material_num;

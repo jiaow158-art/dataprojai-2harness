@@ -1,0 +1,18 @@
+insert overwrite table sdi.sdi_aps_userpara_setting_1007
+select 
+id,
+code,
+create_by,
+create_date,
+description,
+identity_id,
+inv_org_id,
+is_phantom,
+sync_id,
+type_,
+update_by,
+update_date,
+value,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_userpara_setting_1007;

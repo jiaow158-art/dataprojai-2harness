@@ -1,0 +1,334 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/09/18 14:13:27 GMT+08:00
+-- update from huangwenbin 2024-04-11 新增字段：一级部门名称等4个字段
+-- update from huangwenbin 2024-04-16 新增字段：指派师傅时间等4个字段
+-- update from huangwenbin 2024-04-18 修改字典表限制，装到家上线后字段表的字典类型名称有些没维护，需要用编码来做限制
+-- update from huangwenbin 2024-08-10 增加字段：系统签单时间
+-- update from huangwenbin 2024-08-12 切换系统签单时间的取数逻辑
+-- update from huangwenbin 2024-11-20 切换合同金额的逻辑：contract_money-->totalMoney
+-- update from huangwenbin 2024-12-06 修改施工面积逻辑
+-- ******************************************************************** --
+WITH T1 AS(
+SELECT DISTINCT
+       A.DICT_TYPE
+      ,A.DICT_VALUE
+	  ,A.DICT_NAME
+  FROM SDI.SDI_BS_DICT_1030 A
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.DICT_TYPE IN('zdj_order_stage','contract_status','zdj_order_customer_source')
+   --订单阶段 zdj_order_stage
+   --合同状态 contract_status
+   --订单自定义来源 zdj_order_customer_source
+),T2 AS(
+SELECT 
+       QUOTATIONCATEGORYPRICELIST
+      ,REPLACE(REPLACE(SPLIT(REPLACE(REPLACE(QUOTATIONCATEGORYPRICELIST,'}, {',';'),'"',''),';')[0],'}',''),'{','') AS PRICE1
+      ,REPLACE(REPLACE(SPLIT(REPLACE(REPLACE(QUOTATIONCATEGORYPRICELIST,'}, {',';'),'"',''),';')[1],'}',''),'{','') AS PRICE2
+      ,REPLACE(REPLACE(SPLIT(REPLACE(REPLACE(QUOTATIONCATEGORYPRICELIST,'}, {',';'),'"',''),';')[2],'}',''),'{','') AS PRICE3
+      ,ID
+	  ,ORDER_CODE
+	  ,ENGINEERING_AREA
+	  ,SPLIT(SPLIT(QUOTATION_PRICE,'totalMoney": ')[1],',')[0] AS SALE_AMT
+FROM SDI.SDI_HD_ORDER_QUOTATION_1030
+WHERE EP_ID = 3044
+AND APP_ID = 1831
+AND IS_DELETED = 0
+),T3 AS(
+SELECT
+       QUOTATIONCATEGORYPRICELIST
+      ,CASE WHEN PRICE1 LIKE '%AUXILIARY_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE1,', bizType: AUXILIARY_MATERIAL',''),'price: ','')
+            WHEN PRICE2 LIKE '%AUXILIARY_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE2,', bizType: AUXILIARY_MATERIAL',''),'price: ','')
+			WHEN PRICE3 LIKE '%AUXILIARY_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE3,', bizType: AUXILIARY_MATERIAL',''),'price: ','')
+			 END AS FC_SALE_AMT --辅材销售额
+	  ,CASE WHEN PRICE1 LIKE '%PRINCIPAL_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE1,', bizType: PRINCIPAL_MATERIAL',''),'price: ','')
+            WHEN PRICE2 LIKE '%PRINCIPAL_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE2,', bizType: PRINCIPAL_MATERIAL',''),'price: ','')
+			WHEN PRICE3 LIKE '%PRINCIPAL_MATERIAL%'
+	        THEN REPLACE(REPLACE(PRICE3,', bizType: PRINCIPAL_MATERIAL',''),'price: ','')
+			 END AS ZC_SALE_AMT --主材销售额
+	  ,CASE WHEN PRICE1 LIKE '%MANUAL_LABOR%'
+	        THEN REPLACE(REPLACE(PRICE1,', bizType: MANUAL_LABOR',''),'price: ','')
+            WHEN PRICE2 LIKE '%MANUAL_LABOR%'
+	        THEN REPLACE(REPLACE(PRICE2,', bizType: MANUAL_LABOR',''),'price: ','')
+			WHEN PRICE3 LIKE '%MANUAL_LABOR%'
+	        THEN REPLACE(REPLACE(PRICE3,', bizType: MANUAL_LABOR',''),'price: ','')
+			 END AS RG_SALE_AMT --人工销售额
+      ,ID
+	  ,ORDER_CODE
+	  ,ENGINEERING_AREA AS CNSTR_AREA --施工面积
+	  ,SALE_AMT --合同金额
+  FROM T2	  
+),T4 AS(
+SELECT ORDER_CODE
+      ,SUM(SCORE) AS EVALU_SCORE --评价分数
+	  ,COUNT(DISTINCT ID) AS EVALU_CNT --评价条数
+  FROM SDI.SDI_HD_ORDER_EVALUATION_1030 A
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND IS_DELETED = 0
+   AND TYPE IN(1,0)
+ GROUP BY ORDER_CODE  
+),T5 AS(
+SELECT ORDER_CODE
+      ,CONTRACT_SIGN_TIME --签单时间
+	  ,PROJECT_END_TIME --完工时间
+	  ,ASSIGN_TIME	--指派师傅时间
+	  ,FOLLOW_TIME	--完成沟通时间
+	  ,PROJECT_START_TIME	--师傅开工时间
+  FROM SDI.SDI_HD_ORDER_STAGE_INFO_1030 A
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.IS_DELETED = 0   
+),T6 AS(
+SELECT ORDER_CODE
+      ,CONCAT_WS(',',COLLECT_SET(DECORATOR_NAME)) AS DECOR_NAME --师傅姓名
+  FROM SDI.SDI_HD_ORDER_DECORATOR_REL_1030 A
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.IS_DELETED = 0
+   AND A.TYPE = 2
+ GROUP BY ORDER_CODE 
+),T7 AS(
+SELECT ORDER_CODE
+      ,CREATE_TIME
+	  ,ROW_NUMBER() OVER(PARTITION BY ORDER_CODE ORDER BY CREATE_TIME ASC) AS RN
+  FROM SDI.SDI_HD_ORDER_STAGE_LOG_1030 A
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.IS_DELETED = 0 
+   AND A.stage_name = '已签约'
+)
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_ZDJ_ORDER_INFO_F
+SELECT
+       A.ID --自增ID
+      ,A.ORDER_CODE AS ORDER_NUM --订单编号
+      ,A.CLIENT_ID AS CUST_ID --客户ID
+      ,A.CLIENT_NAME AS CUST_NAME --客户姓名
+      ,A.CLIENT_PHONE AS CUST_PHONE_NUM --客户手机号
+      ,A.CLIENT_GENDER AS GENDER --性别 1-男性;2-女性;0-未知
+	  ,CASE WHEN A.CLIENT_GENDER = 1 THEN '男性'
+	        WHEN A.CLIENT_GENDER = 2 THEN '女性'
+			WHEN A.CLIENT_GENDER = 0 THEN '未知'
+			 END AS GENDER_NAME --性别
+      ,A.MEMBER_ID --会员ID
+      ,A.WX_OPEN_ID	--微信小程序OPENID
+      ,A.APPOINTMENT_ID AS APPT_ID --预约单ID
+      ,A.APPOINTMENT_TYPE AS APPT_TYPE --预约类型（1-新房装修，2-旧房改造）
+      ,CASE WHEN A.APPOINTMENT_TYPE = 1 THEN '新房装修'
+	        WHEN A.APPOINTMENT_TYPE = 2 THEN '旧房改造'
+			WHEN A.APPOINTMENT_TYPE = 3 THEN '精装房改造'
+			 END AS APPT_TYPE_NAME --预约类型
+      ,A.PROVIDER_ID AS PRVDR_ID --服务商ID
+      ,A.PROVIDER_CODE AS PRVDR_CODE --服务商编码
+      ,A.EMPLOYEE_ID AS EMP_ID --销售员工ID
+	  ,B.NAME AS EMP_NAME --销售员工名称
+	  ,B.STORE_ID --销售员工所属门店ID
+	  ,I.NAME AS STORE_NAME --销售员工所属门店名称
+      ,A.BIND_TIME	--客户绑定时间
+      ,A.ORDER_TYPE	--订单类型
+	  ,C.DICT_NAME AS ORDER_TYPE_NAME --订单类型名称
+      ,A.CONTRACT_CODE AS CNTC_CODE --合同编码
+      ,A.ORDER_STATUS --订单状态
+	  ,D.DICT_NAME AS ORDER_STATUS_NAME --订单状态名称
+      ,A.STAGE_ID --订单阶段ID
+	  ,E.DICT_NAME AS STAGE_NAME --订单阶段名称
+      ,A.CONTRACT_PARTYA_ID	AS CNTC_PRTYA_ID --合同甲方ID	  
+      ,A.CONTRACT_PARTYA_NAME AS CNTC_PRTYA_NAME --合同甲方名称
+      ,A.CONTRACT_PARTYB_ID AS CNTC_PRTYB_ID --合同乙方ID
+      ,A.CONTRACT_MEMBER_ID AS CNTC_MEMBER_ID --合同乙方会员ID
+      ,A.CONTRACT_PARTYB_NAME AS CNTC_PRTYB_NAME --合同乙方名称
+      ,A.CONTRACT_MONEY AS CNTC_AMT --合同金额
+      ,A.CONTRACT_AREA AS CNTC_AREA --工程建筑面积
+      ,A.CONTRACT_UNIT AS AREA_UNIT --面积单位
+      ,A.QUOTATION_ID AS OFR_ORDER_ID --订单报价ID
+      ,A.CONTRACT_START_DATE AS CNTC_START_DATE --合同开工日期
+      ,A.CONTRACT_END_DATE AS CNTC_END_DATE --合同完工日期
+      ,A.CONTRACT_SIGN_TIME	AS CNTC_SIGN_TIME --签约时间
+      ,A.CONTRACT_STATUS AS CNTC_STATUS --合同状态
+	  ,F.DICT_NAME AS CNTC_STATUS_NAME --合同状态
+      ,A.PROVINCE_ID AS PROV_ID --省区域ID
+      ,A.PROVINCE_CODE AS PROV_CODE --省行政编码
+      ,A.PROVINCE AS PROV_NAME --省区域名
+      ,A.CITY_ID --市区域ID
+      ,A.CITY_CODE --市行政编码
+      ,A.CITY AS CITY_NAME --市区域名
+      ,A.DISTRICT_ID AS DIST_ID --区区域ID
+      ,A.DISTRICT_CODE AS DIST_CODE --区行政编码
+      ,A.DISTRICT AS DIST_NAME --区区域名
+      ,A.COMMUNITY_NAME AS CMY_NAME --小区名称
+      ,A.DETAIL_ADDRESS	AS ADDR --详细地址
+      ,A.DETAIL_ADDRESS_LONGITUDE AS ADDR_LON --详细地址经度
+      ,A.DETAIL_ADDRESS_LATITUDE AS ADDR_LAT --详细地址纬度
+      ,A.STATUS	AS CUST_STATUS --客户状态:0待分配线索,1客户
+	  ,CASE WHEN A.STATUS = 0 THEN  '待分配线索'
+	        WHEN A.STATUS = 1 THEN '客户'
+			 END AS CUST_STATUS_NAME --客户状态名称
+      ,A.SOURCE	AS SOURCE_CODE --订单来源
+	  ,G.DICT_NAME AS SOURCE_NAME --订单来源名称
+      ,A.CUSTOMER_SOURCE AS CUST_SOURCE_CODE --企业自定义来源
+	  ,H.DICT_NAME AS CUST_SOURCE_NAME --企业自定义来源名称
+      ,A.DETAILS AS DETAIL --订单详情
+      ,A.REMARK --备注信息
+      ,A.IS_EVALUATE AS IS_EVALU --客户是否评价：0-否，1-是，2-系统自动评价
+      ,CASE WHEN A.IS_EVALUATE = 0 THEN '否'
+	        WHEN A.IS_EVALUATE = 1 THEN '是'
+			WHEN A.IS_EVALUATE = 2 THEN '系统自动评价'
+			 END AS IS_EVALU_NAME --客户是否评价名称
+	  ,A.IS_REPLY --服务商（运营人员）是否回复评价：0-客户未评价，1-已回复，2-未回复
+      ,CASE WHEN A.IS_REPLY = 0 THEN '客户未评价'
+	        WHEN A.IS_REPLY = 1 THEN '已回复'
+			WHEN A.IS_REPLY = 2 THEN '未回复'
+			 END AS IS_REPLY_NAME --是否回复评价名称
+	  ,A.IS_WHITELIST --是否白名单，1：是；0：否；
+	  ,CASE WHEN A.IS_WHITELIST = 1 THEN '是'
+	        WHEN A.IS_WHITELIST = 0 THEN '否'
+			 END AS IS_WHITELIST_NAME --是否白名单名称
+      ,A.CREATE_TIME --创建时间
+      ,A.CREATE_BY AS CREATE_ID --创建人
+      ,A.CREATE_NAME --创建人名称
+      ,A.UPDATE_TIME --更新时间
+      ,A.UPDATE_BY AS UPDATE_ID --更新人
+      ,A.UPDATE_NAME --更新人名称
+      ,A.HOME_TYPE --住宅类型：1-别墅；2-住宅
+	  ,CASE WHEN A.HOME_TYPE = 1 THEN '别墅'
+	        WHEN A.HOME_TYPE = 2 THEN '住宅'
+			 END AS HOME_TYPE_NAME --住宅类型名称
+      ,A.ACCEPTANCE_CRITERIA_ID AS ACC_CRITA_ID	--验收标准ID，关联验收标准表ID
+      ,A.ALARM_TYPE	--预警类型；1-红色预警；2-橙色预警；3-黄色预警
+      ,CASE WHEN A.ALARM_TYPE = 1 THEN '红色预警'
+	        WHEN A.ALARM_TYPE = 2 THEN '橙色预警'
+			WHEN A.ALARM_TYPE = 3 THEN '黄色预警'
+			 END AS ALARM_TYPE_NAME --预警类型名称
+	  ,A.ALARM_TIME	--预警时间
+      ,A.ALARM_RULE_ID	--预警订单阶段ID
+      ,A.ALARM_REASON --预警原因
+      ,A.ORDER_FRAUD_STATE --订单造假状态：1-造假；0-未造假
+	  ,CASE WHEN A.ORDER_FRAUD_STATE = 1 THEN '造假'
+	        WHEN A.ORDER_FRAUD_STATE = 0 THEN '未造假'
+			 END AS ORDER_FRAUD_STATE_NAME --订单造假状态名称
+      ,A.ORDER_FRAUD_ID	--订单造假ID
+      ,A.SITE_INSPECT_STATE	--工地巡检状态：1-合格；0-不合格
+	  ,CASE WHEN A.SITE_INSPECT_STATE = 1 THEN '合格'
+	        WHEN A.SITE_INSPECT_STATE = 0 THEN '不合格'
+			 END AS SITE_INSPECT_STATE_NAME --工地巡检状态名称
+      ,A.SITE_INSPECT_ID --工地巡检ID
+      ,A.IS_HIDE_EVALUATE AS IS_HIDE_EVALU --是否隐藏评价;1-隐藏
+	  ,CASE WHEN A.IS_HIDE_EVALUATE = 1 THEN '隐藏'
+	        ELSE '不隐藏'
+			 END AS IS_HIDE_EVALU_NAME --是否隐藏评价名称
+      ,A.HIDE_EVALUATE_TIME AS HIDE_EVALU_TIME --隐藏评价时间
+      ,A.EMPLOYEE_TYPE AS EMP_TYPE --员工类型：0-总监；1-销售顾问
+	  ,CASE WHEN A.EMPLOYEE_TYPE = 0 THEN '总监'
+	        WHEN A.EMPLOYEE_TYPE = 1 THEN '销售顾问'
+			 END AS EMP_TYPE_NAME --员工类型名称
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW同步时间
+      ,J.PROVIDER_NAME AS PRVDR_NAME --服务商名称
+      ,K.FC_SALE_AMT --辅材销售额
+      ,K.ZC_SALE_AMT --主材销售额
+      ,K.RG_SALE_AMT --人工销售额 
+      ,COALESCE(AA.AREA,0) AS CNSTR_AREA --施工面积
+      ,K.SALE_AMT --销售额
+      ,O.EVALU_SCORE --评价分数
+	  ,O.EVALU_CNT --评价条数
+	  ,P.CONTRACT_SIGN_TIME AS ORDER_SIGN_TIME --签单时间
+	  ,P.PROJECT_END_TIME AS ORDER_OVER_TIME --完工时间
+	  ,B.POSITION_NAME AS POST_NAME --销售员工岗位
+	  ,Q.POSITION_NAME AS CREATE_POST_NAME --创建人岗位
+	  ,R.SHORT_NAME AS PROV_SHORT_NAME --省份简称
+	  ,S.SHORT_NAME AS CITY_SHORT_NAME --城市简称
+	  ,T.SHORT_NAME AS DIST_SHORT_NAME --区区域简称
+	  ,X.LVL1_DEPT_NAME	--一级部门名称
+      ,X.LVL2_DEPT_NAME	--二级部门名称
+	  ,X.LVL3_DEPT_NAME	--三级部门名称
+	  ,X.LVL4_DEPT_NAME	--四级部门名称
+	  ,P.ASSIGN_TIME	--指派师傅时间
+	  ,P.FOLLOW_TIME	--完成沟通时间
+	  ,P.PROJECT_START_TIME AS ORDER_START_TIME	--师傅开工时间
+	  ,Y.DECOR_NAME --师傅姓名
+	  ,Z.CREATE_TIME AS SYS_ORDER_SIGN_TIME --系统签单时间
+  FROM SDI.SDI_HD_ORDER_INFO_1030 A
+  LEFT JOIN SDI.SDI_BUZ_EMPLOYEE_1030 B
+    ON A.EMPLOYEE_ID = B.ID
+   AND A.EP_ID = B.EP_ID
+   AND A.APP_ID = B.APP_ID
+  LEFT JOIN T1 C
+    ON A.ORDER_TYPE = C.DICT_VALUE
+   AND A.ORDER_TYPE IS NOT NULL
+   AND C.DICT_TYPE = 'zdj_order_stage'
+  LEFT JOIN T1 D
+    ON A.ORDER_STATUS = D.DICT_VALUE
+   AND D.DICT_TYPE = 'zdj_order_stage'	
+  LEFT JOIN T1 E
+    ON A.STAGE_ID = E.DICT_VALUE 
+   AND E.DICT_TYPE = 'zdj_order_stage'
+  LEFT JOIN T1 F
+    ON A.CONTRACT_STATUS = F.DICT_VALUE
+   AND F.DICT_TYPE = 'contract_status'
+  LEFT JOIN T1 G
+    ON A.SOURCE = G.DICT_VALUE
+   AND G.DICT_TYPE = 'zdj_order_customer_source'
+  LEFT JOIN T1 H
+    ON A.CUSTOMER_SOURCE = H.DICT_VALUE
+   AND H.DICT_TYPE = 'zdj_order_customer_source'
+  LEFT JOIN SDI.SDI_BUZ_STORE_1030 I
+    ON B.STORE_ID = I.ID
+   AND A.EP_ID = I.EP_ID
+   AND A.APP_ID = I.APP_ID
+  LEFT JOIN SDI.SDI_HD_PROVIDER_1030 J
+    ON A.PROVIDER_CODE = J.PROVIDER_CODE
+   AND A.EP_ID = J.EP_ID
+   AND A.APP_ID = J.APP_ID
+  LEFT JOIN T3 K
+    ON A.QUOTATION_ID = K.ID
+  LEFT JOIN T4 O
+    ON A.ORDER_CODE = O.ORDER_CODE 
+  LEFT JOIN T5 P
+    ON A.ORDER_CODE = P.ORDER_CODE
+  LEFT JOIN SDI.SDI_BUZ_EMPLOYEE_1030 Q
+    ON A.CREATE_BY = Q.ID
+   AND A.EP_ID = Q.EP_ID
+   AND A.APP_ID = Q.APP_ID
+  LEFT JOIN SDI.SDI_BUZ_REGION_1030 R
+    ON A.PROVINCE_ID = R.ID
+   AND R.STATUS = 1
+  LEFT JOIN SDI.SDI_BUZ_REGION_1030 S
+    ON A.CITY_ID = S.ID
+   AND S.STATUS = 1
+  LEFT JOIN SDI.SDI_BUZ_REGION_1030 T
+    ON A.DISTRICT_ID = T.ID
+   AND T.STATUS = 1  
+  LEFT JOIN(SELECT DISTINCT LVL1_DEPT_NAME	--一级部门名称
+                           ,LVL2_DEPT_NAME	--二级部门名称
+						   ,LVL3_DEPT_NAME	--三级部门名称
+						   ,LVL4_DEPT_NAME	--四级部门名称
+						   ,DEPT_NUM --部门编码
+              FROM DWRDIM.DWR_DIM_DMT_DEPT_INFO_D
+			 WHERE BUSI_TYPE LIKE '%5%' 
+           ) X
+	ON LPAD(A.PROVIDER_CODE,10,'0') = X.DEPT_NUM
+  LEFT JOIN T6 Y
+    ON A.ORDER_CODE = Y.ORDER_CODE
+  LEFT JOIN T7 Z
+    ON A.ORDER_CODE = Z.ORDER_CODE
+   AND Z.RN = 1
+  LEFT JOIN(SELECT ORDER_QUOTATION_ID
+                  ,SUM(COALESCE(AREA,0)) AS AREA
+              FROM SDI.SDI_HD_ORDER_QUOTATION_SCHEME_ITEMS_1030
+             WHERE EP_ID = 3044
+               AND APP_ID = 1831
+               AND IS_DELETED = 0
+			 GROUP BY ORDER_QUOTATION_ID
+           ) AA
+	ON AA.ORDER_QUOTATION_ID = A.QUOTATION_ID
+ WHERE A.EP_ID = 3044
+   AND A.APP_ID = 1831
+   AND A.IS_DELETED = 0
+   AND COALESCE(A.PROVINCE,'') NOT LIKE '%台湾%'
+   AND COALESCE(A.PROVINCE,'') NOT LIKE '%澳门%'

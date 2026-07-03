@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_RPT_ZZT_KCMX_OTHERS_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "非产成品库存明细",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

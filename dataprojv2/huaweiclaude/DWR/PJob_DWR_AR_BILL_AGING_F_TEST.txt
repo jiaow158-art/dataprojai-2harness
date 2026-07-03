@@ -1,0 +1,301 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: zhangpeng
+-- create time: 2023/11/15 17:12:22 GMT+08:00
+-- ******************************************************************** --
+-- 创建中间表 DWRFIN.DWR_AR_M_F_2
+DROP TABLE IF EXISTS `DWRFIN.DWR_AR_M_F_2`;
+CREATE TABLE IF NOT EXISTS `DWRFIN.DWR_AR_M_F_2`(
+	`comp_code` string COMMENT '公司代码',
+	`cust_code` string COMMENT '客户编码',
+	`cust_name` string COMMENT '客户全称',
+	`sales_group_master_file` string COMMENT '销售组-主档',
+	`wbs` string COMMENT 'WBS',
+	`wbs_sales_group` string COMMENT 'WBS-销售组',
+	`special_general_ledger` string COMMENT '特别总账',
+	`general_ledger_account` string COMMENT '总账科目',
+	`currency` string COMMENT '货币',
+	`amt` decimal(38,2) COMMENT '金额',
+	`due_date` timestamp COMMENT '到期日',
+	`date1` timestamp COMMENT '查询日期',
+	`wdate` timestamp COMMENT '签发日期',
+	`due_days` decimal(38,2) COMMENT '到期天数',
+	`bldat` timestamp COMMENT '凭证日期',
+	`n_overdue_due_days` decimal(38,2) COMMENT '未逾期到期天数',
+	`so_group_code` string COMMENT '订单组编码')
+COMMENT '应收票据账龄中间表'
+;
+
+-- 将数据插入中间表 DWRFIN.DWR_AR_M_F_2
+WITH AGING AS (
+SELECT
+	T.COMP_CODE					    AS COMP_CODE					-- 公司代码                	
+	,T.CUST_CODE                    AS CUST_CODE                    -- 客户编码
+	,T.CUST_NAME                    AS CUST_NAME                    -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE      AS SALES_GROUP_MASTER_FILE      -- 销售组-主档
+	,T.WBS                          AS WBS                          -- WBS
+	,T.WBS_SALES_GROUP              AS WBS_SALES_GROUP              -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER       AS SPECIAL_GENERAL_LEDGER       -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT       AS GENERAL_LEDGER_ACCOUNT       -- 总账科目
+	,T.CUR_CURRENCY                 AS CURRENCY                     -- 货币
+	,T.CUR_CU_CLOS_BALANCE_AMT      AS AMT                          -- 金额
+	,T.DUE_DATE                     AS DUE_DATE                     -- 到期日
+	,to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01','02') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+                                    AS DATE1						-- 查询日期
+	,T.VOUCHER_DATE					AS VOUCHER_DATE					-- 凭证日期
+	,T.SO_GROUP_CODE                AS SO_GROUP_CODE                -- 订单组编码
+	,to_date(from_unixtime(unix_timestamp(NVL(T2.WDATE,'47121231'),'yyyyMMdd'))) WDATE
+FROM 
+	DWRFIN.DWR_AR_CUST_DETAIL_F T
+	LEFT JOIN SDI.SDI_BSED_1001 T2 
+	ON  T.COMP_CODE = T2.BUKRS					-- 公司代码
+	AND T.YEAR  = T2.GJAHR 						-- 年度
+	AND T.VOUCHER_CODE  = T2.BELNR				-- 凭证号码
+	AND T.VOUCHER_ITEM  = T2.BUZEI				-- 项目
+WHERE T.POSTING_DATE <= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01','02') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+AND T.CLEAR_DATE > to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01','02') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+AND T.SPECIAL_GENERAL_LEDGER IN('W','V')
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_M_F_2
+SELECT
+	T1.COMP_CODE					AS COMP_CODE					-- 公司代码                	
+	,T1.CUST_CODE                   AS CUST_CODE                   	-- 客户编码
+	,T1.CUST_NAME                   AS CUST_NAME                   	-- 客户全称
+	,T1.SALES_GROUP_MASTER_FILE     AS SALES_GROUP_MASTER_FILE     	-- 销售组-主档
+	,T1.WBS                         AS WBS                         	-- WBS
+	,T1.WBS_SALES_GROUP             AS WBS_SALES_GROUP             	-- WBS-销售组
+	,T1.SPECIAL_GENERAL_LEDGER      AS SPECIAL_GENERAL_LEDGER      	-- 特别总账
+	,T1.GENERAL_LEDGER_ACCOUNT      AS GENERAL_LEDGER_ACCOUNT      	-- 总账科目
+	,T1.CURRENCY                	AS CURRENCY                    	-- 货币
+	,T1.AMT     					AS AMT                         	-- 金额
+	,T1.DUE_DATE                    AS DUE_DATE                    	-- 到期日
+	,T1.DATE1						AS DATE1						-- 查询日期
+	,T1.WDATE						AS WDATE						-- 签发日期
+	,CASE WHEN day(T1.DATE1 - T1.DUE_DATE) >= 0 THEN day(T1.DATE1 - T1.DUE_DATE)
+		ELSE 0
+	END 							AS DUE_DAYS						-- 到期天数
+	,T1.VOUCHER_DATE				AS VOUCHER_DATE					-- 凭证日期
+	,CASE WHEN day(T1.DUE_DATE - T1.DATE1) >= 0 THEN
+			CASE WHEN day(T1.DATE1 - T1.WDATE) >= 0 THEN day(T1.DATE1 - T1.WDATE)
+				ELSE 0
+			END 
+		ELSE -1
+	END 							AS N_OVERDUE_DUE_DAYS			-- 未逾期到期天数
+	,T1.SO_GROUP_CODE				AS SO_GROUP_CODE				-- 订单组编码
+FROM 
+	AGING T1
+;
+
+-- 创建目标表
+DROP TABLE IF EXISTS `DWRFIN.DWR_AR_BILL_AGING_F_2`;
+CREATE TABLE IF NOT EXISTS `DWRFIN.DWR_AR_BILL_AGING_F_2`(
+	`query_date` string COMMENT '查询日期',
+	`comp_code` string COMMENT '公司代码',
+	`cust_code` string COMMENT '客户编码',
+	`cust_name` string COMMENT '客户全称',
+	`sales_group_master_file` string COMMENT '销售组-主档',
+	`wbs` string COMMENT 'WBS',
+	`wbs_sales_group` string COMMENT 'WBS-销售组',
+	`special_general_ledger` string COMMENT '特别总账',
+	`general_ledger_account` string COMMENT '总账科目',
+	`currency` string COMMENT '货币',
+	`local_currency_balance_sum` decimal(38,2) COMMENT '本币累计余额',
+	`overdue_receivables` decimal(38,2) COMMENT '逾期金额',
+	`overdue_receivables_1_month` decimal(38,2) COMMENT '一个月内的逾期金额',
+	`overdue_receivables_1plus_month` decimal(38,2) COMMENT '超一个月的逾期金额',
+	`overdue_receivables_1_year` decimal(38,2) COMMENT '1年内逾期账龄',
+	`overdue_receivables_0_30_day` decimal(38,2) COMMENT '0-30天逾期账龄',
+	`overdue_receivables_31_60_day` decimal(38,2) COMMENT '31-60天逾期账龄',
+	`overdue_receivables_61_90_day` decimal(38,2) COMMENT '61-90天逾期账龄',
+	`overdue_receivables_91_120_day` decimal(38,2) COMMENT '91-120天逾期账龄',
+	`overdue_receivables_121_150_day` decimal(38,2) COMMENT '121-150天逾期账龄',
+	`overdue_receivables_151_180_day` decimal(38,2) COMMENT '151-180天逾期账龄',
+	`overdue_receivables_181_210_day` decimal(38,2) COMMENT '181-210天逾期账龄',
+	`overdue_receivables_211_240_day` decimal(38,2) COMMENT '211-240天逾期账龄',
+	`overdue_receivables_241_270_day` decimal(38,2) COMMENT '241-270天逾期账龄',
+	`overdue_receivables_271_300_day` decimal(38,2) COMMENT '271-300天逾期账龄',
+	`overdue_receivables_301_330_day` decimal(38,2) COMMENT '301-330天逾期账龄',
+	`overdue_receivables_331_365_day` decimal(38,2) COMMENT '331-365天逾期账龄',
+	`overdue_receivables_1_2_year` decimal(38,2) COMMENT '1-2年逾期账龄',
+	`overdue_receivables_2_3_year` decimal(38,2) COMMENT '2-3年逾期账龄',
+	`overdue_receivables_3_4_year` decimal(38,2) COMMENT '3-4年逾期账龄',
+	`overdue_receivables_4p_year` decimal(38,2) COMMENT '4年以上逾期账龄',
+	`n_overdue_receivables` decimal(38,2) COMMENT '未逾期金额',
+	`n_overdue_receivables_1_year` decimal(38,2) COMMENT '1年内未逾期账龄',
+	`n_overdue_receivables_0_30_day` decimal(38,2) COMMENT '0-30天未逾期账龄',
+	`n_overdue_receivables_31_60_day` decimal(38,2) COMMENT '31-60天未逾期账龄',
+	`n_overdue_receivables_61_90_day` decimal(38,2) COMMENT '61-90天未逾期账龄',
+	`n_overdue_receivables_91_120_day` decimal(38,2) COMMENT '91-120天未逾期账龄',
+	`n_overdue_receivables_121_150_day` decimal(38,2) COMMENT '121-150天未逾期账龄',
+	`n_overdue_receivables_151_180_day` decimal(38,2) COMMENT '151-180天未逾期账龄',
+	`n_overdue_receivables_181_210_day` decimal(38,2) COMMENT '181-210天未逾期账龄',
+	`n_overdue_receivables_211_240_day` decimal(38,2) COMMENT '211-240天未逾期账龄',
+	`n_overdue_receivables_241_270_day` decimal(38,2) COMMENT '241-270天未逾期账龄',
+	`n_overdue_receivables_271_300_day` decimal(38,2) COMMENT '271-300天未逾期账龄',
+	`n_overdue_receivables_301_330_day` decimal(38,2) COMMENT '301-330天未逾期账龄',
+	`n_overdue_receivables_331_365_day` decimal(38,2) COMMENT '331-365天未逾期账龄',
+	`n_overdue_receivables_1_2_year` decimal(38,2) COMMENT '1-2年未逾期账龄',
+	`n_overdue_receivables_2_3_year` decimal(38,2) COMMENT '2-3年未逾期账龄',
+	`n_overdue_receivables_3_4_year` decimal(38,2) COMMENT '3-4年未逾期账龄',
+	`n_overdue_receivables_4p_year` decimal(38,2) COMMENT '4年以上未逾期账龄',
+	`business_department` string COMMENT '事业部',
+	`dw_last_update_date` timestamp COMMENT '数据同步时间',
+	`so_group_code` string COMMENT '订单组编码',
+	`receivable_balance_sum` decimal(38,2) COMMENT '应收余额借方合计')
+COMMENT '应收票据账龄'
+;
+
+
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_BILL_AGING_F_2
+SELECT 
+	CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01','02') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END 						        		AS QUERY_DATE						    -- 查询日期
+	,T.COMP_CODE		    			            		AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        		AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            		AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                		AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                		AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        		AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        		AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        		AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        			AS CURRENCY                             -- 货币
+	,T.LOCAL_CURRENCY_BALANCE_SUM           				AS LOCAL_CURRENCY_BALANCE_SUM           -- 本币累计余额
+	,T.OVERDUE_RECEIVABLES                  				AS OVERDUE_RECEIVABLES                  -- 逾期金额
+	,T.OVERDUE_RECEIVABLES_1_MONTH	        				AS OVERDUE_RECEIVABLES_1_MONTH          -- 一个月内的逾期金额
+	,T.OVERDUE_RECEIVABLES_1PLUS_MONTH	    				AS OVERDUE_RECEIVABLES_1PLUS_MONTH      -- 超一个月的逾期金额
+	,T.OVERDUE_RECEIVABLES_1_YEAR	        				AS OVERDUE_RECEIVABLES_1_YEAR           -- 1年内逾期账龄
+	,T.OVERDUE_RECEIVABLES_0_30_DAY	        				AS OVERDUE_RECEIVABLES_0_30_DAY         -- 0-30天逾期账龄
+	,T.OVERDUE_RECEIVABLES_31_60_DAY	    				AS OVERDUE_RECEIVABLES_31_60_DAY        -- 31-60天逾期账龄
+	,T.OVERDUE_RECEIVABLES_61_90_DAY	    				AS OVERDUE_RECEIVABLES_61_90_DAY        -- 61-90天逾期账龄
+	,T.OVERDUE_RECEIVABLES_91_120_DAY	    				AS OVERDUE_RECEIVABLES_91_120_DAY       -- 91-120天逾期账龄
+	,T.OVERDUE_RECEIVABLES_121_150_DAY	    				AS OVERDUE_RECEIVABLES_121_150_DAY      -- 121-150天逾期账龄
+	,T.OVERDUE_RECEIVABLES_151_180_DAY	    				AS OVERDUE_RECEIVABLES_151_180_DAY      -- 151-180天逾期账龄
+	,T.OVERDUE_RECEIVABLES_181_210_DAY	    				AS OVERDUE_RECEIVABLES_181_210_DAY      -- 181-210天逾期账龄
+	,T.OVERDUE_RECEIVABLES_211_240_DAY	    				AS OVERDUE_RECEIVABLES_211_240_DAY      -- 211-240天逾期账龄
+	,T.OVERDUE_RECEIVABLES_241_270_DAY	    				AS OVERDUE_RECEIVABLES_241_270_DAY      -- 241-270天逾期账龄
+	,T.OVERDUE_RECEIVABLES_271_300_DAY	    				AS OVERDUE_RECEIVABLES_271_300_DAY      -- 271-300天逾期账龄
+	,T.OVERDUE_RECEIVABLES_301_330_DAY	    				AS OVERDUE_RECEIVABLES_301_330_DAY      -- 301-330天逾期账龄
+	,T.OVERDUE_RECEIVABLES_331_365_DAY	    				AS OVERDUE_RECEIVABLES_331_365_DAY      -- 331-365天逾期账龄
+	,T.OVERDUE_RECEIVABLES_1_2_YEAR	    					AS OVERDUE_RECEIVABLES_1_2_YEAR         -- 1-2年逾期账龄
+	,T.OVERDUE_RECEIVABLES_2_3_YEAR	    					AS OVERDUE_RECEIVABLES_2_3_YEAR         -- 2-3年逾期账龄
+	,T.OVERDUE_RECEIVABLES_3_4_YEAR	    					AS OVERDUE_RECEIVABLES_3_4_YEAR         -- 3-4年逾期账龄
+	,T.OVERDUE_RECEIVABLES_4P_YEAR	        				AS OVERDUE_RECEIVABLES_4P_YEAR         	-- 4年以上逾期账龄
+	,(T.LOCAL_CURRENCY_BALANCE_SUM - T.OVERDUE_RECEIVABLES)	AS N_OVERDUE_RECEIVABLES        		-- 未逾期金额
+	,T.N_OVERDUE_RECEIVABLES_1_YEAR	    					AS N_OVERDUE_RECEIVABLES_1_YEAR         -- 1年内未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_0_30_DAY	    				AS N_OVERDUE_RECEIVABLES_0_30_DAY       -- 0-30天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_31_60_DAY	    				AS N_OVERDUE_RECEIVABLES_31_60_DAY      -- 31-60天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_61_90_DAY	    				AS N_OVERDUE_RECEIVABLES_61_90_DAY      -- 61-90天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_91_120_DAY						AS N_OVERDUE_RECEIVABLES_91_120_DAY     -- 91-120天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_121_150_DAY					AS N_OVERDUE_RECEIVABLES_121_150_DAY    -- 121-150天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_151_180_DAY					AS N_OVERDUE_RECEIVABLES_151_180_DAY    -- 151-180天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_181_210_DAY					AS N_OVERDUE_RECEIVABLES_181_210_DAY    -- 181-210天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_211_240_DAY					AS N_OVERDUE_RECEIVABLES_211_240_DAY    -- 211-240天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_241_270_DAY					AS N_OVERDUE_RECEIVABLES_241_270_DAY    -- 241-270天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_271_300_DAY					AS N_OVERDUE_RECEIVABLES_271_300_DAY    -- 271-300天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_301_330_DAY					AS N_OVERDUE_RECEIVABLES_301_330_DAY    -- 301-330天未逾期账龄	
+	,T.N_OVERDUE_RECEIVABLES_331_365_DAY					AS N_OVERDUE_RECEIVABLES_331_365_DAY    -- 331-365天未逾期账龄
+	,T.N_OVERDUE_RECEIVABLES_1_2_YEAR	    				AS N_OVERDUE_RECEIVABLES_1_2_YEAR       -- 1-2年未逾期账龄
+	,T.N_OVERDUE_RECEIVABLES_2_3_YEAR	    				AS N_OVERDUE_RECEIVABLES_2_3_YEAR       -- 2-3年未逾期账龄
+	,T.N_OVERDUE_RECEIVABLES_3_4_YEAR	    				AS N_OVERDUE_RECEIVABLES_3_4_YEAR       -- 3-4年未逾期账龄
+	,T.N_OVERDUE_RECEIVABLES_4P_YEAR	    				AS N_OVERDUE_RECEIVABLES_4P_YEAR        -- 4年以上未逾期账龄
+	,CASE WHEN T.WBS_SALES_GROUP IS NULL OR T.WBS_SALES_GROUP = '' THEN T6.NODE_NAME2
+		ELSE T5.NODE_NAME2 
+	END                                                    	AS 	BUSINESS_DEPARTMENT			        -- 事业部
+	,CURRENT_TIMESTAMP()					        		AS DW_LAST_UPDATE_DATE				    -- 数据同步时间
+	,T.SO_GROUP_CODE										AS SO_GROUP_CODE						-- 订单组编码
+	,T.LOCAL_CURRENCY_BALANCE_SUM               			AS RECEIVABLE_BALANCE_SUM				-- 应收余额借方合计	
+FROM 
+	(SELECT
+	T.COMP_CODE		    			            	AS COMP_CODE                            -- 公司代码
+	,T.CUST_CODE		    				        AS CUST_CODE                            -- 客户编码
+	,T.CUST_NAME						            AS CUST_NAME                            -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE		                AS SALES_GROUP_MASTER_FILE              -- 销售组-主档
+	,T.WBS							                AS WBS                                  -- WBS
+	,T.WBS_SALES_GROUP						        AS WBS_SALES_GROUP                      -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER		    	        AS SPECIAL_GENERAL_LEDGER               -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT		    	        AS GENERAL_LEDGER_ACCOUNT               -- 总账科目
+	,T.CURRENCY		    				        	AS CURRENCY                             -- 货币
+	,T.SO_GROUP_CODE								AS SO_GROUP_CODE						-- 订单组编码
+	,SUM(NVL(T.AMT,0)) 								AS LOCAL_CURRENCY_BALANCE_SUM          	-- 本币累计余额
+	,SUM(CASE WHEN T.DUE_DATE < T.DATE1 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES      			-- 逾期金额 
+	,SUM(CASE WHEN T.DUE_DAYS > 0 AND T.DUE_DAYS <= 31 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_1_MONTH			-- 一个月内的逾期金额
+	,SUM(CASE WHEN T.DUE_DAYS > 31 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_1PLUS_MONTH		-- 超一个月的逾期金额
+	,SUM(CASE WHEN T.DUE_DAYS between 0 AND 365 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_1_YEAR			-- 1年内逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 0 AND 30 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_0_30_DAY			-- 0-30天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 31 AND 60 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_31_60_DAY		-- 31-60天逾期账龄
+    ,SUM(CASE WHEN T.DUE_DAYS between 61 AND 90 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_61_90_DAY		-- 61-90天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 91 AND 120 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_91_120_DAY		-- 91-120天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 121 AND 150 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_121_150_DAY		-- 121-150天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 151 AND 180 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_151_180_DAY		-- 151-180天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 181 AND 210 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_181_210_DAY		-- 181-210天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 211 AND 240 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_211_240_DAY		-- 211-240天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 241 AND 270 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_241_270_DAY		-- 241-270天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 271 AND 300 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_271_300_DAY		-- 271-300天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 301 AND 330 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_301_330_DAY		-- 301-330天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 331 AND 365 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_331_365_DAY		-- 331-365天逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 366 AND 730 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_1_2_YEAR			-- 1-2年逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 731 AND 1095 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_2_3_YEAR			-- 2-3年逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS between 1096 AND 1460 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_3_4_YEAR			-- 3-4年逾期账龄
+	,SUM(CASE WHEN T.DUE_DAYS >= 1461 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS OVERDUE_RECEIVABLES_4P_YEAR			-- 4年以上逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 0 AND 365 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_1_YEAR			-- 1年内未逾期账龄
+    ,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 0 AND 30 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_0_30_DAY		-- 0-30天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 31 AND 60 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_31_60_DAY		-- 31-60天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 61 AND 90 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_61_90_DAY		-- 61-90天未逾期账龄
+    ,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 91 AND 120 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_91_120_DAY		-- 91-120天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 121 AND 150 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_121_150_DAY	-- 121-150天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 151 AND 180 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_151_180_DAY	-- 151-180天未逾期账龄
+    ,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 181 AND 210 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_181_210_DAY	-- 181-210天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 211 AND 240 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_211_240_DAY	-- 211-240天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 241 AND 270 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_241_270_DAY	-- 241-270天未逾期账龄
+    ,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 271 AND 300 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_271_300_DAY	-- 271-300天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 301 AND 330 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_301_330_DAY	-- 301-330天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 331 AND 365 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_331_365_DAY	-- 331-365天未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 366 AND 730 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_1_2_YEAR		-- 1-2年未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 731 AND 1095 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_2_3_YEAR		-- 2-3年未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS between 1096 AND 1460 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_3_4_YEAR		-- 3-4年未逾期账龄
+	,SUM(CASE WHEN T.N_OVERDUE_DUE_DAYS > 1460 THEN NVL(T.AMT,0) 
+	          ELSE 0 END)                           AS N_OVERDUE_RECEIVABLES_4P_YEAR		-- 4年以上未逾期账龄
+FROM 
+	DWRFIN.DWR_AR_M_F_2 T
+GROUP BY T.COMP_CODE ,T.CUST_CODE ,T.CUST_NAME ,T.SALES_GROUP_MASTER_FILE ,T.WBS ,T.WBS_SALES_GROUP ,T.SPECIAL_GENERAL_LEDGER ,T.GENERAL_LEDGER_ACCOUNT ,T.CURRENCY,T.SO_GROUP_CODE
+ ) T
+LEFT JOIN DM.DM_RPT_SALES_GROUP_T T5
+ON T.WBS_SALES_GROUP = T5.NODE_NAME9
+LEFT JOIN DM.DM_RPT_SALES_GROUP_T T6
+ON T.SALES_GROUP_MASTER_FILE = T6.NODE_NAME9
+ ;

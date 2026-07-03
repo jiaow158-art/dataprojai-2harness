@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_FP_BUDGET_VOUCHER_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "基金管理预算凭证行 (分录凭证)",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

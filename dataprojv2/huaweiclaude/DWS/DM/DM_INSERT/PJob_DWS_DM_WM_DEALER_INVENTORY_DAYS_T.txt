@@ -1,0 +1,92 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/30 15:00:39 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_WM_DEALER_INVENTORY_DAYS_T;
+INSERT INTO DM.DM_WM_DEALER_INVENTORY_DAYS_T
+with MATERIAL_GENERAL_data as(  -- 物料数据
+  select material_num
+  from DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T
+  where matl_group_code = '1000010'
+),
+b1_customer_data as  -- 瓷砖的经销商数据
+(select CUSTOMER_TYPE,
+		customer_code,
+		customer_name_cn 
+ from dm.dm_b1_customer_data_t 
+ where customer_type in ('CT','SH')  
+ and customer_flag = 'N'
+),
+tmp_t1 as (
+	select 
+		SUBSTR(A.日期,1,7 ) as ZZ_DATE,
+	    A.客户别名 as CUST_NUM,
+	    c.customer_name_cn,
+	    A.物料编码 as material_num,
+	    A.物料描述 as material_name,
+	    sum(A.期末金额) as final_amount,
+	    sum(A.期末数量) as final_quality
+	from DM.DM_WM_B1_INVENTORY_CT_T_D  A 
+	join MATERIAL_GENERAL_data   B 
+	on A.物料编码 = B.material_num 
+	join b1_customer_data c
+	on A.客户别名 = c.customer_code
+	where substr(to_date(A.日期)  + interval '1 day',1,7) = substr(to_date(A.日期)  + interval '1 month',1,7) 
+	and substr(A.日期,1,7) between '2021-01' and substr(sysdate ,1,7)
+	group by SUBSTR(A.日期,1,7), 
+			 A.客户别名, 
+			 c.customer_name_cn,
+			 A.物料编码,  
+			 A.物料描述 
+),
+tmp_t2 as (
+	select 
+		SUBSTR(C.doc_date,1,7) as ZZ_DATE,
+		C.dealer_code as CUST_NUM,
+		e.customer_name_cn,
+		C.material_num ,
+		c.material_name,
+		SUM(C.cost_total_amt) as SALES_COST,
+		SUM(C.material_qty) as sales_quality
+	from DWROTD.DWR_WM_B1_SALES_ORDER_F C
+	join MATERIAL_GENERAL_data D 
+	on C.material_num = D.material_num 
+	join b1_customer_data e
+	on c.dealer_code = e.customer_code
+	where C.customer_type = 'CT'
+	and substr(C.doc_date,1,7) between '2021-01' and substr(sysdate ,1,7)
+	group by SUBSTR(C.doc_date,1,7), 
+			 C.dealer_code,
+			 e.customer_name_cn,
+			 C.material_num ,
+			 c.material_name
+),
+tmp_t3 as (
+select 
+    T1.ZZ_DATE,      -- 年月
+    T1.CUST_NUM,     -- 客户编码
+    t1.customer_name_cn,--客户名称
+    T1.MATERIAL_NUM,  -- 物料编码
+    T1.material_name, -- 物料名称
+    T1.FINAL_AMOUNT, -- 期末金额
+    T1.FINAL_QUALITY,  -- 期末数量
+    T2.SALES_COST, -- 销售成本
+    T2.SALES_QUALITY -- 销售数量   
+   from tmp_t1 t1
+   left join tmp_t2 t2
+   on t2.zz_date = t1.zz_date 
+   and t2.CUST_NUM = t1.CUST_NUM 
+   and t2.material_num = t1.material_num
+ )
+ SELECT ZZ_DATE AS PERIOD_ID_M, --统计月份
+       cust_num ,  -- 客户编码
+       customer_name_cn, -- 客户名称
+       material_num, -- 物料编码
+       material_name, -- 物料名称
+	   SUM(nvl(final_amount,0)) OVER( PARTITION BY cust_num,material_num ORDER BY zz_date ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS final_amount, --期末金额
+	   SUM(nvl(final_QUALITY,0)) OVER( PARTITION BY cust_num,material_num ORDER BY zz_date ROWS BETWEEN 12 PRECEDING AND CURRENT ROW) AS final_quality,
+	   SUM(NVL(SALES_COST,0)) OVER( PARTITION BY cust_num,material_num ORDER BY zz_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS SALES_COST, --销售成本
+	   SUM(nvl(sales_QUALITY,0)) OVER( PARTITION BY cust_num,material_num ORDER BY zz_date ROWS BETWEEN 11 PRECEDING AND CURRENT ROW) AS sales_quality,
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 最后更新时间
+  FROM tmp_t3;

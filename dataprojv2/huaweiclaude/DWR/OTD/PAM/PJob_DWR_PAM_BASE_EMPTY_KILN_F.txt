@@ -1,0 +1,151 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/06/20 14:17:33 GMT+08:00
+-- description:基地空窑时间模型
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from zhz 20250724 由于湖南空窑时间包含了外因时间，所以要剔除这部分
+-- ******************************************************************** --
+
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+WITH TMP AS (
+select 
+ SITE as SITE_CODE --基地代码
+,WORKSHOP as WORK_SHOP_CODE --车间代码
+,'' as PRODUCT_LINE_CODE --产线代码
+,PROCEDURE_CODE as work_no_code --工序代码
+,'' as group_code -- 班组代码
+,DATES as SHIFT_DATE --日期
+,'' as SHIFT_CODE --班次代码
+,START_TIME
+,END_TIME
+,EMPTY_KILN_CAUSE --空窑原因
+,EMPTY_KILN_TIME --空窑时间
+,EMPTY_KILN_NUM --空窑次数
+,CREATE_NAME as  CREATE_BY
+,CREATE_DATE
+,LAST_UPDATE_NAME as LAST_UPDATE_BY
+,LAST_UPDATE_DATE
+from SDI.SDI_D_EMPTY_KILN_STATISTICAL_RECORDS_1006
+WHERE DELETE_FLAG = 1 AND SITE = '1800' --重庆
+and DATES >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+UNION ALL 
+select 
+ a.site as site_code 
+,a.work_shop as WORK_SHOP_CODE --车间代码
+,a.product_line as PRODUCT_LINE_CODE --产线代码
+,a.work_no_code as work_no_code --工序代码
+,a.group_code as group_code -- 班组代码
+,a.shift_date 
+,a.shift_code
+,a.empty_kiln_start_time as START_TIME
+,a.empty_kiln_end_time as END_TIME
+,a.empty_kiln_reason as EMPTY_KILN_CAUSE --空窑原因
+,a.empty_kiln_time as EMPTY_KILN_TIME --空窑时间 
+,a.empty_kiln_number as EMPTY_KILN_NUM --空窑次数
+,a.creater as  CREATE_BY
+,a.create_time as CREATE_DATE
+,a.updater as LAST_UPDATE_BY
+,a.update_time as LAST_UPDATE_DATE
+FROM SDI.SDI_dh_empty_kiln_info_1006 a 
+-- left join sdi.sdi_dp_external_application_time_exemption_form_1006 b 
+-- on a.SITE = b.site 
+-- and a.work_shop = b.work_shop
+-- and a.shift_date = b.shift_date
+-- and b.DELETE_FLAG = 1
+WHERE a.DELETE_FLAG = 1 AND a.SITE = '1600' --湖南
+and a.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all 
+select 
+ site as site_code 
+,work_shop as WORK_SHOP_CODE --车间代码
+,product_line as PRODUCT_LINE_CODE --产线代码
+,work_no_code as work_no_code --工序代码
+,group_code as group_code -- 班组代码
+,shift_date 
+,shift_code
+,empty_kiln_start_time as START_TIME
+,empty_kiln_end_time as END_TIME
+,empty_kiln_reason as EMPTY_KILN_CAUSE --空窑原因
+,empty_kiln_time as EMPTY_KILN_TIME --空窑时间
+,empty_kiln_number as EMPTY_KILN_NUM --空窑次数
+,creater as  CREATE_BY
+,create_time as CREATE_DATE
+,updater as LAST_UPDATE_BY
+,update_time as LAST_UPDATE_DATE
+from sdi.sdi_dp_empty_kiln_info_1006 
+WHERE DELETE_FLAG = 1 AND SITE = '1300' --清远
+and shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all  
+select 
+ site as site_code 
+,work_shop as WORK_SHOP_CODE --车间代码
+,product_line as PRODUCT_LINE_CODE --产线代码
+,work_no_code as work_no_code --工序代码
+,group_code as group_code -- 班组代码
+,shift_date 
+,shift_code
+,EMPTY_KILN_START_TIME as START_TIME
+,EMPTY_KILN_END_TIME as END_TIME
+,CAUSE_EMPTY_KILN as EMPTY_KILN_CAUSE --空窑原因
+,TOTAL_EMPTY_KILN as EMPTY_KILN_TIME --空窑时间
+,NUMBER_EMPTY_KILNS as EMPTY_KILN_NUM --空窑次数
+,creater as  CREATE_BY
+,create_time as CREATE_DATE
+,updater as LAST_UPDATE_BY
+,update_time as LAST_UPDATE_DATE
+from sdi.sdi_ds_kiln_empty_kiln_1006 
+WHERE DELETE_FLAG = 1 AND SITE = '1900' --山西
+and shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all  
+select 
+ site as site_code 
+,work_shop as WORK_SHOP_CODE --车间代码
+,product_line as PRODUCT_LINE_CODE --产线代码
+,work_no_code as work_no_code --工序代码
+,group_code as group_code -- 班组代码
+,shift_date 
+,shift_code
+,shift_start_time as START_TIME
+,shift_end_time as END_TIME
+,shutdown_reason as EMPTY_KILN_CAUSE --空窑原因
+,TOTAL as EMPTY_KILN_TIME --空窑时间
+,shutdown_num as EMPTY_KILN_NUM --空窑次数
+,creater as  CREATE_BY
+,create_time as CREATE_DATE
+,updater as LAST_UPDATE_BY
+,update_time as LAST_UPDATE_DATE
+from sdi.sdi_dj_shutdown_device_record_1006 
+WHERE DELETE_FLAG = 1 AND SITE = '1500' --江西
+and shutdown_device = '釉烧窑'  --江西空窑只取釉烧窑设备
+and shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+)
+insert overwrite table DWROTD.DWR_PAM_BASE_EMPTY_KILN_F partition(period_id_m)
+select 
+ T.SITE_CODE
+,T.WORK_SHOP_CODE
+,T.PRODUCT_LINE_CODE 
+,T.WORK_NO_CODE --工序代码
+,T.GROUP_CODE -- 班组代码
+,T.SHIFT_DATE
+,T.SHIFT_CODE
+,T.START_TIME
+,T.END_TIME
+,T.EMPTY_KILN_CAUSE --空窑原因
+,T.EMPTY_KILN_TIME  --空窑时间
+,T.EMPTY_KILN_NUM --空窑次数
+,T.CREATE_BY
+,T.CREATE_DATE
+,T.LAST_UPDATE_BY
+,T.LAST_UPDATE_DATE
+,'N' AS del_flag
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+,substr(T.SHIFT_DATE,1,7) as period_id_m
+FROM TMP T

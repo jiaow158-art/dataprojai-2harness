@@ -1,0 +1,135 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2025/05/14 09:54:10 GMT+08:00
+-- description:卫浴供应链采购在途表脚本
+-- history list:
+-- UPDATE FROM 10004400 20250709 增加采购信息
+-- ******************************************************************** -- --
+WITH CFG_base AS 
+(
+SELECT '3320' as werks,'GA' as lgort,'Y' as is_avl UNION ALL
+SELECT '3620','GA','Y' UNION ALL
+SELECT '3220','GB','' UNION ALL
+SELECT '3320','GB','' UNION ALL
+SELECT '3520','GB','' UNION ALL
+SELECT '3620','GB','' UNION ALL
+SELECT '3220','GD','Y' UNION ALL
+SELECT '3320','GD','Y' UNION ALL
+SELECT '3520','GD','Y' UNION ALL
+SELECT '3620','GD','Y' UNION ALL
+SELECT '3220','GD90','Y' UNION ALL
+SELECT '3320','GD90','Y' UNION ALL
+SELECT '3620','GD90','Y' UNION ALL
+SELECT '3220','GK','' UNION ALL
+SELECT '3320','GK','' UNION ALL
+SELECT '3520','GK','' UNION ALL
+SELECT '3620','GK','' UNION ALL
+SELECT '3720','GK','' UNION ALL
+SELECT '3220','GO','' UNION ALL
+SELECT '3320','GO','' UNION ALL
+SELECT '3520','GO','' UNION ALL
+SELECT '3620','GO','' UNION ALL
+SELECT '3220','GQ','Y' UNION ALL
+SELECT '3320','GQ','Y' UNION ALL
+SELECT '3520','GQ','Y' UNION ALL
+SELECT '3620','GQ','Y' UNION ALL
+SELECT '3720','GQ','Y' UNION ALL
+SELECT '3220','GR','Y' UNION ALL
+SELECT '3320','GR','Y' UNION ALL
+SELECT '3520','GR','Y' UNION ALL
+SELECT '3620','GR','Y' UNION ALL
+SELECT '3720','GR','Y' UNION ALL
+SELECT '3820','GR','Y' UNION ALL
+SELECT '3220','GR90','Y' UNION ALL
+SELECT '3320','GR90','Y' UNION ALL
+SELECT '3520','GR90','Y' UNION ALL
+SELECT '3620','GR90','Y' UNION ALL
+SELECT '3220','GX','Y' UNION ALL
+SELECT '3320','GX','Y' UNION ALL
+SELECT '3520','GX','Y' UNION ALL
+SELECT '3620','GX','Y' UNION ALL
+SELECT '3720','GX','Y' UNION ALL
+SELECT '3220','GZ','' UNION ALL
+SELECT '3820','GA','Y' UNION ALL
+SELECT '3820','GB','' UNION ALL
+SELECT '3820','GD','Y' UNION ALL
+SELECT '3820','GD90','Y' UNION ALL
+SELECT '3820','GK','' UNION ALL
+SELECT '3720','GO','' UNION ALL
+SELECT '3820','GO','' UNION ALL
+SELECT '3820','GQ','Y' UNION ALL
+SELECT '3720','GR90','Y' UNION ALL
+SELECT '3820','GR90','Y' UNION ALL
+SELECT '3820','GX','Y' UNION ALL
+SELECT '3500','GR','Y' UNION ALL
+SELECT '3602','GR','Y' UNION ALL
+SELECT '3603','GR','Y' UNION ALL
+SELECT '3700','GR','Y' UNION ALL
+SELECT '3200','GF','' UNION ALL
+SELECT '3220','GF','' UNION ALL
+SELECT '3320','GF','' UNION ALL
+SELECT '3500','GF','' UNION ALL
+SELECT '3520','GF','' UNION ALL
+SELECT '3602','GF','' UNION ALL
+SELECT '3603','GF','' UNION ALL
+SELECT '3620','GF','' UNION ALL
+SELECT '3720','GF','' UNION ALL
+SELECT '3520','GR99','' 
+)
+,CFG AS(
+SELECT werks,lgort,max(is_avl) as is_avl FROM CFG_BASE  
+GROUP BY werks,lgort
+)
+insert overwrite table dm_sw.dm_ptp_purchase_transit_t  
+select purchase_order_num,
+purchase_item_num,
+purchase_order_type,
+comp_code,
+purchase_org_code,
+purchase_group_code,
+purchase_order_status,
+purchase_voucher_date,
+order_create_date,
+t1.ernam,
+t1.supplier_num,
+t1.material_num,
+t1.inv_location,
+t1.factory_code,
+item_txt,
+purchase_qty,
+stockin_qty,
+transit_qty,
+purchaser,
+apply_obj,
+approved,
+MIN_DELV_DATE,
+MAX_DELV_DATE,
+case when purchase_order_type='NB' then '标准采购订单'  
+     when purchase_order_type='ZNB1' then 'OEM采购订单'
+     when purchase_order_type='ZNB2' then '委外加工采购订单' end purchase_order_type_t,
+T4.supplier_or_creditor_name AS supplier_name,
+t2.product_level2_name,
+t1.purchase_order_txt
+from dwrpur.dwr_ptp_purchase_transit_f t1 
+join dwimd.dwi_md_data_material_general_t t2 
+on t1.material_num = t2.material_num
+join  CFG  t3 ON t1.factory_code = t3.werks and t1.inv_location = t3.lgort
+LEFT JOIN (select material_num,
+                  MAX(CASE WHEN T.matl_group4_code IN('DJ' ,'TX' ,'TS' ,'ZS' ,'ZX' ,'ZY','TD', 'ZD','DZ') THEN 1 ELSE 0 END) AS DZ1,
+                  MAX(CASE WHEN T.matl_group3_code ='PJ' THEN 1 ELSE 0 END) AS PJ1
+           from DWIMD.dwi_md_data_material_sales_t T 
+           GROUP BY material_num
+          )  T9 ON T1.material_num = T9.material_num
+LEFT JOIN DWIMD.DWI_MD_SUPPLIER_GENERAL_T T4 ON T1.supplier_num = T4.supplier_or_creditor_num AND T4.end_date='4712-12-31'
+where   
+ ((T2.matl_group_code in('3000010','4000010') and T2.external_matl_group_code = '10010') or  
+ (T2.matl_group_code in('3000010','4000010') and T2.prod_property = 'B0001' and T2.external_matl_group_code = '90010') or 
+ ( T2.matl_group_code in('7000010','9000010') and T2.prod_property = 'B0001' and T2.external_matl_group_code = '10010'))
+--AND coalesce(T9.DZ1,0) = 1
+AND T1.purchase_order_type IN('NB','ZNB1','ZNB2')
+and  t1.stat_month = '${PERIOD_ID_M}'
+;
+
+
+

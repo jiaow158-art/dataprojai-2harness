@@ -1,0 +1,18 @@
+insert overwrite table sdi.sdi_mda_module_config_1007
+select 
+id,
+create_by,
+create_date,
+custom_url,
+entity_type,
+is_inside,
+is_only_admin,
+key,
+label,
+platform,
+sync_id,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_mda_module_config_1007;

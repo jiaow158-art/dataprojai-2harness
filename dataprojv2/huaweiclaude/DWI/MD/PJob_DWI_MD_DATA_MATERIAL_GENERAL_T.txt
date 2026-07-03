@@ -1,0 +1,175 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/17 16:55:18 GMT+08:00
+-- updated: yangjunhua  --alter table  DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T add columns ( def_prod_channel string) 增加整合渠道
+-- updated: zhz 		--alter table DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T add columns (bathroom_channal string COMMENT '卫浴渠道')
+-- update from chenzhiyong  20221107 15:10 新增YL09--> prod_property 字段(产品所有权)
+-- update from guzhengfeng  20221109 11:23 新增prod_property_name字段(产品所有权名称)
+-- updated: zhz 20221110 9:00 卫浴品类 新增2404
+-- update :zhz 20230614,sales_code --销售代码 dwi.category --品类 category_name --品类名称product_position1 --产品定位 product_position_name1 --产品定位名称
+-- update :zhangpeng 20231130,添加字段old_material_num
+-- update from huangwenbin 2024-04-03 新增字段：单位面积（瓷砖）、瓷砖产品系列1
+-- update from zhanghz 2024-10-28 新增物料小类
+-- update from wjh 2025-02-27  新增定制主体字段
+-- update from wjh 2025-03-11 新增gy02, gy03, pt02,qd02字段
+-- update from zhz 2025-04-28 新增color_temp_code色温编码,color_temp_name色温名称,lightness_code，明度编码,lightness_name 明度名称,light_sense_code --光感编码 ,light_sense_name --光感名称,dermat_pattern_code --纹样编码,dermat_pattern_name --纹样名称 ,touch_sense_code --触感编码,touch_sense_name --触感名称字段
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T
+SELECT 
+ DWI.MATERIAL_ID
+,DWI.GROUP_NUM 
+,DWI.MATERIAL_NUM 
+,DWI.MATERIAL_NAME 
+,DWI.MATL_TYPE_CODE 
+,DWI.MATL_TYPE_NAME 
+,DWI.PRODUCT_GROUP_CODE 
+,DWI.PRODUCT_GROUP_NAME 
+,DWI.PRODUCT_CLASSIFY_CODE 
+,DWI.PRODUCT_CLASSIFY_NAME 
+,DWI.BASIC_CALC_UNIT_NAME 
+,DWI.BATCH_MNGNT_REQUIRE_FLAG 
+,DWI.SIZE_UNIT 
+,DWI.LENGTH_1 
+,DWI.WIDTH 
+,DWI.HEIGHT 
+,DWI.BUSI_VOLUME 
+,DWI.VOLUME_UNIT_NAME 
+,DWI.DIMENSION 
+,DWI.GROSS_WEIGHT 
+,DWI.NET_WEIGHT 
+,DWI.WEIGHT_UNIT 
+,DWI.TRANS_GROUP_CODE 
+,DWI.TRANS_GROUP_NAME 
+,DWI.MATL_GROUP_CODE 
+,DWI.MATL_GROUP_NAME 
+,DWI.EXTERNAL_MATL_GROUP_CODE 
+,DWI.EXTERNAL_MATL_GROUP_NAME 
+,DWI.PRODUCT_LEVEL_CODE 
+,DWI.PRODUCT_LEVEL_NAME 
+,DWI.PRODUCT_LEVEL1_CODE 
+,DWI.PRODUCT_LEVEL1_NAME 
+,DWI.PRODUCT_LEVEL2_CODE 
+,DWI.PRODUCT_LEVEL2_NAME 
+,DWI.PRODUCT_LEVEL3_CODE 
+,DWI.PRODUCT_LEVEL3_NAME 
+,DWI.PRODUCT_LEVEL4_CODE 
+,DWI.PRODUCT_LEVEL4_NAME 
+,DWI.PRODUCT_LEVEL5_CODE 
+,DWI.PRODUCT_LEVEL5_NAME 
+,DWI.PRODUCT_LEVEL6_CODE 
+,DWI.PRODUCT_LEVEL6_NAME 
+,DWI.PRODUCT_BRAND_CODE 
+,DWI.PRODUCT_BRAND_NAME 
+,DWI.PRODUCT_PLACE_CODE 
+,DWI.PRODUCT_PLACE_NAME 
+,DWI.GENERAL_ITEM_CTGRY_GROUP_CODE 
+,DWI.GENERAL_ITEM_CTGRY_GROUP_NAME 
+,DWI.PRODUCT_POSITION_CODE 
+,DWI.PRODUCT_POSITION_NAME 
+,DWI.COLOR_CODE 
+,DWI.COLOR_NAME 
+,DWI.PRODUCT_SPECIFY_CODE 
+,DWI.PRODUCT_SPECIFY_NAME 
+,DWI.FACES_CODE 
+,DWI.FACES_NAME 
+,DWI.TEXTURE_1 
+,DWI.TEXTURE_1_NAME 
+,DWI.TEXTURE_2 
+,DWI.TEXTURE_2_NAME 
+,DWI.NEW_PRODUCT_CODE 
+,DWI.NEW_PRODUCT_NAME 
+,DWI.MENU_DESC_CODE 
+,DWI.MENU_DESC_NAME 
+,DWI.HEIGHT2_CODE 
+,DWI.HEIGHT2_NAME 
+,DWI.MATL_TEXTURE 
+,DWI.MATL_TEXTURE_NAME 
+,DWI.RESERVED_FIELD_1 
+,DWI.RESERVED_FIELD1_NAME 
+,DWI.RESERVED_FIELD_2 
+,DWI.RESERVED_FIELD2_NAME 
+,DWI.RESERVED_FIELD_3 
+,DWI.RESERVED_FIELD3_NAME 
+,DWI.RESERVED_FIELD_4 
+,DWI.RESERVED_FIELD4_NAME 
+,DWI.RESERVED_FIELD_5 
+,DWI.RESERVED_FIELD5_NAME 
+,DWI.RESERVED_FIELD_6 
+,DWI.RESERVED_FIELD6_NAME 
+,DWI.RESERVED_FIELD_7 
+,DWI.RESERVED_FIELD7_NAME 
+,DWI.RESERVED_FIELD_8 
+,DWI.RESERVED_FIELD8_NAME 
+,DWI.X_DSTRB_C_MM_STATUS_CODE 
+,DWI.X_DSTRB_C_MM_STATUS_NAME 
+,DWI.INDUSTRY_FIELD_CODE 
+,DWI.INDUSTRY_FIELD_NAME 
+,DWI.PRODUCT_LISTED_DATE 
+,DWI.MIN_REMAIN_SHELF_LIFE 
+,DWI.TOTAL_SHELF_LIFE 
+,DWI.CREATE_DATE
+,DWI.UPDATE_DATE  
+,DWI.DW_LAST_UPDATE_DATE
+,case when RESERVED_FIELD_1 IN('G102','G115') then '工程'
+      when RESERVED_FIELD_1 IN('G103') then '大包'
+      when RESERVED_FIELD_1 IN('G105') then '设计师'
+      when RESERVED_FIELD_1 IN('G001','G101','G108','G104') then '零售' else '零售' end as def_prod_channel
+,X_plant_matl_status
+,X_plant_matl_status_name
+,case when EXTERNAL_MATL_GROUP_CODE = '10050' then '艺耐'
+      when reserved_field_1 in ('G101','G111') then '零售'
+      when reserved_field_1 in ('G102','G103','G112','G113') then '工程'
+      when reserved_field_1 in ('G116','G104') then '流通'
+      when reserved_field_1 in ('G109') then 'OEM'
+      when reserved_field_1 in ('G107') then '国贸'
+      when reserved_field_1 in ('G108','') then '共线'
+      ELSE reserved_field1_name END as bathroom_channal
+,case when substr(DWI.product_level_code,1,1) in ('9','7')  then '配件' 
+	 when substr(DWI.product_level_code,1,2) in ('31','41')  then '配件' 
+	 when substr(DWI.product_level_code,1,4) = '4011' then '整装'
+	 when substr(DWI.product_level_code,1,4) = '2404' then '浴室家居'
+	 when substr(DWI.product_level_code,1,4) = '4002' then '浴室家居'
+	 else k.prod_type end as bath_category_name --卫浴品类
+,dwi.prod_property -- 产品所有权
+,dwi.prod_property_name	-- 产品所有权名称
+,dwi.sales_code --销售代码
+,dwi.category --品类
+,dwi.category_name --品类名称
+,dwi.product_position1 --产品定位
+,dwi.product_position_name1 --产品定位名称
+,dwi.old_material_num --旧物料编码
+,dwi.unit_area --单位面积（瓷砖）
+,dwi.product_series_name --瓷砖产品系列1
+,dwi.product_subclass_code -- 物料小类代码
+,dwi.product_subclass_name -- 物料小类名称
+,dwi.CSTM_MAIN_CODE--定制主体编码
+,dwi.CSTM_MAIN_NAME--定制主体名称
+,dwi.secondary_crafts_code     --次工艺编码
+,dwi.secondary_crafts_name--次工艺描述
+,dwi.auxiliary_processes_code  --辅工艺编码
+,dwi.auxiliary_processes_name --辅工艺描述
+,dwi.embryo_whiteness_code     --胚体白度编码
+,dwi.embryo_whiteness_name  --胚体白度描述
+,dwi.tow_lev_channel_code       --二级渠道编码
+,dwi.tow_lev_channel_name      --二级渠道描述
+,dwi.color_temp_code --色温编码
+,dwi.color_temp_name --色温名称
+,dwi.lightness_code  --明度编码
+,dwi.lightness_name  --明度名称
+,dwi.light_sense_code --光感编码 
+,dwi.light_sense_name --光感名称
+,dwi.dermat_pattern_code --纹样编码
+,dwi.dermat_pattern_name --纹样名称 
+,dwi.touch_sense_code --触感编码
+,dwi.touch_sense_name --触感名称
+FROM DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T_HIS DWI 
+LEFT JOIN SDI.SDI_WM_SW_SAP_PROD_GRP_1037 k on DWI.product_level3_code = k.prod_code3
+WHERE END_DATE = '4712-12-31' AND DEL_FLAG = 'N';
+

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_FIN_GROUP_DAILY_DETAIL",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "集团日报中间表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,66 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/07/03 15:56:22 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert overwrite into dm.dm_oms_top10_achievement_t
+select 
+ c.product_level_code
+,c.product_level_name
+,a.product_brand_code
+,a.product_brand_name
+,d.sale_region_code as sales_dist
+,d.sale_region_name as sales_dist___t
+,node_name3
+,node_desc3
+,node_name4
+,node_desc4
+,node_name5
+,node_desc5
+,customer
+,customer___t 
+,material
+,material___t 
+,size_dim
+,product_series_name
+,integrate_channel
+,sum(zxssl) as zxssl
+,sum(ambperformance) as ambperformance
+,current_date 
+,sum(zxsmj) as zxsmj
+from dm.dm_ambv2_zzt_xssr_t a 
+left join dm.dm_rpt_sales_group_t b
+on a.sales_grp = b.node_name9 
+left join dwimd.dwi_md_data_material_general_t c 
+on a.material = c.material_num  
+left join DWRDIM.DWR_DIM_CUST_SALES_AREA_D d
+on a.salesorg = d.sales_org_code
+and a.customer = d.cust_num
+and a.distr_chan = d.distribution_chnl_code 
+and d.end_date = '4712-12-31'
+and d.del_flag = 'N'
+where node_name5 in ('H05230602','H05230604','H05230607','H05230608','H05230611','H05230614','H05230615','H05230616','H05230623','H05230624','H05230626','H05230631','H05230632','H05230634','S09','S10','S11','S12','S13','S14','S15','S19','S20','RMB','H03230604','H03230627','Z049','Z031','H05260203','H05260204','H05260205') and integrate_channel in  ('GD01','GD02') and menu_desc_code = 'A001' 
+and CALMONTH between substr(now() - INTERVAL '1 day' - INTERVAL '2 months',1,7) AND substr(now() - INTERVAL '1 day' ,1,7)
+group by 
+ c.product_level_code
+,c.product_level_name
+,a.product_brand_code
+,a.product_brand_name
+,d.sale_region_code 
+,d.sale_region_name 
+,node_name3
+,node_desc3
+,node_name4
+,node_desc4
+,node_name5
+,node_desc5
+,customer
+,customer___t 
+,material
+,material___t 
+,size_dim
+,product_series_name
+,integrate_channel

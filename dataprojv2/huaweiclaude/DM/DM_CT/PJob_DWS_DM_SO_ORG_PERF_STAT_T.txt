@@ -1,0 +1,305 @@
+/*create table dm.dm_so_org_perf_stat_t
+(
+    calmonth                varchar(500),
+    calday                  varchar(500),
+    customer                varchar(500),
+    material                varchar(500),
+    distr_chan              varchar(500),
+    distr_chan_name         varchar(500),
+    salesorg                varchar(500),
+    integrate_channel       varchar(500),
+    integrate_channel_name  varchar(500),
+    data_source             varchar(500),
+    sales_grp               varchar(500),
+    commission_group        varchar(500),
+    bus_area                varchar(500),
+    cust_group              varchar(500),
+    ambperformance          numeric(38, 10),
+    zxsmj                   numeric(38, 10),
+    zsyjf                   numeric(38, 10),
+    z_yjsgtzz               numeric(38, 10),
+    notax_sales_net_amt     numeric(38, 10),
+    last_period_sum_price   numeric(38, 10),
+    act_cost_sum_amt        numeric(38, 10),
+    standard_price_a        numeric(38, 10),
+    this_month_gross_profit numeric(38, 10),
+    a_cost_gross_profit     numeric(38, 10),
+    standard_a_gross_profit numeric(38, 10),
+    amb_gross_profit        numeric(38, 10),
+    performance_1n          numeric(38, 10),
+    integrate_channel2      varchar(50),
+    sales_area              numeric(38, 10),
+    zsales_channel          varchar(200),
+    zyywcb_zxf              numeric(38, 10),
+    zyywcb_yf               numeric(38, 10),
+    zcbtzz                  numeric(38, 10),
+    zzyywcb_azf             numeric(38, 10),
+    dw_last_update_date     timestamp
+)
+    with (orientation = row, compression = no);
+
+comment on table dm.dm_so_org_perf_stat_t is '销售业绩轻量汇总表';
+
+comment on column dm.dm_so_org_perf_stat_t.calmonth is '日历月';
+
+comment on column dm.dm_so_org_perf_stat_t.calday is '日历日';
+
+comment on column dm.dm_so_org_perf_stat_t.customer is '客户编码';
+
+comment on column dm.dm_so_org_perf_stat_t.material is '物料编码';
+
+comment on column dm.dm_so_org_perf_stat_t.distr_chan is '分销渠道';
+
+comment on column dm.dm_so_org_perf_stat_t.distr_chan_name is '分销渠道名称';
+
+comment on column dm.dm_so_org_perf_stat_t.salesorg is '销售组织';
+
+comment on column dm.dm_so_org_perf_stat_t.integrate_channel is '整合渠道1';
+
+comment on column dm.dm_so_org_perf_stat_t.integrate_channel_name is '整合渠道1名称';
+
+comment on column dm.dm_so_org_perf_stat_t.data_source is '系统来源';
+
+comment on column dm.dm_so_org_perf_stat_t.sales_grp is '销售组';
+
+comment on column dm.dm_so_org_perf_stat_t.commission_group is '佣金组';
+
+comment on column dm.dm_so_org_perf_stat_t.bus_area is '业务范围';
+
+comment on column dm.dm_so_org_perf_stat_t.cust_group is '客户组';
+
+comment on column dm.dm_so_org_perf_stat_t.ambperformance is '业绩';
+
+comment on column dm.dm_so_org_perf_stat_t.zxsmj is '面积';
+
+comment on column dm.dm_so_org_perf_stat_t.zsyjf is '使用积分';
+
+comment on column dm.dm_so_org_perf_stat_t.z_yjsgtzz is '手工调整值';
+
+comment on column dm.dm_so_org_perf_stat_t.notax_sales_net_amt is '不含税收入';
+
+comment on column dm.dm_so_org_perf_stat_t.last_period_sum_price is '上期周期总价，用于现实当月';
+
+comment on column dm.dm_so_org_perf_stat_t.act_cost_sum_amt is '实际A成本';
+
+comment on column dm.dm_so_org_perf_stat_t.standard_price_a is '标A成本';
+
+comment on column dm.dm_so_org_perf_stat_t.this_month_gross_profit is '当月毛利额，不含税收入-上期周期总价';
+
+comment on column dm.dm_so_org_perf_stat_t.a_cost_gross_profit is 'A成本毛利额';
+
+comment on column dm.dm_so_org_perf_stat_t.standard_a_gross_profit is '标A成本毛利额';
+
+comment on column dm.dm_so_org_perf_stat_t.amb_gross_profit is '阿米巴毛利额';
+
+comment on column dm.dm_so_org_perf_stat_t.sales_area is '销售面积';
+
+comment on column dm.dm_so_org_perf_stat_t.zsales_channel is '渠道（销售方）';
+
+
+comment on column dm.dm_so_org_perf_stat_t.zyywcb_zxf is '装卸费';
+
+comment on column dm.dm_so_org_perf_stat_t.zyywcb_yf is '运费';
+
+comment on column dm.dm_so_org_perf_stat_t.zcbtzz is '成本调整值';
+
+comment on column dm.dm_so_org_perf_stat_t.zzyywcb_azf is '安装费';
+ */
+
+-- update：2024/03/29 修改逻辑：A成本加上安装费
+-- update：2024/04/01 修改逻辑：增加渠道（销售方）字段，用于子母客编
+-- update：2024/04/14 修改逻辑：补充安装费、运费、装卸费、成本调整值
+-- update：2024/04/18 修改逻辑：补充wbs
+-- update：2024/09/25 修改逻辑：增加数量字段
+--参数yyyy-MM
+-- update: 2025-03-31 增加字段：clearance_reason，clearance_reason_t
+delete
+from dm.dm_so_org_Perf_stat_t
+where calmonth between '${P_PERIOD_M1}' and '${P_PERIOD_M2}';
+
+insert into dm.dm_so_org_Perf_stat_t
+select calmonth,
+       calday,
+       customer,
+       material,
+       wbs,
+       distr_chan,
+       distr_chan_name,
+       salesorg,
+       integrate_channel,
+       integrate_channel_name,
+       data_source,
+       sales_grp,
+       commission_group,
+       bus_area,
+       cust_group,
+       sum(ambperformance)          ambperformance,
+       sum(zxsmj)                   zxsmj,
+       sum(zsyjf)                   zsyjf,
+       sum(z_yjsgtzz)               z_yjsgtzz,
+       sum(notax_sales_net_amt)     notax_sales_net_amt,
+       sum(last_period_sum_price)   last_period_sum_price,
+       sum(act_cost_sum_amt)        act_cost_sum_amt,
+       sum(standard_price_a)        standard_price_a,
+       sum(this_month_gross_profit) this_month_gross_profit,
+       sum(a_cost_gross_profit)     a_cost_gross_profit,
+       sum(standard_a_gross_profit) standard_a_gross_profit,
+       sum(amb_gross_profit)        amb_gross_profit,
+       sum(performance_1n)          performance_1n,
+       integrate_channel2,
+       sum(sales_area)              sales_area,
+       zsales_channel,
+       sum(zyywcb_zxf),
+       sum(zyywcb_yf),
+       sum(zcbtzz),
+       sum(zzyywcb_azf),
+       current_timestamp            dw_last_update_date,
+       sum(zxssl)                   zxssl,
+	   clearance_reason, --清仓原因/促销原因
+       clearance_reason_t --清仓原因/促销原因描述
+from (
+         select calmonth,
+                calday,
+                customer,
+                material,
+                wbs_elemt           wbs,
+                distr_chan,
+                c.vtext             distr_chan_name,
+                salesorg,
+                integrate_channel,
+                channel_name as     integrate_channel_name,
+                data_source,
+                sales_grp,
+                commission_group,
+                bus_area,
+                cust_group,
+                sum(ambperformance) ambperformance,
+                sum(zxsmj)          zxsmj,
+                sum(zsyjf)          zsyjf,
+                sum(z_yjsgtzz)      z_yjsgtzz,
+                0                   notax_sales_net_amt,
+                0                   last_period_sum_price,
+                0                   act_cost_sum_amt,
+                0                   standard_price_a,
+                0                   this_month_gross_profit,
+                0                   a_cost_gross_profit,
+                0                   standard_a_gross_profit,
+                0                   amb_gross_profit,
+                sum(performance_1n) performance_1n,
+                integrate_channel2,
+                sum(zxsmj)          sales_area,
+                zsales_channel,
+                0                   zyywcb_zxf,
+                0                   zyywcb_yf,
+                0                   zcbtzz,
+                0                   zzyywcb_azf,
+                sum(zxssl)          zxssl,
+				clearance_reason, --清仓原因/促销原因
+                clearance_reason_t --清仓原因/促销原因描述
+         from dm.dm_ambv2_zzt_xssr_t a
+                  left join upload.upload_business_analysis_channel_t b on a.integrate_channel = b.channel_code--前端填报整合渠道名称
+                  left join dm.dm_sdi_tvtwt_1001_t c on a.distr_chan = c.vtweg and c.spras = '1' and c.mandt = '800'--分销渠道编码
+         where 1 = 1
+           and calmonth between '${P_PERIOD_M1}' and '${P_PERIOD_M2}'
+         group by calmonth,
+                  calday,
+                  customer,
+                  material,
+                  wbs,
+                  distr_chan,
+                  c.vtext,
+                  salesorg,
+                  integrate_channel,
+                  channel_name,
+                  data_source,
+                  sales_grp,
+                  commission_group,
+                  bus_area,
+                  cust_group,
+                  integrate_channel2,
+                  zsales_channel,
+				clearance_reason, --清仓原因/促销原因
+                clearance_reason_t --清仓原因/促销原因描述
+         union all
+         select calmonth,
+                calday,
+                customer,
+                material,
+                wbs_elemt                                                                 wbs,
+                distr_chan,
+                c.vtext                                                                   distr_chan_name,
+                salesorg,
+                integrate_channel,
+                channel_name as                                                           integrate_channel_name,
+                data_source,
+                sales_grp,
+                ''                                                                        commission_group,
+                bus_area,
+                cust_group,
+                0                                                                         ambperformance,
+                0                                                                         zxsmj,
+                0                                                                         zsyjf,
+                0                                                                         z_yjsgtzz,
+                sum(notax_sales_net_amt)                                                  notax_sales_net_amt,
+                sum(last_period_sum_price + coalesce(zzyywcb_azf, 0))                     last_period_sum_price,
+                sum(act_cost_sum_amt - zyywcb_zxf - zyywcb_yf)                            act_cost_sum_amt,
+                sum(standard_price_a)                                                     standard_price_a,
+                sum(notax_sales_net_amt) -
+                sum(last_period_sum_price + coalesce(zzyywcb_azf, 0))                     this_month_gross_profit,
+                sum(notax_sales_net_amt) - sum(act_cost_sum_amt - zyywcb_zxf - zyywcb_yf) a_cost_gross_profit,
+                sum(notax_sales_net_amt) - sum(standard_price_a)                          standard_a_gross_profit,
+                sum(amb_profit_amt)                                                       amb_gross_profit,
+                0,
+                integrate_channel2,
+                0,
+                zsales_channel,
+                sum(zyywcb_zxf)                                                           zyywcb_zxf,
+                sum(zyywcb_yf)                                                            zyywcb_yf,
+                sum(zcbtzz)                                                               zcbtzz,
+                sum(zzyywcb_azf)                                                          zzyywcb_azf,
+                0                                                                         zxssl,
+				clearance_reason, --清仓原因/促销原因
+                clearance_reason_t --清仓原因/促销原因描述
+         from dm.dm_ambv2_profit_t a
+                  left join upload.upload_business_analysis_channel_t b on a.integrate_channel = b.channel_code
+                  left join dm.dm_sdi_tvtwt_1001_t c on a.distr_chan = c.vtweg and c.spras = '1' and c.mandt = '800'
+         where 1 = 1
+           and calmonth between '${P_PERIOD_M1}' and '${P_PERIOD_M2}'
+         group by calmonth,
+                  calday,
+                  customer,
+                  material,
+                  wbs,
+                  distr_chan,
+                  c.vtext,
+                  salesorg,
+                  integrate_channel,
+                  channel_name,
+                  data_source,
+                  sales_grp,
+                  bus_area,
+                  cust_group,
+                  integrate_channel2,
+                  zsales_channel,
+				clearance_reason, --清仓原因/促销原因
+                clearance_reason_t --清仓原因/促销原因描述
+     ) aa
+group by calmonth,
+         calday,
+         customer,
+         material,
+         wbs,
+         distr_chan,
+         distr_chan_name,
+         salesorg,
+         integrate_channel,
+         integrate_channel_name,
+         data_source,
+         sales_grp,
+         commission_group,
+         bus_area,
+         cust_group,
+         integrate_channel2,
+         zsales_channel,
+		 clearance_reason, --清仓原因/促销原因
+         clearance_reason_t --清仓原因/促销原因描述

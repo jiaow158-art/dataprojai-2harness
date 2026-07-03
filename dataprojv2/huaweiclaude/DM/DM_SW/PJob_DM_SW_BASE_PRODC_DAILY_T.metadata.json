@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SW_BASE_PRODC_DAILY_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

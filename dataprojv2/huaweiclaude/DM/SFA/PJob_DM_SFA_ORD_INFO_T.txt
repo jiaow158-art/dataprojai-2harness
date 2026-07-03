@@ -1,0 +1,74 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/11/20 14:12:53 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- create table dm.dm_sfa_ord_info_t (
+--  opportunity_number string comment '商机号'
+-- ,order_num string comment '订单号'
+-- ,sap_order_num string comment 'SAP订单'
+-- ,order_line_num string comment '订单行'
+-- ,sap_order_line_num  string comment 'SAP订单行'
+-- ,create_date  timestamp comment '创建日期'
+-- ,update_date  timestamp comment '修改时间'
+-- ,order_type_code  string comment '订单类型'
+-- ,order_type_name  string comment '订单类型描述'
+-- ,cust_code  string comment '客户编码'
+-- ,cust_name  string comment '客户名称'
+-- ,pay_cust_code  string comment '付款编码'
+-- ,pay_cust_name  string comment '付款名称'
+-- ,sale_emp_num  string comment '销售雇员工号'
+-- ,sale_emp_name  string comment '销售雇员描述'
+-- ,material_code  string comment '物料编码'
+-- ,material_name  string comment '物料名称'
+-- ,unit   string comment '单位'
+-- ,qty    decimal(38,10) comment '数量'
+-- ,total_line_amount  decimal(38,10) comment '行合计金额'
+-- ,dw_last_update_date timestamp comment '最后更新时间'
+-- )
+
+insert overwrite table dm.dm_sfa_ord_info_t
+select 
+ T0.ENGNR_REPORT_NUM as opportunity_number --商机号
+,T0.SO_NUM as order_num  --订单号
+,T.sal_vch_num as sap_order_num   --SAP订单
+,T.so_item_id as order_line_num   --订单行
+,T.sal_vch_item_num as sap_order_line_num  --SAP订单行
+,SUBSTR(T0.create_date,1,10) AS create_date  --创建日期
+,SUBSTR(CASE WHEN T0.LAST_UPD_TIMESTAMP >= T.LAST_UPD_TIMESTAMP THEN T0.LAST_UPD_TIMESTAMP ELSE T.LAST_UPD_TIMESTAMP END,1,10) AS update_date  --修改时间
+,SUBSTR(T0.sal_vch_type,1,4) as order_type_code --订单类型
+,T0.sal_vch_type_name order_type_name --订单类型描述
+,T0.cust_num as cust_code  --客户编码
+,T0.cust_name  --客户名称
+,T0.cust_num as pay_cust_code  --付款编码
+,T0.cust_name as pay_cust_name  --付款名称
+,T2.person_num as sale_emp_num  --销售雇员工号
+,T3.emp_name as sale_emp_name  --销售雇员描述
+,T.material_num as material_code  --物料编码
+,T.material_name  --物料名称
+,T.base_measure_unit as unit       --单位
+,T.SAL_ACCUMULATE_QTY as qty        --数量
+,T.subtotal_price_process  as total_line_amount  -- 行合计金额
+,current_timestamp as dw_last_update_date
+from DWROTD.DWR_SO_ITEM_SAP_F T
+left join DWROTD.DWR_SO_HEAD_SAP_F T0 
+on T.sal_vch_num = T0.sal_vch_num
+and T.group_num = T0.group_num
+left join dm.dm_rpt_sales_group_t T1
+on T1.node_name9 = substr(T0.sal_group,1,3)
+left join DWROTD.DWR_SO_SAL_PARTNER_SAP_F T2 
+on T.sal_vch_num = T2.sal_vch_num
+and T2.sal_vch_item_num = '000000'
+and T2.partner_func = 'VE'
+left join DWRDIM.DWR_DIM_EMPLOYEE_BASIC_INFO_D T3 
+on T2.person_num = T3.emp_num 
+and T3.end_date = '4712-12-31'
+where T.group_num = '800'
+and T0.sal_dis_vch_type = 'C_VBTYPL' --订单
+and T0.ENGNR_REPORT_NUM is not null and T0.ENGNR_REPORT_NUM <> ''
+and T1.node_name2 = 'H11000001' --瓷砖事业部
+
+

@@ -1,0 +1,8 @@
+{
+    "name": "PyJob_SA280PUSH",
+    "type": "PYTHON",
+    "directory": "/DWS/DM",
+    "description": "经营简报文案推送脚本 每日九点推送",
+    "connectionName": "AI-wenshu-TEST",
+    "database": null
+}

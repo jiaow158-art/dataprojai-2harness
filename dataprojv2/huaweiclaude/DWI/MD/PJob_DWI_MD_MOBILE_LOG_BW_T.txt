@@ -1,0 +1,17 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/01 11:51:40 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_MOBILE_LOG_BW_T
+  SELECT LOGID,
+         USERCODE,
+         OPERATIONDATE,
+         OPERATIONTYPE,
+         RESNAME,
+         RESID,
+         USERNAME,
+         DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+    FROM SDI.SDI_MOBILE_LOG_1009
+   WHERE DEL_FLAG = 'N'

@@ -1,0 +1,149 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 14:59:18 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--工程商机新增数量ZB77
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB77';
+with base_month as (
+    SELECT SUBSTR(DAY_DT, 1, 7) month_val, DAY_DT AS MONTH_END_DATE --月末最后一天
+    FROM DM.DM_DIM_DATE_D
+    WHERE SUBSTR(DAY_DT, 1, 7) between to_char(current_date - 1 - interval '11 months', 'yyyy-MM') and to_char(current_date - 1, 'yyyy-MM')
+      AND MONTH_END_DAY_FLAG = 'Y'
+)
+,XZSJ as (
+select month_val,  sum(新增商机数) 新增商机数
+from (
+         select 
+                a.month_val,
+                COUNT(DISTINCT CASE
+                                   WHEN SUBSTR(BO_APPLY_DATE, 1, 7) = a.month_val
+                                       THEN BO_CODE END) AS                     新增商机数              
+         from base_month a,
+              DWRLTC.DWR_BO_PROJECT_DETAIL_F aa
+                  left join dm.dm_rpt_sales_group_t b on aa.level_dept_name_9 = b.node_name9
+         where 1 = 1
+           and ((node_name4 in ('H04230655', 'H04230685', 'H04230600')
+             and node_name5 != 'H03230605')
+             or (sale_group is null and sales_area_code is null and
+                 sale_org_code in ('1000', '7900', '8100', '8200', '8300', '8500', '8800'))
+             or sales_area_code in ('S00001',
+                                    'S00003',
+                                    'S00004',
+                                    'S00005',
+                                    'S00006',
+                                    'S00008',
+                                    'S00009',
+                                    'S00010',
+                                    'S00011',
+                                    'S00014',
+                                    'B00012',
+                                    'B00018',
+                                    'B00014',
+                                    'B00015',
+                                    'B00021'))
+
+         group by month_val
+     ) a
+group by month_val
+order by month_val
+)
+--
+, GCSJSL as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB77' as zb_code,
+新增商机数 as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+XZSJ
+where month_val = '${PERIOD_ID_M}' 
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB77' as zb_code,
+0 as 当月实绩,
+SUM(新增商机数)  as 累计实绩,
+0 as 季度累计实绩
+from 
+XZSJ
+where  
+SUBSTRING(month_val,1,7) between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB77' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM(新增商机数) as 季度累计实绩
+from 
+XZSJ
+where  
+to_char((SUBSTRING(month_val,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(month_val,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) as CM_STAT_AMT,
+sum(累计实绩) as ACC_STAT_AMT,
+sum(季度累计实绩) as QTR_TGT_AMT
+from 
+GCSJSL
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.PJFX
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

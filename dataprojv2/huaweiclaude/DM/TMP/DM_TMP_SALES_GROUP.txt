@@ -1,0 +1,49 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/04/13 18:17:15 GMT+08:00
+-- ******************************************************************** --
+CREATE TABLE dwrdim.DM_TMP_SALES_GROUP (
+    NODE1 STRING COMMENT '1级节点',
+    NODENAME1 STRING COMMENT '1级节点名称',
+    NODE2 STRING COMMENT '2级节点',
+    NODENAME2 STRING COMMENT '2级节点名称',
+    NODE3 STRING COMMENT '3级节点',
+    NODENAME3 STRING COMMENT '3级节点名称',
+    NODE4 STRING COMMENT '4级节点',
+    NODENAME4 STRING COMMENT '4级节点名称',
+    NODE5 STRING COMMENT '5级节点',
+    NODENAME5 STRING COMMENT '5级节点名称',
+    NODE6 STRING COMMENT '6级节点',
+    NODENAME6 STRING COMMENT '6级节点名称',
+    NODE7 STRING COMMENT '7级节点',
+    NODENAME7 STRING COMMENT '7级节点名称',
+    NODE8 STRING COMMENT '8级节点',
+    NODENAME8 STRING COMMENT '8级节点名称',
+    NODE9 STRING COMMENT '9级节点',
+    NODENAME9 STRING COMMENT '9级节点名称'
+)
+
+
+create table dwrdim.DM_RPT_COST_CHART_S  (
+prod_code STRING COMMENT '物料编码',
+material_name_cn STRING COMMENT '物料描述',
+factory STRING COMMENT '工厂', 
+factory_desc STRING COMMENT '工厂描述',
+ZWW010  STRING COMMENT '产区',
+prod_level2_code STRING COMMENT '产品层次2',
+prod_level2_name STRING COMMENT '产品层次2描述',
+prod_level3_code STRING COMMENT '产品层次3',
+prod_level3_name STRING COMMENT '产品层次3描述',
+no_sto_sales_qty STRING COMMENT '事业部-销售成本', 
+sales_cost STRING COMMENT '事业部-销售成本', 
+sto_qty STRING COMMENT 'STO数量',
+sum_num STRING COMMENT '总数量', 
+unit_price STRING COMMENT '单价',
+shipment_cost_amt STRING COMMENT '2021年出货单价',
+sum_2122_price STRING COMMENT '22年销售数*21年出货单价', 
+lever_price STRING COMMENT '销售成本-22年结构成本',
+category_name STRING COMMENT '品类-根据产品层次2匹配',
+ower_pro STRING COMMENT '外协自产',
+pro_area STRING COMMENT '产区' 
+)

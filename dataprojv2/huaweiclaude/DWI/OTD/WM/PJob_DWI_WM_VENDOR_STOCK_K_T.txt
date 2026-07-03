@@ -1,0 +1,174 @@
+set hive.cbo.enable=true;				--性能优化SQL
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+WITH Y_FALG_DATA AS(  -- 源表数据删了，打Y标识的数据
+	SELECT 					--查询
+	DWVSK.GROUP_NUM,		--集团
+	DWVSK.MATERIAL_NUM,		--物料编号
+	DWVSK.FACTORY_CODE,		--工厂编码
+	DWVSK.STOCK_PLACE,		--库存地点
+	DWVSK.BATCH_NUM,		--批号
+	DWVSK.SPECIAL_STOCK_FLAG,	--特殊库存标识
+	DWVSK.SUPPLIER_OR_CREDITOR_NUM,	--供应商或债权人的帐号
+	DWVSK.LAST_MXXX_PERIOD,		--在最后的 Mxxx 期间之前，期间的 MxxxH 已经存在
+	DWVSK.CURRENT_STOCK_FIN_YEAR,	--当前实际库存指示的财政年度
+	DWVSK.CREATE_DATE,		--创建日期
+	DWVSK.CREATE_OBJECT_USER_NAME,	--创建对象的人员名称
+	DWVSK.CURRENT_PERIOD,	--当前期间（过账期间）
+	DWVSK.CURRENT_PERIOD_FISCAL_YEAR,	--当前期间的会计年度
+	DWVSK.MIN_ORDER_QTY,	--最小订购量
+	DWVSK.LAST_UPDATE_DATE,	--上次更改的日期
+	DWVSK.SUPPLEMENT_QTY,	--补充数量
+	DWVSK.DSTRT_STOCK_QTY,	--分配的库存数量
+	DWVSK.FROZEN_RETAIL_STOCK,	--冻结的寄售库存
+	DWVSK.LAST_FROZEN_RETAIL_STOCK,	--冻结的寄售库存,前期
+	DWVSK.LIMIT_USE_RETAIL_STOCK,	--限制使用的寄售库存
+	DWVSK.LAST_PASS_CHECK_DATE,	--上次过账的盘点日期
+	'Y' AS DEL_FLAG	--打'Y'删除标识
+	FROM DWIOTD.DWI_WM_VENDOR_STOCK_K_T DWVSK	--DWI-SAP供应商特殊库存(K)
+	LEFT JOIN SDI.SDI_MKOL_1001 SM1		--关联SDI-SAP供应商特殊库存(K)做删除标识的主键关联
+	 ON DWVSK.GROUP_NUM = SM1.MANDT 	--集团 = 集团(SDI.源字段)							
+     AND DWVSK.MATERIAL_NUM = SM1.MATNR 	--物料编号 = 物料编号(SDI.源字段)
+	 AND DWVSK.FACTORY_CODE = SM1.WERKS		--工厂编码 = 工厂编码(SDI.源字段)
+	 AND DWVSK.STOCK_PLACE = SM1.LGORT		--库存地点 = 库存地点(SDI.源字段)
+	 AND DWVSK.BATCH_NUM = SM1.CHARG		--批号 = 批号(SDI.源字段)
+	 AND DWVSK.SPECIAL_STOCK_FLAG = SM1.SOBKZ	--特殊库存标识 = 特殊库存标识(SDI.源字段)
+	 AND DWVSK.SUPPLIER_OR_CREDITOR_NUM = SM1.LIFNR	--供应商或债权人的帐号 = 供应商或债权人的帐号(SDI.源字段)
+	WHERE SM1.MANDT  IS NULL	--集团(SDI.源字段) 为空
+     AND SM1.MATNR  IS NULL		--物料编号(SDI.源字段)为空
+	 AND SM1.WERKS  IS NULL		--工厂编码(SDI.源字段)为空
+	 AND SM1.LGORT  IS NULL		--库存地点(SDI.源字段)为空
+	 AND SM1.CHARG  IS NULL		--批号(SDI.源字段)为空
+	 AND SM1.SOBKZ  IS NULL		--特殊库存标识(SDI.源字段)为空
+	 AND SM1.LIFNR  IS NULL		--供应商或债权人的帐号(SDI.源字段)为空
+	 AND SM1.DEL_FLAG = 'N'	),
+SDI_AND_Y_FLAG_DATA AS( -- SDI与打Y标识数据
+   SELECT					--查询
+	SM1.MANDT				AS	GROUP_NUM,		--SDI源字段集团 AS DWI表集团
+	SM1.MATNR               AS	MATERIAL_NUM,	--SDI源字段物料编号 AS DWI表物料编码
+	SM1.WERKS               AS	FACTORY_CODE,	--SDI源字段工厂编码	AS DWI表工厂编码
+	SM1.LGORT               AS	STOCK_PLACE,	--SDI源字段库存地点 AS DWI表库存地点
+	SM1.CHARG               AS	BATCH_NUM,		--SDI源字段批号	AS DWI表批号
+	SM1.SOBKZ               AS	SPECIAL_STOCK_FLAG,	--SDI源字段特殊库存标识	AS	DWI表特殊库存标识
+	SM1.LIFNR               AS	SUPPLIER_OR_CREDITOR_NUM,	--SDI源字段供应商或债权人的帐号	AS	DWI表供应商或债权人的帐号
+	SM1.KORUE               AS	LAST_MXXX_PERIOD,	--在最后的 Mxxx 期间之前，期间的 MxxxH 已经存在
+	SM1.KOJIN               AS	CURRENT_STOCK_FIN_YEAR,	--当前实际库存指示的财政年度
+	SM1.ERSDA               AS	CREATE_DATE,	--SDI源字段创建日期 AS DWI表创建日期
+	SM1.ERNAM               AS	CREATE_OBJECT_USER_NAME,	--SDI源字段创建对象的人员名称 AS DWI表创建对象的人员名称
+	SM1.LFMON               AS	CURRENT_PERIOD,	--SDI源字段当前期间（过账期间） AS DWI表当前期间（过账期间）
+	SM1.LFGJA               AS	CURRENT_PERIOD_FISCAL_YEAR,	--SDI源字段当前期间的会计年度 AS DWI表当前期间的会计年度
+	SM1.MMENG               AS	MIN_ORDER_QTY,	--SDI源字段最小订购量 AS DWI表最小订购量
+	SM1.LAEDA               AS	LAST_UPDATE_DATE,	--SDI源字段上次更改的日期 AS DWI表上次更改的日期
+	SM1.AMENG               AS	SUPPLEMENT_QTY,	--SDI源字段补充数量 AS DWI表补充数量
+	SM1.FSH_SALLOC_QTY      AS	DSTRT_STOCK_QTY,	--SDI源字段分配的库存数量 AS DWI表分配的库存数量
+	SM1.SSPEM               AS	FROZEN_RETAIL_STOCK,	--SDI源字段冻结的寄售库存 AS DWI表冻结的寄售库存
+	SM1.SVMSP               AS	LAST_FROZEN_RETAIL_STOCK,	--SDI源字段冻结的寄售库存,前期 AS DWI表冻结的寄售库存
+	SM1.SEINM               AS	LIMIT_USE_RETAIL_STOCK,	--SDI源字段限制使用的寄售库存 AS DWI表限制使用的寄售库存
+	SM1.KODLL               AS	LAST_PASS_CHECK_DATE,	--SDI源字段上次过账的盘点日期 AS DWI表上次过账的盘点日期
+    SM1.DEL_FLAG 			AS  DEL_FLAG	--删除标识
+FROM SDI.SDI_MKOL_1001 SM1			--SDI.SAP供应商特殊库存(K)
+UNION ALL					--SDI_MKOL_1001.SAP供应商特殊库存(K) --UNION ALL --DWI_WM_VENDOR_STOCK_K_T.SAP供应商特殊库存(K)
+SELECT 						--查询
+	DWVSK.GROUP_NUM,		--DWI集团
+	DWVSK.MATERIAL_NUM,		--DWI物料编号
+	DWVSK.FACTORY_CODE,		--DWI工厂编码
+	DWVSK.STOCK_PLACE,		--DWI库存地点
+	DWVSK.BATCH_NUM,		--DWI批号
+	DWVSK.SPECIAL_STOCK_FLAG,	--DWI特殊库存标识
+	DWVSK.SUPPLIER_OR_CREDITOR_NUM,		--DWI供应商或债权人的帐号
+	DWVSK.LAST_MXXX_PERIOD,		--DWI在最后的 Mxxx 期间之前，期间的 MxxxH 已经存在
+	DWVSK.CURRENT_STOCK_FIN_YEAR,		--DWI当前实际库存指示的财政年度
+	DWVSK.CREATE_DATE,		--DWI创建日期
+	DWVSK.CREATE_OBJECT_USER_NAME,		--DWI创建对象的人员名称
+	DWVSK.CURRENT_PERIOD,		--DWI当前期间（过账期间）
+	DWVSK.CURRENT_PERIOD_FISCAL_YEAR,		--DWI当前期间的会计年度
+	DWVSK.MIN_ORDER_QTY,	--DWI最小订购量
+	DWVSK.LAST_UPDATE_DATE,	--DWI上次更改的日期
+	DWVSK.SUPPLEMENT_QTY,	--DWI补充数量
+	DWVSK.DSTRT_STOCK_QTY,	--DWI分配的库存数量
+	DWVSK.FROZEN_RETAIL_STOCK,	--DWI冻结的寄售库存
+	DWVSK.LAST_FROZEN_RETAIL_STOCK,	--DWI冻结的寄售库存,前期
+	DWVSK.LIMIT_USE_RETAIL_STOCK,	--DWI限制使用的寄售库存
+	DWVSK.LAST_PASS_CHECK_DATE,	--DWI上次过账的盘点日期
+	DWVSK.DEL_FLAG	--DWI删除标识
+FROM Y_FALG_DATA DWVSK)
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_VENDOR_STOCK_K_T		--DWI-SAP供应商特殊库存(K)
+SELECT 
+		SM1.GROUP_NUM					AS 	 GROUP_NUM,		--集团
+		CASE WHEN SM1.MATERIAL_NUM IS NULL OR SM1.MATERIAL_NUM = ''	--关联物料主数据取物料ID,判断SDI源表字段为空或者空字符串时赋值-999999
+		THEN -999999
+        ELSE NVL(DMMG.MATERIAL_ID, -999998)							--关联不上主数据赋值-999998
+        END 					AS   MATERIAL_ID,		--物料ID
+		CASE
+		WHEN SM1.MATERIAL_NUM IS NULL OR SM1.MATERIAL_NUM = ''		--关联物料主数据取物料编码,判断SDI源表字段为空或者空字符串时赋值'SNULL'
+		THEN 'SNULL'
+		ELSE NVL(DMMG.MATERIAL_NUM, 'NOT EXISTS')					--关联不上主数据赋值'NOT EXISTS'
+		END 						AS MATERIAL_NUM,		--物料编号
+		CASE WHEN SM1.FACTORY_CODE IS NULL OR SM1.FACTORY_CODE = ''	--关联工厂主数据取工厂ID，判断SDI源表字段为空或者空字符串时赋值-999999
+		THEN -999999
+        ELSE NVL(DMF.FACTORY_ID, -999998)							--关联不上主数据赋值-999998
+		END 					AS   FACTORY_ID, 		--工厂ID
+		CASE
+		WHEN SM1.FACTORY_CODE IS NULL OR SM1.FACTORY_CODE = ''		--关联工厂主数据取工厂编码,判断SDI源表字段为空或者空字符串时赋值'SNULL'
+		THEN 'SNULL'
+		ELSE NVL(DMF.FACTORY_CODE, 'NOT EXISTS')					--关联不上主数据赋值'NOT EXISTS'
+		END 						AS 	FACTORY_CODE,		--工厂编码
+		SM1.STOCK_PLACE                   AS   STOCK_PLACE,		--库存地点
+		SM1.BATCH_NUM                   AS   BATCH_NUM,		--批号
+		T.CONFIG_CODE           AS   SPECIAL_STOCK_FLAG,	--特殊库存标识
+		CASE WHEN SM1.SUPPLIER_OR_CREDITOR_NUM IS NULL OR SM1.SUPPLIER_OR_CREDITOR_NUM = ''--关联供应商主数据取供应商ID,判断SDI源表字段为空或者空字符串时赋值-999999
+		THEN -999999
+        ELSE NVL(DMSG.SUPPLIER_OR_CREDITOR_ID, -999998)		--关联不上主数据赋值-999998
+        END 						AS   SUPPLIER_OR_CREDITOR_ID, 		--供应商ID
+		CASE
+		WHEN SM1.SUPPLIER_OR_CREDITOR_NUM IS NULL OR SM1.SUPPLIER_OR_CREDITOR_NUM = ''	--关联供应商主数据取供应商编号,判断SDI源表字段为空或者空字符串时赋值'SNULL'
+		THEN 'SNULL'
+		ELSE NVL(DMSG.SUPPLIER_OR_CREDITOR_NUM, 'NOT EXISTS')	--关联不上主数据赋值'NOT EXISTS'
+		END 						AS   SUPPLIER_OR_CREDITOR_NUM,		--供应商编号
+		SM1.LAST_MXXX_PERIOD                   AS   LAST_MXXX_PERIOD,	--在最后的 Mxxx 期间之前，期间的 MxxxH 已经存在
+		SM1.CURRENT_STOCK_FIN_YEAR                   AS   CURRENT_STOCK_FIN_YEAR,	--当前实际库存指示的财政年度
+		CASE WHEN SM1.CREATE_DATE = '00000000' 		--判断SDI源表字段为00000000时
+		THEN FROM_UNIXTIME(UNIX_TIMESTAMP('19000101', 'yyyyMMdd'),'yyyy-MM-dd')	--转换为日期类型19000101,1900-01-01
+		WHEN SUBSTR(SM1.CREATE_DATE, 1, 4) = '9999' --字段内截取为9999的
+		THEN FROM_UNIXTIME(UNIX_TIMESTAMP('47121231', 'yyyyMMdd'),'yyyy-MM-dd')--转换为47121231,4712-12-31
+		ELSE FROM_UNIXTIME(UNIX_TIMESTAMP(SM1.CREATE_DATE, 'yyyyMMdd'), 'yyyy-MM-dd')
+		END 						AS 	 CREATE_DATE,		--创建日期
+		SM1.CREATE_OBJECT_USER_NAME                   AS   CREATE_OBJECT_USER_NAME,	--创建对象的人员名称
+		SM1.CURRENT_PERIOD                   AS   CURRENT_PERIOD,	--当前期间（过账期间）
+		SM1.CURRENT_PERIOD_FISCAL_YEAR                   AS   CURRENT_PERIOD_FISCAL_YEAR,	--当前期间的会计年度
+		SM1.MIN_ORDER_QTY                   AS   MIN_ORDER_QTY,	--最小订购量
+		CASE WHEN SM1.LAST_UPDATE_DATE = '00000000' --判断SDI源表字段为00000000时
+		THEN FROM_UNIXTIME(UNIX_TIMESTAMP('19000101', 'yyyyMMdd'),'yyyy-MM-dd')--转换为日期类型19000101,1900-01-01
+		WHEN SUBSTR(SM1.LAST_UPDATE_DATE, 1, 4) = '9999' --字段内截取为9999的
+		THEN FROM_UNIXTIME(UNIX_TIMESTAMP('47121231', 'yyyyMMdd'),'yyyy-MM-dd')--转换为47121231,4712-12-31
+		ELSE FROM_UNIXTIME(UNIX_TIMESTAMP(SM1.LAST_UPDATE_DATE, 'yyyyMMdd'), 'yyyy-MM-dd')
+		END 						AS LAST_UPDATE_DATE,	--上次更改的日期
+		SM1.SUPPLEMENT_QTY                   AS   SUPPLEMENT_QTY,	--补充数量
+		SM1.DSTRT_STOCK_QTY          AS   DSTRT_STOCK_QTY,	--分配的库存数量
+		SM1.FROZEN_RETAIL_STOCK                   AS   FROZEN_RETAIL_STOCK,	--冻结的寄售库存
+		SM1.LAST_FROZEN_RETAIL_STOCK                   AS   LAST_FROZEN_RETAIL_STOCK,	--冻结的寄售库存,前期
+		SM1.LIMIT_USE_RETAIL_STOCK                   AS   LIMIT_USE_RETAIL_STOCK,--限制使用的寄售库存
+		SM1.LAST_PASS_CHECK_DATE					AS	 LAST_PASS_CHECK_DATE,--上次过账的盘点日期
+		SM1.DEL_FLAG					  	AS 	 DEL_FLAG,	--删除标识
+		CURRENT_TIMESTAMP() 	AS   DW_LAST_UPDATE_DATE	--DW最后更新时间
+		FROM SDI_AND_Y_FLAG_DATA SM1		--SDI.SAP供应商特殊库存(K)
+		LEFT JOIN DWIMD.DWI_MD_MATERIAL_GENERAL_T DMMG		--关联物料主数据,取MATERIAL_ID
+			 ON  SM1.GROUP_NUM = DMMG.GROUP_NUM				--集团
+			 AND SM1.MATERIAL_NUM = DMMG.MATERIAL_NUM		--物料编号
+			 AND DMMG.END_DATE = '4712-12-31'				--结束时间为'4712-12-31'
+			 AND DMMG.DEL_FLAG = 'N'						--删除标识为'N'
+		LEFT JOIN DWIMD.DWI_MD_SUPPLIER_GENERAL_T DMSG		--关联供应商主数据,取SUPPLIER_OR_CREDITOR_ID
+			 ON  SM1.GROUP_NUM = DMSG.GROUP_NUM				--集团
+			 AND SM1.SUPPLIER_OR_CREDITOR_NUM = DMSG.SUPPLIER_OR_CREDITOR_NUM	--供应商或债权人的帐号
+			 AND DMSG.END_DATE = '4712-12-31'				--结束时间为'4712-12-31'
+			 AND DMSG.DEL_FLAG = 'N'						--删除标识为'N'
+		LEFT JOIN DWIMD.DWI_MD_FACTORY_T DMF			--关联工厂主数据,取FACTORY_ID
+			 ON  SM1.GROUP_NUM = DMF.GROUP_NUM			--集团
+			 AND SM1.FACTORY_CODE = DMF.FACTORY_CODE	--工厂编码
+			 AND DMF.END_DATE = '4712-12-31'			--结束时间为'4712-12-31'
+			 AND DMF.DEL_FLAG = 'N'						--删除标识为'N'
+		LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_REL_R T		--关联通用配置表
+			 ON T.SRC_SYS_CONFIG_CODE = SM1.SPECIAL_STOCK_FLAG	--特殊库存标识
+			 AND T.GROUP_NUM = SM1.GROUP_NUM				--集团
+			 AND T.SOURCE_CODE = 'T148T'				--取'特殊库存描述'中文名称

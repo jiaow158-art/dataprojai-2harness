@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB33",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "应收周转天数（工程市场中心）ZB33",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

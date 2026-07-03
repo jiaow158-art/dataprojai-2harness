@@ -1,0 +1,705 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/03/18 18:43:03 GMT+08:00
+-- description:其他收入明细
+-- history list: 
+-- UPDATE FROM 10004701 2024/03/27 calmonth 格式调整
+-- UPDATE FROM 10004701 2024/04/03 税金逻辑调整
+-- update by zhz 20240416 新增总账科目字段
+-- update 20240614 15000571 新增佣金组与佣金组描述字段
+-- update 20240802 1004701 新增其他支出调整值
+-- update from zhz 20240827 一系列指标新增账套限制KTOPL = 'CNDP'
+-- update zhz 20250507 新增销售单位字段
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with invoice as ( 
+ select term_setting_group,product_group,cust_group1,cust_group2,cust_group3,refer,order_type,policy_name,wbs_sale_group,actual_billed_qty,sale_voucher_num,sale_voucher_item_num,BILL_VOUCHER_NUM,acc_voucher_line_item_num,BILL_TYPE,cust_sal,distribution_channel_code,wbs_element,sale_region_code,sale_org_code,sale_staff,sale_office_code,material_num,so_item_text,prod_level,material_group,company_code,batch_num,factory_code,inv_location,voucher_currency_code,engineer_report_code,inter_trade_clause_loc_1,oss_number,oss_order,material_group1,material_group2,material_group3,material_group4,material_group5,cust_price_group,cust_group,sale_group,assessment_type,item_status,KWERT_KURRF11,KWERT_KURRF10,KWERT_KURRF9,KWERT_KURRF59,KWERT_KURRF55,KWERT_KURRF51,KWERT_KURRF8,KWERT_KURRF19,KWERT_KURRF15,KWERT_KURRF14,KWERT_KURRF17,KWERT_KURRF12,KWERT_KURRF40,KWERT_KURRF39,KWERT_KURRF38,KWERT_KURRF37,KWERT_KURRF36,KWERT_KURRF35,KWERT_KURRF34,KWERT_KURRF33,KWERT_KURRF32,KWERT_KURRF24,KWERT_KURRF42,country,pricing_procedure,alternative_tax_type,account_check_status,cust_refer,reference_bill_num,reference_item_num
+    ,KWERT_KURRF,KWERT_KURRF3,purchase_order_type,PS_WBS_ELEMENT,sale_unit
+    ,tax_arrive_country
+    ,kwert_kurrf18
+    ,order_type_desc
+    ,kwert_kurrf31
+    ,export_country
+    ,commission_group                            --佣金组
+    ,vtext as commission_group_t                 --佣金组描述
+from dwrfin.dwr_gl_invoice_conditional_f  T1
+LEFT JOIN 
+(select 
+provg,vtext
+from sdi.sdi_TVPRT_1001   WHERE mandt = '800' AND spras  = '1' ) t2 
+ON T1.commission_group = T2.provg
+where period_id_m >= '${PERIOD_ID_M}' 
+)
+,gsj_invoice as (
+select row_number() over(PARTITION BY reference_bill_num,reference_item_num ORDER BY create_date||INPUT_TIME DESC) AS RN,--取公司间发票
+reference_bill_num,reference_item_num,BILL_VOUCHER_NUM,acc_voucher_line_item_num
+from dwrfin.dwr_gl_invoice_conditional_f 
+where period_id_m >= '${PERIOD_ID_M}' AND BILL_TYPE IN ('ZIV','ZIG') 
+)
+,tem as (
+SELECT 
+SUBSTR(A.BUDAT, 1, 6) AS calmonth -- 日历年/月
+,A.BUDAT AS calday  --日历日
+,B.sale_voucher_num AS doc_number  --订单抬头 
+,'' as doc_number___t --订单抬头的文本
+,B.sale_voucher_item_num AS s_ord_item -- 订单行 
+,A.BELNR AS ac_doc_nr --财务凭证号
+,A.DOCLN AS ac_doc_ln -- 财务凭证行
+,A.ZUONR AS zasd_p001_zuonr --汇票短号（分配）
+,B.bill_voucher_num AS bill_num --开票抬头
+,B.acc_voucher_line_item_num AS bill_item --开票项目
+,B.bill_type AS bill_type --发票类型
+,'' as bill_type___t --发票类型的文本
+,B.sale_staff AS salesemply  -- 销售人员
+,'' as salesemply___t --销售人员的文本
+,B.cust_sal AS customer   -- 客户编码
+,'' as customer___t --客户编码的文本
+,B.sale_group as sales_grp  --销售组（WBS+客户主档）
+,'' as sales_grp___t --销售组（WBS+客户主档）的文本
+,B.distribution_channel_code AS distr_chan   --分销渠道
+,'' as distr_chan___t --分销渠道的文本
+,B.wbs_sale_group AS zasd_p001_0sales_grp_0 --WBS-销售组 
+,'' as zasd_p001_0sales_grp_0___t --WBS-销售组的文本
+,B.wbs_element AS wbs_elemt --WBS编码
+,'' as wbs_elemt___t --WBS编码的文本
+,B.tax_arrive_country AS country --国家
+,'' as country___t --国家的文本
+,B.sale_region_code AS sales_dist -- 销售地区 
+,'' as sales_dist___t --销售地区的文本
+,B.sale_org_code AS salesorg --销售组织
+,'' as salesorg___t --销售组织的文本
+,B.sale_office_code AS sales_off  -- 销售办公室
+,'' as sales_off___t --销售办公室的文本
+,B.material_num AS material --物料编码
+,B.so_item_text AS material___t --物料编码的文本
+,B.prod_level AS prod_hier  -- 产品层次
+,'' as prod_hier___t --产品层次的文本
+,B.material_group AS matl_group  --物料组
+,'' as matl_group___t --物料组的文本
+,B.material_group1 AS matl_grp_1 --物料组1
+,'' as matl_grp_1___t --物料组1的文本
+,B.material_group2 AS matl_grp_2 --物料组2
+,'' as matl_grp_2___t --物料组2的文本
+,B.material_group3 AS matl_grp_3 --物料组3
+,'' as matl_grp_3___t --物料组3的文本
+,B.material_group4 AS matl_grp_4 --物料组4
+,'' as matl_grp_4___t --物料组4的文本
+,B.material_group5 AS matl_grp_5 --物料组5
+,'' as matl_grp_5___t --物料组5的文本
+,A.RBUKRS AS comp_code  --公司代码
+,'' as comp_code___t --公司代码的文本
+,A.EXTWG_PA AS extmatlgrp --外部物料组
+,'' as extmatlgrp___t --外部物料组的文本
+,B.batch_num AS batch --批次
+,B.factory_code AS plant --工厂
+,'' as plant___t --工厂的文本
+,B.inv_location AS stor_loc --库存地点
+,'' as stor_loc___t --库存地点的文本
+,A.RTCUR AS doc_currcy  --凭证货币
+,'' as doc_currcy___t --凭证货币的文本
+,A.RHCUR AS loc_currc2  --本位币
+,'' as loc_currc2___t --本位币的文本
+,B.engineer_report_code AS z_gcbbh --工程报备号
+,B.engineer_report_code AS zsjbm --商机编码
+,'' as zsjyxq --商机有效期
+,'' as zsjms --商机描述
+,B.oss_number AS zossbjdh -- OSS报价单号
+,B.oss_order AS zgcbbh -- OSS订单号
+,'' AS ztmswldh --TMS物料单号
+,'' AS zddms --订单描述
+ ,B.product_group AS division  --产品组
+,'' as division___t --产品组的文本
+,'' as zqdzh --渠道整合
+,'' as zqdzh___t --渠道整合的文本
+,'' as size_dim --大小/量纲
+,'' as zsfqc --是否清仓
+,'' AS bus_area  --业务范围
+,'' as bus_area___t --业务范围的文本
+,B.cust_group1 AS cust_grp1   --客户组1
+,'' as cust_grp1___t --客户组1的文本
+,B.cust_group2 AS cust_grp2  --客户组2
+,'' as cust_grp2___t --客户组2的文本
+,B.cust_group3 AS cust_grp3   --客户组3
+,'' as cust_grp3___t --客户组3的文本
+,'' as zfsjbm --父商机编码
+,'ACDOCA-VBRP-其他收入' AS infoprov  --信息提供者
+,B.inter_trade_clause_loc_1 as inco1 --国际贸易条款
+,'' as inco1_t --国际贸易条款的文本
+,B.cust_refer AS bstnk_vf --销售政策
+,'' as bstnk_vf_t --销售政策的文本
+,B.term_setting_group AS ktgrd  --科目设置组 
+,'' as ktgrd_t --科目设置组的文本
+,B.cust_price_group AS konda  --价格组
+,'' as konda_t --价格组的文本
+,B.pricing_procedure AS kalsm  --客户定价过程
+,'' as kalsm_t --客户定价过程的文本
+,B.alternative_tax_type AS taxk1  --税分类
+,'' as taxk1_t --税分类的文本
+,'' as BIC_ZSCDH --生产订单号
+-- ,B.kwert_kurrf18 as  zbhsje --不含税金额
+-- ,B.kwert_kurrf17 as zsj --税金
+,case when A.RACCT = '0051020100' AND A.KTOPL = 'CNDP' THEN A.TSL * -1 ELSE 0 END  AS zqtywsr_jgf_dd --"其他业务收入-加工费(订单)"
+,case when A.RACCT = '0051020200' AND A.KTOPL = 'CNDP' THEN A.TSL * -1 ELSE 0 END  AS zqtywsr_ddy --"其他业务收入-订单用"
+,case when A.RACCT = '0051020300' AND A.KTOPL = 'CNDP' THEN A.TSL * -1 ELSE 0 END  AS zqtywsr_gsj --"其他业务收入-公司间" 
+,case when A.RACCT = '0051020400' AND A.KTOPL = 'CNDP' THEN A.TSL * -1 ELSE 0 END  AS zqtywsr_jtj_ddy --"其他业务收入-集团间(订单用)" 
+,0 as zzyywsr_jgf_fdd --其他业务收入-加工费(非订单) 
+,0 as zzyywsr_pdsr --其他业务收入-派单收入
+,0 as zzyywsr_qt --其他业务收入-其他
+,case when COALESCE(kwert_kurrf51,0) = 0 then COALESCE(B.kwert_kurrf12,0) 
+    else 0 end  AS zsyjf --"使用积分"
+,0 as zytjf_sg --预提积分-手工
+,case when COALESCE(kwert_kurrf51,0) = 0 then COALESCE(KWERT_KURRF32,0) + COALESCE(KWERT_KURRF33,0) + COALESCE(KWERT_KURRF34,0) + COALESCE(KWERT_KURRF35,0) + COALESCE(KWERT_KURRF36,0) + COALESCE(KWERT_KURRF37,0) + COALESCE(KWERT_KURRF38,0) + COALESCE(KWERT_KURRF39,0) + COALESCE(KWERT_KURRF40,0) 
+    else 0 end  AS zytjf_xt --"系统预提积分" 
+,0 as zqtywzc_jgf_dd --其他业务支出-加工费(订单)-实际
+,0 as zqtywzc_ddy --其他业务支出-订单用-实际
+,case when COALESCE(kwert_kurrf51,0) = 0 then COALESCE(B.kwert_kurrf31,0)/1.13 
+    else 0 end as zqtywzc_gsj --其他业务支出-公司间
+,0 as zqtywzc_jtj --其他业务支出-集团间
+,0 as zqtywzc_qt_fdd --其他业务支出-其他(非订单)
+,0 as zqtywzc_jgf_fdd --其他业务支出-加工费(非订单)
+,0 as zxsmj --销售面积
+,0 as zxssl --销售数量
+,current_timestamp as dw_last_update_date --同步数据时间
+,B.account_check_status as zkpzt --开票状态
+,'' as zkpzt___t --开票状态的文本
+,B.cust_group as cust_group --客户组
+,'' as cust_group___t --客户组的文本
+,B.sale_group as zsalesgrp --销售组（实际）
+,'' as zsalesgrp___t --销售组（实际）的文本
+,B.cust_refer AS z_zcck   --政策参考
+,0 as zzqj --周期价
+,0 as zqtsrtzz --其他收入调整值
+,0 as zqtzctzz --其他支出调整值
+,0 as zqtywzc_jgf_dd_sj --其他业务支出-加工费(订单)
+,0 as zqtywzc_ddy_sj --其他业务支出-订单用
+,'' as zprodh1  --产品层次1
+,'' as zprodh1___t  --产品层次1描述
+,'' as zprodh2  --产品层次2
+,'' as zprodh2___t  --产品层次2描述
+,'' as zprodh3  --产品层次3
+,'' as zprodh3___t --产品层次3描述
+,'' as zprodh4  --产品层次4
+,'' as zprodh4___t  --产品层次4描述
+,'' as zprodh5  --产品层次5
+,'' as zprodh5___t  --产品层次5描述
+,B.order_type as doc_type --订单类型
+,B.order_type_desc as doc_type___t --订单类型描述
+-- ,0 as zsjcb --实际成本
+,B.assessment_type AS val_type --评估类型
+,case when COALESCE(kwert_kurrf51,0) = 0 then COALESCE(KWERT_KURRF8,0) + COALESCE(KWERT_KURRF9,0) + COALESCE(KWERT_KURRF10,0) + COALESCE(KWERT_KURRF11,0) 
+    else 0 end AS zfdje --"返点金额"
+,case when COALESCE(kwert_kurrf51,0) = 0 then COALESCE(KWERT_KURRF24,0) / (COALESCE(KWERT_KURRF55,0) + 100 ) * 100 
+    else 0 end AS zckcb --参考成本 
+,B.sale_group  as 0SALES_GRP_CUST --销售组（客户主档）
+,'' as 0SALES_GRP_CUST___T --销售组（客户主档）的文本
+,B.export_country --出口国
+,B.kwert_kurrf55 --税率
+,SUBSTR(A.BUDAT, 1, 6) as PERIOD_ID_M
+,A.RACCT as general_ledger_account --总账科目
+,B.commission_group   -- 佣金组
+,B.commission_group_t   -- 佣金组描述
+,B.SALE_UNIT AS SALES_UNIT--销售单位
+FROM SDI.SDI_ACDOCA_1001 A
+LEFT JOIN invoice B       
+ON A.AWREF = B.BILL_VOUCHER_NUM AND A.AWITEM = B.acc_voucher_line_item_num 
+LEFT JOIN gsj_invoice D   
+ON B.reference_bill_num = D.reference_bill_num AND B.reference_item_num = D.reference_item_num AND D.RN = 1
+WHERE A.RACCT IN ('0051020100','0051020200','0051020300','0051020400')
+AND SUBSTR(A.BUDAT, 1, 6) >= '${PERIOD_ID_M}'   
+
+union ALL 
+
+SELECT 
+ SUBSTR(A.BUDAT,1,6) AS calmonth -- 日历年/月
+,A.BUDAT AS calday  --日历日
+,A.KDAUF AS doc_number  --订单抬头 
+,'' as doc_number___t --订单抬头的文本
+,A.KDPOS AS s_ord_item -- 订单行 
+,A.BELNR AS ac_doc_nr --财务凭证号
+,A.DOCLN AS ac_doc_ln -- 财务凭证行
+,A.ZUONR AS zasd_p001_zuonr --汇票短号（分配）
+,'' AS bill_num --开票抬头
+,'' AS bill_item --开票项目
+,'' AS bill_type --发票类型
+,'' as bill_type___t --发票类型的文本
+,A.KMVTNR_PA AS salesemply  -- 销售人员
+,'' as salesemply___t --销售人员的文本
+,case when A.KUNNR = '' or A.KUNNR is null then A.KNKLI_PA else A.KUNNR end  AS customer   -- 客户编码
+,'' as customer___t --客户编码的文本
+,CASE WHEN A.VKGRP_PA = '' OR A.VKGRP_PA IS NULL THEN B.sales_grp_code ELSE A.VKGRP_PA END AS SALES_GRP  --销售组（WBS+客户主档） 
+,'' as sales_grp___t --销售组（WBS+客户主档）的文本
+,A.VTWEG  AS distr_chan   --分销渠道
+,'' as distr_chan___t --分销渠道的文本
+,'' AS zasd_p001_0sales_grp_0 --WBS-销售组 
+,'' as zasd_p001_0sales_grp_0___t --WBS-销售组的文本
+,A.PS_POSID AS wbs_elemt --WBS编码
+,'' as wbs_elemt___t --WBS编码的文本
+,A.KMLAND_PA AS country --国家
+,'' as country___t --国家的文本
+,A.BZIRK AS sales_dist -- 销售地区 
+,'' as sales_dist___t --销售地区的文本
+,A.VKORG  AS salesorg --销售组织
+,'' as salesorg___t --销售组织的文本
+,A.VKBUR_PA  AS sales_off  -- 销售办公室
+,'' as sales_off___t --销售办公室的文本
+,A.matnr AS material --物料编码
+,'' AS material___t --物料编码的文本
+,A.PRODH_PA AS prod_hier  -- 产品层次
+,'' as prod_hier___t --产品层次的文本
+,'' AS matl_group  --物料组
+,'' as matl_group___t --物料组的文本
+,A.MVGR1_PA AS matl_grp_1 --物料组1
+,'' as matl_grp_1___t --物料组1的文本
+,A.MVGR2_PA AS matl_grp_2 --物料组2
+,'' as matl_grp_2___t --物料组2的文本
+,A.MVGR3_PA  AS matl_grp_3 --物料组3
+,'' as matl_grp_3___t --物料组3的文本
+,A.MVGR4_PA AS matl_grp_4 --物料组4
+,'' as matl_grp_4___t --物料组4的文本
+,A.MVGR5_PA AS matl_grp_5 --物料组5
+,'' as matl_grp_5___t --物料组5的文本
+,A.RBUKRS AS comp_code  --公司代码
+,'' as comp_code___t --公司代码的文本
+,A.EXTWG_PA AS extmatlgrp --外部物料组
+,'' as extmatlgrp___t --外部物料组的文本
+,A.CHARG_PA AS batch --批次
+,A.WERKS AS plant --工厂
+,'' as plant___t --工厂的文本
+,A.LGORT_PA AS stor_loc --库存地点
+,'' as stor_loc___t --库存地点的文本
+,A.RTCUR AS doc_currcy  --凭证货币
+,'' as doc_currcy___t --凭证货币的文本
+,A.RHCUR AS loc_currc2  --本位币
+,'' as loc_currc2___t --本位币的文本
+,'' AS z_gcbbh --工程报备号
+,'' AS zsjbm --商机编码
+,'' as zsjyxq --商机有效期
+,'' as zsjms --商机描述
+,'' AS zossbjdh -- OSS报价单号
+,'' AS zgcbbh -- OSS订单号
+,'' AS ztmswldh --TMS物料单号
+,'' AS zddms --订单描述
+,A.SPART  AS division  --产品组
+,'' as division___t --产品组的文本
+,'' as zqdzh --渠道整合
+,'' as zqdzh___t --渠道整合的文本
+,'' as size_dim --大小/量纲
+,'' as zsfqc --是否清仓
+,'' AS bus_area  --业务范围
+,'' as bus_area___t --业务范围的文本
+,'' AS cust_grp1   --客户组1
+,'' as cust_grp1___t --客户组1的文本
+,'' AS cust_grp2  --客户组2
+,'' as cust_grp2___t --客户组2的文本
+,'' AS cust_grp3   --客户组3
+,'' as cust_grp3___t --客户组3的文本
+,'' as zfsjbm --父商机编码
+,'Z000手工-其他收入' AS infoprov  --信息提供者
+,'' as inco1 --国际贸易条款
+,'' as inco1_t --国际贸易条款的文本
+,'' AS bstnk_vf --销售政策
+,'' as bstnk_vf_t --销售政策的文本
+,'' AS ktgrd  --科目设置组 
+,'' as ktgrd_t --科目设置组的文本
+,'' AS konda  --价格组
+,'' as konda_t --价格组的文本
+,'' AS kalsm  --客户定价过程
+,'' as kalsm_t --客户定价过程的文本
+,'' AS taxk1  --税分类
+,'' as taxk1_t --税分类的文本
+,'' as BIC_ZSCDH --生产订单号
+-- ,0 as  zbhsje --不含税金额
+-- ,0 as zsj --税金
+,0  AS zqtywsr_jgf_dd --"其他业务收入-加工费(订单)"
+,0  AS zqtywsr_ddy --"其他业务收入-订单用"
+,0  AS zqtywsr_gsj --"其他业务收入-公司间" 
+,0  AS zqtywsr_jtj_ddy --"其他业务收入-集团间(订单用)" 
+,CASE WHEN A.RACCT IN ('0051020110') AND A.RBUKRS <> 'Z000' THEN A.HSL * -1 ELSE 0 END AS zzyywsr_jgf_fdd --其他业务收入-加工费(非订单)  yj
+,CASE WHEN A.RACCT IN ('0051020210') AND A.RBUKRS <> 'Z000' THEN A.HSL * -1 ELSE 0 END AS zzyywsr_pdsr --其他业务收入-派单收入
+,CASE WHEN A.RACCT IN ('0051029900') AND A.RBUKRS <> 'Z000' THEN A.HSL  * -1 ELSE 0 END AS zzyywsr_qt --其他业务收入-其他
+,0  AS zsyjf --"使用积分"
+,0  as zytjf_sg --预提积分-手工
+,0  AS zytjf_xt --"系统预提积分" 
+,0 as zqtywzc_jgf_dd --其他业务支出-加工费(订单)-实际
+,0 as zqtywzc_ddy --其他业务支出-订单用-实际
+,0 as zqtywzc_gsj --其他业务支出-公司间
+,CASE WHEN A.RACCT IN ('0054050400') AND A.RBUKRS <> 'Z000' THEN A.HSL ELSE 0 END AS zqtywzc_jtj --其他业务支出-集团间  yj
+,CASE WHEN A.RACCT IN ('0054059900') AND A.RBUKRS <> 'Z000' THEN A.HSL ELSE 0 END AS zqtywzc_qt_fdd --其他业务支出-其他(非订单)  yj
+,CASE WHEN A.RACCT IN ('0054050110') AND A.RBUKRS <> 'Z000' THEN A.HSL ELSE 0 END AS zqtywzc_jgf_fdd --其他业务支出-加工费(非订单) yj
+,0 as zxsmj --销售面积
+,0 as zxssl --销售数量
+,current_timestamp as dw_last_update_date --同步数据时间
+,'' as zkpzt --开票状态
+,'' as zkpzt___t --开票状态的文本
+,A.KDGRP as cust_group --客户组
+,'' as cust_group___t --客户组的文本
+,A.VKGRP_PA as zsalesgrp --销售组（实际）
+,'' as zsalesgrp___t --销售组（实际）的文本
+,'' AS z_zcck   --政策参考
+,0 as zzqj --周期价
+,CASE WHEN A.RACCT IN ('0051029900') AND A.RBUKRS = 'Z000' THEN A.HSL*-1 ELSE 0 END AS zqtsrtzz --其他收入调整值
+,CASE WHEN A.RACCT IN ('0054059900') AND A.RBUKRS = 'Z000' THEN A.HSL ELSE 0 END AS zqtzctzz --其他支出调整值
+,0 as zqtywzc_jgf_dd_sj --其他业务支出-加工费(订单)
+,0 as zqtywzc_ddy_sj --其他业务支出-订单用
+,'' as zprodh1  --产品层次1
+,'' as zprodh1___t  --产品层次1描述
+,'' as zprodh2  --产品层次2
+,'' as zprodh2___t  --产品层次2描述
+,'' as zprodh3  --产品层次3
+,'' as zprodh3___t --产品层次3描述
+,'' as zprodh4  --产品层次4
+,'' as zprodh4___t  --产品层次4描述
+,'' as zprodh5  --产品层次5
+,'' as zprodh5___t  --产品层次5描述
+,'' as doc_type --订单类型
+,'' as doc_type___t --订单类型描述
+-- ,0 as zsjcb --实际成本
+,A.BWTAR AS val_type --评估类型
+,0 AS zfdje --"返点金额"
+,0 AS zckcb --参考成本 
+,CASE WHEN A.VKGRP_PA = '' OR A.VKGRP_PA IS NULL THEN B.sales_grp_code ELSE A.VKGRP_PA END as 0SALES_GRP_CUST --销售组（客户主档）
+,'' as 0SALES_GRP_CUST___T --销售组（客户主档）的文本
+,'' as export_country --出口国
+,0 as kwert_kurrf55 --税率
+,SUBSTR(A.BUDAT, 1, 6) as PERIOD_ID_M
+,A.RACCT as general_ledger_account --总账科目
+,'' AS commission_group -- 佣金组
+,'' AS commission_group_t --佣金组描述
+,'' AS SALES_UNIT --销售单位
+FROM SDI.SDI_ACDOCA_1001 A
+left join DWIMD.DWI_MD_COST_CENTER_INFO_T B
+on A.RCNTR = SUBSTR(B.zcost_center,5,99)
+WHERE A.RACCT IN ('0051020110','0051020210','0051029900','0054050400','0054059900','0054050110')
+AND SUBSTR(A.BUDAT, 1, 6) >= '${PERIOD_ID_M}'   
+)
+,tem1 as (
+SELECT 
+concat(substr(t1.calmonth,1,4),'-',substr(t1.calmonth,5,2)) as  calmonth--日历年/月
+,t1.calday --日历日
+,t1.doc_number --订单抬头
+,t1.doc_number___t --订单抬头的文本
+,t1.s_ord_item --订单行
+,t1.ac_doc_nr --财务凭证号
+,t1.ac_doc_ln --财务凭证行
+,t1.zasd_p001_zuonr --汇票短号（分配）
+,t1.bill_num --开票抬头
+,t1.bill_item --开票项目
+,t1.bill_type --发票类型
+,t1.bill_type___t --发票类型的文本
+,t1.salesemply --销售人员
+,t1.salesemply___t --销售人员的文本
+,t1.customer --客户编码
+,t1.customer___t --客户编码的文本
+,t1.sales_grp --销售组（WBS+客户主档）
+,t1.sales_grp___t --销售组（WBS+客户主档）的文本
+,t1.distr_chan --分销渠道
+,t1.distr_chan___t --分销渠道的文本
+,t1.zasd_p001_0sales_grp_0 --WBS-销售组
+,t1.zasd_p001_0sales_grp_0___t --WBS-销售组的文本
+,t1.wbs_elemt --WBS编码
+,t1.wbs_elemt___t --WBS编码的文本
+,t1.country --国家
+,t1.country___t --国家的文本
+,t1.sales_dist --销售地区
+,t1.sales_dist___t --销售地区的文本
+,t1.salesorg --销售组织
+,t1.salesorg___t --销售组织的文本
+,t1.sales_off --销售办公室
+,t1.sales_off___t --销售办公室的文本
+,t1.material --物料编码
+,t1.material___t --物料编码的文本
+,t1.prod_hier --产品层次
+,t1.prod_hier___t --产品层次的文本
+,t1.matl_group --物料组
+,t1.matl_group___t --物料组的文本
+,t1.matl_grp_1 --物料组1
+,t1.matl_grp_1___t --物料组1的文本
+,t1.matl_grp_2 --物料组2
+,t1.matl_grp_2___t --物料组2的文本
+,t1.matl_grp_3 --物料组3
+,t1.matl_grp_3___t --物料组3的文本
+,t1.matl_grp_4 --物料组4
+,t1.matl_grp_4___t --物料组4的文本
+,t1.matl_grp_5 --物料组5
+,t1.matl_grp_5___t --物料组5的文本
+,t1.comp_code --公司代码
+,t1.comp_code___t --公司代码的文本
+,t1.extmatlgrp --外部物料组
+,t1.extmatlgrp___t --外部物料组的文本
+,t1.batch --批次
+,t1.plant --工厂
+,t1.plant___t --工厂的文本
+,t1.stor_loc --库存地点
+,t1.stor_loc___t --库存地点的文本
+,t1.doc_currcy --凭证货币
+,t1.doc_currcy___t --凭证货币的文本
+,t1.loc_currc2 --本位币
+,t1.loc_currc2___t --本位币的文本
+,t1.z_gcbbh --工程报备号
+,t1.zsjbm --商机编码
+,t1.zsjyxq --商机有效期
+,t1.zsjms --商机描述
+,t1.zossbjdh --OSS报价单号
+,t1.zgcbbh --OSS订单号
+,t1.ztmswldh --TMS物料单号
+,t1.zddms --订单描述
+,t1.division --产品组
+,t1.division___t --产品组的文本
+,t1.zqdzh --渠道整合
+,t1.zqdzh___t --渠道整合的文本
+,t1.size_dim --大小/量纲
+,t1.zsfqc --是否清仓
+,t1.bus_area --业务范围
+,t1.bus_area___t --业务范围的文本
+,t1.cust_grp1 --客户组1
+,t1.cust_grp1___t --客户组1的文本
+,t1.cust_grp2 --客户组2
+,t1.cust_grp2___t --客户组2的文本
+,t1.cust_grp3 --客户组3
+,t1.cust_grp3___t --客户组3的文本
+,t1.zfsjbm --父商机编码
+,t1.infoprov --信息提供者
+,t1.inco1 --国际贸易条款
+,t1.inco1_t --国际贸易条款的文本
+,t1.bstnk_vf --销售政策
+,t1.bstnk_vf_t --销售政策的文本
+,t1.ktgrd --科目设置组
+,t1.ktgrd_t --科目设置组的文本
+,t1.konda --价格组
+,t1.konda_t --价格组的文本
+,t1.kalsm --客户定价过程
+,t1.kalsm_t --客户定价过程的文本
+,t1.taxk1 --税分类
+,t1.taxk1_t --税分类的文本
+,t1.BIC_ZSCDH --生产订单号
+-- ,zbhsje + zsj   as zhsje --含税金额  = 不含税金额 + 税金 
+,case when t1.infoprov = 'ACDOCA-VBRP-其他收入' then (t1.zqtywsr_jgf_dd + t1.zqtywsr_ddy + t1.zqtywsr_gsj + t1.zqtywsr_jtj_ddy)
+    when t1.infoprov = 'Z000手工-其他收入' then  (t1.zzyywsr_jgf_fdd + t1.zzyywsr_pdsr + t1.zzyywsr_qt) end zbhsje -- 不含税金额
+,case 
+    when t1.infoprov = 'ACDOCA-VBRP-其他收入' and COALESCE(t1.kwert_kurrf55,0) <> 0 then (t1.zqtywsr_jgf_dd + t1.zqtywsr_ddy + t1.zqtywsr_gsj + t1.zqtywsr_jtj_ddy)*t1.kwert_kurrf55/100
+	when t1.infoprov = 'ACDOCA-VBRP-其他收入' and COALESCE(t1.kwert_kurrf55,0) = 0 then 0
+    when t1.infoprov = 'Z000手工-其他收入' then 0 end as zsj --税金
+,t1.zqtywsr_jgf_dd --其他业务收入-加工费(订单)
+,t1.zqtywsr_ddy --其他业务收入-订单用
+,t1.zqtywsr_gsj --其他业务收入-公司间
+,t1.zqtywsr_jtj_ddy --其他业务收入-集团间(订单用)
+,t1.zzyywsr_jgf_fdd --其他业务收入-加工费(非订单)
+,t1.zzyywsr_pdsr --其他业务收入-派单收入
+,t1.zzyywsr_qt --其他业务收入-其他
+,t1.zsyjf --使用积分
+,t1.zytjf_sg --预提积分-手工
+,t1.zytjf_xt --预提积分-系统
+,t1.zqtywzc_jgf_dd --其他业务支出-加工费(订单)-实际
+,t1.zqtywzc_ddy --其他业务支出-订单用-实际
+,case when t1.zqtywsr_gsj = 0 then t1.zqtywzc_gsj else 0 end as zqtywzc_gsj--其他业务支出-公司间
+,t1.zqtywzc_jtj --其他业务支出-集团间
+,t1.zqtywzc_qt_fdd --其他业务支出-其他(非订单)
+,t1.zqtywzc_jgf_fdd --其他业务支出-加工费(非订单)
+,t1.zxsmj --销售面积
+,t1.zxssl --销售数量
+,t1.dw_last_update_date --同步数据时间
+,t1.zkpzt --开票状态
+,t1.zkpzt___t --开票状态的文本
+,t1.cust_group --客户组
+,t1.cust_group___t --客户组的文本
+,t1.zsalesgrp --销售组（实际）
+,t1.zsalesgrp___t --销售组（实际）的文本
+,t1.z_zcck --政策参考
+,t1.zzqj --周期价
+,t1.zqtsrtzz --其他收入调整值
+,t1.zqtzctzz --其他支出调整值
+,t1.zqtywzc_jgf_dd_sj --其他业务支出-加工费(订单)
+,t1.zqtywzc_ddy_sj --其他业务支出-订单用
+,t1.zprodh1 --产品层次1
+,t1.zprodh1___t --产品层次1描述
+,t1.zprodh2 --产品层次2
+,t1.zprodh2___t --产品层次2描述
+,t1.zprodh3 --产品层次3
+,t1.zprodh3___t --产品层次3描述
+,t1.zprodh4 --产品层次4
+,t1.zprodh4___t --产品层次4描述
+,t1.zprodh5 --产品层次5
+,t1.zprodh5___t --产品层次5描述
+,t1.doc_type --订单类型
+,t1.doc_type___t --订单类型描述
+,t1.zqtywzc_jgf_dd_sj + t1.zqtywzc_ddy_sj as zsjcb --实际成本
+,t1.VAL_TYPE --评估类型
+,t1.zfdje --返点金额
+,t1.zckcb --参考成本
+,t1.0SALES_GRP_CUST --销售组（客户主档）
+,t1.0SALES_GRP_CUST___T --销售组（客户主档）的文本
+,t1.export_country --出口国
+,t1.general_ledger_account --总账科目
+,t1.commission_group -- 佣金组
+,t1.commission_group_t --佣金组描述
+,t1.SALES_UNIT --销售单位
+,t1.PERIOD_ID_M
+from tem as t1
+)
+insert overwrite table dm.dm_zzt_qtxssr_t_01 partition (period_id_m) 
+SELECT 
+calmonth --日历年/月
+,t1.calday --日历日
+,t1.doc_number --订单抬头
+,t1.doc_number___t --订单抬头的文本
+,t1.s_ord_item --订单行
+,t1.ac_doc_nr --财务凭证号
+,t1.ac_doc_ln --财务凭证行
+,t1.zasd_p001_zuonr --汇票短号（分配）
+,t1.bill_num --开票抬头
+,t1.bill_item --开票项目
+,t1.bill_type --发票类型
+,t1.bill_type___t --发票类型的文本
+,t1.salesemply --销售人员
+,t1.salesemply___t --销售人员的文本
+,t1.customer --客户编码
+,t1.customer___t --客户编码的文本
+,t1.sales_grp --销售组（WBS+客户主档）
+,t1.sales_grp___t --销售组（WBS+客户主档）的文本
+,t1.distr_chan --分销渠道
+,t1.distr_chan___t --分销渠道的文本
+,t1.zasd_p001_0sales_grp_0 --WBS-销售组
+,t1.zasd_p001_0sales_grp_0___t --WBS-销售组的文本
+,t1.wbs_elemt --WBS编码
+,t1.wbs_elemt___t --WBS编码的文本
+,t1.country --国家
+,t1.country___t --国家的文本
+,t1.sales_dist --销售地区
+,t1.sales_dist___t --销售地区的文本
+,t1.salesorg --销售组织
+,t1.salesorg___t --销售组织的文本
+,t1.sales_off --销售办公室
+,t1.sales_off___t --销售办公室的文本
+,t1.material --物料编码
+,t1.material___t --物料编码的文本
+,t1.prod_hier --产品层次
+,t1.prod_hier___t --产品层次的文本
+,t1.matl_group --物料组
+,t1.matl_group___t --物料组的文本
+,t1.matl_grp_1 --物料组1
+,t1.matl_grp_1___t --物料组1的文本
+,t1.matl_grp_2 --物料组2
+,t1.matl_grp_2___t --物料组2的文本
+,t1.matl_grp_3 --物料组3
+,t1.matl_grp_3___t --物料组3的文本
+,t1.matl_grp_4 --物料组4
+,t1.matl_grp_4___t --物料组4的文本
+,t1.matl_grp_5 --物料组5
+,t1.matl_grp_5___t --物料组5的文本
+,t1.comp_code --公司代码
+,t1.comp_code___t --公司代码的文本
+,t1.extmatlgrp --外部物料组
+,t1.extmatlgrp___t --外部物料组的文本
+,t1.batch --批次
+,t1.plant --工厂
+,t1.plant___t --工厂的文本
+,t1.stor_loc --库存地点
+,t1.stor_loc___t --库存地点的文本
+,t1.doc_currcy --凭证货币
+,t1.doc_currcy___t --凭证货币的文本
+,t1.loc_currc2 --本位币
+,t1.loc_currc2___t --本位币的文本
+,t1.z_gcbbh --工程报备号
+,t1.zsjbm --商机编码
+,t1.zsjyxq --商机有效期
+,t1.zsjms --商机描述
+,t1.zossbjdh --OSS报价单号
+,t1.zgcbbh --OSS订单号
+,t1.ztmswldh --TMS物料单号
+,t1.zddms --订单描述
+,t1.division --产品组
+,t1.division___t --产品组的文本
+,t1.zqdzh --渠道整合
+,t1.zqdzh___t --渠道整合的文本
+,t1.size_dim --大小/量纲
+,t1.zsfqc --是否清仓
+,t1.bus_area --业务范围
+,t1.bus_area___t --业务范围的文本
+,t1.cust_grp1 --客户组1
+,t1.cust_grp1___t --客户组1的文本
+,t1.cust_grp2 --客户组2
+,t1.cust_grp2___t --客户组2的文本
+,t1.cust_grp3 --客户组3
+,t1.cust_grp3___t --客户组3的文本
+,t1.zfsjbm --父商机编码
+,t1.infoprov --信息提供者
+,t1.inco1 --国际贸易条款
+,t1.inco1_t --国际贸易条款的文本
+,t1.bstnk_vf --销售政策
+,t1.bstnk_vf_t --销售政策的文本
+,t1.ktgrd --科目设置组
+,t1.ktgrd_t --科目设置组的文本
+,t1.konda --价格组
+,t1.konda_t --价格组的文本
+,t1.kalsm --客户定价过程
+,t1.kalsm_t --客户定价过程的文本
+,t1.taxk1 --税分类
+,t1.taxk1_t --税分类的文本
+,t1.BIC_ZSCDH as `/bic/zscdh` --生产订单号
+,t1.zbhsje + t1.zsj   as zhsje --含税金额  = 不含税金额 + 税金
+,t1.zbhsje --不含税金额
+,t1.zsj --税金
+,t1.zqtywsr_jgf_dd --其他业务收入-加工费(订单)
+,t1.zqtywsr_ddy --其他业务收入-订单用
+,t1.zqtywsr_gsj --其他业务收入-公司间
+,t1.zqtywsr_jtj_ddy --其他业务收入-集团间(订单用)
+,t1.zzyywsr_jgf_fdd --其他业务收入-加工费(非订单)
+,t1.zzyywsr_pdsr --其他业务收入-派单收入
+,t1.zzyywsr_qt --其他业务收入-其他
+,t1.zsyjf --使用积分
+,t1.zytjf_sg --预提积分-手工
+,t1.zytjf_xt --预提积分-系统
+,t1.zqtywzc_jgf_dd --其他业务支出-加工费(订单)-实际
+,t1.zqtywzc_ddy --其他业务支出-订单用-实际
+,t1.zqtywzc_gsj --其他业务支出-公司间
+,t1.zqtywzc_jtj --其他业务支出-集团间
+,t1.zqtywzc_qt_fdd --其他业务支出-其他(非订单)
+,t1.zqtywzc_jgf_fdd --其他业务支出-加工费(非订单)
+,t1.zxsmj --销售面积
+,t1.zxssl --销售数量
+,t1.dw_last_update_date --同步数据时间
+,t1.zkpzt --开票状态
+,t1.zkpzt___t --开票状态的文本
+,t1.cust_group --客户组
+,t1.cust_group___t --客户组的文本
+,t1.zsalesgrp --销售组（实际）
+,t1.zsalesgrp___t --销售组（实际）的文本
+,t1.z_zcck --政策参考
+,t1.zzqj --周期价
+,t1.zqtsrtzz --其他收入调整值
+,t1.zqtywzc_jgf_dd_sj --其他业务支出-加工费(订单)
+,t1.zqtywzc_ddy_sj --其他业务支出-订单用
+,t1.zprodh1 --产品层次1
+,t1.zprodh1___t --产品层次1描述
+,t1.zprodh2 --产品层次2
+,t1.zprodh2___t --产品层次2描述
+,t1.zprodh3 --产品层次3
+,t1.zprodh3___t --产品层次3描述
+,t1.zprodh4 --产品层次4
+,t1.zprodh4___t --产品层次4描述
+,t1.zprodh5 --产品层次5
+,t1.zprodh5___t --产品层次5描述
+,t1.doc_type --订单类型
+,t1.doc_type___t --订单类型描述
+,t1.zsjcb --实际成本
+,t1.VAL_TYPE --评估类型
+,t1.zfdje --返点金额
+,t1.zckcb --参考成本
+,t1.0SALES_GRP_CUST --销售组（客户主档）
+,t1.0SALES_GRP_CUST___T --销售组（客户主档）的文本
+,t1.export_country --出口国
+,t1.general_ledger_account --总账科目
+,t1.commission_group -- 佣金组
+,t1.commission_group_t --佣金组描述
+,t1.zqtzctzz --其他支出调整值
+,t1.SALES_UNIT --销售单位
+,t1.PERIOD_ID_M
+from tem1 as t1

@@ -1,0 +1,3031 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2023/04/21 14:22:40 GMT+08:00
+-- ******************************************************************** --
+--2023-05-30 zhz 非全资调整逻辑修改，增加数据来源S
+--2023-06-01 zhz 修改上期周期价逻辑、数据来源D的跨事业部收入逻辑
+--2023-06-09 zhz 修改阿米巴内部结算价逻辑
+--2023-06-28 zhz 阿米巴成本、成本调整值、所有指标条件调整以及代码优化
+--2023-07-03 zhz 因为架构调整原因，非全资调整值逻辑调整
+--2023-07-07 zhz 上期周期单价、总价逻辑调整 
+--2023-08-08 zhz 内部交易线组匹配架构修改
+--2023-08-09 zhz 修改产品事业部取数逻辑
+--2023-08-17 zhz 新增浴室柜订单齐套标识字段
+--2023-08-18 zhz 获取第三方订单上周周期单价
+--2023-08-23 zhz 恢复成本调整值特殊工程的逻辑
+--2023-08-29 zhz 新增补数据数据来源为T
+--2023-09-07 zhz 注释实际成本内部事业部成本逻辑，注释补数据代码
+--2023-09-11 zhz s数据来源非全资逻辑修改
+--2023-09-15 zhz 新增一系列字段
+--2023-10-02 zhz 重新关联物料主档产品层次
+--2023-10-07 zhz U数据来源置0
+--2023-10-24 zhz 补数据
+--2023-10-27 gzf 补共享仓利润调整	 
+--2023-10-27 zhz 剔除bw过来的G000共享仓取数 
+--2023-11-01 ZP 共享仓 把这个限制条件修改为：业务范围bus_area not in('G000','G001')
+--2023-11-01 zhz 阿米巴毛利额新增业务范围G001
+--2023-11-02 zhangpeng 阿米巴毛利额=收入调整值-成本调整值,实际成本合计=成本调整值
+--2023-11-03 zhangpeng 不含税销售净额（管理）=收入调整值
+--2023-11-03 zhangpeng 业务范围的文本改为 值为：共享仓收入成本调整
+--2023-11-03 zhangpeng 阿米巴毛利额=收入调整值--阿米巴结算总价-销售单元(不含税)
+--2024-01-03 15:41:16  linw 新增技术债.待BW修复后剔除
+--备注：共享仓4-9月份数据是通过手工脚本刷进来的，归到10月里面，如果跑10月数据，需要跑手工脚本
+--修改共享仓销售事业部(1+N)代码获取逻辑
+delete from dm.dm_ambv2_profit_t WHERE calmonth >= substr('${PERIOD_ID_D}',1,7);
+insert into dm.dm_ambv2_profit_t
+with tmp as (
+select  
+ A.bill_num 
+,A.bill_item
+,ocs.confirm_price as "OCS特批"
+,oss.confirm_price as "OSS特批"
+,gcbb.gcbbh
+,t.category_code
+,sum(coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0) - coalesce(A.ZSYJF,0) - coalesce(A.ZYTJF_XT,0) - coalesce(A.ZYTJF_SG,0) + coalesce(zzyywsr_qt,0) + coalesce(zsrtzz,0)) as "不含税销售净额"
+,sum(case when B.prod_property in ('C0002') and substr(A.calmonth,1,4) <= '2022' then coalesce(A.zckcb,0) 
+  	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and (D1.trading_mode = 'A' or B.prod_property is null) and SUBSTR(A.PLANT,3,2) = '80' then coalesce(A.zckcb,0) 
+  	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and (D1.trading_mode = 'A' or B.prod_property is null) and A.material in ('HNA_A','HNE_A','HNG_A','HNK_A','HNP_A','HNQ_A','HNS_A','HNT_A','HNV_A','HNW_A') then coalesce(zyywcb,0) * 1.16 
+  	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and (D1.trading_mode = 'A' or B.prod_property is null) and B.general_item_ctgry_group_code = 'ZJGY' then coalesce(zyywcb,0) 
+ 	  else coalesce(Z.PRICE1,0) * coalesce(A.zxssl,0) end) as "阿米巴成本总价"  
+,sum(coalesce(Z.PRICE,0) * coalesce(A.zxssl,0)) as "阿米巴结算总价-生产基地"
+from DM.DM_ZZT_XSSR_T A   
+left join dwimd.dwi_md_data_material_general_t B 
+on A.material = B.material_num --limit 1
+left join dm.dm_rpt_sales_group_t C 
+on A.sales_grp = C.node_name9 --获取销售事业部
+left join upload.upload_amb_cost_rules_t D1
+on D1.product_belong = B.prod_property and D1.sales_division = substr(C.node_name2,2,999)
+left join (select *,row_number() over(partition by MATNR,ZSYB_CODE,DATEF,DATED order by werks ) as RN
+from dwifin.dwi_prc_ztamb_cost_t where SUBSTR(DATED,1,4) >= '2022' and ZSYB_CODE <> '09' ) Z
+on A.material = Z.MATNR and A.calday between Z.DATEF and Z.DATED and RN = 1 
+and Z.ZSYB_CODE = case when B.prod_property = 'C0001' then '07'   
+					   when B.prod_property = 'C0002' then '05' 
+					   when B.prod_property = 'A0001' then '01' 
+					   when B.prod_property = 'B0001' then '08' 
+					   when B.prod_property = 'C0003' then '04' 
+					   when B.prod_property = 'C0004' then '06' 
+					   when B.prod_property = 'C0005' then '03'
+					   when B.prod_property = 'C0006' then '02'  
+					   when B.prod_property = 'D0001' then '10'  end 
+left join dwrotd.dwr_so_head_sap_f sap
+on A.doc_number = sap.sal_vch_num
+left join DWRCS.DWR_CS_QUOTATION_HEADER_F ocs
+on sap.quote_num = ocs.quotation_code and ocs.confirm_price is not null 
+left join dwrotd.dwr_so_head_oss_f oss
+on sap.quote_num = oss.oss_so_num and oss.confirm_price is not null 
+left join upload.upload_spec_gcbb_t gcbb
+on case when  A.calmonth='202312' AND A.bill_num ='9003989186'  and A.bill_item='000010'  then 'CD003896' 
+      when    A.calmonth='202312' AND A.bill_num ='9003936113'  and A.bill_item='000010'  then 'D20230830005'  
+      when    A.calmonth ='202312' and A.bill_num ='9003936141'  and A.bill_item='000010'   then 'CD003896'
+      else A.z_gcbbh end  = gcbb.gcbbh  -- @技术债
+left join upload.upload_category_limit_t T
+on B.category = t.category_code and B.dimension = T.size_dim
+where bill_num is not null and A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and (bus_area not in ('A000','G000') or bus_area is null)
+and substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) >= substr('${PERIOD_ID_D}',1,7)
+group by 
+ A.bill_num 
+,A.bill_item 
+,ocs.confirm_price 
+,oss.confirm_price 
+,gcbb.gcbbh 
+,t.category_code
+
+)
+,tmp1 as (
+select  
+ substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) as calmonth
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,A.bill_num
+,A.bill_item
+,A.bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,sales_grp
+,sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,A.material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,A.batch
+,A.plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+--,bus_area
+,case when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and substr(plant,3,2) = '80' 
+	  then (case when ((tmp."OCS特批" = '1' or tmp."OSS特批" = 'Y') and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.05')
+	  or ((tmp."OCS特批" = '0' or tmp."OSS特批" = 'N' or tmp."OCS特批" is null or tmp."OSS特批" is null) and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.02') then 'E000' end )	  
+	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and tmp.gcbbh is not null 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then 'F000' end)
+	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and A.doc_type = 'ZA02' 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then 'J000' end)
+	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and distr_chan = '08' 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then 'H000' end)
+	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and tmp.category_code is not null 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then 'I000' end) else bus_area end as bus_area
+,bus_area___t
+-- ,case when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and substr(PLANT,3,2) = '80' 
+-- 	  then (case when ((tmp."OCS特批" = '1' or tmp."OSS特批" = 'Y') and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.05')
+-- 	  or ((tmp."OCS特批" = '0' or tmp."OSS特批" = 'N' or tmp."OCS特批" is null or tmp."OSS特批" is null) and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.02') then '清仓业务' end )
+-- 	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and tmp.gcbbh is not null 
+-- 	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then '特殊工程' end)
+-- 	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and A.doc_type = 'ZA02' 
+-- 	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then '定向促销' end)
+-- 	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and distr_chan = '08' 
+-- 	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then '整装头部' end)
+-- 	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and category_code is not null
+-- 	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then '山西基地平衡方案' end) else bus_area___t end as bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,coalesce(zhsje,0) as zhsje
+,coalesce(zbhsje,0) as zbhsje
+,coalesce(zhwjz,0) as zhwjz
+,coalesce(zyywsr_zyck,0) as zyywsr_zyck
+,coalesce(zzyywsr_gn,0) as zzyywsr_gn
+,coalesce(zyywsr_wm,0) as zyywsr_wm
+,coalesce(zyywsr_gsj,0) as zyywsr_gsj
+,coalesce(zyywsr_jtj,0) as zyywsr_jtj
+,coalesce(zzxcyf,0) as zzxcyf
+,coalesce(zhwjzjgtz,0) as zhwjzjgtz
+,coalesce(zsj,0) as zsj
+,coalesce(zzxcyfsj,0) as zzxcyfsj
+,coalesce(zhwjzjgtzsj,0) as zhwjzjgtzsj
+,coalesce(zhwjzsj,0) as zhwjzsj
+,coalesce(zzyywsr_qt,0) as zzyywsr_qt
+,coalesce(zsyjf,0) as zsyjf
+,coalesce(zytjf_sg,0) as zytjf_sg
+,coalesce(zytjf_xt,0) as zytjf_xt
+,coalesce(zyywcb,0) as zyywcb
+,coalesce(zyywcb_gsj,0) as zyywcb_gsj
+,coalesce(zyywcb_jtj,0) as zyywcb_jtj
+,coalesce(zyywcb_dsf,0) as zyywcb_dsf
+,coalesce(zyywcb_yf,0) as zyywcb_yf
+,coalesce(ztms_yf,0) as ztms_yf
+,coalesce(zsgrz_yf,0) as zsgrz_yf
+,coalesce(zyywcb_zxf,0) as zyywcb_zxf
+,coalesce(ztms_zxf,0) as ztms_zxf
+,coalesce(zsgrz_zxf,0) as zsgrz_zxf
+,coalesce(zzyywcb_clcbcy,0) as zzyywcb_clcbcy
+,coalesce(zzyywcb_cbcbcy,0) as zzyywcb_cbcbcy
+,coalesce(zzyywcb_cpjjss,0) as zzyywcb_cpjjss
+,coalesce(zzyywcb_qt,0) as zzyywcb_qt
+,coalesce(zxsmj,0) as zxsmj
+,coalesce(A.zxssl,0) as zxssl
+,A.dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,coalesce(zzyywcb_zz,0) as zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,coalesce(zzqj,0) as zzqj
+,coalesce(zsrtzz,0) as zsrtzz
+--,coalesce(zcbtzz,0) as zcbtzz
+,case when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0 and substr(PLANT,3,2) = '80' and coalesce(A.zxssl,0) <> 0 
+	  then (case when (tmp."OCS特批" = '1' or "OSS特批" = 'Y') and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.05' then tmp."阿米巴成本总价" - tmp."不含税销售净额" * 0.95 
+		   	     when (tmp."OCS特批" = '0' or tmp."OSS特批" = 'N' or tmp."OCS特批" is null or tmp."OSS特批" is null) and if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.02' then tmp."不含税销售净额" * 0.98 - tmp."阿米巴成本总价" else 0 end )
+	  when SUBSTR(C.node_name2,2,999) in ('11000001','11000009') and B.prod_property = 'A0001' and coalesce(zcbtzz,0) = 0  and ( tmp.gcbbh is not null or A.doc_type = 'ZA02' or distr_chan = '08' or (substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and tmp.category_code is not null )) and coalesce(A.zxssl,0) <> 0--tmp.gcbbh is not null or
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴成本总价")/tmp."不含税销售净额",1) < '0.03' then tmp."不含税销售净额" * 0.97 - tmp."阿米巴成本总价" else 0 end ) else coalesce(zcbtzz,0) end as zcbtzz
+ 
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,B.category
+,B.category_name
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,coalesce(zfdje,0) as zfdje
+,coalesce(z_yjsgtzz,0) as z_yjsgtzz
+,A.val_type
+,coalesce(zyywsr_zyck_pzhb,0) as zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,coalesce(zzyywcb_azf,0) as zzyywcb_azf
+,case when SUBSTR(C.node_name4,2,999) = '03230629' and (substr(A.plant,1,2) not in ('39','3B') or A.plant is null) AND (zcbkm = '0054010100' or DOC_TYPE = 'ZA07')
+and (B.product_level2_code <> '9006' or B.product_level2_code is null) then coalesce(ZYYWCB_GSJ,0) - coalesce(ZYYWCB,0) else 0 end "产品成本-非全资调整"
+,B.prod_property        "产品所有权"
+,SUBSTR(C.node_name2,2,999) "销售事业部(1+N)代码"
+,C.node_desc2  "销售事业部(1+N)"
+,E.utilities_dept "产品事业部(1+N)代码"
+,E.utilities_dept_name  "产品事业部(1+N)"
+,sales_grp as zsales_grp
+,sales_grp___t as zsales_grp_n 
+,distr_chan as zsales_channel 
+,(if(T2.zcost is not null,coalesce(T2.zcost,0),coalesce(T1.zcost,0)) * coalesce(A.zxssl,0) / 1.13) "标准成本A"
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" * 1.13 else 0 end as "阿米巴结算总价-销售单元(含税)"
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" else 0 end as "阿米巴结算总价-销售单元(不含税)"--只存在成本那行
+,F.classify_name "分类"
+,F.prod_line_name "产品线"
+,F.category_name "品类"
+,G.category_prod_line "品类-产品线管理"
+,IF(H.material_num is not null ,'X','') "主推产品"
+,IF(I.bathroom_cabinet_actual is not null ,'X','') "主销产品"
+,case  
+      when F.category_name = '普通坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '智能坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '盆'       then  substr(A.material ,1,5)
+      when F.category_name = '蹲便器'    then  substr(A.material ,1,6)
+      when F.category_name = '小便器'    then  substr(A.material ,1,5)
+      when JJ.category  is not null then JJ.simplified_code
+      else J.sku_short_code end "SKU简码"
+,'' "一级部门编码"
+,'' "一级部门名称"
+,'' "二级部门编码"
+,'' "二级部门名称"
+,'' "WBS一级部门编码"
+,'' "WBS一级部门名称"
+,'' "WBS二级部门编码"
+,'' "WBS二级部门名称"
+,'' "WBS三级部门编码"
+,'' "WBS三级部门名称"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null ) --发票类型为空是因为有手工数 
+and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07')
+and (D1.trading_mode = 'A' or B.prod_property is null),coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0) ,0) "实际成本(对外销售)"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  --and ((coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0)) <> 0 or ((coalesce(A.ZYYWCB,0) <> 0 or coalesce(A.zyywcb_dsf,0) <> 0 or coalesce(A.zcbtzz,0) <> 0) and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07'))) 
+and D1.trading_mode = 'B',coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0) + coalesce(ZFDJE,0),0) "1+N收入"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null ) 
+and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07')
+and D1.trading_mode = 'B',if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0) ,KC.avg_kcje * coalesce(A.zxssl,0)) ,0) "1+N成本"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and D1.trading_mode = 'C',coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0) + coalesce(ZFDJE,0),0) "跨事业部收入"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null ) 
+and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07')
+   ,(case when D1.trading_mode = 'C' and D1.division_cost_flag = 'B' and coalesce(A.ZYYWCB,0) <> 0 then 
+	(case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" else 0 end )
+      	  when D1.trading_mode = 'C' and D1.division_cost_flag = 'A'  then if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0) ,KC.avg_kcje * coalesce(A.zxssl,0)) else 0 end),0) "跨事业部成本"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and D1.trading_mode = 'B',if(coalesce(A.zcbtzz,0) = 0 and coalesce(zsrtzz,0) = 0,D1.salesorg_profit_rate,1),0) "1+N比例"     
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and D1.trading_mode = 'C',if(coalesce(A.zcbtzz,0) = 0 and coalesce(zsrtzz,0) = 0,D1.salesorg_profit_rate,1),0) "跨事业部比例"     
+,'S' "数据来源"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and (D1.trading_mode = 'A' or B.prod_property is null),coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0),0) "对外销售收入"
+,B.prod_property_name 
+
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and D2.division_cost_flag is not null,if(coalesce(A.zcbtzz,0) = 0 and coalesce(zsrtzz,0) = 0,D2.salesorg_profit_rate,1),0) "事业部内部比例"
+
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and D2.division_cost_flag is not null ,coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0),0) "事业部内部收入"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and  (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07')
+, 	(case when D2.division_cost_flag = 'B' and coalesce(A.ZYYWCB,0) <> 0 then 
+	(case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" else 0 end )
+      when D2.division_cost_flag = 'A'  then if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0) ,KC.avg_kcje * coalesce(A.zxssl,0)) else 0 end),0) "事业部内部成本"
+--事业部内部
+,case when "distr_chan" = '06' then 'GD03'
+      when ("distr_chan" not in ('08', '06') or "distr_chan" is null) then 'GD01'
+      when "distr_chan" = '08' then 'GD02' else '' end  "整合渠道"
+,current_timestamp 	
+,D1.trading_mode
+, case when (B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                          B.prod_property_name is not null) then 'GG01'
+                    when "doc_type" = 'ZA02' or substr(A.plant, -2) = '80' then 'GD04'
+                    when "distr_chan" = '06' and B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null then 'GG05'
+                    when "distr_chan" = '06' and B.reserved_field_1 = 'G105' then 'GG08'
+                    when "distr_chan" not in ('08', '06') or "distr_chan" is null then
+                        CASE
+                            when B.reserved_field_1 = 'G105' then 'GG08'
+                            when B.reserved_field_3  = 'A9' then 'GG03'
+                            WHEN (B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null) and (B.reserved_field_3 <> 'A9' or B.reserved_field_1 is null) and
+                                 substr(B.product_level3_code, 1, 1) = '1' and
+                                 substr(B.product_level3_code, 1, 4) <> '1016' then 'GG06' END
+                    WHEN "distr_chan" = '08' then
+--                    case when substr(t3.prod_code3,1,1) = '1' and substr(t3.prod_code3,1,4) <> '1016' then '瓷砖产品'
+                        case
+                            when B.prod_property in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') or
+                                 B.prod_property_name is null then 'GG02'
+                            when B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                                 B.prod_property_name is not null then 'GG01' end             end  "整合渠道2"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null )  
+and (D1.trading_mode = 'A' or B.prod_property is null),if(coalesce(A.zcbtzz,0) = 0 and coalesce(zsrtzz,0) = 0 and B.prod_property is not null,D1.salesorg_profit_rate,1),0) "对外销售比例"  
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" / coalesce(A.zxssl,0) else 0 end as "阿米巴结算单价-销售单元"
+,if( (A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') or A.bill_type is null) 
+and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07' or coalesce(zyywcb_dsf,0) <> 0),--第三方订单
+case when D1.trading_mode in ('B','C') then if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0, coalesce(if(V.V_PRICE=0,V.S_PRICE,V.V_PRICE),if(V1.V_PRICE=0,V1.S_PRICE,V1.V_PRICE),S.S_PRICE,S1.S_PRICE,S2.S_PRICE,0),KC.avg_kcje )
+     when D1.trading_mode in ('A') then coalesce(if(V.V_PRICE=0,V.S_PRICE,V.V_PRICE),if(V1.V_PRICE=0,V1.S_PRICE,V1.V_PRICE),S.S_PRICE,S1.S_PRICE,S2.S_PRICE,0) end ,0) "上期周期单价"
+,case when calday = '00000000' then '' else TO_DATE(calday,'YYYY-MM-DD') end as stat_day
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴结算总价-生产基地" / coalesce(A.zxssl,0) else 0 end as "阿米巴结算单价-生产基地"
+from DM.DM_ZZT_XSSR_T A   
+left join dwimd.dwi_md_data_material_general_t B 
+on A.material = B.material_num --limit 1
+left join DM.dm_zcds_mat_zysacb_t T1
+on A.material = T1.matnr and A.calday between T1.datab and T1.datbi and A.size_dim = T1.groes and T1.groes is not null 
+left join DM.dm_zcds_mat_zysacb_t T2
+on A.material = T2.matnr and A.calday between T2.datab and T2.datbi and T2.groes is null 
+left join dm.dm_rpt_sales_group_t C 
+on A.sales_grp = C.node_name9 --获取销售事业部
+left join (select distinct product_belong,product_division from upload.upload_amb_cost_rules_t where trading_mode = 'A' and product_division is not null) D
+on D.product_belong = B.prod_property --获取产品事业部
+left join upload.upload_amb_cost_rules_t D1
+on D1.product_belong = B.prod_property and D1.sales_division = substr(C.node_name2,2,999) --获取成本规则外挂表关联信息（事业部）
+left join upload.upload_amb_cost_rules_t D2
+on D2.product_belong = B.prod_property and D2.sales_division = substr(C.node_name3,2,999)--获取成本规则外挂表关联信息（单元）
+left join (select distinct substr(node_name2,2,999) as utilities_dept, node_desc2 as utilities_dept_name from dm.dm_rpt_sales_group_t) E
+on D.product_division = E.utilities_dept---获取产品事业部名称
+left join DM.DM_RPT_PROD_CATEGORY_T F 
+on A.zprodh3 = F.prod_level3_code and F.prod_level3_code is not null 
+left join DM.DM_RPT_PRODLINE_CLASS_T G  
+on A.material = G.material_code 
+left join (select distinct MATERIAL_NUM,stat_year from DM.DM_RPT_MASTESERIES_PROD_T) H --主推产品
+on A.material = H.material_num and substring(A.calmonth,1,4) = H.stat_year
+left join (select distinct bathroom_cabinet_actual,stat_year from DM.DM_RPT_MASTERSALE_PROD_T) I --主销产品
+on A.material = I.bathroom_cabinet_actual and substring(A.calmonth,1,4) = I.stat_year
+left join (select distinct prod_code,sku_short_code from DM.DM_RPT_SHORT_CODE_T) J --SKU简码
+on A.material = J.prod_code 
+left join tmp 
+on A.bill_num = tmp.bill_num and A.bill_item = tmp.bill_item
+left join dm.dm_gl_out_invoice_t Y 
+on Y.bill_voucher_num = A.bill_num and Y.acc_voucher_line_item_num = A.bill_item 
+left join (select val_type,calmonth,material,if (sum(quantity) <> 0,sum(zsjkcje)/sum(quantity),0) as avg_kcje
+from DM.DM_RPT_ZZT_KCMX_T group by val_type,calmonth,material) as KC 
+on A.calmonth = KC.calmonth and coalesce(A.val_type ,'#') = coalesce(KC.val_type ,'#') and A.material = KC.material
+left join (select distinct matnr,bwkey,bwtar,pspnr,BDATJ,POPER,STPRS/PEINH as S_PRICE,PVPRS/PEINH as V_PRICE from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'V') V
+on A.material = V.MATNR and A.plant = V.bwkey and coalesce(A.val_type,'#') = coalesce(V.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(V.pspnr,'#')
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',1,4)  = V.BDATJ
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',6,2) = SUBSTR(V.POPER,2,2)
+left join (select distinct matnr,bwkey,bwtar,BDATJ,POPER,STPRS/PEINH as S_PRICE,PVPRS/PEINH as V_PRICE from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'V' and pspnr is null) V1
+on A.material = V1.MATNR and A.plant = V1.bwkey and coalesce(A.val_type,'#') = coalesce(V1.bwtar,'#') 
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',1,4)  = V1.BDATJ
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',6,2) = SUBSTR(V1.POPER,2,2)
+left join (select matnr,bwkey,bwtar,pspnr,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar,pspnr order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S') S
+on A.material = S.MATNR and A.plant = S.bwkey and coalesce(A.val_type,'#') = coalesce(S.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(S.pspnr,'#') and S.RN = 1
+left join (select matnr,bwkey,bwtar,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S' and pspnr is null) S1
+on A.material = S1.MATNR and A.plant = S1.bwkey and coalesce(A.val_type,'#') = coalesce(S1.bwtar,'#') and S1.RN = 1
+left join (select matnr,bwkey,bwtar,pspnr,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar,pspnr order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S') S2
+on A.material = S2.MATNR and A.plant = S2.bwkey and coalesce(A.batch,'#') = coalesce(S2.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(S2.pspnr,'#') and S2.RN = 1
+left join (select distinct simplified_code,product_code,stat_year,category from upload.upload_sw_shower_room_simplified_code_t) JJ
+on SUBSTR(A.calmonth,1,4) = JJ.stat_year and A.material = JJ.product_code
+where substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) >= substr('${PERIOD_ID_D}',1,7) and ( bus_area <> 'G000' or  bus_area is null )
+
+union all 
+select  
+ substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,A.bill_num
+,A.bill_item
+,A.bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,coalesce(K1.belong_sales_grp,K.belong_sales_grp) "对应归属销售组"
+,coalesce(L1.node_desc9,L.node_desc9)
+,coalesce(K1.belong_channel,K.belong_channel) "对应归属渠道"
+,'' distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,A.material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,batch
+,plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,coalesce(zhsje,0) as zhsje
+,coalesce(zbhsje,0) as zbhsje
+,coalesce(zhwjz,0) as zhwjz
+,coalesce(zyywsr_zyck,0) as zyywsr_zyck
+,coalesce(zzyywsr_gn,0) as zzyywsr_gn
+,coalesce(zyywsr_wm,0) as zyywsr_wm
+,coalesce(zyywsr_gsj,0) as zyywsr_gsj
+,coalesce(zyywsr_jtj,0) as zyywsr_jtj
+,coalesce(zzxcyf,0) as zzxcyf
+,coalesce(zhwjzjgtz,0) as zhwjzjgtz
+,coalesce(zsj,0) as zsj
+,coalesce(zzxcyfsj,0) as zzxcyfsj
+,coalesce(zhwjzjgtzsj,0) as zhwjzjgtzsj
+,coalesce(zhwjzsj,0) as zhwjzsj
+,coalesce(zzyywsr_qt,0) as zzyywsr_qt
+,case when D1.trading_mode = 'C' and D1.division_cost_flag = 'B' then 0 else coalesce(zsyjf,0)  end as zsyjf
+,coalesce(zytjf_sg,0) as zytjf_sg
+,case when D1.trading_mode = 'C' and D1.division_cost_flag = 'B' then 0 else coalesce(zytjf_xt,0) end as zytjf_xt  
+,coalesce(zyywcb,0) as zyywcb
+,coalesce(zyywcb_gsj,0) as zyywcb_gsj
+,coalesce(zyywcb_jtj,0) as zyywcb_jtj
+,coalesce(zyywcb_dsf,0) as zyywcb_dsf
+,coalesce(zyywcb_yf,0) as zyywcb_yf
+,coalesce(ztms_yf,0) as ztms_yf
+,coalesce(zsgrz_yf,0) as zsgrz_yf
+,coalesce(zyywcb_zxf,0) as zyywcb_zxf
+,coalesce(ztms_zxf,0) as ztms_zxf
+,coalesce(zsgrz_zxf,0) as zsgrz_zxf
+,coalesce(zzyywcb_clcbcy,0) as zzyywcb_clcbcy
+,coalesce(zzyywcb_cbcbcy,0) as zzyywcb_cbcbcy
+,coalesce(zzyywcb_cpjjss,0) as zzyywcb_cpjjss
+,coalesce(zzyywcb_qt,0) as zzyywcb_qt
+,coalesce(zxsmj,0) as zxsmj
+,coalesce(A.zxssl,0) as zxssl
+,A.dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,coalesce(zzyywcb_zz,0) as zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,coalesce(zzqj,0) as zzqj
+,coalesce(zsrtzz,0) as zsrtzz
+,coalesce(zcbtzz,0) as zcbtzz
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,B.category
+,B.category_name
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,coalesce(zfdje,0) as zfdje
+,coalesce(z_yjsgtzz,0) as z_yjsgtzz
+,A.val_type
+,coalesce(zyywsr_zyck_pzhb,0) as zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,coalesce(zzyywcb_azf,0) as zzyywcb_azf
+,'0'  "产品成本-非全资调整"
+,B.prod_property        "产品所有权"
+,E.utilities_dept
+,E.utilities_dept_name  "销售事业部(1+N)"
+,E.utilities_dept
+,E.utilities_dept_name  "产品事业部(1+N)"
+,A.sales_grp as zsales_grp
+,sales_grp___t as zsales_grp_n 
+,distr_chan as zsales_channel 
+,(if(T2.zcost is not null,coalesce(T2.zcost,0),coalesce(T1.zcost,0)) * coalesce(A.zxssl,0) / 1.13) "标准成本A"
+--,case when B.prod_property not in ('C0001','C0002') then coalesce(A.zxscb_amb,0)  
+--      when B.prod_property in ('C0002') and substr(A.calmonth,1,4) <= '2022' then coalesce(A.zckcb,0) * 1.13
+--      when B.prod_property = 'C0001' then Z1.PRICE1 * A.zxssl * 1.13
+--      when substr(A.calmonth,1,4) > '2022' and B.prod_property = 'C0002' then Z2.PRICE1 * A.zxssl * 1.13
+--      else 0 end "阿米巴内部结算价(含税)"
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" * 1.13 else 0 end as "阿米巴结算总价-销售单元(含税)"			
+--,case when B.prod_property not in ('C0001','C0002') then coalesce(A.zxscb_amb / 1.13,0)  
+--      when B.prod_property in ('C0002') and substr(A.calmonth,1,4) <= '2022' then coalesce(A.zckcb,0) 
+--      when B.prod_property = 'C0001' then Z1.PRICE1 * A.zxssl
+--      when substr(A.calmonth,1,4) > '2022' and B.prod_property = 'C0002' then Z2.PRICE1 * A.zxssl
+--      else 0 end "阿米巴内部结算价(不含税)"	
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价"  else 0 end as "阿米巴结算总价-销售单元(不含税)"	
+,F.classify_name "分类"
+,F.prod_line_name "产品线"
+,F.category_name "品类"
+,G.category_prod_line "品类-产品线管理"
+,IF(H.material_num is not null ,'X','') "主推产品"
+,IF(I.bathroom_cabinet_actual is not null ,'X','') "主销产品"
+,case  
+      when F.category_name = '普通坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '智能坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '盆'       then  substr(A.material ,1,5)
+      when F.category_name = '蹲便器'    then  substr(A.material ,1,6)
+      when F.category_name = '小便器'    then  substr(A.material ,1,5)
+      when JJ.category  is not null then JJ.simplified_code
+      else J.sku_short_code end "SKU简码"
+,'' "一级部门编码"
+,'' "一级部门名称"
+,'' "二级部门编码"
+,'' "二级部门名称"
+,'' "WBS一级部门编码"
+,'' "WBS一级部门名称"
+,'' "WBS二级部门编码"
+,'' "WBS二级部门名称"
+,'' "WBS三级部门编码"
+,'' "WBS三级部门名称"
+,'0' "实际成本(对外销售)"
+,if(D1.trading_mode = 'B',coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0) + coalesce(ZFDJE,0),0) "1+N收入"
+,if(D1.trading_mode = 'B',if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0),KC.avg_kcje * coalesce(A.zxssl,0)),0) "1+N成本"
+,case when D1.trading_mode = 'C' and D1.division_cost_flag = 'B' then --TMP."阿米巴结算总价-销售单元(不含税)"	
+(case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" else 0 end)
+      when D1.trading_mode = 'C' and D1.division_cost_flag = 'A'  then 
+      coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0) + coalesce(ZFDJE,0) else 0 end "跨事业部收入"
+,if(D1.trading_mode = 'C',if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0),KC.avg_kcje * coalesce(A.zxssl,0)),0) "跨事业部成本"      
+,if(D1.trading_mode = 'B',coalesce(D1.product_belong_rate,0) ,0) "1+N比例"     
+--1+N利润 =("1+N收入"-"1+N成本")* "1+N"比例
+,if(D1.trading_mode = 'C',coalesce(D1.product_belong_rate,0),0) "跨事业部比例"     
+,'D' "数据来源"
+,if(D1.trading_mode = 'A' or B.prod_property is null,coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0) + coalesce(ZFDJE,0),0) "对外销售收入"
+,B.prod_property_name 
+
+,0 "事业部内部比例"
+--,0 "事业部内部利润"
+,0 "事业部内部收入"
+,0 "事业部内部成本"
+,case when "distr_chan" = '06' then 'GD03'
+      when ("distr_chan" not in ('08', '06') or "distr_chan" is null) then 'GD01'
+      when "distr_chan" = '08' then 'GD02' else '' end  "整合渠道"
+,current_timestamp 
+,D1.trading_mode
+, case when (B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                          B.prod_property_name is not null) then 'GG01'
+                    when "doc_type" = 'ZA02' or substr(A.plant, -2) = '80' then 'GD04'
+                    when "distr_chan" = '06' and B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null then 'GG05'
+                    when "distr_chan" = '06' and B.reserved_field_1 = 'G105' then 'GG08'
+                    when "distr_chan" not in ('08', '06') or "distr_chan" is null then
+                        CASE
+                            when B.reserved_field_1 = 'G105' then 'GG08'
+                            when "zyl03" = 'A9' then 'GG03'
+                            WHEN (B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null) and (B.reserved_field_3 <> 'A9' or B.reserved_field_1 is null) and
+                                 substr(B.product_level3_code, 1, 1) = '1' and
+                                 substr(B.product_level3_code, 1, 4) <> '1016' then 'GG06' END
+                    WHEN "distr_chan" = '08' then
+--                    case when substr(t3.prod_code3,1,1) = '1' and substr(t3.prod_code3,1,4) <> '1016' then '瓷砖产品'
+                        case
+                            when B.prod_property in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') or
+                                 B.prod_property_name is null then 'GG02'
+                            when B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                                 B.prod_property_name is not null then 'GG01' end             end  "整合渠道2"
+,'0' "对外销售比例"
+
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴成本总价" / coalesce(A.zxssl,0) else 0 end  as "阿米巴结算单价-销售单元"	
+,case when D1.trading_mode in ('B','C') then if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0, coalesce(if(V.V_PRICE=0,V.S_PRICE,V.V_PRICE),if(V1.V_PRICE=0,V1.S_PRICE,V1.V_PRICE),S.S_PRICE,S1.S_PRICE,S2.S_PRICE,0),KC.avg_kcje)
+     when D1.trading_mode in ('A') then coalesce(if(V.V_PRICE=0,V.S_PRICE,V.V_PRICE),if(V1.V_PRICE=0,V1.S_PRICE,V1.V_PRICE),S.S_PRICE,S1.S_PRICE,S2.S_PRICE,0) end  "上期周期单价"
+,case when calday = '00000000' then '' else TO_DATE(calday,'YYYY-MM-DD') end 
+,case when coalesce(A.zxssl,0) <> 0 then TMP."阿米巴结算总价-生产基地" / coalesce(A.zxssl,0) else 0 end as "阿米巴结算单价-生产基地"
+from DM.DM_ZZT_XSSR_T A
+left join dwimd.dwi_md_data_material_general_t B 
+on A.material = B.material_num --limit 1
+left join DM.dm_zcds_mat_zysacb_t T1
+on A.material = T1.matnr and A.calday between T1.datab and T1.datbi and A.size_dim = T1.groes and T1.groes is not null 
+left join DM.dm_zcds_mat_zysacb_t T2
+on A.material = T2.matnr and A.calday between T2.datab and T2.datbi and T2.groes is null 
+left join dm.dm_rpt_sales_group_t C 
+on A.sales_grp = C.node_name9 --获取销售事业部
+left join (select distinct product_belong,product_division from upload.upload_amb_cost_rules_t where trading_mode = 'A' and product_division is not null) D
+on D.product_belong = B.prod_property --获取产品事业部
+left join upload.upload_amb_cost_rules_t D1
+on D1.product_belong = B.prod_property and D1.sales_division = substr(C.node_name2,2,999) --获取成本规则外挂表关联信息
+left join (select distinct substr(node_name2,2,999) as utilities_dept, node_desc2 as utilities_dept_name from dm.dm_rpt_sales_group_t) E
+on D.product_division = E.utilities_dept---获取产品事业部名称
+left join DM.DM_RPT_PROD_CATEGORY_T F 
+on A.zprodh3 = F.prod_level3_code and F.prod_level3_code is not null 
+left join DM.DM_RPT_PRODLINE_CLASS_T G  
+on A.material = G.material_code 
+left join (select distinct MATERIAL_NUM,stat_year from DM.DM_RPT_MASTESERIES_PROD_T) H --主推产品
+on A.material = H.material_num and substring(A.calmonth,1,4) = H.stat_year
+left join (select distinct bathroom_cabinet_actual,stat_year from DM.DM_RPT_MASTERSALE_PROD_T) I --主销产品
+on A.material = I.bathroom_cabinet_actual and substring(A.calmonth,1,4) = I.stat_year
+left join (select distinct prod_code,sku_short_code from DM.DM_RPT_SHORT_CODE_T) J --SKU简码
+on A.material = J.prod_code 
+left join (select distinct product_belong,ext_matl_group,sales_org,sales_grp,channel_code,belong_sales_grp,belong_channel from upload.upload_amb_cross_divison_salesgrp_t) K
+on A.salesorg = K.sales_org and A.distr_chan = K.channel_code and B.prod_property = K.product_belong and A.extmatlgrp = K.ext_matl_group and K.sales_grp is null
+left join (select distinct product_belong,ext_matl_group,sales_org,sales_grp,channel_code,belong_sales_grp,belong_channel from upload.upload_amb_cross_divison_salesgrp_t) K1
+on A.salesorg = K1.sales_org and A.distr_chan = K1.channel_code and B.prod_property = K1.product_belong and A.extmatlgrp = K1.ext_matl_group and A.sales_grp = K1.sales_grp and K1.sales_grp is not null 
+left join dm.dm_rpt_sales_group_t  L 
+on K.belong_sales_grp = L.node_name9
+left join dm.dm_rpt_sales_group_t  L1 
+on K1.belong_sales_grp = L1.node_name9
+left join tmp 
+on A.bill_num = tmp.bill_num and A.bill_item = tmp.bill_item
+left join (select val_type,calmonth,material,if (sum(quantity) <> 0,sum(zsjkcje)/sum(quantity),0) as avg_kcje
+from DM.DM_RPT_ZZT_KCMX_T group by val_type,calmonth,material) as KC 
+on A.calmonth = KC.calmonth and coalesce(A.val_type ,'#') = coalesce(KC.val_type ,'#') and A.material = KC.material
+left join (select distinct matnr,bwkey,bwtar,pspnr,BDATJ,POPER,STPRS/PEINH as S_PRICE,PVPRS/PEINH as V_PRICE from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'V') V
+on A.material = V.MATNR and A.plant = V.bwkey and coalesce(A.val_type,'#') = coalesce(V.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(V.pspnr,'#')
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',1,4)  = V.BDATJ
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',6,2) = SUBSTR(V.POPER,2,2)
+left join (select distinct matnr,bwkey,bwtar,BDATJ,POPER,STPRS/PEINH as S_PRICE,PVPRS/PEINH as V_PRICE from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'V' and pspnr is null) V1
+on A.material = V1.MATNR and A.plant = V1.bwkey and coalesce(A.val_type,'#') = coalesce(V1.bwtar,'#') 
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',1,4)  = V1.BDATJ
+and SUBSTR(TO_DATE(substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)||'-01','YYYY-MM-DD') - INTERVAL '1 month',6,2) = SUBSTR(V1.POPER,2,2)
+left join (select matnr,bwkey,bwtar,pspnr,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar,pspnr order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S') S
+on A.material = S.MATNR and A.plant = S.bwkey and coalesce(A.val_type,'#') = coalesce(S.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(S.pspnr,'#') and S.RN = 1
+left join (select matnr,bwkey,bwtar,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S' and pspnr is null) S1
+on A.material = S1.MATNR and A.plant = S1.bwkey and coalesce(A.val_type,'#') = coalesce(S1.bwtar,'#') and S1.RN = 1
+left join (select matnr,bwkey,bwtar,pspnr,STPRS/PEINH as S_PRICE,row_number() over(partition by matnr,bwkey,bwtar,pspnr order by BDATJ||SUBSTR(POPER,2,2) desc) as RN
+from DWRFIN.DWR_MAT_PERIOD_PRICE_R where (SOBKZ is null or SOBKZ = 'Q') and vprsv = 'S') S2
+on A.material = S2.MATNR and A.plant = S2.bwkey and coalesce(A.batch,'#') = coalesce(S2.bwtar,'#') and coalesce(A.wbs_elemt,'#') = coalesce(S2.pspnr,'#') and S2.RN = 1
+left join (select distinct simplified_code,product_code,stat_year,category from upload.upload_sw_shower_room_simplified_code_t) JJ
+on SUBSTR(A.calmonth,1,4) = JJ.stat_year and A.material = JJ.product_code 
+where A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and A.bill_type is not null 
+and ((coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0)) <> 0 or ((coalesce(A.ZYYWCB,0) <> 0 or coalesce(A.zyywcb_dsf,0) <> 0 ) and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07' or coalesce(zyywcb_dsf,0) <> 0)))
+and D1.trading_mode in ('B','C') and ( bus_area <> 'G000' or  bus_area is null )
+and substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) >= substr('${PERIOD_ID_D}',1,7) 
+
+union all 
+select  
+ substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) as calmonth
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,A.bill_num
+,A.bill_item
+,A.bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,'R1R' sales_grp
+,C1.node_desc9 as sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,A.material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,A.batch
+,A.plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,0 zhsje
+,0 zbhsje
+,0 zhwjz
+,0 zyywsr_zyck
+,0 zzyywsr_gn
+,0 zyywsr_wm
+,0 zyywsr_gsj
+,0 zyywsr_jtj
+,0 zzxcyf
+,0 zhwjzjgtz
+,0 zsj
+,0 zzxcyfsj
+,0 zhwjzjgtzsj
+,0 zhwjzsj
+,0 zzyywsr_qt
+,0 zsyjf
+,0 zytjf_sg
+,0 zytjf_xt
+,0 zyywcb
+,0 zyywcb_gsj
+,0 zyywcb_jtj
+,0 zyywcb_dsf
+,0 zyywcb_yf
+,0 ztms_yf
+,0 zsgrz_yf
+,0 zyywcb_zxf
+,0 ztms_zxf
+,0 zsgrz_zxf
+,0 zzyywcb_clcbcy
+,0 zzyywcb_cbcbcy
+,0 zzyywcb_cpjjss
+,0 zzyywcb_qt
+,0 zxsmj
+,0 zxssl
+,A.dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,0 zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,0 zzqj
+,0 zsrtzz
+,0 zcbtzz
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,B.category
+,B.category_name
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,0 zfdje
+,0 z_yjsgtzz
+,A.val_type
+,0 zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,0 zzyywcb_azf
+,case when SUBSTR(C.node_name4,2,999) = '03230629' and (substr(A.plant,1,2) not in ('39','3B') or A.plant is null) AND (zcbkm = '0054010100' or DOC_TYPE = 'ZA07')
+and (B.product_level2_code <> '9006' or B.product_level2_code is null) then coalesce(ZYYWCB_GSJ,0) - coalesce(ZYYWCB,0) else 0 end "产品成本-非全资调整"
+,B.prod_property        "产品所有权"
+,SUBSTR(C.node_name2,2,999) "销售事业部(1+N)代码"
+,C1.node_desc2  "销售事业部(1+N)"
+,E.utilities_dept "产品事业部(1+N)代码"
+,E.utilities_dept_name  "产品事业部(1+N)"
+,sales_grp as zsales_grp
+,sales_grp___t as zsales_grp_n 
+,distr_chan as zsales_channel 
+,0 "标准成本A"
+,0 "阿米巴结算总价-销售单元(含税)"		
+,0 "阿米巴结算总价-销售单元(不含税)"	
+,F.classify_name "分类"
+,F.prod_line_name "产品线"
+,F.category_name "品类"
+,G.category_prod_line "品类-产品线管理"
+,IF(H.material_num is not null ,'X','') "主推产品"
+,IF(I.bathroom_cabinet_actual is not null ,'X','') "主销产品"
+,case  
+      when F.category_name = '普通坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '智能坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '盆'       then  substr(A.material ,1,5)
+      when F.category_name = '蹲便器'    then  substr(A.material ,1,6)
+      when F.category_name = '小便器'    then  substr(A.material ,1,5)
+      when JJ.category  is not null then JJ.simplified_code
+      else J.sku_short_code end "SKU简码"
+,'' "一级部门编码"
+,'' "一级部门名称"
+,'' "二级部门编码"
+,'' "二级部门名称"
+,'' "WBS一级部门编码"
+,'' "WBS一级部门名称"
+,'' "WBS二级部门编码"
+,'' "WBS二级部门名称"
+,'' "WBS三级部门编码"
+,'' "WBS三级部门名称"
+,0 "实际成本(对外销售)"
+,0 "1+N收入"
+,0 "1+N成本"
+,0 "跨事业部收入"
+,0 "跨事业部成本"
+,0 "1+N比例"     
+--,0 "1+N利润"
+,0 "跨事业部比例"     
+,'W' as "数据来源"
+,0 as "对外销售收入"
+,B.prod_property_name 
+--,0 "跨事业部利润"
+,0 "事业部内部比例"
+--,0 "事业部内部利润"
+,0 "事业部内部收入"
+,0 "事业部内部成本"
+,case when "distr_chan" = '06' then 'GD03'
+      when ("distr_chan" not in ('08', '06') or "distr_chan" is null) then 'GD01'
+      when "distr_chan" = '08' then 'GD02' else '' end  "整合渠道"
+,current_timestamp 	
+,D1.trading_mode
+,case when (B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                          B.prod_property_name is not null) then 'GG01'
+                    when "doc_type" = 'ZA02' or substr(A.plant, -2) = '80' then 'GD04'
+                    when "distr_chan" = '06' and B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null then 'GG05'
+                    when "distr_chan" = '06' and B.reserved_field_1 = 'G105' then 'GG08'
+                    when "distr_chan" not in ('08', '06') or "distr_chan" is null then
+                        CASE
+                            when B.reserved_field_1 = 'G105' then 'GG08'
+                            when B.reserved_field_3  = 'A9' then 'GG03'
+                            WHEN (B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null) and (B.reserved_field_3 <> 'A9' or B.reserved_field_1 is null) and
+                                 substr(B.product_level3_code, 1, 1) = '1' and
+                                 substr(B.product_level3_code, 1, 4) <> '1016' then 'GG06' END
+                    WHEN "distr_chan" = '08' then
+--                    case when substr(t3.prod_code3,1,1) = '1' and substr(t3.prod_code3,1,4) <> '1016' then '瓷砖产品'
+                        case
+                            when B.prod_property in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') or
+                                 B.prod_property_name is null then 'GG02'
+                            when B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                                 B.prod_property_name is not null then 'GG01' end             end "整合渠道2"
+,0 as "对外销售比例"  
+--,0 as "对外销售收入利润"
+--,0 as "不含税销售净额"
+,0 as "阿米巴结算单价-销售单元"	
+,0 as "上期周期单价"
+--,0 as "上周周期总价"
+,case when calday = '00000000' then '' else TO_DATE(calday,'YYYY-MM-DD') end stat_day
+,0 as "阿米巴结算单价-生产基地"
+from DM.DM_ZZT_XSSR_T A   
+left join dwimd.dwi_md_data_material_general_t B 
+on A.material = B.material_num 
+left join dm.dm_rpt_sales_group_t C 
+on A.sales_grp = C.node_name9 --获取销售事业部
+left join dm.dm_rpt_sales_group_t C1 
+on C1.node_name9 = 'R1R' --获取销售事业部
+left join (select distinct product_belong,product_division from upload.upload_amb_cost_rules_t where trading_mode = 'A' and product_division is not null) D
+on D.product_belong = B.prod_property --获取产品事业部
+left join upload.upload_amb_cost_rules_t D1
+on D1.product_belong = B.prod_property and D1.sales_division = substr(C.node_name2,2,999) --获取成本规则外挂表关联信息
+left join (select distinct substr(node_name2,2,999) as utilities_dept, node_desc2 as utilities_dept_name from dm.dm_rpt_sales_group_t) E
+on D.product_division = E.utilities_dept---获取产品事业部名称
+left join DM.DM_RPT_PROD_CATEGORY_T F 
+on A.zprodh3 = F.prod_level3_code and F.prod_level3_code is not null 
+left join DM.DM_RPT_PRODLINE_CLASS_T G  
+on A.material = G.material_code 
+left join (select distinct MATERIAL_NUM,stat_year from DM.DM_RPT_MASTESERIES_PROD_T) H --主推产品
+on A.material = H.material_num and substring(A.calmonth,1,4) = H.stat_year
+left join (select distinct bathroom_cabinet_actual,stat_year from DM.DM_RPT_MASTERSALE_PROD_T) I --主销产品
+on A.material = I.bathroom_cabinet_actual and substring(A.calmonth,1,4) = I.stat_year
+left join (select distinct prod_code,sku_short_code from DM.DM_RPT_SHORT_CODE_T) J --SKU简码
+on A.material = J.prod_code 
+left join (select distinct simplified_code,product_code,stat_year,category from upload.upload_sw_shower_room_simplified_code_t) JJ
+on SUBSTR(A.calmonth,1,4) = JJ.stat_year and A.material = JJ.product_code 
+where "产品成本-非全资调整" <> 0 and ( bus_area <> 'G000' or  bus_area is null )
+and substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) >= substr('${PERIOD_ID_D}',1,7)
+union all 
+select  
+ substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2)
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,A.bill_num
+,A.bill_item
+,A.bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,coalesce(K1.belong_sales_grp,K.belong_sales_grp) "对应归属销售组"
+,coalesce(L1.node_desc9,L.node_desc9)
+,coalesce(K1.belong_channel,K.belong_channel) "对应归属渠道"
+,'' distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,A.material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,A.batch
+,A.plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,0
+,A.dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,0
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,0
+,0
+,0
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,B.category
+,B.category_name
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,0
+,0
+,A.val_type
+,0
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,0 as zxscb_amb
+,0 as zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,0
+,0 "产品成本-非全资调整"
+,B.prod_property        "产品所有权"
+,SUBSTR(C.node_name2,2,999)
+,C.node_desc2  "销售事业部(1+N)"
+,E.utilities_dept
+,E.utilities_dept_name  "产品事业部(1+N)"
+,A.sales_grp as zsales_grp
+,A.sales_grp___t as zsales_grp_n 
+,A.distr_chan as zsales_channel 
+,0 "标准成本A"
+,0 "阿米巴结算总价-销售单元(含税)"		
+,0 "阿米巴结算总价-销售单元(不含税)"	
+,F.classify_name "分类"
+,F.prod_line_name "产品线"
+,F.category_name "品类"
+,G.category_prod_line "品类-产品线管理"
+,IF(H.material_num is not null ,'X','') "主推产品"
+,IF(I.bathroom_cabinet_actual is not null ,'X','') "主销产品"
+,case  
+      when F.category_name = '普通坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '智能坐便器' then  substr(A.material ,1,7)
+      when F.category_name = '盆'       then  substr(A.material ,1,5)
+      when F.category_name = '蹲便器'    then  substr(A.material ,1,6)
+      when F.category_name = '小便器'    then  substr(A.material ,1,5)
+      when JJ.category  is not null then JJ.simplified_code
+      else J.sku_short_code end "SKU简码"
+,'' "一级部门编码"
+,'' "一级部门名称"
+,'' "二级部门编码"
+,'' "二级部门名称"
+,'' "WBS一级部门编码"
+,'' "WBS一级部门名称"
+,'' "WBS二级部门编码"
+,'' "WBS二级部门名称"
+,'' "WBS三级部门编码"
+,'' "WBS三级部门名称"
+,0 "实际成本(对外销售)"
+,0 "1+N收入"
+,0 "1+N成本"
+,0 "跨事业部收入"
+,0 "跨事业部成本"
+,0 "1+N比例"     
+--,0 "1+N利润"
+,0 "跨事业部比例"     
+,'U' as "数据来源"
+,0 as "对外销售收入"
+,B.prod_property_name 
+--,0 "跨事业部利润"
+,if(D2.division_cost_flag is not null,coalesce(D2.product_belong_rate,0),0) "事业部内部比例"
+--【新记录上（"事业部内部收入"-"事业部内部成本"）-原记录上的（"使用积分"+"预提积分-系统"+"预提积分-手工"）】*新记录上"事业部内部"比例
+--,if(D2.division_cost_flag is not null,(coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0) - 
+--if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0),KC.avg_kcje * coalesce(A.zxssl,0)) - coalesce(A.ZSYJF,0) - coalesce(A.ZYTJF_XT,0) - coalesce(A.ZYTJF_SG,0))
+--* coalesce(D2.product_belong_rate,0),0)  "事业部内部利润"
+,if(D2.division_cost_flag is not null,coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0),0) "事业部内部收入"
+,if(D2.division_cost_flag is not null,if(substr(A.comp_code,1,2) <> substr(A.plant,1,2) or KC.avg_kcje = 0,coalesce(A.ZYYWCB,0) + coalesce(A.ZYYWCB_DSF,0),KC.avg_kcje * coalesce(A.zxssl,0)),0)  "事业部内部成本"
+,case when "distr_chan" = '06' then 'GD03'
+      when ("distr_chan" not in ('08', '06') or "distr_chan" is null) then 'GD01'
+      when "distr_chan" = '08' then 'GD02' else '' end  "整合渠道"
+,current_timestamp 	
+,D2.trading_mode
+,case when (B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                          B.prod_property_name is not null) then 'GG01'
+                    when "doc_type" = 'ZA02' or substr(A.plant, -2) = '80' then 'GD04'
+                    when "distr_chan" = '06' and B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null then 'GG05'
+                    when "distr_chan" = '06' and B.reserved_field_1 = 'G105' then 'GG08'
+                    when "distr_chan" not in ('08', '06') or "distr_chan" is null then
+                        CASE
+                            when B.reserved_field_1 = 'G105' then 'GG08'
+                            when B.reserved_field_3  = 'A9' then 'GG03'
+                            WHEN (B.reserved_field_1 <> 'G105' or B.reserved_field_1 is null) and (B.reserved_field_3 <> 'A9' or B.reserved_field_1 is null) and
+                                 substr(B.product_level3_code, 1, 1) = '1' and
+                                 substr(B.product_level3_code, 1, 4) <> '1016' then 'GG06' END
+                    WHEN "distr_chan" = '08' then
+--                    case when substr(t3.prod_code3,1,1) = '1' and substr(t3.prod_code3,1,4) <> '1016' then '瓷砖产品'
+                        case
+                            when B.prod_property in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') or
+                                 B.prod_property_name is null then 'GG02'
+                            when B.prod_property not in ('A0000', 'A0001', 'C0001', 'C0002', 'C0004') and
+                                 B.prod_property_name is not null then 'GG01' end             end "整合渠道2"
+,0 as "对外销售比例"  
+--,0 as "对外销售收入利润"
+--,0 as "不含税销售净额"
+,0 as "阿米巴结算单价-销售单元"	
+,0 as "上期周期单价"
+--,0 as "上周周期总价"
+,case when calday = '00000000' then '' else TO_DATE(calday,'YYYY-MM-DD') end 
+,0 as "阿米巴结算单价-生产基地"
+from DM.DM_ZZT_XSSR_T A   
+left join dwimd.dwi_md_data_material_general_t B 
+on A.material = B.material_num 
+left join dm.dm_rpt_sales_group_t C 
+on A.sales_grp = C.node_name9 --获取销售事业部
+left join (select distinct product_belong,product_division from upload.upload_amb_cost_rules_t where trading_mode = 'A' and product_division is not null) D
+on D.product_belong = B.prod_property --获取产品事业部
+left join upload.upload_amb_cost_rules_t D2
+on D2.product_belong = B.prod_property and D2.sales_division = substr(C.node_name3,2,999)--获取成本规则外挂表关联信息（单元）
+left join (select distinct substr(node_name2,2,999) as utilities_dept, node_desc2 as utilities_dept_name from dm.dm_rpt_sales_group_t) E
+on D.product_division = E.utilities_dept---获取产品事业部名称
+left join DM.DM_RPT_PROD_CATEGORY_T F 
+on A.zprodh3 = F.prod_level3_code and F.prod_level3_code is not null 
+left join DM.DM_RPT_PRODLINE_CLASS_T G  
+on A.material = G.material_code 
+left join (select distinct MATERIAL_NUM,stat_year from DM.DM_RPT_MASTESERIES_PROD_T) H --主推产品
+on A.material = H.material_num and substring(A.calmonth,1,4) = H.stat_year
+left join (select distinct bathroom_cabinet_actual,stat_year from DM.DM_RPT_MASTERSALE_PROD_T) I --主销产品
+on A.material = I.bathroom_cabinet_actual and substring(A.calmonth,1,4) = I.stat_year
+left join (select distinct prod_code,sku_short_code from DM.DM_RPT_SHORT_CODE_T) J --SKU简码
+on A.material = J.prod_code 
+left join (select distinct simplified_code,product_code,stat_year,category from upload.upload_sw_shower_room_simplified_code_t) JJ
+on SUBSTR(A.calmonth,1,4) = JJ.stat_year and A.material = JJ.product_code 
+left join (select distinct product_belong,ext_matl_group,sales_org,sales_grp,channel_code,belong_sales_grp,belong_channel,flag from upload.upload_amb_cross_divison_salesgrp_t) K
+on A.salesorg = K.sales_org and A.distr_chan = K.channel_code and B.prod_property = K.product_belong and A.extmatlgrp = K.ext_matl_group and K.sales_grp is null and K.flag = 'U'
+left join (select distinct product_belong,ext_matl_group,sales_org,sales_grp,channel_code,belong_sales_grp,belong_channel,flag from upload.upload_amb_cross_divison_salesgrp_t) K1
+on A.salesorg = K1.sales_org and A.distr_chan = K1.channel_code and B.prod_property = K1.product_belong and A.extmatlgrp = K1.ext_matl_group and A.sales_grp = K1.sales_grp and K1.sales_grp is not null and K1.flag = 'U'
+left join dm.dm_rpt_sales_group_t L 
+on K.belong_sales_grp = L.node_name9
+left join dm.dm_rpt_sales_group_t L1 
+on K1.belong_sales_grp = L1.node_name9
+left join (select val_type,calmonth,material,if (sum(quantity) <> 0,sum(zsjkcje)/sum(quantity),0) as avg_kcje
+from DM.DM_RPT_ZZT_KCMX_T group by val_type,calmonth,material) as KC 
+on A.calmonth = KC.calmonth and coalesce(A.val_type ,'#') = coalesce(KC.val_type ,'#') and A.material = KC.material
+where A.bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') 
+and ((coalesce(A.ZZYYWSR_GN,0) + coalesce(ZYYWSR_WM,0) + coalesce(ZYYWSR_ZYCK,0) + coalesce(ZHWJZJGTZ,0) + coalesce(ZYYWSR_JTJ,0) + coalesce(ZZXCYF,0)  + coalesce(ZFDJE,0)) <> 0 or ((coalesce(A.ZYYWCB,0) <> 0 or coalesce(A.zyywcb_dsf,0) <> 0 ) and (zcbkm in ('0054010100','0054010500') or doc_type = 'ZA07')))
+and D2.division_cost_flag is not null  and ( bus_area <> 'G000' or  bus_area is null )
+and substr(A.calmonth,1,4)||'-'||substr(A.calmonth,5,2) >= substr('${PERIOD_ID_D}',1,7)
+)
+,
+
+/*
+业务范围（bus_area) <> G000 
+数据来源（data_source）= ‘S'
+而且：产品所有权（prod_property）不为空
+而且：客户编码（customer）存在共享仓客户范围内（表：SDI.SDI_CT_SHARE_CUSTOMER_REL_1037，字段：共享仓客户编码（dealer_code））
+而且：年月（calmonth）在“入参日期所在年的1月”  到  “入参日期所在月”（注：入参日期为当前日期减5天）
+而且：分销渠道（distr_chan）<>06
+而且：交易模式（trading_mode）不为空
+*/
+g1 as(
+select
+	d.cust_code														-- 客户编码
+	,d.material_code												-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0) as amb_cost_unit_price_amt					-- 阿米巴成本单价
+	,nvl(d3.zcost,0) as standard_a_cost_unit_price_amt				-- 标A成本单价
+from
+(
+	select
+		t.customer				as cust_code						-- 客户编码
+		,t.material				as material_code					-- 物料编码
+		,case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+				else sum(t.notax_sales_net_amt)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+			end 				as revenue_unit_price_amt			-- 收入单价
+		,case when t.trading_mode = 'A' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.act_cost_sum_amt)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				when t.trading_mode = 'B' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.profit_1n)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				when t.trading_mode = 'C' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.cross_profit)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				else 0
+			end 				as actual_cost_unit_price_amt		-- 实际成本单价
+		,case when t.prod_property = 'C0001' then '07'  
+				when t.prod_property = 'C0002' then '05' 
+				when t.prod_property = 'A0001' then '01' 
+				when t.prod_property = 'B0001' then '08' 
+				when t.prod_property = 'C0003' then '04' 
+				when t.prod_property = 'C0004' then '06' 
+				when t.prod_property = 'C0005' then '03' 
+				when t.prod_property = 'C0006' then '02' 
+				when t.prod_property = 'D0001' then '10' 
+				else 'null'
+			end zsyb_code											-- 事业部编码
+		,t.prod_property											-- 产品所有权
+	from 
+		dm.dm_ambv2_profit_t t
+	where t.data_source = 'S'
+	and t.prod_property is not null
+	and t.customer in (select dealer_code from upload.upload_ct_share_customer_rel_1037 group by dealer_code)
+	and substr(t.calmonth,1,7) between substr('${PERIOD_ID_D}',1,4)||'-01' and substr('${PERIOD_ID_D}',1,7)
+	and (t.bus_area not in('G000','G001')  or t.bus_area is null)
+	and (t.distr_chan <> '06' or t.distr_chan is null)
+	and t.trading_mode is not null
+) d
+
+left join 
+	(select 
+		d1.matnr													-- 物料编码
+		,d1.datef													-- 开始日期
+		,d1.dated													-- 结束日期
+		,d1.zsyb_code												-- 事业部编码
+		,d1.zsyb													-- 事业部描述
+		,d1.price1													-- 内部结算价
+	from (
+		select 
+			d.matnr 												-- 物料编码
+			,d.datef 		                    					-- 开始日期
+			,d.dated		                    					-- 结束日期
+			,d.zsyb_code 											-- 事业部编码
+			,d.zsyb 												-- 事业部描述
+			,d.price1 												-- 内部结算价
+			,d.werks
+			,row_number ()over(partition by d.matnr ,d.datef,d.zsyb_code ,d.zsyb order by d.werks asc,d.dated desc) as rn
+		from 
+			dwifin.dwi_prc_ztamb_cost_t d
+		where d.dated > d.datef
+		) d1
+	where d1.rn = 1
+	) d2
+on d.material_code = d2.matnr 
+and d.zsyb_code = d2.zsyb_code
+and REPLACE('${PERIOD_ID_D}','-','') >= d2.datef
+and REPLACE('${PERIOD_ID_D}','-','') <= d2.dated
+
+left join dm.dm_zcds_mat_zysacb_t d3
+on d.material_code = d3.matnr
+and REPLACE('${PERIOD_ID_D}','-','') >= d3.datab
+and REPLACE('${PERIOD_ID_D}','-','') <= d3.datbi 
+and d3.groes is not null
+
+group by
+	d.cust_code														-- 客户编码
+	,d.material_code												-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0)												-- 阿米巴成本单价
+	,nvl(d3.zcost,0)												-- 标A成本单价
+
+)
+,
+
+/*
+业务范围（bus_area) <> G000 
+数据来源（data_source）= ‘S'
+而且：产品所有权（prod_property）不为空
+而且：客户编码（customer）存在共享仓客户范围内（表：SDI.SDI_CT_SHARE_CUSTOMER_REL_1037，字段：共享仓客户编码（dealer_code））
+而且：年月（calmonth）中年度为：入参日期所在年的上一年（注：入参日期为当前日期减5天）
+而且：分销渠道（distr_chan）<>06
+而且：交易模式（trading_mode）不为空
+*/
+g2 as(
+select
+	d.cust_code														-- 客户编码
+	,d.material_code												-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0) as amb_cost_unit_price_amt					-- 阿米巴成本单价
+	,nvl(d3.zcost,0) as standard_a_cost_unit_price_amt				-- 标A成本单价
+from
+(
+	select
+		t.customer				as cust_code						-- 客户编码
+		,t.material				as material_code					-- 物料编码
+		,case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+				else sum(t.notax_sales_net_amt)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+			end 				as revenue_unit_price_amt			-- 收入单价
+		,case when t.trading_mode = 'A' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.act_cost_sum_amt)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				when t.trading_mode = 'B' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.profit_1n)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				when t.trading_mode = 'C' then case when sum(t.zxssl)over(partition by t.customer,t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.cross_profit)over(partition by t.customer,t.material)/sum(t.zxssl)over(partition by t.customer,t.material)
+												end
+				else 0
+			end 				as actual_cost_unit_price_amt		-- 实际成本单价
+		,case when t.prod_property = 'C0001' then '07'  
+				when t.prod_property = 'C0002' then '05' 
+				when t.prod_property = 'A0001' then '01' 
+				when t.prod_property = 'B0001' then '08' 
+				when t.prod_property = 'C0003' then '04' 
+				when t.prod_property = 'C0004' then '06' 
+				when t.prod_property = 'C0005' then '03' 
+				when t.prod_property = 'C0006' then '02' 
+				when t.prod_property = 'D0001' then '10' 
+				else 'null'
+			end zsyb_code											-- 事业部编码
+		,t.prod_property											-- 产品所有权
+	from 
+		dm.dm_ambv2_profit_t t
+	where t.data_source = 'S'
+	and t.prod_property is not null
+	and t.customer in (select dealer_code from upload.upload_ct_share_customer_rel_1037 group by dealer_code)
+	and substr(t.calmonth,1,4) = substr('${PERIOD_ID_D}',1,4) - 1
+	and (t.bus_area not in('G000','G001') or t.bus_area is null)
+	and (t.distr_chan <> '06' or t.distr_chan is null)
+	and t.trading_mode is not null
+) d
+
+left join 
+	(select 
+		d1.matnr													-- 物料编码
+		,d1.datef													-- 开始日期
+		,d1.dated													-- 结束日期
+		,d1.zsyb_code												-- 事业部编码
+		,d1.zsyb													-- 事业部描述
+		,d1.price1													-- 内部结算价
+	from (
+		select 
+			d.matnr 												-- 物料编码
+			,d.datef 		                    					-- 开始日期
+			,d.dated		                    					-- 结束日期
+			,d.zsyb_code 											-- 事业部编码
+			,d.zsyb 												-- 事业部描述
+			,d.price1 												-- 内部结算价
+			,d.werks
+			,row_number ()over(partition by d.matnr ,d.datef,d.zsyb_code ,d.zsyb order by d.werks asc,d.dated desc) as rn
+		from 
+			dwifin.dwi_prc_ztamb_cost_t d
+		where d.dated > d.datef
+		) d1
+	where d1.rn = 1
+	) d2
+on d.material_code = d2.matnr 
+and d.zsyb_code = d2.zsyb_code
+and REPLACE('${PERIOD_ID_D}','-','') >= d2.datef
+and REPLACE('${PERIOD_ID_D}','-','') <= d2.dated
+
+left join dm.dm_zcds_mat_zysacb_t d3
+on d.material_code = d3.matnr
+and REPLACE('${PERIOD_ID_D}','-','') >= d3.datab
+and REPLACE('${PERIOD_ID_D}','-','') <= d3.datbi 
+and d3.groes is not null
+
+group by
+	d.cust_code														-- 客户编码
+	,d.material_code												-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0)												-- 阿米巴成本单价
+	,nvl(d3.zcost,0)												-- 标A成本单价
+
+
+)
+,
+
+/*
+业务范围（bus_area) <> G000 
+数据来源（data_source）= ‘S'
+而且：产品所有权（prod_property）不为空
+而且：销售区域（sales_dist）为：（B00018、S00001、S00003、S00004、S00005、S00006、S00008、S00009、S00010、S00011、S00014）
+而且：年月（calmonth）在“入参日期所在年的1月”  到  “入参日期所在月”（注：入参日期为当前日期减5天）
+而且：分销渠道（distr_chan）<>06
+而且：交易模式（trading_mode）不为空
+*/
+g3 as(
+select
+	d.material_code													-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0) as amb_cost_unit_price_amt					-- 阿米巴成本单价
+	,nvl(d3.zcost,0) as standard_a_cost_unit_price_amt				-- 标A成本单价
+from
+(
+	select
+		t.material				as material_code					-- 物料编码
+		,case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+				else sum(t.notax_sales_net_amt)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+			end 				as revenue_unit_price_amt			-- 收入单价
+		,case when t.trading_mode = 'A' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.act_cost_sum_amt)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				when t.trading_mode = 'B' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.profit_1n)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				when t.trading_mode = 'C' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.cross_profit)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				else 0
+			end 				as actual_cost_unit_price_amt		-- 实际成本单价
+		,case when t.prod_property = 'C0001' then '07'  
+				when t.prod_property = 'C0002' then '05' 
+				when t.prod_property = 'A0001' then '01' 
+				when t.prod_property = 'B0001' then '08' 
+				when t.prod_property = 'C0003' then '04' 
+				when t.prod_property = 'C0004' then '06' 
+				when t.prod_property = 'C0005' then '03' 
+				when t.prod_property = 'C0006' then '02' 
+				when t.prod_property = 'D0001' then '10' 
+				else 'null'
+			end zsyb_code											-- 事业部编码
+		,t.prod_property											-- 产品所有权
+	from 
+		dm.dm_ambv2_profit_t t
+	where t.data_source = 'S'
+	and t.prod_property is not null
+	and t.sales_dist in ('B00018','S00001','S00003','S00004','S00005','S00006','S00008','S00009','S00010','S00011','S00014')
+	and substr(t.calmonth,1,7) between substr('${PERIOD_ID_D}',1,4)||'-01' and substr('${PERIOD_ID_D}',1,7)
+	and (t.bus_area not in('G000','G001') or t.bus_area is null)
+	and (t.distr_chan <> '06' or t.distr_chan is null)
+	and t.trading_mode is not null
+) d
+
+left join 
+	(select 
+		d1.matnr													-- 物料编码
+		,d1.datef													-- 开始日期
+		,d1.dated													-- 结束日期
+		,d1.zsyb_code												-- 事业部编码
+		,d1.zsyb													-- 事业部描述
+		,d1.price1													-- 内部结算价
+	from (
+		select 
+			d.matnr 												-- 物料编码
+			,d.datef 		                    					-- 开始日期
+			,d.dated		                    					-- 结束日期
+			,d.zsyb_code 											-- 事业部编码
+			,d.zsyb 												-- 事业部描述
+			,d.price1 												-- 内部结算价
+			,d.werks
+			,row_number ()over(partition by d.matnr ,d.datef,d.zsyb_code ,d.zsyb order by d.werks asc,d.dated desc) as rn
+		from 
+			dwifin.dwi_prc_ztamb_cost_t d
+		where d.dated > d.datef
+		) d1
+	where d1.rn = 1
+	) d2
+on d.material_code = d2.matnr 
+and d.zsyb_code = d2.zsyb_code
+and REPLACE('${PERIOD_ID_D}','-','') >= d2.datef
+and REPLACE('${PERIOD_ID_D}','-','') <= d2.dated
+
+left join dm.dm_zcds_mat_zysacb_t d3
+on d.material_code = d3.matnr
+and REPLACE('${PERIOD_ID_D}','-','') >= d3.datab
+and REPLACE('${PERIOD_ID_D}','-','') <= d3.datbi 
+and d3.groes is not null
+
+group by
+	d.material_code													-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0)												-- 阿米巴成本单价
+	,nvl(d3.zcost,0)												-- 标A成本单价
+)
+,
+
+/*
+业务范围（bus_area) <> G000 
+数据来源（data_source）= ‘S'
+而且：产品所有权（prod_property）不为空
+而且：销售区域（sales_dist）为：（B00018、S00001、S00003、S00004、S00005、S00006、S00008、S00009、S00010、S00011、S00014）
+而且：年月（calmonth）中年度为：入参日期所在年的上一年（注：入参日期为当前日期减5天）
+而且：分销渠道（distr_chan）<>06
+而且：交易模式（trading_mode）不为空
+*/
+g4 as(
+select
+	d.material_code													-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0) as amb_cost_unit_price_amt					-- 阿米巴成本单价
+	,nvl(d3.zcost,0) as standard_a_cost_unit_price_amt				-- 标A成本单价
+from
+(
+	select
+		t.material				as material_code					-- 物料编码
+		,case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+				else sum(t.notax_sales_net_amt)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+			end 				as revenue_unit_price_amt			-- 收入单价
+		,case when t.trading_mode = 'A' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.act_cost_sum_amt)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				when t.trading_mode = 'B' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.profit_1n)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				when t.trading_mode = 'C' then case when sum(t.zxssl)over(partition by t.material) = 0 then 0 
+													else sum(t.notax_sales_net_amt - t.cross_profit)over(partition by t.material)/sum(t.zxssl)over(partition by t.material)
+												end
+				else 0
+			end 				as actual_cost_unit_price_amt		-- 实际成本单价
+		,case when t.prod_property = 'C0001' then '07'  
+				when t.prod_property = 'C0002' then '05' 
+				when t.prod_property = 'A0001' then '01' 
+				when t.prod_property = 'B0001' then '08' 
+				when t.prod_property = 'C0003' then '04' 
+				when t.prod_property = 'C0004' then '06' 
+				when t.prod_property = 'C0005' then '03' 
+				when t.prod_property = 'C0006' then '02' 
+				when t.prod_property = 'D0001' then '10' 
+				else 'null'
+			end zsyb_code											-- 事业部编码
+		,t.prod_property											-- 产品所有权
+	from 
+		dm.dm_ambv2_profit_t t
+	where t.data_source = 'S'
+	and t.prod_property is not null
+	and t.sales_dist in ('B00018','S00001','S00003','S00004','S00005','S00006','S00008','S00009','S00010','S00011','S00014')
+	and substr(t.calmonth,1,4) = substr('${PERIOD_ID_D}',1,4) - 1
+	and (t.bus_area not in('G000','G001') or t.bus_area is null)
+	and (t.distr_chan <> '06' or t.distr_chan is null)
+	and t.trading_mode is not null
+) d
+
+left join 
+	(select 
+		d1.matnr													-- 物料编码
+		,d1.datef													-- 开始日期
+		,d1.dated													-- 结束日期
+		,d1.zsyb_code												-- 事业部编码
+		,d1.zsyb													-- 事业部描述
+		,d1.price1													-- 内部结算价
+	from (
+		select 
+			d.matnr 												-- 物料编码
+			,d.datef 		                    					-- 开始日期
+			,d.dated		                    					-- 结束日期
+			,d.zsyb_code 											-- 事业部编码
+			,d.zsyb 												-- 事业部描述
+			,d.price1 												-- 内部结算价
+			,d.werks
+			,row_number ()over(partition by d.matnr ,d.datef,d.zsyb_code ,d.zsyb order by d.werks asc,d.dated desc) as rn
+		from 
+			dwifin.dwi_prc_ztamb_cost_t d
+		where d.dated > d.datef
+		) d1
+	where d1.rn = 1
+	) d2
+on d.material_code = d2.matnr 
+and d.zsyb_code = d2.zsyb_code
+and REPLACE('${PERIOD_ID_D}','-','') >= d2.datef
+and REPLACE('${PERIOD_ID_D}','-','') <= d2.dated
+
+left join dm.dm_zcds_mat_zysacb_t d3
+on d.material_code = d3.matnr
+and REPLACE('${PERIOD_ID_D}','-','') >= d3.datab
+and REPLACE('${PERIOD_ID_D}','-','') <= d3.datbi 
+and d3.groes is not null
+
+group by
+	d.material_code													-- 物料编码
+	,d.revenue_unit_price_amt										-- 收入单价
+	,d.actual_cost_unit_price_amt									-- 实际成本单价
+	,nvl(d2.price1,0)												-- 阿米巴成本单价
+	,nvl(d3.zcost,0)												-- 标A成本单价
+)
+,
+
+/*
+关联维表取维度值
+*/
+g5 as(
+select
+	substr(f.doc_date,1,7) as year_month							-- 日历年/月
+	,replace(f.doc_date,'-','')	as year_month_day					-- 日历日
+	,f.doc_num														-- 订单抬头
+	,f.customer_code												-- 客户编码
+	,f.operation_center_code as cust_code	                        -- 运营商客户
+	,f.customer_name	                                            -- 客户名称
+	,f.node_name9 as sales_grp_code	                                -- 销售组（主档）
+	,f.node_desc9 as sales_grp_desc	                                -- 销售组（主档）的文本
+	,g."SALES_CHANNEL_CODE"	                                        -- 分销渠道
+	,g."SALES_CHANNEL"	                                            -- 分销渠道的文本
+	,g."LAND1"                                                      -- 国家
+	,g."BZIRK" as sales_area_code                                   -- 销售地区
+	,g."SALES_AREA"	                                                -- 销售地区的文本
+	,g."SALES_ORGANIZATION_CODE"	                                -- 销售组织
+	,g."SALES_ORGANIZATION"	                                        -- 销售组织的文本
+	,g."SALES_DEPARTMENT_CODE"	                                    -- 销售办公室
+	,g."SALES_DEPARTMENT"	                                        -- 销售办公室的文本
+	,f.material_num	as material_code                                -- 物料编码
+	,f.material_name	                                            -- 物料编码的文本
+	,f.product_level_code	                                        -- 产品层次
+	,f.product_level_name	                                        -- 产品层次的文本
+	,f.matl_group_code	                                            -- 物料组
+	,f.matl_group_name	                                            -- 物料组的文本
+	,h.matl_group1_code	                                            -- 物料组1
+	,h.matl_group1_name	                                            -- 物料组1的文本
+	,h.matl_group2_code	                                            -- 物料组2
+	,h.matl_group2_name	                                            -- 物料组2的文本
+	,h.matl_group3_code	                                            -- 物料组3
+	,h.matl_group3_name	                                            -- 物料组3的文本
+	,h.matl_group4_code	                                            -- 物料组4
+	,h.matl_group4_name	                                            -- 物料组4的文本
+	,h.matl_group5_code	                                            -- 物料组5
+	,h.matl_group5_name	                                            -- 物料组5的文本
+	,f.external_matl_group_code	                                    -- 外部物料组
+	,f.external_matl_group_name	                                    -- 外部物料组的文本
+	,f.batch_num	                                                -- 批次
+	,f.product_group_code	                                        -- 产品组
+	,f.product_group_name	                                        -- 产品组的文本
+	,f.dimension	                                                -- 大小/量纲
+	,f.sale_area	                                                -- 销售面积
+	,f.material_qty	                                                -- 销售数量
+	,f.node_name9	                                                -- 销售组（实际）
+	,f.node_desc9	                                                -- 销售组（实际）的文本
+	,k.product_level1_code	                                        -- 产品层次1
+	,k.product_level1_name	                                        -- 产品层次1描述
+	,k.product_level2_code	                                        -- 产品层次2
+	,k.product_level2_name	                                        -- 产品层次2描述
+	,k.product_level3_code	                                        -- 产品层次3
+	,k.product_level3_name	                                        -- 产品层次3描述
+	,k.product_level4_code	                                        -- 产品层次4
+	,k.product_level4_name	                                        -- 产品层次4描述
+	,k.product_level5_code	                                        -- 产品层次5
+	,k.product_level5_name	                                        -- 产品层次5描述
+	,f.matl_type_code	                                			-- 产品类型
+	,k.prod_property                                                -- 产品所有权
+	,k.prod_property_name                                           -- 产品所有权名称
+	,substr(f.node_name2,2,99) as node_name2	                    -- 销售事业部(1+N)代码
+	,f.node_desc2		                                            -- 销售事业部(1+N)名称
+from 
+	dwrcs.dwr_dea_share_ware_perf_f f
+
+left join dm.dm_rpt_zmaster_cus_t g
+	   on f.customer_code = g."ACCOUNT_NUMBER"
+	  and f.sales_org_code = g."SALES_ORGANIZATION_CODE"
+	  and f.sales_channel = g."SALES_CHANNEL_CODE"
+	  and g."PARVW" = 'AG'
+
+left join dwimd.dwi_md_data_material_sales_t h
+	   on f.material_num = h.material_num
+	  and f.sales_org_code = h.sales_org_code
+	  and f.sales_channel = h.distribution_channel_code
+
+left join dwimd.dwi_md_data_material_general_t k
+	   on f.material_num = k.material_num
+
+where k.prod_property is not null
+  and substr(f.doc_date,1,7) = substr('${PERIOD_ID_D}',1,7)
+
+)
+
+select --补数据数据
+ calmonth
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,bill_num
+,bill_item
+,bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,sales_grp
+,sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,batch
+,plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,zhsje
+,zbhsje
+,zhwjz
+,zyywsr_zyck
+,zzyywsr_gn
+,zyywsr_wm
+,zyywsr_gsj
+,zyywsr_jtj
+,zzxcyf
+,zhwjzjgtz
+,zsj
+,zzxcyfsj
+,zhwjzjgtzsj
+,zhwjzsj
+,zzyywsr_qt
+,zsyjf
+,zytjf_sg
+,zytjf_xt
+,zyywcb
+,zyywcb_gsj
+,zyywcb_jtj
+,zyywcb_dsf
+,zyywcb_yf
+,ztms_yf
+,zsgrz_yf
+,zyywcb_zxf
+,ztms_zxf
+,zsgrz_zxf
+,zzyywcb_clcbcy
+,zzyywcb_cbcbcy
+,zzyywcb_cpjjss
+,zzyywcb_qt
+,zxsmj
+,zxssl
+,dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,zzqj
+,zsrtzz
+,zcbtzz
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,zpl
+,zpl___t
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,zfdje
+,z_yjsgtzz
+,val_type
+,zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,zzyywcb_azf
+,prod_cost_adjust
+,prod_property
+,sales_division_1n_code
+,sales_division_1n
+,product_division_1n_code
+,product_division_1n
+,zsales_grp
+,zsales_grp_n
+,zsales_channel
+,standard_price_a
+,amb_internal_tax_price
+,amb_internal_price
+,classify_name
+,prod_line_name
+,category_name
+,category_prod_line
+,masterseries_prod
+,mastersale_prod
+,sku_short_code
+,one_level_dept_code
+,one_level_dept_name
+,two_level_dept_code
+,two_level_dept_name
+,wbs_1_level_dept_code
+,wbs_1_level_dept_name
+,wbs_2_level_dept_code
+,wbs_2_level_dept_name
+,wbs_3_level_dept_code
+,wbs_3_level_dept_name
+,ext_act_sales_cost
+,income_1n
+,cost_1n
+,cross_income
+,cross_cost
+,rate_1n
+,profit_1n
+,cross_rate
+,data_source
+,ext_sales_income
+,prod_property_name
+,cross_profit
+,dept_inner_rate
+,dept_inner_profit
+,dept_inner_income
+,dept_inner_cost
+,integrate_channel
+,last_update_date
+,trading_mode
+,integrate_channel2
+,ext_sales_rate
+,ext_sales_profit
+,notax_sales_net_amt
+,amb_internal_avg_price
+,last_period_avg_price
+,last_period_sum_price
+,stat_day
+,amb_internal_avg_fac_price
+,amb_profit_amt
+,act_cost_sum_amt
+,act_cost_profit_amt
+,bom_flag
+,s_calmonth
+,s_calday
+,0 as profit_1n_amt
+,0 as cross_profit_amt
+,0 as dept_inner_profit_amt
+,0 as ext_profit_1n_amt
+,0 as ext_cross_profit_amt
+,0 as ext_dept_inner_profit_amt
+from dm.dm_ambv2_profit_t_ext
+where calmonth >= substr('${PERIOD_ID_D}',1,7)
+
+union all
+select  
+ calmonth
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,bill_num
+,bill_item
+,bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,sales_grp
+,sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,batch
+,plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,case when bus_area = 'E000' then '清仓业务' 
+	  when bus_area = 'F000' then '特殊工程' 
+	  when bus_area = 'J000' then '定向促销' 
+	  when bus_area = 'H000' then '整装头部' 
+	  when bus_area = 'I000' then '山西基地平衡方案' else bus_area___t END AS bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,zhsje
+,zbhsje
+,zhwjz
+,zyywsr_zyck
+,zzyywsr_gn
+,zyywsr_wm
+,zyywsr_gsj
+,zyywsr_jtj
+,zzxcyf
+,zhwjzjgtz
+,zsj
+,zzxcyfsj
+,zhwjzjgtzsj
+,zhwjzsj
+,zzyywsr_qt
+,zsyjf
+,zytjf_sg
+,zytjf_xt
+,zyywcb
+,zyywcb_gsj
+,zyywcb_jtj
+,zyywcb_dsf
+,zyywcb_yf
+,ztms_yf
+,zsgrz_yf
+,zyywcb_zxf
+,ztms_zxf
+,zsgrz_zxf
+,zzyywcb_clcbcy
+,zzyywcb_cbcbcy
+,zzyywcb_cpjjss
+,zzyywcb_qt
+,zxsmj
+,zxssl
+,A.dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,zzqj
+,zsrtzz
+,zcbtzz
+,c.product_level1_code as zprodh1
+,c.product_level1_name as zprodh1___t
+,coalesce(c.product_level2_code,c.product_level1_code) as zprodh2
+,coalesce(c.product_level2_name,c.product_level1_name) as zprodh2___t
+,coalesce(c.product_level3_code,c.product_level2_code,c.product_level1_code) as zprodh3
+,coalesce(c.product_level3_name,c.product_level2_name,c.product_level1_name) as zprodh3___t
+,coalesce(c.product_level4_code,c.product_level3_code,c.product_level2_code,c.product_level1_code) as zprodh4
+,coalesce(c.product_level4_name,c.product_level3_name,c.product_level2_name,c.product_level1_name) as zprodh4___t
+,coalesce(c.product_level5_code,c.product_level4_code,c.product_level3_code,c.product_level2_code,c.product_level1_code) as zprodh5
+,coalesce(c.product_level5_name,c.product_level4_name,c.product_level3_name,c.product_level2_name,c.product_level1_name) as zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,A.category
+,A.category_name
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,zfdje
+,z_yjsgtzz
+,val_type
+,zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,zzyywcb_azf
+,coalesce("产品成本-非全资调整",0) "产品成本-非全资调整"
+,"产品所有权"
+,"销售事业部(1+N)代码"
+,"销售事业部(1+N)"
+,"产品事业部(1+N)代码"
+,"产品事业部(1+N)"
+,zsales_grp
+,zsales_grp_n 
+,zsales_channel 
+,coalesce("标准成本A",0) "标准成本A"
+,coalesce("阿米巴结算总价-销售单元(含税)",0) "阿米巴结算总价-销售单元(含税)"
+,coalesce("阿米巴结算总价-销售单元(不含税)",0) "阿米巴结算总价-销售单元(不含税)"--只存在成本那行
+,"分类"
+,"产品线"
+,"品类"
+,"品类-产品线管理"
+,"主推产品"
+,"主销产品"
+,"SKU简码"
+,"一级部门编码"
+,"一级部门名称"
+,"二级部门编码"
+,"二级部门名称"
+,"WBS一级部门编码"
+,"WBS一级部门名称"
+,"WBS二级部门编码"
+,"WBS二级部门名称"
+,"WBS三级部门编码"
+,"WBS三级部门名称"
+,coalesce("实际成本(对外销售)",0) "实际成本(对外销售)"
+,coalesce("1+N收入",0) "1+N收入"
+,coalesce("1+N成本",0) "1+N成本"
+,coalesce("跨事业部收入",0) "跨事业部收入"
+,coalesce("跨事业部成本",0) "跨事业部成本"
+,coalesce("1+N比例",0) "1+N比例"     
+--1+N利润 =("1+N收入"-"1+N成本"-使用积分(ZSYJF)-预提积分-系统(ZYTJF_XT）-预提积分-手工(ZYTJF_SG))*"1+N"比例
+,(coalesce("1+N收入",0)-coalesce("1+N成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * coalesce("1+N比例",0) as "1+N利润"
+,coalesce("跨事业部比例",0) "跨事业部比例"    
+,"数据来源"
+,coalesce("对外销售收入",0) "对外销售收入"
+,A.prod_property_name 
+--跨事业部利润 = ("跨事业部收入"-"跨事业部成本"-"使用积分"-"预提积分-系统"-"预提积分-手工"）*"跨事业部比例"	
+,(coalesce("跨事业部收入",0)-coalesce("跨事业部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * coalesce("跨事业部比例",0) as "跨事业部利润"
+,coalesce("事业部内部比例",0) "事业部内部比例"
+--（"事业部内部收入"-"事业部内部成本"-"使用积分"-"预提积分-系统"-"预提积分-手工"）* "事业部内部"比例
+,(coalesce("事业部内部收入",0)-coalesce("事业部内部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * coalesce("事业部内部比例",0) as "事业部内部利润"
+,coalesce("事业部内部收入",0) "事业部内部收入"
+,coalesce("事业部内部成本",0) "事业部内部成本"
+--事业部内部
+,"整合渠道"
+,current_timestamp 	
+,trading_mode
+,"整合渠道2"
+,coalesce("对外销售比例",0)  "对外销售比例"
+--（对外销售收入-实际成本（对外销售）-使用积分（ZSYJF)-预提积分-系统（ZYTJF_XT）-预提积分-手工（ZYTJF_SG))*"对外销售比例"
+,(coalesce("对外销售收入",0)-coalesce("实际成本(对外销售)",0)- coalesce(ZSYJF ,0)- coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * coalesce("对外销售比例",0) as "对外销售收入利润"
+--对外销售收入+"1+N收入"+"跨事业部收入"-使用积分（ZSYJF)-预提积分-系统（ZYTJF_XT）-预提积分-手工（ZYTJF_SG) + 主营业务收入-其他（zzyywsr_qt）+收入调整值
+,coalesce("对外销售收入",0)+coalesce("1+N收入",0)+coalesce("跨事业部收入",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) + coalesce(zzyywsr_qt,0) + coalesce(zsrtzz,0) as "不含税销售净额"
+,coalesce("阿米巴结算单价-销售单元",0) "阿米巴结算单价-销售单元"
+,coalesce("上期周期单价",0) "上期周期单价"
+,coalesce(coalesce("上期周期单价",0) * coalesce(ZXSSL,0),zzyywcb_zz)  as "上周周期总价"
+,stat_day
+,coalesce("阿米巴结算单价-生产基地",0) "阿米巴结算单价-生产基地"
+--"不含税销售净额 "- "阿米巴结算总价-销售单元（不含税）" - 成本调整值
+--【"不含税销售净额 ”-"1+N成本"-”跨事业部成本"】
+,case when trading_mode = 'A' or trading_mode is null then coalesce("对外销售收入",0)+coalesce("1+N收入",0)+coalesce("跨事业部收入",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) + coalesce(zzyywsr_qt,0) + coalesce(zsrtzz,0) - coalesce("阿米巴结算总价-销售单元(不含税)",0) - (case when bus_area in ('E000','F000','J000','H000','I000','G001') then coalesce(zcbtzz,0) else 0 end) 
+	  else (coalesce("对外销售收入",0)+coalesce("1+N收入",0)+coalesce("跨事业部收入",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) + coalesce(zzyywsr_qt,0) + coalesce(zsrtzz,0) - coalesce("1+N成本",0)-coalesce("跨事业部成本",0) - (case when bus_area in ('E000','F000','J000','H000','I000','G001') then coalesce(zcbtzz,0) else 0 end)) * (coalesce("1+N比例",0)+coalesce("跨事业部比例",0)) end as "阿米巴毛利额"
+--实际成本合计（管理）=1+N成本+实际成本（对外销售）+跨事业部成本+事业部内部成本+主营业务成本-安装费+主营业务成本-运费+主营业务成本-装卸费+成本调整值
+,coalesce("1+N成本",0)+coalesce("实际成本(对外销售)",0)+coalesce("跨事业部成本",0)+coalesce(zzyywcb_azf,0) + coalesce(zyywcb_yf,0) + coalesce(zyywcb_zxf,0) + (case when bus_area not in ('E000','F000','J000','H000','I000') or bus_area is null then coalesce(zcbtzz,0) else 0 end) as "实际成本合计(管理)"
+--实际成本毛利额=不含税销售净额（管理）-实际成本合计（管理）
+,coalesce("对外销售收入",0)+coalesce("1+N收入",0)+coalesce("跨事业部收入",0) - coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) + coalesce(zzyywsr_qt,0) + coalesce(zsrtzz,0) - (coalesce("1+N成本",0)+coalesce("实际成本(对外销售)",0)+coalesce("跨事业部成本",0)+ coalesce(zzyywcb_azf,0) + coalesce(zyywcb_yf,0) + coalesce(zyywcb_zxf,0) + (case when bus_area not in ('E000','F000','J000','H000','I000') or bus_area is null then coalesce(zcbtzz,0) else 0 end)) as "实际成本毛利额"
+,b.item_status as "浴室柜订单齐套标识"
+,calmonth as s_calmonth
+,stat_day as s_calday
+,case when trading_mode = 'B' then coalesce("1+N收入",0)-coalesce("1+N成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) else 0 end "1+N毛利额"
+,case when trading_mode = 'C' then coalesce("跨事业部收入",0)-coalesce("跨事业部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) else 0 end "跨事业部毛利额"
+,case when coalesce("事业部内部比例",0) <> 0 then coalesce("事业部内部收入",0)-coalesce("事业部内部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0) else 0 end "事业部内部毛利额" 
+,case when trading_mode = 'B' then (coalesce("1+N收入",0)-coalesce("1+N成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * (1- coalesce("1+N比例",0)) else 0 end "1+N对外分成毛利额"
+,case when trading_mode = 'C' then (coalesce("跨事业部收入",0)-coalesce("跨事业部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * (1- coalesce("跨事业部比例",0)) else 0 end "跨事业部对外分成毛利额"
+,case when coalesce("事业部内部比例",0) <> 0 then (coalesce("事业部内部收入",0)-coalesce("事业部内部成本",0)- coalesce(ZSYJF,0) - coalesce(ZYTJF_XT,0) - coalesce(ZYTJF_SG,0)) * (1 - coalesce("事业部内部比例",0)) else 0 end "事业部内部对外分成毛利额" 
+from TMP1 a 
+left join dm.dm_item_status_t b 
+on a.doc_number = b.sales_voucher_code and a.s_ord_item = b.sales_voucher_item_code 
+left join dwimd.dwi_md_data_material_general_t c 
+on a.material = c.material_num
+
+union all
+
+select
+	g5.year_month					-- 日历年/月
+	,g5.year_month_day				-- 日历日
+	,g5.doc_num						-- 订单抬头
+	,''								-- 订单抬头的文本
+	,''								-- 订单行
+	,''								-- 财务凭证号
+	,''								-- 财务凭证行
+	,''								-- 汇票短号（分配）
+	,''								-- 开票抬头
+	,''								-- 开票项目
+	,''								-- 发票类型
+	,''								-- 发票类型的文本
+	,''								-- 销售人员
+	,''								-- 销售人员的文本
+	,g5.customer_code				-- 客户编码
+	,g5.customer_name				-- 客户编码的文本
+	,g5.sales_grp_code				-- 销售组（主档）
+	,g5.sales_grp_desc				-- 销售组（主档）的文本
+	,g5."SALES_CHANNEL_CODE"		-- 分销渠道
+	,g5."SALES_CHANNEL"				-- 分销渠道的文本
+	,''								-- WBS-销售组
+	,''								-- WBS-销售组的文本
+	,''								-- WBS编码
+	,''								-- WBS编码的文本
+	,g5."LAND1"						-- 国家
+	,''								-- 国家的文本
+	,g5.sales_area_code				-- 销售地区
+	,g5."SALES_AREA"				-- 销售地区的文本
+	,g5."SALES_ORGANIZATION_CODE"	-- 销售组织
+	,g5."SALES_ORGANIZATION"		-- 销售组织的文本
+	,g5."SALES_DEPARTMENT_CODE"		-- 销售办公室
+	,g5."SALES_DEPARTMENT"			-- 销售办公室的文本
+	,g5.material_code				-- 物料编码
+	,g5.material_name				-- 物料编码的文本
+	,g5.product_level_code			-- 产品层次
+	,g5.product_level_name			-- 产品层次的文本
+	,g5.matl_group_code				-- 物料组
+	,g5.matl_group_name				-- 物料组的文本
+	,g5.matl_group1_code			-- 物料组1
+	,g5.matl_group1_name			-- 物料组1的文本
+	,g5.matl_group2_code			-- 物料组2
+	,g5.matl_group2_name			-- 物料组2的文本
+	,g5.matl_group3_code			-- 物料组3
+	,g5.matl_group3_name			-- 物料组3的文本
+	,g5.matl_group4_code			-- 物料组4
+	,g5.matl_group4_name			-- 物料组4的文本
+	,g5.matl_group5_code			-- 物料组5
+	,g5.matl_group5_name			-- 物料组5的文本
+	,''								-- 公司代码
+	,''								-- 公司代码的文本
+	,g5.external_matl_group_code	-- 外部物料组
+	,g5.external_matl_group_name	-- 外部物料组的文本
+	,g5.batch_num					-- 批次
+	,''								-- 工厂
+	,''								-- 工厂的文本
+	,''								-- 库存地点
+	,''								-- 库存地点的文本
+	,''								-- 凭证货币
+	,''								-- 凭证货币的文本
+	,''								-- 本位币
+	,''								-- 本位币的文本
+	,''								-- 工程报备号
+	,''								-- 商机编码
+	,''								-- 商机有效期
+	,''								-- 商机描述
+	,''								-- OSS报价单号
+	,''								-- OSS订单号
+	,''								-- TMS物料单号
+	,''								-- 订单描述
+	,g5.product_group_code			-- 产品组
+	,g5.product_group_name			-- 产品组的文本
+	,''								-- 渠道整合
+	,''								-- 渠道整合的文本
+	,g5.dimension					-- 大小/量纲
+	,''								-- 是否清仓
+	,'G001'							-- 业务范围
+	,'共享仓收入成本调整'				-- 业务范围的文本
+	,''								-- 客户组1
+	,''								-- 客户组1的文本
+	,''								-- 客户组2
+	,''								-- 客户组2的文本
+	,''								-- 客户组3
+	,''								-- 客户组3的文本
+	,''								-- 父商机编码
+	,''								-- 信息提供者
+	,''								-- 国际贸易条款
+	,''								-- 国际贸易条款的文本
+	,''								-- 销售政策
+	,''								-- 销售政策的文本
+	,''								-- 科目设置组
+	,''								-- 科目设置组的文本
+	,''								-- 价格组
+	,''								-- 价格组的文本
+	,''								-- 客户定价过程
+	,''								-- 客户定价过程的文本
+	,''								-- 税分类
+	,''								-- 税分类的文本
+	,''								-- 生产订单号
+	,0								-- 含税金额
+	,0								-- 不含税金额
+	,0								-- 货物净值( 不含税)
+	,0								-- 主营业务收入-自营出口
+	,0								-- 主营业务收入-国内销售
+	,0								-- 主营业务收入-国内销售(外贸公司)
+	,0								-- 主营业务收入-公司间
+	,0								-- 主营业务收入-集团间
+	,0								-- 中心仓运费
+	,0								-- 货物价值-价格调整
+	,0								-- 税金
+	,0								-- 中心仓运费税金
+	,0								-- 货物价值-价格调整税金
+	,0								-- 税金-(货物净值+价格调整）
+	,0								-- 主营业务收入-其它
+	,0								-- 使用积分
+	,0								-- 预提积分-手工
+	,0								-- 预提积分-系统
+	,0								-- 实际成本
+	,0								-- 主营业务成本-公司间
+	,0								-- 主营业务成本-集团间
+	,0								-- 主营业务成本-第三方
+	,0								-- 主营业务成本-运费
+	,0								-- TMS运费_计费
+	,0								-- 主营业务成本-运费（SAP手工）
+	,0								-- 主营业务成本-装卸费
+	,0								-- TMS装卸费_计费
+	,0								-- 主营业务成本-装卸费（SAP手工）
+	,0								-- 主营业务成本-材料成本差异
+	,0								-- 主营业务成本-产品成本差异
+	,0								-- 主营业务成本-产品降级损失
+	,0								-- 主营业务成本-其他
+	,g5.sale_area					-- 销售面积
+	,g5.material_qty				-- 销售数量
+	,CURRENT_TIMESTAMP()			-- 同步数据时间
+	,''								-- 成本科目
+	,''								-- 收入科目
+	,''								-- 收入科目的文本
+	,''								-- 收入凭证
+	,''								-- 成本凭证
+	,''								-- 公司发票
+	,''								-- 公司间行
+	,''								-- 开票状态
+	,''								-- 开票状态的文本
+	,''								-- 主营业务成本
+	,''								-- 客户组
+	,''								-- 客户组的文本
+	,g5.node_name9					-- 销售组（实际）
+	,g5.node_desc9					-- 销售组（实际）的文本
+	,''								-- 政策参考
+	,0								-- 周期价
+	,g5.material_qty * coalesce(g1.revenue_unit_price_amt,g2.revenue_unit_price_amt,g3.revenue_unit_price_amt,g4.revenue_unit_price_amt,0) 			--'收入调整值'
+	,g5.material_qty * coalesce(g1.actual_cost_unit_price_amt,g2.actual_cost_unit_price_amt,g3.actual_cost_unit_price_amt,g4.actual_cost_unit_price_amt,0)	--'成本调整值'
+	,g5.product_level1_code			-- 产品层次1
+	,g5.product_level1_name			-- 产品层次1描述
+	,g5.product_level2_code			-- 产品层次2
+	,g5.product_level2_name			-- 产品层次2描述
+	,g5.product_level3_code			-- 产品层次3
+	,g5.product_level3_name			-- 产品层次3描述
+	,g5.product_level4_code			-- 产品层次4
+	,g5.product_level4_name			-- 产品层次4描述
+	,g5.product_level5_code			-- 产品层次5
+	,g5.product_level5_name			-- 产品层次5描述
+	,''								-- 产品规格
+	,''								-- 产品规格描述
+	,''								-- 产品渠道
+	,''								-- 产品渠道描述
+	,''								-- 新品说明
+	,''								-- 新品说明描述
+	,''								-- 品类
+	,''								-- 品类描述
+	,''								-- 日历年/季度
+	,''								-- 产品定位
+	,''								-- 产品定位描述
+	,''								-- 产品功能
+	,''								-- 产品功能描述
+	,''								-- 盈利分析
+	,''								-- 盈利分析描述
+	,''								-- 面相
+	,''								-- 面相描述
+	,''								-- 产品材质
+	,''								-- 产品材质描述
+	,''								-- 工艺新品
+	,''								-- 工艺新品描述
+	,''								-- 色系
+	,''								-- 色系描述
+	,''								-- 纹路
+	,''								-- 纹路描述
+	,''								-- 母客编
+	,''								-- 母客编描述
+	,''								-- 母销售组织
+	,''								-- 母销售组织描述
+	,''								-- 产品上市时间
+	,''								-- 产品上市时间描述
+	,''								-- 批次入库日期
+	,''								-- 产区(变动)
+	,''								-- 产区
+	,''								-- Unit(销售面积)
+	,''								-- Unit(销售数量)
+	,''								-- 订单类型
+	,''								-- 订单类型描述
+	,0								-- 返点金额
+	,0								-- 业绩手工调整值(作废)
+	,''								-- 评估类型
+	,0								-- 主营业务收入-自营出口-凭证货币
+	,''								-- 交易模式
+	,''								-- 交易模式描述
+	,''								-- 销售事业部
+	,''								-- 销售事业部描述
+	,''								-- 产品事业部
+	,''								-- 产品事业部描述
+	,''								-- 生产事业部
+	,''								-- 生产事业部描述
+	,''								-- 发货事业部
+	,''								-- 发货事业部描述
+	,''								-- b事业部
+	,0								-- a事业部成本
+	,0								-- 含税销售额（业绩（不含调整值）+使用积分）
+	,''								-- 参考凭证编号
+	,''								-- 参考凭证项目号
+	,g5.matl_type_code				-- 产品类型
+	,''								-- 合同号
+	,''								-- 旧物料号
+	,''								-- 项目建议
+	,''								-- 信用检查的规则
+	,''								-- 运输地区
+	,''								-- 政策名称
+	,''								-- bom母件号
+	,0								-- 主营业务成本-安装费
+	,0								-- 产品成本-非全资调整
+	,g5.prod_property				-- 产品所有权
+	,g5.node_name2					-- 销售事业部(1+N)代码
+	,g5.node_desc2					-- 销售事业部(1+N)名称
+	,''								-- 产品事业部(1+N)代码
+	,''								-- 产品事业部(1+N)名称
+	,''								-- 销售组（销售方）
+	,''								-- 销售组（销售方）的文本
+	,''								-- 渠道（销售方）
+	,g5.material_qty * coalesce(g1.standard_a_cost_unit_price_amt,g2.standard_a_cost_unit_price_amt,g3.standard_a_cost_unit_price_amt,g4.standard_a_cost_unit_price_amt,0)/1.13							--'标准成本A'
+	,0								-- 阿米巴结算总价-销售单元（含税）
+	,g5.material_qty * coalesce(g1.amb_cost_unit_price_amt,g2.amb_cost_unit_price_amt,g3.amb_cost_unit_price_amt,g4.amb_cost_unit_price_amt,0)	-- 阿米巴结算总价-销售单元（不含税）
+	,''								-- 分类
+	,''								-- 产品线
+	,''								-- 品类
+	,''								-- 品类-产品线管理
+	,''								-- 主推产品
+	,''								-- 主销产品
+	,''								-- 简码SKU
+	,''								-- 一级部门编码
+	,''								-- 一级部门名称
+	,''								-- 二级部门编码
+	,''								-- 二级部门名称
+	,''								-- wbs一级部门编码
+	,''								-- wbs一级部门名称
+	,''								-- wbs二级部门编码
+	,''								-- wbs二级部门名称
+	,''								-- wbs三级部门编码
+	,''								-- wbs三级部门编码
+	,0								-- 实际成本（对外销售）
+	,0								-- 1+N收入
+	,0								-- 1+N成本
+	,0								-- 跨事业部收入
+	,0								-- 跨事业部成本
+	,0								-- 1+N比例
+	,0								-- 1+N利润
+	,0								-- 跨事业部比例
+	,'T'							-- 数据来源
+	,0								-- 对外销售收入
+	,g5.prod_property_name			-- 产品所有权名称
+	,0								-- 跨事业部利润
+	,0								-- 事业部内部比例
+	,0								-- 事业部内部利润
+	,0								-- 事业部内部收入
+	,0								-- 事业部内部成本
+	,case when g5."SALES_CHANNEL_CODE" = '06' then 'GD03'	--'整合渠道层级1'
+			when g5."SALES_CHANNEL_CODE" = '08' then 'GD02'
+			else 'GD01'
+		end union_channel_level1_code
+	,''								-- 最后更新时间
+	,'' 							-- 交易模式
+	,''								-- 整合渠道层级2
+	,0								-- 对外销售比例
+	,0								-- 对外销售收入利润
+	,g5.material_qty * coalesce(g1.revenue_unit_price_amt,g2.revenue_unit_price_amt,g3.revenue_unit_price_amt,g4.revenue_unit_price_amt,0)	-- 不含税销售净额(管理)
+	,0								-- 阿米巴结算单价-销售单元
+	,0								-- 上期周期单价
+	,0								-- 上期周期总价
+	,''								-- 日期(年月日)
+	,0								-- 阿米巴结算单价-生产基地
+	,g5.material_qty * coalesce(g1.revenue_unit_price_amt,g2.revenue_unit_price_amt,g3.revenue_unit_price_amt,g4.revenue_unit_price_amt,0) -g5.material_qty * coalesce(g1.amb_cost_unit_price_amt,g2.amb_cost_unit_price_amt,g3.amb_cost_unit_price_amt,g4.amb_cost_unit_price_amt,0) -- 阿米巴毛利额
+	,g5.material_qty * coalesce(g1.actual_cost_unit_price_amt,g2.actual_cost_unit_price_amt,g3.actual_cost_unit_price_amt,g4.actual_cost_unit_price_amt,0) -- 实际成本合计
+	,0								-- 实际成本毛利额
+	,''								-- 浴室柜订单齐套标识
+	,''								-- 原日历月
+	,''								-- 原日历日
+	,0								-- 1+N毛利额
+	,0								-- 跨事业部毛利额
+	,0								-- 事业部内部毛利额
+	,0								-- 1+N对外分成毛利额
+	,0								-- 跨事业部对外分成毛利额
+	,0								-- 事业部内部对外分成毛利额	
+from 
+	g5
+left join g1
+	   on g5.cust_code = g1.cust_code
+	  and g5.material_code = g1.material_code
+
+left join g2
+	   on g5.cust_code = g2.cust_code
+	  and g5.material_code = g2.material_code
+	  
+left join g3
+	   on g5.material_code = g3.material_code
+
+left join g4
+	   on g5.material_code = g4.material_code
+;

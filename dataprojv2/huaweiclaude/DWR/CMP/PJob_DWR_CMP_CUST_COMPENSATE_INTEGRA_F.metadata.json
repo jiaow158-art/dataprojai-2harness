@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CMP_CUST_COMPENSATE_INTEGRA_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CMP",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

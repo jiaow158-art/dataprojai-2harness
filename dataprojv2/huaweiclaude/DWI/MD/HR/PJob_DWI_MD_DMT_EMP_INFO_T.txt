@@ -1,0 +1,36 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/09/02 14:35:25 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_DMT_EMP_INFO_T
+SELECT E.ID AS EMP_ID --雇员ID
+      ,E.STORE_ID  --门店ID
+      ,E.NAME AS EMP_NAME --雇员名称
+      ,E.PER_USER_ID AS USER_ID --用户ID
+      ,E.SEX --性别 1:女；2:男
+      ,E.DESC_INFO AS EMP_INFO_DESC --雇员信息描述
+      ,E.POSITION_ID --职位ID
+      ,E.POSITION_NAME  --职位名称
+      ,E.EMPLOYEE_GROUP_ID --雇员所在组ID
+      ,E.EMPLOYEE_GROUP_NAME --雇员所在组名称
+      ,E.STATUS --雇员状态 1：在职；2：离职
+      ,E.CREATE_TIME --创建时间
+      ,E.UPDATE_TIME --更新时间
+      ,E.EMAIL --邮箱
+      ,E.IS_WXWORK_USER --是否微信导购用户
+      ,E.DEALER_ID --经销商ID
+      ,E.OUT_EMPLOYEE_ID  --外部雇员ID
+      ,E.IS_LINE_GROUP --是否线组长 1：是；0：否 
+      ,E.IS_MARKET_MANAGER --是否市场经理 1：是；0：否 
+      ,E.IS_PRODUCT_MANAGER --是否产品经理 1：是；0：否 
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+FROM SDI.SDI_BUZ_EMPLOYEE_1030 E 
+INNER JOIN SDI.SDI_BUZ_EMPLOYEE_STORE_ROLE_1030 R 
+ON E.EP_ID = R.EP_ID 
+AND E.APP_ID = R.APP_ID
+AND E.PER_USER_ID = R.USER_ID
+WHERE E.EP_ID = 3044
+AND E.APP_ID = 1831
+AND E.STATUS = 1
+;

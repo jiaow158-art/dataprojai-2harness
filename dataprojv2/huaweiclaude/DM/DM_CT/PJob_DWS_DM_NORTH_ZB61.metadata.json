@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB61",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "准时交付率（整装绿灯产品）ZB61",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

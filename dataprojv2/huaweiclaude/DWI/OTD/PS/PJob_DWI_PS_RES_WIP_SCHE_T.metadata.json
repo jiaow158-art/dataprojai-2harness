@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PS_RES_WIP_SCHE_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/PS",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

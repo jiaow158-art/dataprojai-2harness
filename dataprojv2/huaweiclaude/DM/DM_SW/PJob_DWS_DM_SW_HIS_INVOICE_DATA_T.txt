@@ -1,0 +1,77 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: zhanghanzhong
+-- 卫浴历史出货数据表
+-- create time: 2022/11/23 09:55:55 GMT+08:00
+-- ******************************************************************** --
+delete from dm.dm_sw_his_invoice_data_t where stat_month = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD'),1,7);
+insert into dm.dm_sw_his_invoice_data_t 
+with mat as (
+select b.material_id,b.material_num,b.material_name,c.matl_group4_code
+from dwimd.dwi_md_data_material_general_t b
+left join (select material_num,max(matl_group2_code) matl_group2_code,max(matl_group4_code) as matl_group4_code 
+from dwimd.dwi_md_data_material_sales_t group by material_num ) c 
+on b.material_num = c.material_num
+)
+,
+TMP as (
+select
+ m.material_id
+,SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD'),1,7) as stat_month
+,m.material_num
+,m.material_name
+,sum(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD'),1,7) then actual_billed_qty else 0 end ) as cur_m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '12 month',1,7) then actual_billed_qty else 0 end ) as last_12m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '11 month',1,7) then actual_billed_qty else 0 end ) as last_11m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '10 month',1,7) then actual_billed_qty else 0 end ) as last_10m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '9 month',1,7) then actual_billed_qty else 0 end ) as last_09m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '8 month',1,7) then actual_billed_qty else 0 end ) as last_08m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '7 month',1,7) then actual_billed_qty else 0 end ) as last_07m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '6 month',1,7) then actual_billed_qty else 0 end ) as last_06m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '5 month',1,7) then actual_billed_qty else 0 end ) as last_05m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '4 month',1,7) then actual_billed_qty else 0 end ) as last_04m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '3 month',1,7) then actual_billed_qty else 0 end ) as last_03m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '2 month',1,7) then actual_billed_qty else 0 end ) as last_02m_sales_qty
+,SUM(case when substr(create_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD') - INTERVAL '1 month',1,7) then actual_billed_qty else 0 end ) as last_01m_sales_qty	
+from DM.DM_GL_OUT_INVOICE_T a 
+left join mat m on a.material_num = m.material_num
+where substr(create_date,1,7) <= SUBSTR(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD'),1,7) and sale_org_code between '3210' and '3920'
+and payer_id not in ('0000003200','0000003300','0000003500','0000003600','0000003700','0000003800','0000003900','0000003A00')
+and m.matl_group4_code <> 'DZ' and a.material_num not like 'J%00000'
+group by
+ substr(TO_DATE('${PERIOD_ID_D}','YYYY-MM-DD'),1,7)
+,m.material_id
+,m.material_num
+,m.material_name
+)
+select 
+ material_id			as id						-- id
+,stat_month				as stat_month               -- 年月
+,material_num			as material_num             -- 产品编码
+,material_name			as material_name            -- 产品描述
+,(last_12m_sales_qty + last_11m_sales_qty + last_10m_sales_qty + last_09m_sales_qty + last_08m_sales_qty + last_07m_sales_qty +
+last_06m_sales_qty + last_05m_sales_qty + last_04m_sales_qty + last_03m_sales_qty + last_02m_sales_qty + last_01m_sales_qty -
+greatest(last_12m_sales_qty,last_11m_sales_qty,last_10m_sales_qty,last_09m_sales_qty,last_08m_sales_qty,last_07m_sales_qty
+,last_06m_sales_qty,last_05m_sales_qty,last_04m_sales_qty,last_03m_sales_qty,last_02m_sales_qty,last_01m_sales_qty) -
+least(last_12m_sales_qty,last_11m_sales_qty,last_10m_sales_qty,last_09m_sales_qty,last_08m_sales_qty,last_07m_sales_qty
+,last_06m_sales_qty,last_05m_sales_qty,last_04m_sales_qty,last_03m_sales_qty,last_02m_sales_qty,last_01m_sales_qty))  / 10 
+						as avg_12m_sales_qty		-- 12个月均销
+,(last_06m_sales_qty + last_05m_sales_qty + last_04m_sales_qty + last_03m_sales_qty + last_02m_sales_qty + last_01m_sales_qty ) / 6 
+						as avg_06m_sales_qty		-- 6个月均销
+,(last_03m_sales_qty + last_02m_sales_qty + last_01m_sales_qty ) / 3 
+						as avg_03m_sales_qty		-- 3个月均销
+,cur_m_sales_qty		as cur_m_sales_qty			-- 当月出货
+,last_12m_sales_qty     as last_12m_sales_qty       -- 12个月前出货
+,last_11m_sales_qty     as last_11m_sales_qty       -- 11个月前出货
+,last_10m_sales_qty     as last_10m_sales_qty       -- 10个月前出货
+,last_09m_sales_qty     as last_09m_sales_qty       -- 09个月前出货
+,last_08m_sales_qty     as last_08m_sales_qty       -- 08个月前出货
+,last_07m_sales_qty     as last_07m_sales_qty       -- 07个月前出货
+,last_06m_sales_qty     as last_06m_sales_qty       -- 06个月前出货
+,last_05m_sales_qty     as last_05m_sales_qty       -- 05个月前出货
+,last_04m_sales_qty     as last_04m_sales_qty       -- 04个月前出货
+,last_03m_sales_qty     as last_03m_sales_qty       -- 03个月前出货
+,last_02m_sales_qty     as last_02m_sales_qty       -- 02个月前出货
+,last_01m_sales_qty     as last_01m_sales_qty       -- 01个月前出货
+,CURRENT_TIMESTAMP()	as last_update_date			-- 数据同步时间
+from tmp

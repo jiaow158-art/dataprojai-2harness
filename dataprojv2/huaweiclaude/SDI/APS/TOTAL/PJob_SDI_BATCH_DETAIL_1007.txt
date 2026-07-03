@@ -1,0 +1,23 @@
+insert overwrite table sdi.sdi_batch_detail_1007
+select 
+id,
+batch_no,
+create_by,
+create_date,
+distribute_date,
+distribute_people,
+inv_org_id,
+is_phantom,
+line_no,
+main_unit,
+quantity,
+sale_order_detail_id,
+square_measure,
+state,
+sync_id,
+update_by,
+update_date,
+wbs_line_no,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_batch_detail_1007;

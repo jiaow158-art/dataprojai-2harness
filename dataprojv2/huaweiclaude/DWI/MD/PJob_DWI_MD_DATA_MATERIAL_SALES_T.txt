@@ -1,0 +1,64 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/17 17:51:49 GMT+08:00
+-- UPDATE FROM guzhengfeng 20230904 新增字段：X_DSTRB_C_MM_STATUS_CODE 跨分销链状态编码
+-- update zhz 20250219 增加产品层次字段
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_DATA_MATERIAL_SALES_T
+SELECT 
+     T.MATERIAL_ID
+    ,T.SALES_ORG_CODE	 			
+    ,T.MATERIAL_NUM	 				
+    ,T.GROUP_NUM	 					
+    ,T.DISTRIBUTION_CHANNEL_CODE	 	
+    ,T.DISTRIBUTION_CHNL_NAME	 	
+    ,T.SALES_ORG_NAME	 			
+    ,T.SPEC_D_CHAIN_MM_STATUS_CODE	
+    ,T.CASH_DISCOUNT_FLAG	 		
+    ,T.MATL_GROUP1_CODE	 			
+    ,T.MATL_GROUP2_CODE	 			
+    ,T.MATL_GROUP3_CODE	 			
+    ,T.MATL_GROUP4_CODE	 			
+    ,T.MATL_GROUP5_CODE	 			
+    ,T.MATL_STATISTICS_GROUP_CODE	
+    ,T.MATL_PRICE_GROUP_CODE	 		
+    ,T.MATL_M_FILE_ITEM_C_GROUP_CODE	
+    ,T.MATL_M_FILE_ITEM_C_GROUP_NAME 
+    ,T.DELIVERY_FACTORY	 			
+    ,T.MATL_SUBJ_SET_GROUP_CODE	 	
+    ,T.MATL_SUBJ_SET_GROUP_NAME      
+    ,T.PROD_ATTRIBUTE_ID_1           
+    ,T.PROD_ATTRIBUTE_ID_2           
+    ,T.PROD_ATTRIBUTE_ID_3           
+    ,T.PROD_ATTRIBUTE_ID_4           
+    ,T.PROD_ATTRIBUTE_ID_5           
+    ,T.PROD_ATTRIBUTE_ID_6           
+    ,T.PROD_ATTRIBUTE_ID_7           
+    ,T.PROD_ATTRIBUTE_ID_8           
+    ,T.PROD_ATTRIBUTE_ID_9           
+    ,T.PROD_ATTRIBUTE_ID_10          
+    ,T.DEL_FLAG                      
+    ,T.UPDATE_DATE                   
+    ,T.START_DATE                    
+    ,T.END_DATE
+    ,T.MATL_GROUP1_NAME
+    ,T.MATL_GROUP2_NAME
+    ,T.MATL_GROUP3_NAME
+    ,T.MATL_GROUP4_NAME
+    ,T.MATL_GROUP5_NAME
+    ,T.MATL_STATISTICS_GROUP_NAME
+    ,T.MATL_PRICE_GROUP_NAME
+    ,D.X_DSTRB_C_MM_STATUS_CODE     -- 跨分销链状态编码 20230904新增
+    ,T.PRODUCT_LEVEL_CODE
+FROM 
+    DWIMD.DWI_MD_DATA_MATERIAL_SALES_T_HIS T 
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T D
+ON T.GROUP_NUM = D.GROUP_NUM
+AND T.MATERIAL_NUM = D.MATERIAL_NUM
+WHERE END_DATE = '4712-12-31' AND DEL_FLAG = 'N'
+;

@@ -1,0 +1,306 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/12/18 15:10:48 GMT+08:00
+-- description:商机明细模型表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- 当前线组取数字段修改：T8.node_name9-->T1.dqxsz 黄文彬 2023-12-19
+-- update from chenzhiyong 20231226 新增 预计合同签订时间 、预计出货时间 逻辑
+-- update from chenzhiyong 20231226 新增 跟进事业部名称、瓷砖预计用量	薄板预计用量	干挂预计用量	木地板预计用量	艺耐预计用量	绿家预计用量	辅材预计用量	洁具预计用量	仿石景观砖类预计用量
+-- update from chenzhiyong 20240109 BUSINESS_OPPORTUNITY 新增部分字段
+-- update from chenzhiyong 20240119 新增战略百强客户:strategy_customer_code/strategy_cust_name
+-- update from chenzhiyong 20240122 新增字段：effective_date ,sale_group ,sale_group_desc ,sale_dept ,sale_dept_desc 
+-- update from chenzhiyong 20240123 新增字段:工程大类/工程小类名称
+-- update from chenzhiyong 20240123 新增字段：运营平台商机跟进方、商机来源、一级商机、二级商机、输单原因
+-- update from chenzhiyong 20240124 新增字段：工程大类/工程小类（历史的那部分商机）、合同金额 、一级商机的逻辑
+-- update from chenzhiyong 20240320 修改一级商机：三房、医疗康养、酒店逻辑
+-- update from chenzhiyong 20240320 修改一级商机：地产、商业连锁
+-- update from chenzhiyong 20240325 新增字段：min_deliver_date(大货要货单最早时间), min_bill_date(发票开票时间最早时间), bo_tran_date(商机转化日期)
+-- update from chenzhiyong 20240325 修改 商机转化日期 逻辑，是否LTC标识为LTC为LTC开单，其它都是非LTC开单
+-- update from chenzhiyong 20240328 新增字段：BZIRK(销售地区)、BZTXT（销售地区名称）
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+--CREATE TABLE DWRLTC.DWR_BO_PROJECT_DETAIL_F AS   -- 商机明细表
+WITH BUSINESS_BUSINESS_SALE_FORECAST_DATA AS( -- 商机产品品类数据
+	SELECT T1.business_id,
+		   CONCAT_WS(',',collect_set(T2.meaning)) as PROD_CATEGORY,  -- 产品品类
+		   sum(nvl(t1.estimated_amount,0)) as estimated_amt, -- 预计标的金额
+		   sum(nvl(t1.estimated_year_deliver_amount,0)) as estimated_year_deliver_amt -- 预计本年度可发货金额
+	FROM SDI.sdi_business_sale_forecast_1033 T1  -- 商机销售预测
+	LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T2 
+	ON T1.big_category = T2.lookup_code 
+	AND T2.lookup_type = 'PRODUCT_CATEGORY' -- 产品品类
+	group by T1.business_id
+),
+PROJECT_APPLY_AREA_DATA AS(  -- 项目评审面积/件数数据
+	SELECT T1.business_id ,
+		   T1.business_code,
+		   SUM(T2.quantity) AS PROJECT_APPLY_AREA -- 项目评审面积/件数
+	FROM SDI.SDI_PROJECT_REVIEW_1033 T1    -- LTC 项目评审
+	LEFT JOIN SDI.SDI_PROJECT_REVIEW_PROFIT_1033 T2  
+	ON T1.project_id = T2.project_id 
+	group by T1.business_id ,
+			 T1.business_code
+),
+CONTRACT_LOGIN_AREA_DATA AS( -- 合同登记面积/件数 数据
+	select T3.business_id ,
+	 	   T3.business_code ,
+	 	   SUM(T4.quantity) AS contract_login_area, -- 合同登记面积/件数
+	 	   SUM(T4.contract_amount) AS contract_login_amount -- 合同登记金额
+	FROM SDI.SDI_CONTRACT_1033 T3   -- LTC 合同
+	LEFT JOIN SDI.SDI_CONTRACT_PROFIT_1033 T4
+	ON T3.contract_id = T4.contract_id 
+	WHERE T3.business_id IS NOT NULL   -- 有商机为空的数据
+	GROUP BY T3.business_id ,
+			 T3.business_code 
+),
+HIS_OA_SJ_DATA AS( -- OA 历史商机数据
+	select T.dh AS BO_CODE,
+		   NVL(T.yjnchl,0) AS oa_expected_year_out_amt -- 预计年出货量(万元)
+	from(
+	SELECT T.lsh ,T.dh ,T.bbsj,T.yjnchl,
+		   row_number() over(PARTITION by dh order by bbsj desc) rn
+	FROM SDI.SDI_FORMTABLE_MAIN_60_1004 T   -- OA 历史商机
+	WHERE NVL(T.dh,'ISNULL') <> 'ISNULL'
+	) T
+	where t.rn = 1
+),
+estimated_signed_date_data as(  -- 预计合同签订时间数据
+    SELECT business_id,
+    	   estimated_signed_date  -- 预计合同签订时间
+    FROM(
+    	select business_id,
+    		   estimated_signed_date,
+    		   ROW_NUMBER() OVER(PARTITION BY business_id ORDER BY estimated_signed_date asc) RN
+    	from SDI.sdi_business_sale_forecast_1033 t
+    ) T
+    WHERE RN = 1
+),
+estimated_delivery_date_data as(  -- 预计出货时间数据
+    SELECT business_id,
+    	   estimated_delivery_date  -- 预计出货时间
+    FROM(
+    	select business_id,
+    		   estimated_delivery_date,
+    		   ROW_NUMBER() OVER(PARTITION BY business_id ORDER BY estimated_delivery_date asc) RN
+    	from SDI.sdi_business_sale_forecast_1033 t
+    ) T
+    WHERE RN = 1
+),
+DELIVER_SHIPMENT_DATA AS(  -- 大货要货单最早时间数据
+	SELECT business_code,
+		   min(SUBSTRING(CAST(creation_date AS STRING),1,10)) as  MIN_DELIVER_DATE -- 大货要货单最早时间
+	FROM SDI.SDI_DELIVER_SHIPMENT_HEADER_1033 
+	where plan_type in ('DT_PLAN','ZL_PLAN') 
+	group by business_code
+),
+GL_INVOICE_CONDITIONAL_DATA AS(  -- 发票开票时间最早时间数据
+	select engineer_report_code AS business_code,
+		   min(SUBSTRING(CAST(bill_date AS STRING),1,10)) as  MIN_BILL_DATE -- 发票开票时间最早时间
+	from dwrfin.dwr_gl_invoice_conditional_f 
+	WHERE 1=1  
+	--and period_id_m >= REPLACE('${PERIOD_ID_M}','-','')
+	--WHERE period_id_m >= '201806' -- 初始化数据放开此条件
+	GROUP BY engineer_report_code
+),
+TMP_DATA AS(
+SELECT CONCAT(SUBSTRING(T1.SJYXQ,1,4),'-',SUBSTRING(T1.SJYXQ,5,2),'-',SUBSTRING(T1.SJYXQ,7,2)) AS BO_VALIDITY_DATE, -- 商机有效期
+	   T3.business_id AS BO_ID, -- 商机ID
+	   T1.sjh AS BO_CODE, -- 商机号
+	   T2.xmmc AS BO_NAME, -- 商机名称
+	   T3.STRATEGY_TYPE AS STRATEGY_TYPE, -- 报备类型
+	   T4.meaning AS STRATEGY_TYPE_CN_NAME , -- 报备类型名称
+	   T1.GCLB AS WORKS_CATEGORY, -- 工程类别(商机类别)
+	   T2.SJLY2 AS BO_SOURCE, -- 商机来源
+	   T1.sjjd AS BO_STAGE, -- 商机阶段
+	   T3.STAGE_STATE ,  -- 阶段状态
+	   T5.meaning AS STAGE_STATE_CN_NAME, -- 阶段状态名称
+	   CONCAT(SUBSTRING(T1.SQRQ,1,4),'-',SUBSTRING(T1.SQRQ,5,2),'-',SUBSTRING(T1.SQRQ,7,2)) AS bo_APPLY_DATE, -- 申请日期
+	   T1.sjlx AS BO_BIG_TYPE, -- 商机大类(商机类型)
+	   T1.xmlx AS BO_SMALL_TYPE, -- 商机小类(项目类型)
+	   T6.PROD_CATEGORY,  -- 产品品类
+	   T2.gjsyb AS FOLLOW_UP_DIVISION_DEPT, -- 跟进事业部
+	   '' AS FOLLOW_UP_DIVISION_DEPT_NAME, -- 跟进事业部名称
+	   T1.XMJSF	as DEVELOPMENT_NAME,	-- 建设方（甲方）
+	   '' AS  CONSTRUCTION_NAME ,-- 施工方（乙方） 字段还未确定
+	   T1.XMDZ AS PROJECT_ADDRESS,   -- 项目地址
+	   T1.SHENG AS province,  -- 省
+	   T1.SHI AS city,   -- 市
+	   T1.QU  AS AREA,   -- 区
+	   T3.EXPECTED_COOPERATION_TYPE, -- 预计合作类型
+	   T7.meaning AS EXPECTED_COOPERATION_NAME, -- 预计合作类型名称
+	   T2.SQR AS apply_emp_num, -- 业务员(申请人)
+	   NVL(T10.nachn,T2.SQR) AS apply_emp_NAME, -- 业务员(申请人)
+	   T8.node1 AS LEVEL_DEPT_CODE_1, -- 1层部门编码
+	   T8.NODE_NAME1 AS LEVEL_DEPT_NAME_1, -- 1层部门名称
+	   T8.node_desc1 AS LEVEL_DEPT_DESC_1, -- 1层部门描述
+	   T8.node2 AS LEVEL_DEPT_CODE_2, -- 2层部门编码
+	   T8.node_name2 AS LEVEL_DEPT_NAME_2, -- 2层部门名称
+	   T8.node_desc2 AS LEVEL_DEPT_DESC_2, -- 2层部门描述
+	   T8.node3 AS LEVEL_DEPT_CODE_3, -- 3层部门编码
+	   T8.node_name3 AS LEVEL_DEPT_NAME_3, -- 3层部门名称
+	   T8.node_desc3 AS LEVEL_DEPT_DESC_3, -- 3层部门描述
+	   T8.node4 AS LEVEL_DEPT_CODE_4, -- 4层部门编码
+	   T8.node_name4 AS LEVEL_DEPT_NAME_4, -- 4层部门名称
+	   T8.node_desc4 AS LEVEL_DEPT_DESC_4, -- 4层部门描述
+	   T8.node5 AS LEVEL_DEPT_CODE_5, -- 5层部门编码
+	   T8.node_name5 AS LEVEL_DEPT_NAME_5, -- 5层部门名称
+	   T8.node_desc5 AS LEVEL_DEPT_DESC_5, -- 5层部门描述
+	   T8.node6 AS LEVEL_DEPT_CODE_6, -- 6层部门编码
+	   T8.node_name6 AS LEVEL_DEPT_NAME_6, -- 6层部门名称
+	   T8.node_desc6 AS LEVEL_DEPT_DESC_6, -- 6层部门描述
+	   T8.node7 AS LEVEL_DEPT_CODE_7, -- 7层部门编码
+	   T8.node_name7 AS LEVEL_DEPT_NAME_7, -- 7层部门名称
+	   T8.node_desc7 AS LEVEL_DEPT_DESC_7, -- 7层部门描述
+	   T8.node8 AS LEVEL_DEPT_CODE_8, -- 8层部门编码
+	   T8.node_name8 AS LEVEL_DEPT_NAME_8, -- 8层部门名称
+	   T8.node_desc8 AS LEVEL_DEPT_DESC_8, -- 8层部门描述
+	   T8.node10 AS LEVEL_DEPT_CODE_9, -- 9层部门编码
+	   T8.node_name10 AS LEVEL_DEPT_NAME_9, -- 9层部门名称
+	   T8.node_desc10 AS LEVEL_DEPT_DESC_9, -- 9层部门描述
+	   T8.node9 AS LEVEL_DEPT_CODE_10, -- 10层部门编码
+	   T1.dqxsz AS LEVEL_DEPT_NAME_10, -- 10层部门名称(当前线组)
+	   T8.node_desc9 AS LEVEL_DEPT_DESC_10, -- 10层部门描述
+	   T1.KHBM AS CUST_CODE, -- 客户编码
+	   T9.cust_name, -- 客户名称
+	   T11.zzkunnr AS UPPER_CUST_CODE, -- 母客编
+	   T11.name1 AS UPPER_CUST_NAME, -- 母客编名称
+	   T15.estimated_signed_date, -- 预计合同签订时间
+	   T16.estimated_delivery_date , -- 预计出货时间
+	   T1.ZWBS as wbs_code, -- 工程WBS号 
+	   T2.ZLTC_FLG AS LTC_FLAG, -- 是否LTC商机
+	   CASE WHEN T2.sfxaxqsj = '1' THEN 'Y' ELSE 'N' END as xa_bo_flag,--  是否雄安新区商机
+	   CASE WHEN T1.ZIF_SP_PRJ IN ('Y','是') THEN 'Y' ELSE 'N' END AS special_project_flag,  --  是否特性工程
+	   CASE WHEN T2.ZSFLSWD IN ('Y','是') THEN 'Y' ELSE 'N' END AS chain_network_flag,  --  是否连锁网点
+	   CASE WHEN T2.SFYFWS IN ('Y','是') THEN 'Y' ELSE 'N' END AS Service_flag , --  是否有服务商
+	   T2.ZLSJH AS STRATEGY_BO_CODE,  -- 战略商机编号
+	   T2.ZLSJMC AS STRATEGY_BO_NAME,  -- 战略商机名称
+	   T6.estimated_amt, -- 预计标的金额(LTC的商机金额)
+	   T6.estimated_year_deliver_amt, -- 预计本年度可发货金额
+	   NVL(T12.PROJECT_APPLY_AREA,0) as project_review_qty,-- 项目评审面积
+	   NVL(T13.contract_login_area,0) as contract_entry_qty , -- 合同登记面积
+	   T1.FPJE as DELIVERY_AMT,  -- 发货金额
+	   T1.MIANJI AS DELIVERY_AREA, -- 发货面积
+	   NVL(T6.estimated_amt,T14.oa_expected_year_out_amt) as bo_amt, -- 商机金额
+	   NVL(T1.czyjyl,0) + NVL(T1.bbyjyl,0) + NVL(T1.ggyjyl,0) + NVL(T1.fsjgzyjyl,0) AS BO_AREA, -- 商机面积
+	   NVL(T1.czyjyl,0) AS czyjyl_QTY, -- 瓷砖预计用量
+	   NVL(T1.bbyjyl,0) AS bbyjyl_QTY, -- 薄板预计用量
+	   NVL(T1.ggyjyl,0) AS ggyjyl_QTY, -- 干挂预计用量
+	   NVL(T1.MDBYJYL,0) AS MDBYJYL_QTY, -- 木地板预计用量
+	   NVL(T1.YNYJYL,0) AS YNYJYL_QTY, -- 艺耐预计用量
+	   NVL(T1.LJYJYL,0) AS LJYJYL_QTY, -- 绿家预计用量
+	   NVL(T1.FCYJYL,0) AS FCYJYL_QTY, -- 辅材预计用量
+	   NVL(T1.JJYJYL,0) AS JJYJYL_QTY, -- 洁具预计用量
+	   NVL(T1.FSJGZYJYL,0) AS FSJGZYJYL_QTY, -- 仿石景观砖类预计用量
+	   CURRENT_TIMESTAMP() AS dw_last_update_date,  -- 数据同步时间
+	   T3.division AS division_code, -- 事业部编码
+       T17.meaning as division_name, -- 事业部名称
+	   T3.engineering_big_category , -- 工程大类
+       T3.engineering_small_category , -- 工程小类
+       T3.sale_org as sale_org_code, -- 销售组织
+       T3.sale_org_name, -- 销售组织名称
+       CASE WHEN T1.GCLB = '战略子项目' THEN T3.customer_code ELSE '' END AS strategy_customer_code,-- 百强战略客户编码
+       CASE WHEN T1.GCLB = '战略子项目' THEN T3.customer_name ELSE '' END AS strategy_cust_name,-- 百强战略客户编码
+       SUBSTRING(T3.effective_date,1,10) AS  effective_date, -- 商机有效期
+       T3.sale_group, -- 销售组
+       T3.sale_group_describe AS sale_group_desc, -- 销售组描述
+       T3.sale_dept, -- 销售部门
+       T3.sale_dept_describe AS sale_dept_desc , -- 销售部门描述
+       NVL(T18.meaning,T1.sjlx) AS engineering_big_category_name, -- 工程大类名称
+       NVL(T19.meaning,T1.xmlx) AS ENGINEERING_SMALL_CATEGORY_name, -- 工程小类名称
+       T20.BO_FOLLOW_UP, -- 运营平台商机跟进方
+       T20.BO_SOURCE3, -- 商机来源
+       CASE WHEN NVL(T18.meaning,T1.sjlx) IN ('地产类','地产类型','施工总包','房地产住宅') AND NVL(T19.meaning,T1.xmlx) NOT IN ('酒店','安置房','棚户改造','棚户区改造','人才公寓','公租房','经济适用房','医院','康养地产','疗养院') THEN '地产'
+       	    WHEN NVL(T18.meaning,T1.sjlx) IN ('企业类','企业类型') AND NVL(T19.meaning,T1.xmlx) NOT IN ('酒店','安置房','棚户改造','棚户区改造','人才公寓','公租房','经济适用房','医院','康养地产','疗养院') THEN '企业总部'
+       	    WHEN NVL(T18.meaning,T1.sjlx) IN ('区域连锁','全国连锁','商业类','商业类型') AND NVL(T19.meaning,T1.xmlx) NOT IN ('酒店','安置房','棚户改造','棚户区改造','人才公寓','公租房','经济适用房','医院','康养地产','疗养院') THEN '商业连锁'
+       	    WHEN NVL(T19.meaning,T1.xmlx) IN ('安置房','棚户改造','棚户区改造','人才公寓','公租房','经济适用房','人才保障房') THEN '三房'
+       	    WHEN NVL(T18.meaning,T1.sjlx) IN ('市政类','市政类型','交通类','交通类型') AND NVL(T19.meaning,T1.xmlx) NOT IN ('酒店','安置房','棚户改造','棚户区改造','人才公寓','公租房','经济适用房','医院','康养地产','疗养院') THEN '市政工程'
+       	    WHEN NVL(T19.meaning,T1.xmlx) IN ('医院','康养地产','疗养院') THEN '医疗康养'
+       	    WHEN NVL(T19.meaning,T1.xmlx) IN ('酒店') THEN '酒店'
+       	    WHEN NVL(T18.meaning,T1.sjlx) = 'PA-总部工程（除战' AND NVL(T19.meaning,T1.xmlx) = '餐饮食品' THEN '商业连锁'
+       	    WHEN NVL(T18.meaning,T1.sjlx) = 'PA-总部工程（除战' AND NVL(T19.meaning,T1.xmlx) = '住宅地产(高端精装、普通精装、公共区域)' THEN '地产'
+       	    ELSE '其它'
+       END AS ONE_BO_NAME, -- 一级商机
+       T20.TWO_BO_NAME, -- 二级商机
+       T20.lose_order_reason, -- 输单原因
+       NVL(T13.contract_login_amount,0) AS contract_login_amount, -- 合同登记金额
+	   T21.MIN_DELIVER_DATE, -- 大货要货单最早时间
+	   T22.MIN_BILL_DATE, -- 发票开票时间最早时间
+	   CASE WHEN T1.sjjd = 'S5' AND 
+			   CASE WHEN T2.ZLTC_FLG = 'LTC'THEN T21.MIN_DELIVER_DATE -- 大货要货单最早时间
+			        ELSE T22.MIN_BILL_DATE END <= CONCAT(SUBSTRING(T1.SJYXQ,1,4),'-',SUBSTRING(T1.SJYXQ,5,2),'-',SUBSTRING(T1.SJYXQ,7,2))
+	    THEN CASE WHEN T2.ZLTC_FLG = 'LTC'THEN T21.MIN_DELIVER_DATE -- 大货要货单最早时间
+		        ELSE T22.MIN_BILL_DATE END 
+		ELSE '' END AS BO_TRAN_DATE, --  商机转化日期	 
+		T1.BZIRK AS SALES_AREA_CODE, -- 销售地区编码
+		T1.BZTXT AS SALES_AREA_NAME, -- 销售地区名称
+	   CONCAT(SUBSTRING(T1.SQRQ,1,4),'-',SUBSTRING(T1.SQRQ,5,2)) AS PERIOD_ID_M -- 分区字段 
+FROM SDI.SDI_ZTSD_SJKF_LOG_1001 T1 -- 工程中心商机台账
+JOIN SDI.SDI_ZSD_SJXX_1001 T2 --  工程商机扣费台账
+ON T1.SJH = T2.SJH 
+LEFT JOIN SDI.SDI_BUSINESS_OPPORTUNITY_1033 T3 -- RTM商机机会
+ON T1.sjh = T3.business_code 
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T4  -- RTM LOOKUP 表
+ON T3.STRATEGY_TYPE = T4.lookup_code 
+AND T4.lookup_type = 'SALES_STRATEGY'   -- 报备类型
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T5  
+ON T3.STAGE_STATE = T5.lookup_code 
+AND T5.lookup_type = 'STAGE_STATE'   -- 阶段状态
+LEFT JOIN BUSINESS_BUSINESS_SALE_FORECAST_DATA T6
+ON T3.business_id = T6.business_id
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T7
+ON T3.EXPECTED_COOPERATION_TYPE = T7.lookup_code 
+AND T7.lookup_type = 'EXPECTED_COOPERATION_TYPE' -- 预计合作类型
+LEFT JOIN dm.dm_rpt_sales_group_t T8 -- 组织架构
+ON T1.dqxsz = T8.node_name9 
+LEFT JOIN DWIMD.dwi_md_cust_general_t T9 -- 客户主数据
+ON T1.KHBM = T9.cust_num 
+AND T9.end_date = '4712-12-31'
+LEFT JOIN SDI.sdi_pa0002_1001 T10    -- 人员
+ON T2.SQR = T10.pernr
+AND T10.ENDDA >= T1.SQRQ
+AND T10.BEGDA <= T1.SQRQ
+AND T10.DEL_FLAG = 'N' 
+LEFT JOIN SDI.sdi_zsd_zmkb_1001 T11  -- 字母客编
+ON T1.KHBM = T11.kunnr 
+AND T2.zvkorg = T11.vkorg
+AND T2.zvtweg = T11.vtweg
+LEFT JOIN PROJECT_APPLY_AREA_DATA T12  -- 项目评审面积/件数数据
+ON T1.sjh = T12.business_code
+LEFT JOIN CONTRACT_LOGIN_AREA_DATA T13  -- 合同登记面积/件数数据
+ON T1.sjh = T13.business_code
+LEFT JOIN HIS_OA_SJ_DATA T14 -- OA 历史商机
+ON T1.sjh = T14.BO_CODE
+LEFT JOIN estimated_signed_date_data T15 -- 预计合同签订时间数据
+ON T3.business_id = T15.business_id
+LEFT JOIN estimated_delivery_date_data T16 -- 预计出货时间数据
+ON T3.business_id = T16.business_id
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T17  -- RTM LOOKUP 表
+ON T3.division = T17.lookup_code 
+AND T17.lookup_type = 'DIVISION'   --  事业部
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T18  -- RTM LOOKUP 表
+ON T3.engineering_big_category = T18.lookup_code 
+AND T18.lookup_type = 'ENGINEERING_BIG_CATEGORY'   --  工程大类
+LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 T19  -- RTM LOOKUP 表
+ON T3.engineering_small_category = T19.lookup_code 
+AND T19.lookup_type = 'ENGINEERING_SMALL_CATEGORY'   --  工程小类
+LEFT JOIN SDI.SDI_BO_CLASS_1037 T20 -- 商机分类
+ON T1.SJH = T20.bo_code
+LEFT JOIN DELIVER_SHIPMENT_DATA T21  -- 要货单
+ON T1.SJH = T21.business_code
+LEFT JOIN GL_INVOICE_CONDITIONAL_DATA T22 -- 发票数据
+ON T1.SJH = T22.business_code
+WHERE T1.MANDT = '800'
+--AND CONCAT(SUBSTRING(T1.SQRQ,1,4),'-',SUBSTRING(T1.SQRQ,5,2)) >= '${PERIOD_ID_M}' -- 参数传递，传昨天所在月份的上月
+)
+INSERT OVERWRITE TABLE DWRLTC.DWR_BO_PROJECT_DETAIL_F PARTITION(PERIOD_ID_M)
+SELECT T.*
+FROM TMP_DATA T;

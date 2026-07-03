@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_COST_FUND_CENTER_R",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/COST",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

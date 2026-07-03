@@ -1,0 +1,774 @@
+DROP TABLE IF EXISTS dm.test_db;
+create table dm.test_db as
+with a as (
+    SELECT
+        ID,
+        BATCH --批次
+,
+        PLAN_no --报工号
+,
+        PRODUCT_ORDER_CODE --生产工单   
+,
+        ITEM_CODE --物料编码
+,
+        ITEM_SPECIFICATION_MODEL --规格
+,
+        ITEM_PRODUCT_PROPERTY --物料组1
+,
+        RESOURCE_NAME --资源名称 
+,
+        base --基地
+,
+        REQUIRE_DELIVERY --客户交期  
+,
+        PROMISE_DELIVERY --工厂交期
+,
+        START_TIME --计划开始时间 
+,
+        END_TIME --计划结束时间
+,
+        RELEASE_START_TIME --下达日期
+,
+        STATUS --计划状态
+,
+        PLAN_AMOUNT --计划数量 
+,
+        PLAN_AREA --计划数量(平方米)   
+,
+        BASE_DELIVERY_DATE --基地交期
+,
+        Reply_Delivery --OEM回复交期
+,
+        SELF_FOREIGN_FLAG --自制外协标识 0:(Self, 自制) 1:(Foreign, 外协)
+,
+        ZJHS_TIME --准交核算时间
+,
+        CLOSE_FLAG --关闭标识	
+,
+        NAME --工单类型原名称
+,
+        FINISHED_AMOUNT --完成数量（入库数量）
+,
+        FINISHED_AREA --完成面积（入库面积）
+,
+        PRODUCTION_DATE --生产日期
+,
+        OEM_STATUS,
+        QTY --具体完成数量
+,
+        QTY * ITEM_AREA JT_AREA --具体完成面积
+    FROM
+        (
+            select
+                CASE WHEN COALESCE(S.batch,'') <> '' THEN S.batch
+                     WHEN COALESCE(BT.CHARG,'') <> '' THEN BT.CHARG
+					 ELSE '10001'
+                      END batch,
+                CASE WHEN COALESCE(S.INVENTORY_LOCATION,'') <> '' THEN S.INVENTORY_LOCATION
+				     ELSE BT.LGORT
+					  END AS INVENTORY_LOCATION,
+                COALESCE(BT.BUDAT,S.PRODUCTION_DATE) PRODUCTION_DATE,
+                CASE WHEN BT.BANFN IS NOT NULL THEN BT.MENGE
+    				 ELSE S.QTY
+					  END AS QTY,
+                T.*
+            from
+                DWROTD.DWR_PS_DAILY_SCHEDULE_F S
+                LEFT JOIN (
+                    select
+                        T0.ID,
+                        T0.CLOSE_FLAG,
+                        T0.CLOSE_QTY,
+                        T0.END_TIME,
+                        T0.FINISHED_AMOUNT,
+                        T0.FINISHED_AREA,
+                        T0.IS_CANCEL,
+                        T0.ITEM_CODE,
+                        T0.ITEM_NAME,
+                        T0.ITEM_SPECIFICATION_MODEL,
+                        T0.ITEM_AREA,
+                        (
+                            CASE
+                                WHEN T0.ITEM_PRODUCT_PROPERTY IS NULL
+                                OR T0.ITEM_PRODUCT_PROPERTY IN ('FGB', 'TGB', 'YFB')
+                                OR T0.ITEM_CODE LIKE 'Z%'
+                                OR T0.ITEM_CODE LIKE 'W%'
+                                OR T0.ITEM_CODE LIKE 'A%' THEN 'A'
+                                ELSE T0.ITEM_PRODUCT_PROPERTY
+                            END
+                        ) ITEM_PRODUCT_PROPERTY --物料组1
+,
+                        T0.LAST_UPDATE_DATE,
+                        T0.OEM_PURCHASE_ORDER_NO,
+                        T0.BASE_DELIVERY_DATE,
+                        T0.Reply_Delivery,
+                        T0.IS_BY_HAND,
+                        T0.SELF_FOREIGN_FLAG,
+                        COALESCE(T0.NAME, '0') NAME --工单类型原名称
+,
+                        T1.PLAN_AMOUNT PLAN_AMOUNT,
+                        T0.PLAN_AREA,
+                        T0.PLAN_NO,
+                        T0.PLAN_TASK_DETAIL_ID,
+                        T0.PLAN_TASK_ID,
+                        T0.PROCESS_TECH_ID,
+                        T2.CODE PROCESS_TECH_ID_DISPLAY,
+                        T2.NAME PROCESS_TECH_NAME,
+                        T0.PROCESS_TECH_TASK_ID,
+                        T3.PROTECH_NUM PROCESS_TECH_TASK_ID_DISPLAY,
+                        T0.PRODUCT_AREA_CODE,
+                        T0.PRODUCT_AREA_ID,
+                        T0.PRODUCT_AREA_NAME,
+                        T0.PRODUCT_ORDER_CODE,
+                        T0.PRODUCT_ORDER_ID,
+                        T0.PROMISE_DELIVERY,
+                        T0.RE_DATE,
+                        T0.RELEASE_START_TIME,
+                        T0.REQUIRE_DELIVERY,
+                        T0.RESOURCE_CODE,
+                        T0.RESOURCE_ID,
+                        T0.RESOURCE_NAME,
+                        T0.RE_STATE,
+                        T1.SAM SAM,
+                        T0.START_TIME,
+                        T0.IS_CANCELED --,T0.OEM_STATUS
+                        --,T0.STATUS
+,
+                        (
+                            CASE
+                                WHEN T0.RESOURCE_NAME LIKE '%OEM%' THEN substr(T0.RESOURCE_NAME, 1, 5)
+                                ELSE (
+                                    CASE
+                                        WHEN T0.RESOURCE_NAME LIKE '%山东%' THEN '山东'
+                                        WHEN T0.RESOURCE_NAME LIKE '东华盛昌釉线%' THEN '华盛昌'
+                                        WHEN T0.RESOURCE_NAME LIKE '东华盛昌介砖加工线' THEN '华盛昌加工'
+                                        WHEN T0.RESOURCE_NAME LIKE '丰城介砖加工线' THEN '丰城加工'
+                                        WHEN T0.RESOURCE_NAME LIKE '丰城釉线%'
+                                        OR T0.RESOURCE_NAME LIKE '丰城十一车间釉线%' THEN '丰城'
+                                        WHEN T0.RESOURCE_NAME LIKE '永川介砖加工线' THEN '永川加工'
+                                        WHEN T0.RESOURCE_NAME LIKE '永川釉线%' THEN '永川'
+                                        WHEN T0.RESOURCE_NAME LIKE '%山西%' THEN '山西'
+                                        WHEN T0.RESOURCE_NAME LIKE '湖南介砖加工线' THEN '湖南加工'
+                                        WHEN T0.RESOURCE_NAME LIKE '湖南釉线%' THEN '湖南'
+                                        WHEN T0.RESOURCE_NAME LIKE '%釉线工序' THEN '清远'
+                                        WHEN T0.RESOURCE_NAME LIKE '清远介砖加工线' THEN '清远加工'
+                                    END
+                                )
+                            END
+                        ) base --基地
+,
+                        (
+                            CASE
+                                T0.STATUS
+                                WHEN 10 THEN '未完成'
+                                WHEN 20 THEN '已下达'
+                                WHEN 30 THEN '已完成'
+                            END
+                        ) STATUS --计划状态
+,
+                        (
+                            CASE
+                                WHEN T0.SELF_FOREIGN_FLAG = 0 THEN date_add(T0.END_TIME, 7)
+                                ELSE (
+                                    CASE
+                                        WHEN T0.REQUIRE_DELIVERY IS NULL THEN T0.Reply_Delivery
+                                        ELSE (
+                                            CASE
+                                                WHEN T0.Reply_Delivery IS NULL THEN date_add(T0.REQUIRE_DELIVERY, 10)
+                                                ELSE (
+                                                    CASE
+                                                        WHEN T0.REQUIRE_DELIVERY < T0.Reply_Delivery THEN date_add(T0.REQUIRE_DELIVERY, 10)
+                                                        ELSE T0.Reply_Delivery
+                                                    END
+                                                )
+                                            END
+                                        )
+                                    END
+                                )
+                            END
+                        ) ZJHS_TIME --准交核算时间
+,
+                        (
+                            CASE
+                                WHEN T0.RESOURCE_NAME LIKE '%OEM%' THEN (
+                                    CASE
+                                        WHEN T0.OEM_STATUS IN (10, 20, 30) THEN 0
+                                        ELSE T0.OEM_STATUS
+                                    END
+                                )
+                                ELSE 1010
+                            END
+                        ) OEM_STATUS,
+				T0.SUPPLIER_OR_CREDITOR_ACCT
+                    from
+                        (
+                            SELECT
+                                PLANTASKDETAIL.ID ID,
+                                PLANTASKDETAIL.ID PLAN_TASK_DETAIL_ID,
+                                TECHORDER.ID PROCESS_TECH_TASK_ID,
+                                TASK.ID PLAN_TASK_ID,
+                                PRODUCTORDER.ID PRODUCT_ORDER_ID,
+                                PRODUCTORDER.ORDER_NUM PRODUCT_ORDER_CODE,
+                                PRODUCTORDER.REQUIRE_DELIVERY PROMISE_DELIVERY,
+                                PRODUCTORDER.REQUIRE_DELIVERY REQUIRE_DELIVERY,
+                                PLANTASKDETAIL.WORK_ORDER OEM_PURCHASE_ORDER_NO,
+                                PROCESSTECH.ID PROCESS_TECH_ID,
+                                ITEM.ID ITEM_ID,
+                                ITEM.CODE ITEM_CODE,
+                                ITEM.NAME ITEM_NAME,
+                                ITEM.AREA ITEM_AREA,
+                                ITEM.SPECIFICATION_MODEL ITEM_SPECIFICATION_MODEL,
+                                ITEM.PRODUCT_PROPERTY ITEM_PRODUCT_PROPERTY,
+                                WIPRES.ID RESOURCE_ID,
+                                WIPRES.CODE RESOURCE_CODE,
+                                WIPRES.NAME RESOURCE_NAME,
+                                T0.ID PRODUCT_AREA_ID,
+                                T0.IS_BY_HAND,
+                                T0.CODE PRODUCT_AREA_CODE,
+                                T0.NAME PRODUCT_AREA_NAME,
+                                FINISHEDVM.FINISHED_AMOUNT FINISHED_AMOUNT,
+                                PLANTASKDETAIL.UPDATE_DATE LAST_UPDATE_DATE,
+                                (PLANTASKDETAIL.PLAN_AMOUNT * ITEM.AREA) PLAN_AREA,
+                                (FINISHEDVM.FINISHED_AMOUNT * ITEM.AREA) FINISHED_AREA,
+                                TASK.PLAN_NO PLAN_NO,
+                                TASK.START_TIME START_TIME,
+                                TASK.END_TIME END_TIME,
+                                TASK.STATUS STATUS,
+                                TASK.IS_CANCEL IS_CANCEL,
+                                TASK.RE_STATE RE_STATE,
+                                TASK.RE_DATE RE_DATE,
+                                PLANTASKDETAIL.RELEASE_START_TIME RELEASE_START_TIME,
+                                TASK.CLOSE_FLAG CLOSE_FLAG,
+                                TASK.CLOSE_QTY CLOSE_QTY,
+                                DELIVERYDATE.BASE_DELIVERY_DATE,
+                                oem.Reply_Delivery,
+                                OEM.STATUS OEM_STATUS,
+                                PRODUCTORDER.SELF_FOREIGN_FLAG,
+                                GD_TYPE.NAME,
+                                PRODUCTORDER.IS_CANCELED,
+								TT.CODE AS SUPPLIER_OR_CREDITOR_ACCT
+                            FROM
+                                DWROTD.DWR_PS_APS_PLAN_TASK_DTL_F PLANTASKDETAIL --Y
+                                LEFT OUTER JOIN DWROTD.DWR_PS_APS_PLAN_TASK_F TASK ON PLANTASKDETAIL.PLAN_TASK_ID = TASK.ID
+                                LEFT OUTER JOIN DWROTD.DWR_PS_RES_WIP_SCHE_F WIPRES --Y
+                                ON TASK.RESOURCE_ID = WIPRES.ID
+                                LEFT OUTER JOIN DWROTD.DWR_PS_APS_PROTECH_ORDER_F TECHORDER --Y
+                                ON PLANTASKDETAIL.PROCESS_TECH_TASK_ID = TECHORDER.ID
+                                LEFT OUTER JOIN DWROTD.DWR_PS_APS_PRO_ORDER_F PRODUCTORDER --Y
+                                ON TECHORDER.PRODUCT_ORDER_ID = PRODUCTORDER.ID
+                                LEFT OUTER JOIN SDI.sdi_ITEM_1007 ITEM ON PRODUCTORDER.SRC_MATERIAL_ID = ITEM.ID
+                                and ITEM.del_flag = 'N'
+                                LEFT OUTER JOIN SDI.sdi_aps_protech_1007 PROCESSTECH ON TECHORDER.PROCESS_TECH_ID = PROCESSTECH.ID
+                                and PROCESSTECH.del_flag = 'N'
+                                LEFT OUTER join SDI.SDI_DELIVERYDATE_CHANGE_1007 DELIVERYDATE ON DELIVERYDATE.PLAN_NO = TASK.PLAN_NO
+                                AND DELIVERYDATE.del_flag = 'N'
+                                LEFT OUTER join SDI.sdi_APS_OEM_PO_SUM_1007 OEM ON OEM.APS_PLAN_TASK_DTL_ID = PLANTASKDETAIL.ID
+                                and OEM.del_flag = 'N'
+                                left join sdi.SDI_SUPPLIER_1007 tt
+								on oem.SUPPLIER_ID = tt.ID
+								and tt.del_flag = 'N'
+								LEFT OUTER JOIN DWROTD.DWR_PS_ORDER_TYPE_SETTING_F GD_TYPE --Y
+                                ON GD_TYPE.ID = PRODUCTORDER.ORDER_TYPE_SET_ID
+                                LEFT OUTER JOIN (
+                                    SELECT
+                                        DAILYSCHEDULE.PLAN_TASK_ID PLANTASKID,
+                                        DAILYSCHEDULE.PLAN_TASK_ID PLAN_TASK_ID,
+                                        DAILYSCHEDULE.PROCESS_TECH_ORDER_ID PROCESS_TECH_TASK_ID,
+                                        SUM(DAILYSCHEDULE.QTY) FINISHED_AMOUNT
+                                    FROM
+                                        DWROTD.DWR_PS_DAILY_SCHEDULE_F DAILYSCHEDULE --Y
+                                    GROUP BY
+                                        DAILYSCHEDULE.PLAN_TASK_ID,
+                                        DAILYSCHEDULE.PROCESS_TECH_ORDER_ID
+                                ) FINISHEDVM ON PLANTASKDETAIL.PLAN_TASK_ID = FINISHEDVM.PLAN_TASK_ID
+                                AND PLANTASKDETAIL.PROCESS_TECH_TASK_ID = FINISHEDVM.PROCESS_TECH_TASK_ID
+                                LEFT OUTER JOIN DWROTD.DWR_PS_RES_ENTERPRISE_F T0 --Y
+                                ON WIPRES.SRC_BELONG_FACT_ID = T0.ID
+                        ) T0
+                        LEFT OUTER JOIN DWROTD.DWR_PS_APS_PLAN_TASK_DTL_F T1 --Y
+                        ON T0.PLAN_TASK_DETAIL_ID = T1.ID
+                        LEFT OUTER JOIN SDI.sdi_aps_protech_1007 T2 ON T0.PROCESS_TECH_ID = T2.ID
+                        LEFT OUTER JOIN DWROTD.DWR_PS_APS_PROTECH_ORDER_F T3 ON T0.PROCESS_TECH_TASK_ID = T3.ID
+                ) T ON T.Plan_Task_Id = S.PLAN_TASK_ID
+                AND S.PROCESS_TECH_ORDER_ID = T.Process_Tech_Task_ID
+				LEFT JOIN (
+			SELECT AN.BANFN,KO.LIFNR,PO.WERKS ,PO.LGORT 
+,BE.CHARG,sum(CASE WHEN BE.SHKZG = 'S' 
+THEN BE.MENGE ELSE 0 - BE.MENGE END) AS MENGE ,concat(substr(BE.BUDAT,1,4),'-',substr(BE.BUDAT,5,2),'-',substr(BE.BUDAT,7,2)) as BUDAT
+FROM SDI.SDI_EBAN_1001 AN  
+left JOIN SDI.SDI_EKPO_1001 AS PO ON PO.BANFN = AN.BANFN 
+AND PO.BNFPO = AN.BNFPO 
+INNER JOIN SDI.SDI_EKKO_1001 AS KO ON KO.EBELN = PO.EBELN  
+LEFT JOIN SDI.SDI_EKBE_1001 AS BE ON PO.EBELN = BE.EBELN 
+AND PO.EBELP = BE.EBELP  WHERE AN.BNFPO = '00010'
+AND AN.BSART = 'ZNB1' AND BE.BEWTP = 'E' 
+GROUP BY AN.BANFN,KO.LIFNR,PO.WERKS ,PO.LGORT 
+,BE.CHARG,concat(substr(BE.BUDAT,1,4),'-',substr(BE.BUDAT,5,2),'-',substr(BE.BUDAT,7,2))
+				) BT 
+		ON T.OEM_PURCHASE_ORDER_NO = BT.BANFN
+		--AND T.SUPPLIER_OR_CREDITOR_ACCT = BT.LIFNR
+		--AND SUBSTR(REPLACE(S.PRODUCTION_DATE,'-',''),1,8) = BT.BUDAT
+        ) BASIC_DATA
+    WHERE
+        STATUS IN ('已完成', STATUS)
+        AND IS_CANCEL = 0
+        and ZJHS_TIME >= '2022-02-01'
+        AND ZJHS_TIME <= '2022-03-02'
+),
+B AS (
+    SELECT
+        A.*,
+        (
+            CASE
+                WHEN ZJHS_TIME >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN CLOSE_FLAG = 1 THEN '是'
+                        ELSE '否'
+                    END
+                )
+                ELSE '否'
+            END
+        ) clearance_within_time1 --是否核算时间内关单1
+,
+        (
+            CASE
+                WHEN REQUIRE_DELIVERY >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN CLOSE_FLAG = 1 THEN '是'
+                        ELSE '否'
+                    END
+                )
+                ELSE '否'
+            END
+        ) clearance_within_time2 --是否核算时间内关单2
+,
+        (
+            CASE
+                WHEN ZJHS_TIME >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN RESOURCE_NAME LIKE '%湖南%' THEN (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7' THEN QTY
+                                ELSE 0
+                            END
+                        )
+                        ELSE (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7'
+                                AND BATCH NOT LIKE '%9' THEN QTY
+                                ELSE 0
+                            END
+                        )
+                    END
+                )
+                ELSE 0
+            END
+        ) ontime_quality1 --按时按质报工数量1
+,
+        (
+            CASE
+                WHEN REQUIRE_DELIVERY >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN RESOURCE_NAME LIKE '%湖南%' THEN (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7' THEN QTY
+                                ELSE 0
+                            END
+                        )
+                        ELSE (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7'
+                                AND BATCH NOT LIKE '%9' THEN QTY
+                                ELSE 0
+                            END
+                        )
+                    END
+                )
+                ELSE 0
+            END
+        ) ontime_quality2 --按时按质报工数量2
+,
+        (
+            CASE
+                WHEN ZJHS_TIME >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN RESOURCE_NAME LIKE '%湖南%' THEN (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7' THEN JT_AREA
+                                ELSE 0
+                            END
+                        )
+                        ELSE (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7'
+                                AND BATCH NOT LIKE '%9' THEN JT_AREA
+                                ELSE 0
+                            END
+                        )
+                    END
+                )
+                ELSE 0
+            END
+        ) ontime_AREA1 --按时按质报工面积1
+,
+        (
+            CASE
+                WHEN REQUIRE_DELIVERY >= PRODUCTION_DATE THEN (
+                    CASE
+                        WHEN RESOURCE_NAME LIKE '%湖南%' THEN (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7' THEN JT_AREA
+                                ELSE 0
+                            END
+                        )
+                        ELSE (
+                            CASE
+                                WHEN BATCH NOT LIKE '%7'
+                                AND BATCH NOT LIKE '%9' THEN JT_AREA
+                                ELSE 0
+                            END
+                        )
+                    END
+                )
+                ELSE 0
+            END
+        ) ontime_AREA2 --按时按质报工面积2
+    FROM
+        A
+    WHERE
+        OEM_STATUS <> 0
+        AND RELEASE_START_TIME IS NOT NULL
+),
+C AS (
+    SELECT
+        B1.*,
+        B2.ontime_quality1_1,
+        B2.ontime_AREA1_1,
+        ontime_quality2_2,
+        ontime_AREA2_2
+    FROM
+        B B1
+        LEFT OUTER JOIN (
+            SELECT
+                ID,
+                sum(ontime_quality1) ontime_quality1_1,
+                sum(ontime_AREA1) ontime_AREA1_1,
+                sum(ontime_quality2) ontime_quality2_2,
+                sum(ontime_AREA2) ontime_AREA2_2
+            FROM
+                B
+            GROUP BY
+                ID
+        ) B2 ON B1.ID = B2.ID
+),
+D AS (
+    SELECT
+        C.*,
+        (
+            CASE
+                WHEN PLAN_AMOUNT <= ONTIME_QUALITY1_1 THEN PLAN_AMOUNT
+                ELSE ONTIME_QUALITY1_1
+            END
+        ) Submitted_quantity1 --准交数量1
+,
+        (
+            CASE
+                WHEN PLAN_AMOUNT <= ONTIME_QUALITY2_2 THEN PLAN_AMOUNT
+                ELSE ONTIME_QUALITY2_2
+            END
+        ) Submitted_quantity2 --准交数量2
+,
+        (
+            CASE
+                WHEN PLAN_AREA <= ONTIME_AREA1_1 THEN PLAN_AREA
+                ELSE ONTIME_AREA1_1
+            END
+        ) Submitted_AREA1 --准交面积1
+,
+        (
+            CASE
+                WHEN PLAN_AREA <= ONTIME_AREA2_2 THEN PLAN_AREA
+                ELSE ONTIME_AREA2_2
+            END
+        ) Submitted_AREA2 --准交面积2
+    FROM
+        C
+),
+E AS (
+    SELECT
+        D.*,
+        ONTIME_AREA1_1 / PLAN_AREA Submitted_AREA_RATE1 --面积准交率1
+,
+        ONTIME_AREA2_2 / PLAN_AREA Submitted_AREA_RATE2 --面积准交率2
+,
+        (
+            CASE
+                WHEN ITEM_PRODUCT_PROPERTY IN ('A', 'B') THEN (
+                    CASE
+                        WHEN ONTIME_QUALITY1_1 / PLAN_AMOUNT >= 0.9 THEN '是'
+                        ELSE '否'
+                    END
+                )
+                ELSE (
+                    CASE
+                        WHEN ONTIME_QUALITY1_1 / PLAN_AMOUNT >= 0.995 THEN '是'
+                        ELSE '否'
+                    END
+                )
+            END
+        ) SKU_delivered1 --SKU是否准交1
+,
+        (
+            CASE
+                WHEN ITEM_PRODUCT_PROPERTY IN ('A', 'B') THEN (
+                    CASE
+                        WHEN ONTIME_QUALITY2_2 / PLAN_AMOUNT >= 0.9 THEN '是'
+                        ELSE '否'
+                    END
+                )
+                ELSE (
+                    CASE
+                        WHEN ONTIME_QUALITY2_2 / PLAN_AMOUNT >= 0.995 THEN '是'
+                        ELSE '否'
+                    END
+                )
+            END
+        ) SKU_delivered2 --SKU是否准交2
+    FROM
+        D
+),
+F as(
+    SELECT
+        E1.*,
+        '纯安全库存' GD_TYPE
+    FROM
+        E E1
+    WHERE
+        E1.ID in (
+            SELECT
+                E2.ID
+            FROM
+                E E2
+            WHERE
+                E2.NAME <> '安全库存'
+        )
+    UNION ALL
+    SELECT
+        E3.*,
+        '非纯安全库存' GD_TYPE
+    FROM
+        E E3
+    WHERE
+        E3.ID NOT IN (
+            SELECT
+                E4.ID
+            FROM
+                E E4
+            WHERE
+                E4.NAME <> '安全库存'
+        )
+),
+--工单类型
+G AS (
+    SELECT distinct
+        F1.ID ID,
+        F1.PLAN_no PLAN_no,
+        F1.PRODUCT_ORDER_CODE PRODUCT_ORDER_CODE,
+        F1.ITEM_CODE ITEM_CODE,
+        F1.ITEM_SPECIFICATION_MODEL ITEM_SPECIFICATION_MODEL,
+        F1.ITEM_PRODUCT_PROPERTY ITEM_PRODUCT_PROPERTY,
+        F1.RESOURCE_NAME RESOURCE_NAME,
+        F1.base base,
+        F1.REQUIRE_DELIVERY REQUIRE_DELIVERY,
+        F1.PROMISE_DELIVERY PROMISE_DELIVERY,
+        F1.START_TIME START_TIME,
+        F1.END_TIME END_TIME,
+        F1.RELEASE_START_TIME RELEASE_START_TIME,
+        F1.STATUS STATUS,
+        F1.PLAN_AMOUNT PLAN_AMOUNT,
+        F1.PLAN_AREA PLAN_AREA,
+        F1.BASE_DELIVERY_DATE BASE_DELIVERY_DATE,
+        F1.Reply_Delivery Reply_Delivery,
+        --F1.PRODUCTION_DATE PRODUCTION_DATE,
+		'' AS PRODUCTION_DATE,
+        F1.ZJHS_TIME ZJHS_TIME,
+        F1.FINISHED_AMOUNT FINISHED_AMOUNT,
+        F1.FINISHED_AREA FINISHED_AREA,
+        '是' clearance_within_time1,
+        F1.ontime_quality1_1 ontime_quality1_1,
+        F1.ontime_AREA1_1 ontime_AREA1_1,
+        F1.Submitted_quantity1 Submitted_quantity1,
+        F1.Submitted_AREA1 Submitted_AREA1,
+        F1.Submitted_AREA_RATE1 Submitted_AREA_RATE1,
+        F1.SKU_delivered1 SKU_delivered1,
+        F1.clearance_within_time2 clearance_within_time2,
+        F1.ontime_quality2_2 ontime_quality2_2,
+        F1.ontime_AREA2_2 ontime_AREA2_2,
+        F1.Submitted_quantity2 Submitted_quantity2,
+        F1.Submitted_AREA2 Submitted_AREA2,
+        F1.Submitted_AREA_RATE2 Submitted_AREA_RATE2,
+        F1.SKU_delivered2 SKU_delivered2,
+        F1.GD_TYPE GD_TYPE
+    FROM
+        F F1
+    WHERE
+        F1.ID IN (
+            SELECT
+                F2.ID
+            FROM
+                F F2
+            WHERE
+                F2.clearance_within_time1 = '是'
+        )
+    UNION ALL
+    SELECT DISTINCT
+        F3.ID ID,
+        F3.PLAN_no PLAN_no,
+        F3.PRODUCT_ORDER_CODE PRODUCT_ORDER_CODE,
+        F3.ITEM_CODE ITEM_CODE,
+        F3.ITEM_SPECIFICATION_MODEL ITEM_SPECIFICATION_MODEL,
+        F3.ITEM_PRODUCT_PROPERTY ITEM_PRODUCT_PROPERTY,
+        F3.RESOURCE_NAME RESOURCE_NAME,
+        F3.base base,
+        F3.REQUIRE_DELIVERY REQUIRE_DELIVERY,
+        F3.PROMISE_DELIVERY PROMISE_DELIVERY,
+        F3.START_TIME START_TIME,
+        F3.END_TIME END_TIME,
+        F3.RELEASE_START_TIME RELEASE_START_TIME,
+        F3.STATUS STATUS,
+        F3.PLAN_AMOUNT PLAN_AMOUNT,
+        F3.PLAN_AREA PLAN_AREA,
+        F3.BASE_DELIVERY_DATE BASE_DELIVERY_DATE,
+        F3.Reply_Delivery Reply_Delivery,
+        --F3.PRODUCTION_DATE PRODUCTION_DATE,
+		'' AS PRODUCTION_DATE,
+        F3.ZJHS_TIME ZJHS_TIME,
+        F3.FINISHED_AMOUNT FINISHED_AMOUNT,
+        F3.FINISHED_AREA FINISHED_AREA,
+        F3.clearance_within_time1 clearance_within_time1,
+        F3.ontime_quality1_1 ontime_quality1_1,
+        F3.ontime_AREA1_1 ontime_AREA1_1,
+        F3.Submitted_quantity1 Submitted_quantity1,
+        F3.Submitted_AREA1 Submitted_AREA1,
+        F3.Submitted_AREA_RATE1 Submitted_AREA_RATE1,
+        F3.SKU_delivered1 SKU_delivered1,
+        F3.clearance_within_time2 clearance_within_time2,
+        F3.ontime_quality2_2 ontime_quality2_2,
+        F3.ontime_AREA2_2 ontime_AREA2_2,
+        F3.Submitted_quantity2 Submitted_quantity2,
+        F3.Submitted_AREA2 Submitted_AREA2,
+        F3.Submitted_AREA_RATE2 Submitted_AREA_RATE2,
+        F3.SKU_delivered2 SKU_delivered2,
+        F3.GD_TYPE GD_TYPE
+    FROM
+        F F3
+    WHERE
+        F3.ID NOT IN (
+            SELECT
+                F4.ID
+            FROM
+                F F4
+            WHERE
+                F4.clearance_within_time1 = '是'
+        )
+)
+select * from g;
+
+SELECT
+        G1.ID ID,
+        G1.PLAN_no PLAN_no,
+        G1.PRODUCT_ORDER_CODE PRODUCT_ORDER_CODE,
+        G1.ITEM_CODE ITEM_CODE,
+        G1.ITEM_SPECIFICATION_MODEL ITEM_SPECIFICATION_MODEL,
+        G1.ITEM_PRODUCT_PROPERTY ITEM_PRODUCT_PROPERTY,
+        G1.RESOURCE_NAME RESOURCE_NAME,
+        G1.base base,
+        G1.REQUIRE_DELIVERY REQUIRE_DELIVERY,
+        G1.PROMISE_DELIVERY PROMISE_DELIVERY,
+        G1.START_TIME START_TIME,
+        G1.END_TIME END_TIME,
+        G1.RELEASE_START_TIME RELEASE_START_TIME,
+        G1.STATUS STATUS,
+        G1.PLAN_AMOUNT PLAN_AMOUNT,
+        G1.PLAN_AREA PLAN_AREA,
+        G1.BASE_DELIVERY_DATE BASE_DELIVERY_DATE,
+        G1.Reply_Delivery Reply_Delivery,
+        G1.PRODUCTION_DATE PRODUCTION_DATE,
+        G1.ZJHS_TIME ZJHS_TIME,
+        G1.FINISHED_AMOUNT FINISHED_AMOUNT,
+        G1.FINISHED_AREA FINISHED_AREA,
+        G1.clearance_within_time1 clearance_within_time1,
+        G1.ontime_quality1_1 ontime_quality1_1,
+        G1.ontime_AREA1_1 ontime_AREA1_1,
+        G1.Submitted_quantity1 Submitted_quantity1,
+        G1.Submitted_AREA1 Submitted_AREA1,
+        G1.Submitted_AREA_RATE1 Submitted_AREA_RATE1,
+        '是' SKU_delivered1,
+        G1.clearance_within_time2 clearance_within_time2,
+        G1.ontime_quality2_2 ontime_quality2_2,
+        G1.ontime_AREA2_2 ontime_AREA2_2,
+        G1.Submitted_quantity2 Submitted_quantity2,
+        G1.Submitted_AREA2 Submitted_AREA2,
+        G1.Submitted_AREA_RATE2 Submitted_AREA_RATE2,
+        G1.SKU_delivered2 SKU_delivered2,
+        G1.GD_TYPE GD_TYPE
+    FROM dm.test_db G1
+    WHERE
+        G1.ID IN (
+            SELECT
+                G2.ID
+            FROM
+                dm.test_db G2
+            WHERE
+                G2.SKU_delivered1 = '是'
+        )
+    UNION ALL
+    SELECT
+        G3.ID ID,
+        G3.PLAN_no PLAN_no,
+        G3.PRODUCT_ORDER_CODE PRODUCT_ORDER_CODE,
+        G3.ITEM_CODE ITEM_CODE,
+        G3.ITEM_SPECIFICATION_MODEL ITEM_SPECIFICATION_MODEL,
+        G3.ITEM_PRODUCT_PROPERTY ITEM_PRODUCT_PROPERTY,
+        G3.RESOURCE_NAME RESOURCE_NAME,
+        G3.base base,
+        G3.REQUIRE_DELIVERY REQUIRE_DELIVERY,
+        G3.PROMISE_DELIVERY PROMISE_DELIVERY,
+        G3.START_TIME START_TIME,
+        G3.END_TIME END_TIME,
+        G3.RELEASE_START_TIME RELEASE_START_TIME,
+        G3.STATUS STATUS,
+        G3.PLAN_AMOUNT PLAN_AMOUNT,
+        G3.PLAN_AREA PLAN_AREA,
+        G3.BASE_DELIVERY_DATE BASE_DELIVERY_DATE,
+        G3.Reply_Delivery Reply_Delive,
+        G3.PRODUCTION_DATE PRODUCTION_DATE,
+        G3.ZJHS_TIME ZJHS_TIME,
+        G3.FINISHED_AMOUNT FINISHED_AMOUNT,
+        G3.FINISHED_AREA FINISHED_AREA,
+        G3.clearance_within_time1 clearance_within_time1,
+        G3.ontime_quality1_1 ontime_quality1_1,
+        G3.ontime_AREA1_1 ontime_AREA1_1,
+        G3.Submitted_quantity1 Submitted_quantity1,
+        G3.Submitted_AREA1 Submitted_AREA1,
+        G3.Submitted_AREA_RATE1 Submitted_AREA_RATE1,
+        G3.SKU_delivered1 SKU_delivered1,
+        G3.clearance_within_time2 clearance_within_time2,
+        G3.ontime_quality2_2 ontime_quality2_2,
+        G3.ontime_AREA2_2 ontime_AREA2_2,
+        G3.Submitted_quantity2 Submitted_quantity2,
+        G3.Submitted_AREA2 Submitted_AREA2,
+        G3.Submitted_AREA_RATE2 Submitted_AREA_RATE2,
+        G3.SKU_delivered2 SKU_delivered2,
+        G3.GD_TYPE GD_TYPE
+    FROM
+        dm.test_db G3
+    WHERE
+        G3.ID NOT IN (
+            SELECT
+                G4.ID
+            FROM
+                dm.test_db G4
+            WHERE
+                G4.SKU_delivered1 = '是'
+        )

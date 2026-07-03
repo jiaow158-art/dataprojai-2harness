@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWR_AR_BILL_AGING_F_2",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

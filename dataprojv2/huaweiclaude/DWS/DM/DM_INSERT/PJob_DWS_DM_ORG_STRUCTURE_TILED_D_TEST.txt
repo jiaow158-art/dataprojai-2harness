@@ -1,0 +1,74 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/22 10:46:13 GMT+08:00
+-- ******************************************************************** --
+
+DELETE FROM DM.DM_ORG_STRUCTURE_TILED_D_TEST;
+INSERT INTO DM.DM_ORG_STRUCTURE_TILED_D_TEST
+with recursive tmp  as (
+select  
+org_short_name_cn::varchar(1024) as org_short_name_cn_all ,
+org_code ::varchar(1024) as org_code_all,
+org_name_cn::varchar(1024) org_name_cn_all,
+org_code,
+up_org_code,
+org_short_name_cn,
+org_name_cn
+FROM  DM.DM_ORG_STRUCTURE_ENTWECHAT_D_TEST  H
+where  up_org_code  is NULL 
+and data_flag = 0
+union 
+select
+(t2.org_short_name_cn_all||'>,'||t1.org_short_name_cn )::varchar(1024) org_short_name_cn_all,
+(t2.org_code_all||'>,'||t1.org_code )::varchar(1024) org_code_all,
+(t2.org_name_cn_all||'>,'||t1.org_name_cn)::varchar(1024) org_name_cn_all,
+t1.org_code ,
+t1.up_org_code,
+t1.org_short_name_cn,
+t1.org_name_cn
+from  
+ DM.DM_ORG_STRUCTURE_ENTWECHAT_D_TEST  t1 
+ join tmp t2   on t1.up_org_code = t2.org_code
+ where  data_flag = 0
+)
+--select * from tmp
+select 
+org_code
+,up_org_code 
+,org_short_name_cn
+,org_name_cn
+,org_short_name_cn_all as org_short_name_cn_all_level
+,org_name_cn_all as org_name_cn_all_level
+,split_part(org_short_name_cn_all,'>,',1)  org_short_name_cn_level1
+,split_part(org_name_cn_all,'>,',1)   org_name_cn_level1
+,split_part(org_short_name_cn_all,'>,',2)  org_short_name_cn_level2
+,split_part(org_name_cn_all,'>,',2)   org_name_cn_level2
+,split_part(org_short_name_cn_all,'>,',3)  org_short_name_cn_level3
+,split_part(org_name_cn_all,'>,',3)   org_name_cn_level3
+,split_part(org_short_name_cn_all,'>,',4)  org_short_name_cn_level4
+,split_part(org_name_cn_all,'>,',4)   org_name_cn_level4
+,split_part(org_short_name_cn_all,'>,',5)  org_short_name_cn_level5
+,split_part(org_name_cn_all,'>,',5)   org_name_cn_level5
+,split_part(org_short_name_cn_all,'>,',6)  org_short_name_cn_level6
+,split_part(org_name_cn_all,'>,',6)   org_name_cn_level6
+,split_part(org_short_name_cn_all,'>,',7)  org_short_name_cn_level7
+,split_part(org_name_cn_all,'>,',7)   org_name_cn_level7
+,split_part(org_short_name_cn_all,'>,',8)  org_short_name_cn_level8
+,split_part(org_name_cn_all,'>,',8)   org_name_cn_level8
+,split_part(org_short_name_cn_all,'>,',9)  org_short_name_cn_level9
+,split_part(org_name_cn_all,'>,',9)   org_name_cn_level9
+,split_part(org_short_name_cn_all,'>,',10)  org_short_name_cn_level10
+,split_part(org_name_cn_all,'>,',10)   org_name_cn_level10
+,current_timestamp() as dw_last_update_date -- 数据同步时间
+,split_part(org_code_all,'>,',1) org_code_level1
+,split_part(org_code_all,'>,',2) org_code_level2
+,split_part(org_code_all,'>,',3) org_code_level3
+,split_part(org_code_all,'>,',4) org_code_level4
+,split_part(org_code_all,'>,',5) org_code_level5
+,split_part(org_code_all,'>,',6) org_code_level6
+,split_part(org_code_all,'>,',7) org_code_level7
+,split_part(org_code_all,'>,',8) org_code_level8
+,split_part(org_code_all,'>,',9) org_code_level9
+,split_part(org_code_all,'>,',10) org_code_level10
+from TMP;

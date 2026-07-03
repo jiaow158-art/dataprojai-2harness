@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_AR_CUST_DETAIL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "应收客户明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

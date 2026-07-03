@@ -1,0 +1,8 @@
+{
+    "name": "delivery_order_t",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "default"
+}

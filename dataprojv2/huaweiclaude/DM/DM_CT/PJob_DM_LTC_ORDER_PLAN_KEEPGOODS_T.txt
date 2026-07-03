@@ -1,0 +1,233 @@
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+WITH SELF_PROJECT_DATA01 AS(    -- 自营工程数据
+SELECT A.POSNR AS SAP_ITEM_NUM
+ ,D.POSID AS PLAN_ITEM_NUM
+ ,B.POSNR AS SAP_PLAN_NUM
+ ,E.POSID AS PLAN_NUM 
+ ,C.POSNR AS SAP_WBS_NUM
+ ,F.POSID AS WBS_NUM  
+ FROM SDI.SDI_PRHI_1001 A
+ LEFT JOIN SDI.SDI_PRHI_1001 B
+ ON A.UP = B.POSNR
+ AND A.MANDT = B.MANDT
+ AND B.DEL_FLAG = 'N'
+ LEFT JOIN SDI.SDI_PRHI_1001 C
+ ON B.UP = C.POSNR
+ AND C.MANDT = B.MANDT
+ AND C.DEL_FLAG = 'N' 
+ LEFT JOIN SDI.SDI_PRPS_1001 D
+ ON A.POSNR = D.PSPNR
+ AND A.MANDT = D.MANDT
+ AND D.DEL_FLAG = 'N' 
+ LEFT JOIN SDI.SDI_PRPS_1001 E
+ ON B.POSNR = E.PSPNR 
+ AND E.MANDT = B.MANDT
+ AND E.DEL_FLAG = 'N' 
+ LEFT JOIN SDI.SDI_PRPS_1001 F
+ ON C.POSNR = F.PSPNR  
+ AND C.MANDT = F.MANDT
+ AND F.DEL_FLAG = 'N' 
+ WHERE A.MANDT = '800'
+ AND A.DEL_FLAG = 'N'
+),
+SELL_PROJECT_DATA01 as ( -- 经销工程数据
+select t1.vbeln as sap_header_num,  -- 销售凭证
+	   t1.POSNR as sap_line_num, -- 销售凭证项目
+	   t2.kunnr as cust_num, -- 客户
+	   concat(t1.VBELN,t1.POSNR) as sap_item_num,  -- sap销售订单号
+	   sum(t1.BMENG) as lh_qty,    -- 留货数据
+	   min(t1.EDATU) as min_lh_date,   -- 留货时间(最小值)
+	   max(t1.EDATU) as max_lh_date   -- 留货时间(最大值)
+FROM SDI.SDI_VBEP_1001 t1
+join SDI.sdi_vbak_1001 t2
+on t1.vbeln = t2.vbeln
+where t1.del_flag = 'N'
+and t2.del_flag = 'N'
+group by t1.vbeln ,
+		 t1.POSNR,
+		 t2.kunnr
+),
+SELF_PROJECT_DATA02 AS( -- 自营工程数据
+SELECT
+       '自营工程' AS LH_TYPE  -- 留货类型
+       ,A.SO_NO AS SALE_ORDER_NUM --销售订单号 
+      ,A.SO_ITEM AS SALE_ORDER_ITEM_NUM --销售订单行号 
+	  ,'' AS OSS_ORDER_NUM-- OSS销售订单编码
+	  ,'' AS OSS_PURCHASE_VOUCHER_NUM -- OSS采购订单编号
+      ,A.WBS AS WBS_ELEMENT --WBS元素
+	  ,F.PLAN_ITEM_NUM --计划单行号
+	  ,F.WBS_NUM --WBS号
+	  ,K.post1 as WBS_NAME_CN -- WBS名称
+	  ,F.PLAN_NUM --计划单号
+       ,B.COMPANY_ID --公司ID
+      ,A.COMP_CODE AS COMPANY_CODE --公司代码
+	  ,B.COMPANY_NAME --公司名称
+	  ,C.MATERIAL_ID --物料ID
+      ,A.MATERIAL AS MATERIAL_NUM --物料编码
+	  ,C.MATERIAL_NAME --物料名称
+      ,C.LENGTH_1 --长度
+	  ,C.WIDTH --宽度
+	  ,C.DIMENSION --规格
+	  ,C.EXTERNAL_MATL_GROUP_CODE --外部物料组
+	  ,C.MATL_GROUP_CODE --物料组
+	  ,C.PRODUCT_LEVEL_CODE --产品层次
+	  ,C.RESERVED_FIELD_1 AS PRODUCT_CHANNEL_CODE --产品渠道编码
+	  ,C2.CONFIG_NAME AS PRODUCT_CHANNEL_NAME --产品渠道名称
+	  ,COALESCE(J.APPROVAL_QUANTITY,'') AS REQUIRE_QUANTITY  -- 需求数量
+      ,FROM_UNIXTIME(UNIX_TIMESTAMP(J.EXCEPT_DATE,'yyyyMMdd'),'yyyy-MM-dd') AS REQUIRE_DELIVERY_DATE -- 需求时间
+      ,D.FACTORY_ID AS FACTORY_WERKS_ID --工厂ID
+	  ,A.PLANT AS FACTORY_WERKS_CODE --工厂编码
+	  ,D.FACTORY_NAME AS FACTORY_WERKS_NAME --工厂名称
+      ,A.STOR_LOC AS INV_LOCATION --库存地点编码
+      ,A.BATCH AS BATCH_NUM --批次
+      ,A.VENDOR AS SUPPLIER_OR_CREDITOR_ACCT --供应商编码
+	  ,E.SUPPLIER_OR_CREDITOR_NAME --供应商名称
+	  ,H.CUST_ID --客户ID
+      ,A.CUSTOMER AS CUST_NUM --客户编码
+	  ,H.CUST_NAME --客户名称
+	  ,H.ADDRESS_NAME --客户所在地址
+      ,A.STOCK_TYPE --库存类型
+      ,A.SPEC_TYPE --特殊库存标识
+	  --,FROM_UNIXTIME(UNIX_TIMESTAMP(I.BUDAT,'yyyyMMdd'),'yyyy-MM-dd') AS VOUCHER_POST_DATE --过账日期
+      ,FROM_UNIXTIME(UNIX_TIMESTAMP(MIN(I.BUDAT) OVER(PARTITION BY F.PLAN_ITEM_NUM),'yyyyMMdd'),'yyyy-MM-dd') as  MIN_LH_DATE   -- 最小留货时间
+      ,FROM_UNIXTIME(UNIX_TIMESTAMP(MAX(I.BUDAT) OVER(PARTITION BY F.PLAN_ITEM_NUM),'yyyyMMdd'),'yyyy-MM-dd') as MAX_LH_DATE    -- 最大留货时间
+      ,A.STOCK_QTY AS LH_QTY --留货数量
+	  ,A.STOCK_QTY * C.LENGTH_1 * C.WIDTH /1000000 AS LH_AREA --留货面积（平方米）
+	  ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+  FROM SDI.SDI_ZCDSV_TOTALSTCK_1001 A
+  LEFT JOIN DWRDIM.DWR_DIM_COMPANY_D B
+    ON A.COMP_CODE = B.COMPANY_CODE
+   AND A.CLIENT = B.GROUP_NUM
+   AND B.END_DATE = '4712-12-31'
+   AND B.DEL_FLAG = 'N'
+  LEFT JOIN DWRDIM.DWR_DIM_MATERIAL_GENERAL_D C
+    ON A.MATERIAL = C.MATERIAL_NUM
+   AND C.END_DATE = '4712-12-31'
+   AND C.DEL_FLAG = 'N'
+  LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R C2
+    ON C.RESERVED_FIELD_1 = C2.SRC_SYS_CONFIG_CODE
+   AND C2.SOURCE_CODE = 'ZTYL01'
+  LEFT JOIN DWRDIM.DWR_DIM_FACTORY_D D
+    ON A.PLANT = D.FACTORY_CODE
+   AND A.CLIENT = D.GROUP_NUM
+   AND D.END_DATE = '4712-12-31'
+   AND D.DEL_FLAG = 'N'
+  LEFT JOIN DWRDIM.DWR_DIM_SUPPLIER_GENERAL_D E
+    ON A.VENDOR = E.SUPPLIER_OR_CREDITOR_NUM
+   AND A.CLIENT = E.GROUP_NUM
+   AND E.END_DATE = '4712-12-31'
+   AND E.DEL_FLAG = 'N'
+  LEFT JOIN SELF_PROJECT_DATA01 F
+    ON A.WBS = F.SAP_ITEM_NUM
+  LEFT JOIN DWRDIM.DWR_DIM_CUST_GENERAL_D H
+    ON A.CUSTOMER = H.CUST_NUM
+   AND A.CLIENT = H.GROUP_NUM
+   AND H.DEL_FLAG = 'N'
+   AND H.END_DATE = '4712-12-31'
+  LEFT JOIN(SELECT
+                  MATNR
+                 ,WERKS
+                 ,MAT_PSPNR
+                 ,MIN(BUDAT) AS BUDAT
+              FROM SDI.SDI_MATDOC_1001
+             WHERE BWART = '415'
+               AND SOBKZ = 'Q' 
+               AND SHKZG = 'S'
+			   AND DEL_FLAG = 'N'
+             GROUP BY
+                  MATNR
+                 ,WERKS
+                 ,MAT_PSPNR			 
+           ) I
+  ON A.MATERIAL = I.MATNR
+ AND COALESCE(A.PLANT,'') = COALESCE(I.WERKS,'')
+ AND COALESCE(A.WBS,'') = COALESCE(I.MAT_PSPNR,'')
+ LEFT JOIN DM.DM_LTC_PLAN_ORDER_T J  -- LTC计划订单表_OSS
+ ON F.PLAN_ITEM_NUM = J.PLAN_ITEM_NUM
+ AND F.WBS_NUM = J.WBS_NUM
+ LEFT JOIN SDI.sdi_prps_1001 K
+ ON F.WBS_NUM = K.posid
+ AND K.DEL_FLAG = 'N'
+ WHERE A.CLIENT = '800'
+   AND A.SPEC_TYPE = 'Q'
+   AND A.STOCK_TYPE = '01'
+   AND A.DEL_FLAG = 'N'
+ ),
+SELL_PROJECT_DATA02 as( -- 经销工程数据
+SELECT '经销工程' AS LH_TYPE,
+       t1.sap_header_num as SALE_ORDER_NUM,   -- SAP订单头
+       --t1.sap_line_num, -- SAP订单行
+       t1.sap_item_num as SALE_ORDER_ITEM_NUM, -- SAP订单行
+	   t2.ORDER_NUM AS OSS_ORDER_NUM, -- OSS销售订单编码
+	   t2.PURCHASE_VOUCHER_NUM AS OSS_PURCHASE_VOUCHER_NUM, -- OSS采购订单编号
+       '' AS WBS_ELEMENT, --WBS元素
+       '' AS PLAN_ITEM_NUM, --计划单行号
+       --t2.order_num ,  --  OSS销售订单编码
+       t2.wbs_num ,  -- WBS编码
+       t2.proj_name as WBS_NAME_CN,  -- 项目名称
+       '' as PLAN_NUM, --计划单号
+       '' as COMPANY_ID, --公司ID
+       '' as COMPANY_CODE, --公司代码
+	   '' as COMPANY_NAME, --公司名称
+       t4.MATERIAL_ID, --物料ID
+       t2.MATERIAL_NUM, --物料编码
+	   t4.MATERIAL_NAME, --物料名称
+       t4.LENGTH_1, --长度
+	   t4.WIDTH, --宽度
+	   t4.DIMENSION, --规格
+	   t4.EXTERNAL_MATL_GROUP_CODE, --外部物料组
+	   t4.MATL_GROUP_CODE, --物料组
+	   t4.PRODUCT_LEVEL_CODE, --产品层次
+	   t4.RESERVED_FIELD_1 AS PRODUCT_CHANNEL_CODE, --产品渠道编码
+	   t6.CONFIG_NAME AS PRODUCT_CHANNEL_NAME, --产品渠道名称
+       t2.REQUIRE_QUANTITY,  -- 需求数量
+       FROM_UNIXTIME(UNIX_TIMESTAMP(t2.REQUIRE_DELIVERY_DATE,'yyyyMMdd'),'yyyy-MM-dd') as REQUIRE_DELIVERY_DATE, -- 需求时间
+       T7.FACTORY_ID AS FACTORY_WERKS_ID, --工厂ID
+	   T5.WERKS AS FACTORY_WERKS_CODE, --工厂编码
+	   T7.FACTORY_NAME AS FACTORY_WERKS_NAME, --工厂名称
+	   t5.lgort as INV_LOCATION,  -- 库存地点编码
+	   t5.charg as BATCH_NUM, -- 批次号
+	   '' AS SUPPLIER_OR_CREDITOR_ACCT, --供应商编码
+	   '' as SUPPLIER_OR_CREDITOR_NAME, --供应商名称
+       t3.CUST_ID, --客户ID
+       t1.cust_num, --客户编码
+	   t3.CUST_NAME, --客户名称
+	   t3.ADDRESS_NAME, --客户所在地址
+	   '' as STOCK_TYPE, --库存类型
+       '' as SPEC_TYPE, --特殊库存标识
+       FROM_UNIXTIME(UNIX_TIMESTAMP(t1.min_lh_date,'yyyyMMdd'),'yyyy-MM-dd') as min_lh_date,   -- 留货时间(最小值)
+       FROM_UNIXTIME(UNIX_TIMESTAMP(t1.max_lh_date,'yyyyMMdd'),'yyyy-MM-dd') as max_lh_date,   -- 留货时间(最大值)
+       t1.lh_qty,    -- 留货数据
+       t1.lh_qty * t4.LENGTH_1 * t4.WIDTH /1000000 AS lh_AREA, --留货面积（平方米）
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SELL_PROJECT_DATA01 t1
+left join DM.DM_LTC_SALE_ORDER_T t2 -- LTC销售订单表_OSS
+on t1.sap_item_num = t2.sap_item_num
+left join DWRDIM.DWR_DIM_CUST_GENERAL_D t3
+on t1.cust_num = t3.cust_num
+and t3.end_date = '4712-12-31' 
+left join DWRDIM.DWR_DIM_MATERIAL_GENERAL_D t4 
+on t2.material_num = t4.material_num 
+and t4.end_date = '4712-12-31'
+left join sdi.sdi_vbap_1001 t5
+on t1.sap_header_num = t5.vbeln
+and t1.sap_line_num = t5.posnr
+and t5.del_flag = 'N'
+LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R t6
+ON t4.RESERVED_FIELD_1 = t6.SRC_SYS_CONFIG_CODE
+AND t6.SOURCE_CODE = 'ZTYL01'
+LEFT JOIN DWRDIM.DWR_DIM_FACTORY_D t7 
+ON T5.WERKS = t7.factory_code  
+and t7.end_date = '4712-12-31'
+where t2.order_num  is not null
+)
+INSERT OVERWRITE TABLE DM.DM_LTC_ORDER_PLAN_KEEPGOODS_T
+SELECT T1.*
+FROM SELF_PROJECT_DATA02 T1
+union all
+select t2.*
+FROM SELL_PROJECT_DATA02 T2;

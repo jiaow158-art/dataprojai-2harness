@@ -1,0 +1,234 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2022/11/11 11:21:33 GMT+08:00
+-- update from huangwenbin 2024-02-21 新增字段：当前处理人
+-- update from huangwenbin 2024-02-23 新增字段：工单接单人所属部门、工单关闭人所属部门、当前处理人所属部门
+-- update from huangwenbin 2024-03-26 修改评分逻辑：在2024-03-05 16:00前是满分5星，1星20分，后修改为满分10星，1星10分
+-- update from huangwenbin 2024-04-01 修改评分逻辑：非自动评价评分星级在2024-03-05 16:00前是满分5星，1星20分，后修改为满分10星，1星10分
+-- 自动评价评分星级在2024-03-26 00:00前是满分5星，1星20分，后修改为满分10星，1星10分
+-- update from huangwenbin 2024-03-26 修改评分逻辑：在2024-03-05 16:00前是满分5星，1星20分，后修改为满分10星，1星10分
+-- update from 15000571 2024-05-11 修改评分逻辑：非自动评价评分星级在2024-03-05 :00前是满分5星，1星20分，后修改为满分10星，1星10分，后又改为满分10分，一星1分
+-- update from 15000571 2024-05-13  新增字段：组织架构（5月11日 15000571 新增字段）修改评分逻辑：满分100分改为满分10分
+-- update from 15000571 2024-05-15  新增字段：补充说明字段，并将“详细说明”字段清洗去HTML与json格式
+-- update from 15000571 2024-05-16  字段“工单实施人/部门/ID”修改逻辑： 当单据状态为：处理中，挂起，取当前处理人字段 ；当单据状态为：待评价、关闭，取实施人字段
+-- update from huangwenbin 2025-02-28 新增字段：工单实施人类型名称、当前处理人类型名称
+-- update from huangwenbin 2025-03-03 修改评分逻辑：从原来的10分制改成100分制
+-- update from huangwenbin 2025-03-07 增加字段：处理时长（秒）
+-- update from huangwenbin 2025-03-07 法大大系统不特殊处理
+-- update from huangwenbin 2025-03-03 修改评分逻辑：1星从原来的20分改成10分
+-- ******************************************************************** --
+
+WITH T1 AS(
+SELECT B.FLOW_ID
+--非自动评价评分星级在2024-03-05 16:00前是满分5星，1星20分，后修改为满分10星，1星10分
+--自动评价评分星级在2024-03-26 00:00前是满分5星，1星20分，后修改为满分10星，1星10分
+      ,CASE WHEN SUBSTR(B.CREATE_TIME,1,16) <= '2024-03-05 16:00' AND COALESCE(C.PJ_TYPE,0) = 0
+	        THEN ROUND(SUM(A.ANSWER_TEXT)/3,1) * 10
+			WHEN SUBSTR(B.CREATE_TIME,1,16) <= '2024-03-26 00:00' AND COALESCE(C.PJ_TYPE,0) = 1
+	        THEN ROUND(SUM(A.ANSWER_TEXT)/3,1) * 10
+			ELSE ROUND(SUM(A.ANSWER_TEXT)/3,1) * 10
+			 END AS PF 
+  FROM SDI.SDI_AA_PAPER_ANSWER_OPTION_1013 A
+ INNER JOIN SDI.SDI_AA_PAPER_ANSWER_1013 B
+    ON A.ANSWER_ID = B.ANSWER_ID
+ INNER JOIN SDI.SDI_AA_FLOW_1013 C
+    ON B.FLOW_ID = C.FLOW_ID
+ WHERE A.QUESTION_ID IN (81,82,83)
+ GROUP BY B.FLOW_ID,B.CREATE_TIME,COALESCE(C.PJ_TYPE,0)
+),T2 AS(
+SELECT DISTINCT R1.USERID
+  FROM SDI.SDI_ITSM_SYS_USER_ROLE_1013 R1
+ INNER JOIN SDI.SDI_ITSM_SYS_ROLE_1013 R2
+    ON R1.ROLEID = R2.ROLEID
+   AND R2.ROLENAME = '二线工程师'
+ WHERE R1.USERID NOT IN(SELECT USERID FROM SDI.SDI_ITSM_SYS_USER_ROLE_1013 
+                         WHERE ROLEID = 'dfa6c6344e114b1280ab0363580e228a')
+),T3 AS(
+--一条工单存在多个当前处理人，需要转成合并
+SELECT FLOW_ID
+      ,CONCAT_WS(',',COLLECT_LIST(USER_NAME)) AS USER_NAME
+      ,CONCAT_WS(',', COLLECT_LIST(USER_ID)) AS USER_ID
+  FROM SDI.SDI_AA_FLOW_USER_HANDING_1013
+ GROUP BY FLOW_ID
+)
+
+INSERT OVERWRITE TABLE DWRBIT.DWR_RM_ORDER_FLOW_F
+SELECT
+       A.FLOW_ID 	--业务流转ID
+      ,A.FLOW_NO AS FLOW_NUM --文号	   
+      ,regexp_replace(A.FLOW_MEMO, '<[^<]+>', '') AS FLOW_DESC	--描述	
+      ,A.FORM_NAME AS FLOW_NAME	--表单名称	  
+      ,A.TITLE AS FLOW_TITLE --标题
+      ,A.F_FLOW_ID AS FATHER_FLOW_ID --父业务流转ID	  
+      ,A.FORM_KEY	--对应的表单KEY
+      ,A.WF_ID	--流程ID_配置系统
+      ,A.PROC_DEF_ID	--ACTIVITI流程定义部署的ID
+      ,A.CREATE_TIME	--创建时间
+      ,A.CREATOR_ID	--创建人
+      ,A.CREATOR_NAME	--创建人名称
+      ,A.DEPT_ID	--创建人部门
+      ,A.DEPT_NAME	--创建人部门名称
+      ,A.FLOW_STATUS	--流转状态：0拟稿 1流转中2已结束 -1删除 -2强制删除   3强制结束
+      ,A.PROC_INST_ID	--流程实例ID
+      ,A.FORM_ID	--表单ID
+      ,A.CTI AS CTI_ID	--CTI目录
+      ,A.CTI_NAME	--CTI名称	  
+      ,A.COMPLETE_USER_ID	--完成用户ID
+      ,A.COMPLETE_USER_NAME	--完成用户名称
+      ,A.ORG_FLOW_ID	--导入的数据ID
+      ,A.COMPLATE_TIME	--完成时间
+      ,CASE WHEN A.COMPLATE_TIME IS NULL OR A.COMPLATE_TIME = ''
+	        THEN (unix_timestamp(concat(current_date(),' 00:00:00')) - unix_timestamp(A.CREATE_TIME))
+			ELSE (unix_timestamp(A.COMPLATE_TIME) - unix_timestamp(A.CREATE_TIME))
+			 END AS DURATION	--任务持续时间（完成时间-创建时间)，分钟	  
+      ,A.FILENO_RULE_ID	--文号规则编号
+      ,A.FILENO_RULE_NO AS FILENO_RULE_NUM	--文号规则流水号
+      ,A.FILENO_RULE_TIME	--文号添加时间
+      ,A.FORCE_USER_ID	--强制删除用户ID
+      ,A.FORCE_USER_NAME	--强制删除用户名称
+      ,A.IS_CANCELED AS IS_CANCEL	--是否被取消过流程
+      ,A.UNIT_ID	--单位ID
+      ,A.ALERT_USER_ID	--办结后提醒的用户ID
+      ,A.ALERT_USER_NAME	--办结后提醒的用户名称
+      ,A.VIEW_USER_ID	--办结后分阅的用户ID
+      ,A.VIEW_USER_NAME	--办结后分阅的用户名称
+      ,A.MODULEID AS MODULE_ID	--模块ID
+      ,A.AFFECTSCOPE AS AFFECT_SCOPE	--影响范围
+      ,A.URGENTLEVEL AS URGENT_LEVEL	--紧急程度
+      ,A.P_LEVEL AS PRIORITY_LEVEL	--优先级
+      ,A.P_HANDLE_TIME AS PRIORITY_HANDLE_TIME	--优先级-预计完成时间(结束时间）
+      ,A.P_RESPONSE_TIME AS PRIORITY_RESPONSE_TIME	--优先级-响应时长(开始时间）
+      ,A.BUSINESS_STATUS AS BUSI_STATUS	--业务状态
+      ,A.IS_ADD_SUBTASK	--是否为增发子任务 1:用户子任务 2系统子任务 3自定义子任务4重新激活工单
+      ,A.BUSINESS_START_TIME AS BUSI_START_TIME	--工单接单时间
+      ,A.BUSINESS_START_USERID AS BUSI_START_USERID	--工单接单人ID
+      ,A.BUSINESS_START_USERNAME AS BUSI_START_USERNAME	--工单接单人名称
+      ,A.BUSINESS_HANDLE_TIME AS BUSI_HANDLE_TIME	--工单实施时间
+      
+     ,CASE WHEN E.NAMECN IN ('处理中','挂起') THEN O.USER_ID  
+           WHEN E.NAMECN IN ('待评价','关闭') THEN A.BUSINESS_HANDLE_USERID 
+           ELSE COALESCE(A.BUSINESS_HANDLE_USERID,O.USER_ID) END AS BUSI_HANDLE_USERID  	--工单实施人ID       
+    --   ,A.BUSINESS_HANDLE_USERID AS BUSI_HANDLE_USERID	--工单实施人ID
+    
+     ,CASE WHEN E.NAMECN IN ('处理中','挂起') THEN O.USER_NAME  
+           WHEN E.NAMECN IN ('待评价','关闭') THEN A.BUSINESS_HANDLE_USERNAME 
+           ELSE COALESCE(A.BUSINESS_HANDLE_USERNAME,O.USER_NAME) END AS BUSI_HANDLE_USERNAME  	--工单实施人名称     
+
+
+    --   ,A.BUSINESS_HANDLE_USERNAME AS BUSI_HANDLE_USERNAME	--工单实施人名称
+    
+      ,A.BUSINESS_CLOSE_TIME AS BUSI_CLOSE_TIME	--工单关闭时间
+      ,A.BUSINESS_CLOSE_USERID AS BUSI_CLOSE_USERID	--工单关闭人ID
+      ,A.BUSINESS_CLOSE_USERNAME AS BUSI_CLOSE_USERNAME	--工单关闭人名称
+      ,A.BUSINESS_UPDATE_TIME AS BUSI_UPDATE_TIME	--业务更新时间
+      ,A.FLOW_DURINGTIME	--逾期超时计算字段       
+      ,A.REJECT AS REJECT_FLAG	--驳回特殊标识
+      ,A.PJ_TYPE AS EVALUATE_TYPE	--评价标识 1-系统自动评价 
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,SPLIT(A.CTI_NAME,'-')[0] AS CTI_NAME1 --目录1
+	  ,SPLIT(A.CTI_NAME,'-')[1] AS CTI_NAME2 --目录2
+	  ,SPLIT(A.CTI_NAME,'-')[2] AS CTI_NAME3 --目录3
+	  ,SPLIT(A.CTI_NAME,'-')[3] AS CTI_NAME4 --目录4
+	  ,SPLIT(A.CTI_NAME,'-')[4] AS CTI_NAME5 --目录5
+	  ,SPLIT(A.CTI_NAME,'-')[5] AS CTI_NAME6 --目录6
+	  ,SPLIT(A.CTI_NAME,'-')[6] AS CTI_NAME7 --目录7
+	  ,SPLIT(A.CTI_NAME,'-')[7] AS CTI_NAME8 --目录8
+	  ,CASE WHEN U1.NEW_SYSTEM_NAME IS NOT NULL THEN U1.NEW_SYSTEM_NAME
+	        --WHEN A.CTI_NAME LIKE '%法大大系统%' THEN 'OA系统'
+	        WHEN SPLIT(A.CTI_NAME,'-')[2] = 'B1' THEN 'B1系统'
+			ELSE COALESCE(COALESCE(D.SYSTEM_NAME,C.SYSTEM_NAME),B.SYSTEM_NAME)
+			 END AS SYSTEM_NAME --系统名称
+      ,CASE --WHEN A.CTI_NAME LIKE '%法大大系统%' THEN CAST('2022-01-01' AS DATE)
+	        WHEN SPLIT(A.CTI_NAME,'-')[2] = 'B1' THEN CAST('2023-10-01' AS DATE)
+			ELSE COALESCE(COALESCE(D.OP_DATE,C.OP_DATE),B.OP_DATE)
+			 END AS OP_DATE --ITIL接手系统运维时间
+	  ,CASE WHEN COALESCE(COALESCE(D.OP_DATE,C.OP_DATE),B.OP_DATE) IS NULL THEN NULL
+	         --AND A.CTI_NAME NOT LIKE '%法大大系统%' THEN NULL
+	        --WHEN A.CTI_NAME LIKE '%法大大系统%' THEN unix_timestamp(A.CREATE_TIME) - unix_timestamp(CAST('2022-01-01' AS DATE))
+			WHEN SPLIT(A.CTI_NAME,'-')[2] = 'B1' THEN unix_timestamp(A.CREATE_TIME) - unix_timestamp(CAST('2023-10-01' AS DATE))
+			ELSE unix_timestamp(A.CREATE_TIME) - unix_timestamp(COALESCE(COALESCE(D.OP_DATE,C.OP_DATE),B.OP_DATE))
+	         END AS OP_DIFF_DATE --接手时间差
+	  ,E.NAMECN AS BUSI_STATUS_NAME --状态名称
+	  ,CASE WHEN G.USERTYPEID = '7bafbfdacb8144c4816ca5e801664f69'
+    		THEN '内部用户'
+   		    --WHEN G.USERTYPEID = '6bed100d7c784ebbb0794e1b83760e7d'
+    		--THEN '外部用户'
+			ELSE '外部用户'
+    		 END AS IS_OUT_USER --是否内部用户
+	  ,CASE WHEN H.PF > 100 AND E.NAMECN IN('关闭')	THEN 100
+	        WHEN H.PF IS NULL AND E.NAMECN IN('关闭') THEN 100
+			ELSE H.PF
+			 END AS PF_VALUE --评分
+	  ,CASE WHEN A.PJ_TYPE = 1 THEN '是'
+	        ELSE '否'
+	         END AS IS_AUTO_PJ --是否自动评价
+	  ,CASE WHEN I.USERID IS NULL THEN '否'
+	        ELSE '是'
+			 END AS IS_TURN_EX --是否转二线
+	  ,F.EVENT_DEAL_NAME AS EV_OPERATOR_NAME --操作人 
+	  ,F.EVENT_WRITEUSER_NAME AS EV_CREATOR_NAME --创建人
+      ,SPLIT(F.EVENT_REQUEST_NAME,'-')[0] AS EV_REQUEST_NAME --请求人
+      
+     ,CASE WHEN E.NAMECN IN ('处理中','挂起') THEN R.DEPT_NAME 
+           WHEN E.NAMECN IN ('待评价','关闭') THEN J.DEPT_NAME
+           ELSE COALESCE(J.DEPT_NAME,R.DEPT_NAME) END AS  EV_BUSI_DEPT_NAME  	--工单实施人部门名称           
+    --   ,J.DEPT_NAME AS EV_BUSI_DEPT_NAME --实施人所属部门
+    
+    
+	  ,CAST(REPLACE(K.XYSC,'min','') AS DECIMAL) AS RESP_TIME --响应时长
+	  ,O.USER_NAME AS CUR_HANDLE_USER_NAME --当前处理人
+	  ,P.DEPT_NAME AS BUSI_START_DEPT_NAME --工单接单人所属部门
+	  ,Q.DEPT_NAME AS BUSI_CLOSE_DEPT_NAME --工单关闭人所属部门
+	  ,R.DEPT_NAME AS CUR_HANDLE_DEPT_NAME --当前处理人所属部门
+	  ,G.DEPARTMENTNAME  --组织架构（5月11日 15000571 新增字段）
+	  ,regexp_replace(ST.DETAILS, '<[^<]+>', '')   AS DETAILS --补充说明（2024年5月15日 15000571 新增字段）
+	  ,CASE WHEN E.NAMECN IN ('处理中','挂起') THEN R.EMP_TYPE_NAME 
+            WHEN E.NAMECN IN ('待评价','关闭') THEN J.EMP_TYPE_NAME
+            ELSE COALESCE(J.EMP_TYPE_NAME,R.EMP_TYPE_NAME)
+			 END AS EV_EMP_TYPE_NAME  	--工单实施人类型名称
+	  ,R.EMP_TYPE_NAME AS CUR_EMP_TYPE_NAME --当前处理人类型名称
+	  ,COALESCE(S.CLSC,0) AS HNDL_DUR --处理时长（秒）
+  FROM SDI.SDI_AA_FLOW_1013 A
+  LEFT JOIN SDI.SDI_ITIL_SYSTEM_OP_DATE_1037 B
+    ON SPLIT(A.CTI_NAME,'-')[0] = B.SYSTEM_NAME
+  LEFT JOIN SDI.SDI_ITIL_SYSTEM_OP_DATE_1037 C
+    ON SPLIT(A.CTI_NAME,'-')[2] = C.SYSTEM_NAME
+   AND SPLIT(A.CTI_NAME,'-')[0] NOT IN('桌面终端问题','基础架构问题','信息安全') --目录1为3个系统直接取目录1
+  LEFT JOIN SDI.SDI_ITIL_SYSTEM_OP_DATE_1037 D
+    ON SPLIT(A.CTI_NAME,'-')[3] = D.SYSTEM_NAME
+   AND SPLIT(A.CTI_NAME,'-')[0] NOT IN('桌面终端问题','基础架构问题','信息安全') --目录1为3个系统直接取目录1	
+  LEFT JOIN SDI.SDI_ITSM_CONFIG_DICTIONARIES_1013 E
+    ON E.DICTIONARIESCODE = A.BUSINESS_STATUS
+  LEFT JOIN SDI.SDI_STA_EVENT_1013 F
+    ON A.FLOW_ID = F.EVENT_ID  
+  LEFT JOIN SDI.SDI_ITSM_SYS_USER_1013 G
+    ON G.USERID = CASE WHEN COALESCE(F.EVENT_REQUEST_ID,'') = '' THEN F.EVENT_WRITEUSER_ID
+	                   ELSE F.EVENT_REQUEST_ID
+					    END 
+  LEFT JOIN T1 AS H
+    ON A.FLOW_ID = H.FLOW_ID
+  LEFT JOIN T2 AS I
+    ON A.BUSINESS_HANDLE_USERID = I.USERID
+  LEFT JOIN SDI.SDI_IT_IMPLEMENTER_1037 J
+    ON J.EMP_NAME = A.BUSINESS_HANDLE_USERNAME
+  LEFT JOIN SDI.SDI_V_XYGDSH_1013 K
+    ON A.FLOW_NO = K.FLOW_NO
+  LEFT JOIN T3 O
+    ON A.FLOW_ID = O.FLOW_ID
+  LEFT JOIN SDI.SDI_IT_IMPLEMENTER_1037 P 
+    ON A.BUSINESS_START_USERNAME = P.EMP_NAME
+  LEFT JOIN SDI.SDI_IT_IMPLEMENTER_1037 Q 
+    ON A.BUSINESS_CLOSE_USERNAME = Q.EMP_NAME
+  LEFT JOIN SDI.SDI_IT_IMPLEMENTER_1037 R 
+    ON O.USER_NAME = R.EMP_NAME 	
+  LEFT JOIN SDI.SDI_ITIL_SYSTEM_REL_1037 U1
+    ON CASE WHEN A.CTI_NAME LIKE '%法大大系统%' THEN 'OA系统'
+	        WHEN SPLIT(A.CTI_NAME,'-')[2] = 'B1' THEN 'B1系统'
+			ELSE COALESCE(COALESCE(D.SYSTEM_NAME,C.SYSTEM_NAME),B.SYSTEM_NAME)
+			 END = COALESCE(u1.old_system_name,'SNULL')		 
+  LEFT JOIN SDI.SDI_STA_ORDER_1013 ST 
+    ON ST.ORDER_ID= A.FLOW_ID
+  LEFT JOIN SDI.SDI_AA_FLOW_CLSC_1013 S
+    ON A.FLOW_ID = S.FLOW_ID
+;

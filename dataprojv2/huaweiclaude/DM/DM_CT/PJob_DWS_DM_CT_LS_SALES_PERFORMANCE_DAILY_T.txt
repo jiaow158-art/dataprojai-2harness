@@ -1,0 +1,2908 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/05/23 14:22:41 GMT+08:00
+--update from huangwenbin 2025-05-23 参考ct_sales_performance_daily_t搭建的表，因为直接在ct_sales_performance_daily_t修改影响的报表很多，故新增一张报表，专供SA290使用
+-- update from huangwenbin 2026-03-02 架构调整还没完成，先将排名逻辑置空，待调整再调整代码
+-- update from huangwenbin 2026-03-20 预算目标：去掉逻辑is_double_count = 0
+-- update from huangwenbin 2026-04-01 零售营销中心剔除梦之家，不含体系外剔除梦之家
+-- ******************************************************************** --
+delete
+from dm.dm_ct_ls_sales_performance_daily_t
+where calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd');
+insert into dm.dm_ct_ls_sales_performance_daily_t(
+       level1,
+       level1_code,
+       level2,
+       level2_code,
+       level3,
+       level3_code,
+       level4,
+       level4_code,
+       level5,
+       level5_code,
+       level6,
+       level6_code,
+       level7,
+       level7_code,
+       integrate_channel_code,
+       customer,
+       parent_customer,
+       double_count,
+       day_achievement,
+       last_year_day_achievement,
+       month_achievement,
+       last_period_month_achievement,
+       last_year_month_achievement,
+       last_year_all_month_achievement,
+       quarter_achievement,
+       last_period_quarter_achievement,
+       last_year_quarter_achievement,
+       year_achievement,
+       last_year_achievement,
+       last_all_year_achievement,
+       high_value_month_achievement,
+       high_value_last_period_month_achievement,
+       high_value_last_year_month_achievement,
+       high_value_quarter_achievement,
+       high_value_last_period_quarter_achievement,
+       high_value_last_year_quarter_achievement,
+       high_value_year_achievement,
+       high_value_last_year_achievement,
+       month_stand_a_gross_profit,
+       last_period_month_stand_a_gross_profit,
+       last_year_month_stand_a_gross_profit,
+       quarter_stand_a_gross_profit,
+       last_period_quarter_stand_a_gross_profit,
+       last_year_quarter_stand_a_gross_profit,
+       year_stand_a_gross_profit,
+       last_year_stand_a_gross_profit,
+       month_notax,
+       last_period_month_notax,
+       last_year_month_notax,
+       quarter_notax,
+       last_period_quarter_notax,
+       last_year_quarter_notax,
+       year_notax,
+       last_year_notax,
+       word_impression_month_achievement,
+       word_impression_quarter_achievement,
+       word_impression_year_achievement,
+       package_month_achievement,
+       package_quarter_achievement,
+       package_year_achievement,
+       n1_month_achievement,
+       n1_quarter_achievement,
+       n1_year_achievement,
+       large_spec_month_achievement,
+       large_spec_quarter_achievement,
+       large_spec_year_achievement,
+       month_sales_area,
+       quarter_sales_area,
+       year_sales_area,
+       gd04_month_sales_area,
+       gd04_quarter_sales_area,
+       gd04_year_sales_area,
+       engineering_adjust_month_achievement,
+       engineering_adjust_quarter_achievement,
+       engineering_adjust_year_achievement,
+       share_warehouse_month_achievement,
+       share_warehouse_quarter_achievement,
+       share_warehouse_year_achievement,
+       other_adjust_month_achievement,
+       other_adjust_quarter_achievement,
+       other_adjust_year_achievement,
+       month_amb_cost,
+       last_period_month_amb_cost,
+       last_year_month_amb_cost,
+       quarter_amb_cost,
+       last_period_quarter_amb_cost,
+       last_year_quarter_amb_cost,
+       year_amb_cost,
+       last_year_amb_cost,
+       month_amb_gross_profit,
+       last_period_month_amb_gross_profit,
+       last_year_month_amb_gross_profit,
+       quarter_amb_gross_profit,
+       last_period_quarter_amb_gross_profit,
+       last_year_quarter_amb_gross_profit,
+       year_amb_gross_profit,
+       last_year_amb_gross_profit,
+       month_target,
+       month_double_count_target,
+       quarter_target,
+       quarter_double_count_target,
+       year_target,
+       year_double_count_target,
+       all_year_target,
+       all_year_double_count_target,
+       month_target_high_value,
+       quarter_target_high_value,
+       year_target_high_value,
+       all_year_target_high_value,
+       month_target_1n,
+       quarter_target_1n,
+       year_target_1n,
+       all_year_target_1n,
+       month_target_package,
+       quarter_target_package,
+       year_target_package,
+       all_year_target_package,
+       month_target_word_impression,
+       quarter_target_word_impression,
+       year_target_word_impression,
+       all_year_target_word_impression,
+       level4_rank,
+       level4_quarter_rank,
+       level4_year_rank,
+       level5_rank,
+       level5_double_rank,
+       level5_quarter_rank,
+       level5_quarter_double_rank,
+       level5_year_rank,
+       level5_year_double_rank,
+       level6_rank,
+       level6_double_rank,
+       level6_quarter_rank,
+       level6_quarter_double_rank,
+       level6_year_rank,
+       level6_year_double_rank,
+       level7_rank,
+       level7_double_rank,
+       level7_quarter_rank,
+       level7_quarter_double_rank,
+       level7_year_rank,
+       level7_year_double_rank,
+       no_double_count_month_achievement,
+       no_double_count_quarter_achievement,
+       no_double_count_year_achievement,
+       calday,
+       dw_last_update_date,
+       month_predition,
+       year_predition,
+       month_a_cost,
+       last_period_month_a_cost,
+       last_year_month_a_cost,
+       quarter_a_cost,
+       last_period_quarter_a_cost,
+       last_year_quarter_a_cost,
+       year_a_cost,
+       last_year_a_cost,
+       month_a_gross_profit,
+       last_period_month_a_gross_profit,
+       last_year_month_a_gross_profit,
+       quarter_a_gross_profit,
+       last_period_quarter_a_gross_profit,
+       last_year_quarter_a_gross_profit,
+       year_a_gross_profit,
+       last_year_a_gross_profit,
+       last_day_achievement,
+       high_value_day_achievement,
+       week_avg_day_achievement,
+       last_month_day_achievement,  
+       last_month_double_count_target,
+       qjcp_month_achievement, --旗舰产品月业绩
+       qjcp_quarter_achievement, --旗舰产品季业绩
+       qjcp_year_achievement, --旗舰产品年业绩
+       iw_month_achievement, --IW产品月业绩
+       iw_quarter_achievement, --IW产品季业绩
+       iw_year_achievement, --IW产品年业绩
+	   fc_month_achievement, --辅材产品月业绩
+	   fc_quarter_achievement, --辅材产品季业绩
+	   fc_year_achievement, --辅材产品年业绩
+	   qjcp_month_target, --旗舰产品月目标
+	   qjcp_quarter_target, --旗舰产品季目标
+	   qjcp_year_target, --旗舰产品年目标
+	   fc_month_target, --辅材产品月目标
+	   fc_quarter_target, --辅材产品季目标
+	   fc_year_target, --辅材产品年目标
+	   iw_month_target, --IW产品月目标
+	   iw_quarter_target, --IW产品季目标
+	   iw_year_target, --IW产品年目标
+	   gd04_month_target, --特惠品月目标
+	   gd04_quarter_target, --特惠品季目标
+	   gd04_year_target, --特惠品年目标
+	   last_11month_all_month_achievement, --11个月前整月业绩
+	   next_month_target, --下个月目标
+	   level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	   level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+	   new_level5,
+       new_level5_code,
+       new_level5_double_rank,
+       new_level5_quarter_rank,
+       new_level5_quarter_double_rank,
+       new_level5_year_rank,
+       new_level5_year_double_rank
+)
+with base as (select node_desc2                                                        level1,
+                     node_name2                                                        level1_code,
+                     case when node_name5 = 'R8Q' then node_desc5
+					      when node_name5 = 'H03230628' then node_desc5
+						  else node_desc3 end level2,
+                     case when node_name5 = 'R8Q' then node_name5
+					      when node_name5 = 'H03230628' then node_name5
+					      else node_name3 end level2_code,
+                     case when node_name5 = 'R8Q' then ''
+					      when node_name5 = 'H03230628' then ''
+					      when node_name3 in ('H03230618') then node_desc4 else '' end level3,
+                     case when node_name5 = 'R8Q' then ''
+					      when node_name5 = 'H03230628' then ''
+                         when node_name3 in ('H03230618') then node_name4
+                         else '' end                                                   level3_code,
+                     case when node_name5 = 'R8Q' then node_desc5
+                         when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                             then node_desc5
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             node_desc3
+                         else '' end                                                   level4,
+                     case when node_name5 = 'R8Q' then node_name5
+                         when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                             then node_name5
+						 when node_name5 = 'H03230628' then node_name5	 
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             node_name3
+                         else '' end                                                   level4_code,
+                     case when node_name5 = 'R8Q' then node_desc5
+					      when node_name5 = 'H03230628' then node_desc5
+						 --when node_name4 = 'H04230600' and node_name7 in('Z009','Z125','Z126') then '晋豫零售部' --鲁豫晋运营中心下面的山西销区、豫北销区、豫南销区人为归纳到晋豫零售部
+                         when node_name4 = 'H04230600' then node_desc6 --鲁豫晋运营中心，直接去第6节点
+						 when node_name4 = 'H04230655'
+                             then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             node_desc3
+                         else '' end                                                   level5,
+                     case when node_name5 = 'R8Q' then node_name5
+					      when node_name5 = 'H03230628' then node_name5
+						 --when node_name4 = 'H04230600' and node_name7 in('Z009','Z125','Z126') then node_name4 || 'GRP1' --鲁豫晋运营中心下面的山西销区、豫北销区、豫南销区人为归纳到晋豫零售部
+                         when node_name4 = 'H04230600' then node_name6 --鲁豫晋运营中心，直接去第6节点
+						 when node_name4 = 'H04230655'
+                             then node_name5 || a.integrate_channel_code
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             node_name3
+                         else '' end                                                   level5_code,
+                     case when node_name5 = 'R8Q' then node_desc5
+					      when node_name5 = 'H03230628' then node_desc5
+					     when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel_code = 'GD01' 
+                             then node_desc8
+                         when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                             then node_desc7
+					     when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_desc6
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                              node_name4 in ('H04230685', 'H04230680') then
+                              node_desc5
+                         else '' end                                                   level6,
+                     case when node_name5 = 'R8Q' then node_name5
+					     when node_name5 = 'H03230628' then node_name5
+					     when node_name4 = 'H04230600'and length(node_name8) = 4 --and integrate_channel_code = 'GD01'
+                             then node_name8                                     
+                         when node_name4 = 'H04230600'and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                             then node_name7                                     
+						 when node_name4 = 'H04230600'and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_name6	 
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                              node_name4 in ('H04230685', 'H04230680') then
+                             node_name5
+                         else '' end                                                   level6_code,
+                     case when node_name5 = 'R8Q' then node_desc5||'体系内'
+					     when node_name5 in ('H03230628') then
+                             node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+                         when node_name4 = 'H04230600' and length(node_name9) = 3 then node_desc9
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+                         else '' end                                                   level7,
+                     case when node_name5 = 'R8Q' then node_name5||'U'
+					     when node_name5 in ('H03230628') then
+                             case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                         when node_name4 = 'H04230600' and length(node_name9) = 3 then node_name9
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                             case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                         when node_name4 in ('H04230685', 'H04240301', 'H04230680') then
+                             case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                         else '' end                                                   level7_code,
+                     integrate_channel_code,
+                     customer,
+                     parent_customer,
+                     double_count,
+					 case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				          then '体系外'
+					      when node_name3 in('H03230612','H03230627','H03230605')
+						   and data_source in ('S','T','D') then '体系外'
+					      else ''
+					       end as level2_sub, --第2层级子名称
+				     case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				          then node_name3 || 'U'
+					      when node_name3 in('H03230612','H03230627','H03230605') and data_source in ('S','T','D')
+					      then 'H03230618' || 'U'
+					      else ''
+					       end as level2_sub_code, --第2层级子名称
+					 case when node_name5 = 'R8Q' then node_desc5
+					      when node_name5 = 'H03230628' then node_desc5
+						 --when node_name4 = 'H04230600' and node_name7 in('Z009','Z125','Z126') then '晋豫零售部' --鲁豫晋运营中心下面的山西销区、豫北销区、豫南销区人为归纳到晋豫零售部
+                         when node_name4 = 'H04230600' then node_desc6 --鲁豫晋运营中心，直接去第6节点
+						 when node_name6 = 'H06230645' and integrate_channel_code = 'GD01' then case when node_desc8 like '%广州%' then '广州零售渠道'
+						                                         when node_desc7 like '%广州%' then '广州零售渠道'
+																 else '佛山零售渠道'
+																  end
+						 when node_name4 = 'H04230655'
+                             then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                             node_desc3
+                         else '' end                                                   new_level5,
+                     case when node_name5 = 'R8Q' then node_name5
+					      when node_name5 = 'H03230628' then node_name5
+						 --when node_name4 = 'H04230600' and node_name7 in('Z009','Z125','Z126') then node_name4 || 'GRP1' --鲁豫晋运营中心下面的山西销区、豫北销区、豫南销区人为归纳到晋豫零售部
+                         when node_name4 = 'H04230600' then node_name6 --鲁豫晋运营中心，直接去第6节点
+						 when node_name6 = 'H06230645' and integrate_channel_code = 'GD01' then case when node_desc8 like '%广州%' then 'H06230645-GZ'
+						                                         when node_desc7 like '%广州%' then 'H06230645-GZ'
+																 else 'H06230645-FS'
+																  end
+						 when node_name4 = 'H04230655'
+                             then node_name5 || a.integrate_channel_code
+                         when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                             node_name3
+                         else '' end                                                   new_level5_code,
+                     sum(day_achievement) / 10000                                      day_achievement,
+                     sum(last_year_day_achievement) / 10000                            last_year_day_achievement,
+                     sum(month_achievement) / 10000                                    month_achievement,
+                     sum(last_period_month_achievement) / 10000                        last_period_month_achievement,
+                     sum(last_year_month_achievement) / 10000                          last_year_month_achievement,
+                     sum(last_year_all_month_achievement) / 10000                      last_year_all_month_achievement,
+                     sum(quarter_achievement) / 10000                                  quarter_achievement,
+                     sum(last_period_quarter_achievement) / 10000                      last_period_quarter_achievement,
+                     sum(last_year_quarter_achievement) / 10000                        last_year_quarter_achievement,
+                     sum(year_achievement) / 10000                                     year_achievement,
+                     sum(last_year_achievement) / 10000                                last_year_achievement,
+                     sum(last_all_year_achievement) / 10000                            last_all_year_achievement,
+                     sum(high_value_month_achievement) / 10000                         high_value_month_achievement,
+                     sum(high_value_last_period_month_achievement) / 10000             high_value_last_period_month_achievement,
+                     sum(high_value_last_year_month_achievement) / 10000               high_value_last_year_month_achievement,
+                     sum(high_value_quarter_achievement) / 10000                       high_value_quarter_achievement,
+                     sum(high_value_last_period_quarter_achievement) / 10000           high_value_last_period_quarter_achievement,
+                     sum(high_value_last_year_quarter_achievement) / 10000             high_value_last_year_quarter_achievement,
+                     sum(high_value_year_achievement) / 10000                          high_value_year_achievement,
+                     sum(high_value_last_year_achievement) / 10000                     high_value_last_year_achievement,
+                     sum(month_stand_a_gross_profit) / 10000                           month_stand_a_gross_profit,
+                     sum(last_period_month_stand_a_gross_profit) / 10000               last_period_month_stand_a_gross_profit,
+                     sum(last_year_month_stand_a_gross_profit) / 10000                 last_year_month_stand_a_gross_profit,
+                     sum(quarter_stand_a_gross_profit) / 10000                         quarter_stand_a_gross_profit,
+                     sum(last_period_quarter_stand_a_gross_profit) / 10000             last_period_quarter_stand_a_gross_profit,
+                     sum(last_year_quarter_stand_a_gross_profit) / 10000               last_year_quarter_stand_a_gross_profit,
+                     sum(year_stand_a_gross_profit) / 10000                            year_stand_a_gross_profit,
+                     sum(last_year_stand_a_gross_profit) / 10000                       last_year_stand_a_gross_profit,
+                     sum(month_notax) / 10000                                          month_notax,
+                     sum(last_period_month_notax) / 10000                              last_period_month_notax,
+                     sum(last_year_month_notax) / 10000                                last_year_month_notax,
+                     sum(quarter_notax) / 10000                                        quarter_notax,
+                     sum(last_period_quarter_notax) / 10000                            last_period_quarter_notax,
+                     sum(last_year_quarter_notax) / 10000                              last_year_quarter_notax,
+                     sum(year_notax) / 10000                                           year_notax,
+                     sum(last_year_notax) / 10000                                      last_year_notax,
+                     sum(word_impression_month_achievement) / 10000                    word_impression_month_achievement,
+                     sum(word_impression_quarter_achievement) / 10000                  word_impression_quarter_achievement,
+                     sum(word_impression_year_achievement) / 10000                     word_impression_year_achievement,
+                     sum(package_month_achievement) / 10000                            package_month_achievement,
+                     sum(package_quarter_achievement) / 10000                          package_quarter_achievement,
+                     sum(package_year_achievement) / 10000                             package_year_achievement,
+                     sum(n1_month_achievement) / 10000                                 n1_month_achievement,
+                     sum(n1_quarter_achievement) / 10000                               n1_quarter_achievement,
+                     sum(n1_year_achievement) / 10000                                  n1_year_achievement,
+                     sum(large_spec_month_achievement) / 10000                         large_spec_month_achievement,
+                     sum(large_spec_quarter_achievement) / 10000                       large_spec_quarter_achievement,
+                     sum(large_spec_year_achievement) / 10000                          large_spec_year_achievement,
+                     sum(month_sales_area) / 10000                                     month_sales_area,
+                     sum(quarter_sales_area) / 10000                                   quarter_sales_area,
+                     sum(year_sales_area) / 10000                                      year_sales_area,
+                     sum(gd04_month_sales_area) / 10000                                gd04_month_sales_area,
+                     sum(gd04_quarter_sales_area) / 10000                              gd04_quarter_sales_area,
+                     sum(gd04_year_sales_area) / 10000                                 gd04_year_sales_area,
+                     sum(engineering_adjust_month_achievement) / 10000                 engineering_adjust_month_achievement,
+                     sum(engineering_adjust_quarter_achievement) / 10000               engineering_adjust_quarter_achievement,
+                     sum(engineering_adjust_year_achievement) / 10000                  engineering_adjust_year_achievement,
+                     sum(share_warehouse_month_achievement) / 10000                    share_warehouse_month_achievement,
+                     sum(share_warehouse_quarter_achievement) / 10000                  share_warehouse_quarter_achievement,
+                     sum(share_warehouse_year_achievement) / 10000                     share_warehouse_year_achievement,
+                     sum(other_adjust_month_achievement) / 10000                       other_adjust_month_achievement,
+                     sum(other_adjust_quarter_achievement) / 10000                     other_adjust_quarter_achievement,
+                     sum(other_adjust_year_achievement) / 10000                        other_adjust_year_achievement,
+                     sum(month_amb_cost) / 10000                                       month_amb_cost,
+                     sum(last_period_month_amb_cost) / 10000                           last_period_month_amb_cost,
+                     sum(last_year_month_amb_cost) / 10000                             last_year_month_amb_cost,
+                     sum(quarter_amb_cost) / 10000                                     quarter_amb_cost,
+                     sum(last_period_quarter_amb_cost) / 10000                         last_period_quarter_amb_cost,
+                     sum(last_year_quarter_amb_cost) / 10000                           last_year_quarter_amb_cost,
+                     sum(year_amb_cost) / 10000                                        year_amb_cost,
+                     sum(last_year_amb_cost) / 10000                                   last_year_amb_cost,
+                     sum(month_amb_gross_profit) / 10000                               month_amb_gross_profit,
+                     sum(last_period_month_amb_gross_profit) / 10000                   last_period_month_amb_gross_profit,
+                     sum(last_year_month_amb_gross_profit) / 10000                     last_year_month_amb_gross_profit,
+                     sum(quarter_amb_gross_profit) / 10000                             quarter_amb_gross_profit,
+                     sum(last_period_quarter_amb_gross_profit) / 10000                 last_period_quarter_amb_gross_profit,
+                     sum(last_year_quarter_amb_gross_profit) / 10000                   last_year_quarter_amb_gross_profit,
+                     sum(year_amb_gross_profit) / 10000                                year_amb_gross_profit,
+                     sum(last_year_amb_gross_profit) / 10000                           last_year_amb_gross_profit,
+                     0                                                                 month_predition,
+                     0                                                                 year_predition,
+                     sum(month_a_cost) / 10000                                         month_a_cost,
+                     sum(last_period_month_a_cost) / 10000                             last_period_month_a_cost,
+                     sum(last_year_month_a_cost) / 10000                               last_year_month_a_cost,
+                     sum(quarter_a_cost) / 10000                                       quarter_a_cost,
+                     sum(last_period_quarter_a_cost) / 10000                           last_period_quarter_a_cost,
+                     sum(last_year_quarter_a_cost) / 10000                             last_year_quarter_a_cost,
+                     sum(year_a_cost) / 10000                                          year_a_cost,
+                     sum(last_year_a_cost) / 10000                                     last_year_a_cost,
+                     sum(month_a_gross_profit) / 10000                                 month_a_gross_profit,
+                     sum(last_period_month_a_gross_profit) / 10000                     last_period_month_a_gross_profit,
+                     sum(last_year_month_a_gross_profit) / 10000                       last_year_month_a_gross_profit,
+                     sum(quarter_a_gross_profit) / 10000                               quarter_a_gross_profit,
+                     sum(last_period_quarter_a_gross_profit) / 10000                   last_period_quarter_a_gross_profit,
+                     sum(last_year_quarter_a_gross_profit) / 10000                     last_year_quarter_a_gross_profit,
+                     sum(year_a_gross_profit) / 10000                                  year_a_gross_profit,
+                     sum(last_year_a_gross_profit) / 10000                             last_year_a_gross_profit,
+                     sum(last_day_achievement) / 10000                                 last_day_achievement,
+                     sum(high_value_day_achievement) / 10000                           high_value_day_achievement,
+                      --2025/03/18新增周与上月均值
+                     sum(week_avg_day_achievement)/10000                               week_avg_day_achievement,
+                     sum(last_month_day_achievement)/10000                             last_month_day_achievement,
+					 --2025-03-31新增
+                     sum(qjcp_month_achievement) / 10000 as qjcp_month_achievement, --旗舰产品月业绩
+                     sum(qjcp_quarter_achievement) / 10000 as qjcp_quarter_achievement, --旗舰产品季业绩
+                     sum(qjcp_year_achievement) / 10000 as qjcp_year_achievement, --旗舰产品年业绩
+                     sum(iw_month_achievement) / 10000 as iw_month_achievement, --IW产品月业绩
+                     sum(iw_quarter_achievement) / 10000 as iw_quarter_achievement, --IW产品季业绩
+                     sum(iw_year_achievement) / 10000 as iw_year_achievement, --IW产品年业绩
+                     sum(fc_month_achievement) / 10000 as fc_month_achievement, --辅材产品月业绩
+                     sum(fc_quarter_achievement) / 10000 as fc_quarter_achievement, --辅材产品季业绩
+                     sum(fc_year_achievement) / 10000 as fc_year_achievement, --辅材产品年业绩
+					 sum(last_11month_all_month_achievement) / 10000 as last_11month_all_month_achievement --11个月前整月业绩
+              from dm.ct_sales_performance_t a
+                       left join dm.dm_md_sale_grp_reset_t b on a.org_code = b.node_name9
+                       left join upload.upload_business_analysis_channel_t c
+                                 on a.integrate_channel_code = c.channel_code
+              where calday = to_char(to_date('${P_PERIOD_D}'), 'yyyyMMdd')
+			    and double_count = 0
+              group by integrate_channel_code,
+                       level1,
+                       level1_code,
+                       level2,
+                       level2_code,
+                       level3,
+                       level3_code,
+                       level4,
+                       level4_code,
+                       level5,
+                       level5_code,
+                       level6,
+                       level6_code,
+                       level7,
+                       level7_code,
+                       b.node_name3,
+                       customer,
+                       parent_customer,
+                       double_count,
+					   level2_sub, --第2层级子名称
+				       level2_sub_code, --第2层级子名称
+					   new_level5,
+                       new_level5_code
+              union all
+--事业部U部分剔除
+              select node_desc2                                                     level1,
+                     node_name2                                                     level1_code,
+                     ''                                                             level2,
+                     node_name3 || '-U'                                             level2_code,
+                     ''                                                             level3,
+                     ''                                                             level3_code,
+                     ''                                                             level4,
+                     ''                                                             level4_code,
+                     ''                                                             level5,
+                     ''                                                             level5_code,
+                     ''                                                             level6,
+                     ''                                                             level6_code,
+                     ''                                                             level7,
+                     ''                                                             level7_code,
+                     integrate_channel_code,
+                     customer,
+                     parent_customer,
+                     double_count,
+					 '' as level2_sub, --第2层级子名称
+				     '' as level2_sub_code, --第2层级子名称
+					 '' as new_level5,
+                     '' as new_level5_code,
+                     sum(day_achievement) / 10000 * (-1)                            day_achievement,
+                     sum(last_year_day_achievement) / 10000 * (-1)                  last_year_day_achievement,
+                     sum(month_achievement) / 10000 * (-1)                          month_achievement,
+                     sum(last_period_month_achievement) / 10000 * (-1)              last_period_month_achievement,
+                     sum(last_year_month_achievement) / 10000 * (-1)                last_year_month_achievement,
+                     sum(last_year_all_month_achievement) / 10000 * (-1)            last_year_all_month_achievement,
+                     sum(quarter_achievement) / 10000 * (-1)                        quarter_achievement,
+                     sum(last_period_quarter_achievement) / 10000 * (-1)            last_period_quarter_achievement,
+                     sum(last_year_quarter_achievement) / 10000 * (-1)              last_year_quarter_achievement,
+                     sum(year_achievement) / 10000 * (-1)                           year_achievement,
+                     sum(last_year_achievement) / 10000 * (-1)                      last_year_achievement,
+                     sum(last_all_year_achievement) / 10000 * (-1)                  last_all_year_achievement,
+                     sum(high_value_month_achievement) / 10000 * (-1)               high_value_month_achievement,
+                     sum(high_value_last_period_month_achievement) / 10000 * (-1)   high_value_last_period_month_achievement,
+                     sum(high_value_last_year_month_achievement) / 10000 * (-1)     high_value_last_year_month_achievement,
+                     sum(high_value_quarter_achievement) / 10000 * (-1)             high_value_quarter_achievement,
+                     sum(high_value_last_period_quarter_achievement) / 10000 * (-1) high_value_last_period_quarter_achievement,
+                     sum(high_value_last_year_quarter_achievement) / 10000 * (-1)   high_value_last_year_quarter_achievement,
+                     sum(high_value_year_achievement) / 10000 * (-1)                high_value_year_achievement,
+                     sum(high_value_last_year_achievement) / 10000 * (-1)           high_value_last_year_achievement,
+                     sum(month_stand_a_gross_profit) / 10000 * (-1)                 month_stand_a_gross_profit,
+                     sum(last_period_month_stand_a_gross_profit) / 10000 * (-1)     last_period_month_stand_a_gross_profit,
+                     sum(last_year_month_stand_a_gross_profit) / 10000 * (-1)       last_year_month_stand_a_gross_profit,
+                     sum(quarter_stand_a_gross_profit) / 10000 * (-1)               quarter_stand_a_gross_profit,
+                     sum(last_period_quarter_stand_a_gross_profit) / 10000 * (-1)   last_period_quarter_stand_a_gross_profit,
+                     sum(last_year_quarter_stand_a_gross_profit) / 10000 * (-1)     last_year_quarter_stand_a_gross_profit,
+                     sum(year_stand_a_gross_profit) / 10000 * (-1)                  year_stand_a_gross_profit,
+                     sum(last_year_stand_a_gross_profit) / 10000 * (-1)             last_year_stand_a_gross_profit,
+                     sum(month_notax) / 10000 * (-1)                                month_notax,
+                     sum(last_period_month_notax) / 10000 * (-1)                    last_period_month_notax,
+                     sum(last_year_month_notax) / 10000 * (-1)                      last_year_month_notax,
+                     sum(quarter_notax) / 10000 * (-1)                              quarter_notax,
+                     sum(last_period_quarter_notax) / 10000 * (-1)                  last_period_quarter_notax,
+                     sum(last_year_quarter_notax) / 10000 * (-1)                    last_year_quarter_notax,
+                     sum(year_notax) / 10000 * (-1)                                 year_notax,
+                     sum(last_year_notax) / 10000 * (-1)                            last_year_notax,
+                     sum(word_impression_month_achievement) / 10000 * (-1)          word_impression_month_achievement,
+                     sum(word_impression_quarter_achievement) / 10000 * (-1)        word_impression_quarter_achievement,
+                     sum(word_impression_year_achievement) / 10000 * (-1)           word_impression_year_achievement,
+                     sum(package_month_achievement) / 10000 * (-1)                  package_month_achievement,
+                     sum(package_quarter_achievement) / 10000 * (-1)                package_quarter_achievement,
+                     sum(package_year_achievement) / 10000 * (-1)                   package_year_achievement,
+                     sum(n1_month_achievement) / 10000 * (-1)                       n1_month_achievement,
+                     sum(n1_quarter_achievement) / 10000 * (-1)                     n1_quarter_achievement,
+                     sum(n1_year_achievement) / 10000 * (-1)                        n1_year_achievement,
+                     sum(large_spec_month_achievement) / 10000 * (-1)               large_spec_month_achievement,
+                     sum(large_spec_quarter_achievement) / 10000 * (-1)             large_spec_quarter_achievement,
+                     sum(large_spec_year_achievement) / 10000 * (-1)                large_spec_year_achievement,
+                     sum(month_sales_area) / 10000 * (-1)                           month_sales_area,
+                     sum(quarter_sales_area) / 10000 * (-1)                         quarter_sales_area,
+                     sum(year_sales_area) / 10000 * (-1)                            year_sales_area,
+                     sum(gd04_month_sales_area) / 10000 * (-1)                      gd04_month_sales_area,
+                     sum(gd04_quarter_sales_area) / 10000 * (-1)                    gd04_quarter_sales_area,
+                     sum(gd04_year_sales_area) / 10000 * (-1)                       gd04_year_sales_area,
+                     sum(engineering_adjust_month_achievement) / 10000 * (-1)       engineering_adjust_month_achievement,
+                     sum(engineering_adjust_quarter_achievement) / 10000 * (-1)     engineering_adjust_quarter_achievement,
+                     sum(engineering_adjust_year_achievement) / 10000 * (-1)        engineering_adjust_year_achievement,
+                     sum(share_warehouse_month_achievement) / 10000 * (-1)          share_warehouse_month_achievement,
+                     sum(share_warehouse_quarter_achievement) / 10000 * (-1)        share_warehouse_quarter_achievement,
+                     sum(share_warehouse_year_achievement) / 10000 * (-1)           share_warehouse_year_achievement,
+                     sum(other_adjust_month_achievement) / 10000 * (-1)             other_adjust_month_achievement,
+                     sum(other_adjust_quarter_achievement) / 10000 * (-1)           other_adjust_quarter_achievement,
+                     sum(other_adjust_year_achievement) / 10000 * (-1)              other_adjust_year_achievement,
+                     sum(month_amb_cost) / 10000 * (-1)                             month_amb_cost,
+                     sum(last_period_month_amb_cost) / 10000 * (-1)                 last_period_month_amb_cost,
+                     sum(last_year_month_amb_cost) / 10000 * (-1)                   last_year_month_amb_cost,
+                     sum(quarter_amb_cost) / 10000 * (-1)                           quarter_amb_cost,
+                     sum(last_period_quarter_amb_cost) / 10000 * (-1)               last_period_quarter_amb_cost,
+                     sum(last_year_quarter_amb_cost) / 10000 * (-1)                 last_year_quarter_amb_cost,
+                     sum(year_amb_cost) / 10000 * (-1)                              year_amb_cost,
+                     sum(last_year_amb_cost) / 10000 * (-1)                         last_year_amb_cost,
+                     sum(month_amb_gross_profit) / 10000 * (-1)                     month_amb_gross_profit,
+                     sum(last_period_month_amb_gross_profit) / 10000 * (-1)         last_period_month_amb_gross_profit,
+                     sum(last_year_month_amb_gross_profit) / 10000 * (-1)           last_year_month_amb_gross_profit,
+                     sum(quarter_amb_gross_profit) / 10000 * (-1)                   quarter_amb_gross_profit,
+                     sum(last_period_quarter_amb_gross_profit) / 10000 * (-1)       last_period_quarter_amb_gross_profit,
+                     sum(last_year_quarter_amb_gross_profit) / 10000 * (-1)         last_year_quarter_amb_gross_profit,
+                     sum(year_amb_gross_profit) / 10000 * (-1)                      year_amb_gross_profit,
+                     sum(last_year_amb_gross_profit) / 10000 * (-1)                 last_year_amb_gross_profit,
+                     0                                                              month_predition,
+                     0                                                              year_predition,
+                     sum(month_a_cost) / 10000 * (-1)                               month_a_cost,
+                     sum(last_period_month_a_cost) / 10000 * (-1)                   last_period_month_a_cost,
+                     sum(last_year_month_a_cost) / 10000 * (-1)                     last_year_month_a_cost,
+                     sum(quarter_a_cost) / 10000 * (-1)                             quarter_a_cost,
+                     sum(last_period_quarter_a_cost) / 10000 * (-1)                 last_period_quarter_a_cost,
+                     sum(last_year_quarter_a_cost) / 10000 * (-1)                   last_year_quarter_a_cost,
+                     sum(year_a_cost) / 10000 * (-1)                                year_a_cost,
+                     sum(last_year_a_cost) / 10000 * (-1)                           last_year_a_cost,
+                     sum(month_a_gross_profit) / 10000 * (-1)                       month_a_gross_profit,
+                     sum(last_period_month_a_gross_profit) / 10000 * (-1)           last_period_month_a_gross_profit,
+                     sum(last_year_month_a_gross_profit) / 10000 * (-1)             last_year_month_a_gross_profit,
+                     sum(quarter_a_gross_profit) / 10000 * (-1)                     quarter_a_gross_profit,
+                     sum(last_period_quarter_a_gross_profit) / 10000 * (-1)         last_period_quarter_a_gross_profit,
+                     sum(last_year_quarter_a_gross_profit) / 10000 * (-1)           last_year_quarter_a_gross_profit,
+                     sum(year_a_gross_profit) / 10000 * (-1)                        year_a_gross_profit,
+                     sum(last_year_a_gross_profit) / 10000 * (-1)                   last_year_a_gross_profit,
+                     sum(last_day_achievement) / 10000 * (-1)                       last_day_achievement,
+                     sum(high_value_day_achievement) / 10000 * (-1)                 high_value_day_achievement,
+                      --2025/03/18新增周与上月均值
+                     sum(week_avg_day_achievement)/10000* (-1)                      week_avg_day_achievement,
+                     sum(last_month_day_achievement)/10000* (-1)                    last_month_day_achievement,
+                     --2025-03-31新增
+                     sum(qjcp_month_achievement) / 10000 as qjcp_month_achievement, --旗舰产品月业绩
+                     sum(qjcp_quarter_achievement) / 10000 as qjcp_quarter_achievement, --旗舰产品季业绩
+                     sum(qjcp_year_achievement) / 10000 as qjcp_year_achievement, --旗舰产品年业绩
+                     sum(iw_month_achievement) / 10000 as iw_month_achievement, --IW产品月业绩
+                     sum(iw_quarter_achievement) / 10000 as iw_quarter_achievement, --IW产品季业绩
+                     sum(iw_year_achievement) / 10000 as iw_year_achievement, --IW产品年业绩
+					 sum(fc_month_achievement) / 10000 as fc_month_achievement, --辅材产品月业绩
+                     sum(fc_quarter_achievement) / 10000 as fc_quarter_achievement, --辅材产品季业绩
+                     sum(fc_year_achievement) / 10000 as fc_year_achievement, --辅材产品年业绩
+					 sum(last_11month_all_month_achievement) / 10000 as last_11month_all_month_achievement --11个月前整月业绩
+              from dm.ct_sales_performance_t a
+                       left join dm.dm_md_sale_grp_reset_t b on a.org_code = b.node_name9
+                       left join upload.upload_business_analysis_channel_t c
+                                 on a.integrate_channel_code = c.channel_code
+              where calday = to_char(to_date('${P_PERIOD_D}'), 'yyyyMMdd')
+                and data_source = 'U'
+				and double_count = 0
+              group by integrate_channel_code,
+                       level1,
+                       level1_code,
+                       level2,
+                       level2_code,
+                       level3,
+                       level3_code,
+                       level4,
+                       level4_code,
+                       level5,
+                       level5_code,
+                       level6,
+                       level6_code,
+                       level7,
+                       level7_code,
+                       b.node_name3,
+                       customer,
+                       parent_customer,
+                       double_count,
+					   level2_sub, --第2层级子名称
+				       level2_sub_code, --第2层级子名称
+					   new_level5,
+                       new_level5_code
+					   ),
+     target as (
+         select node_desc2                                                        level1,
+                node_name2                                                        level1_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				     else node_desc3 end level2,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				     else node_name3 end level2_code,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+				     when node_name3 in ('H03230618') then node_desc4 else '' end level3,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+                    when node_name3 in ('H03230618') then node_name4
+                    else '' end                                                   level3_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_desc5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level4,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_name5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level4_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' then node_desc6
+                    when node_name4 = 'H04230655' and channel_name is not null
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' then node_name6
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level5_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				    when node_name5 = 'H03230628' then node_desc5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel_code = 'GD01'
+                        then node_desc8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                        then node_desc7
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_desc6
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then
+                        node_desc5
+					--when node_name3 = 'H03230628' then node_desc3
+                    else '' end                                                   level6,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel_code = 'GD01'
+                        then node_name8           
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                        then node_name7           
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_name6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_name5
+					--when node_name3 = 'H03230628' then node_name3
+                    else '' end                                                   level6_code,
+                case when node_name5 = 'R8Q' then node_desc5||'体系内'
+				     when node_name5 in ('H03230628') then
+                             node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_desc9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+					--when node_name3 in ('H03230628') then
+                    --    node_desc3 || case when data_source in ('U') then '体系内' else '体系外' end
+                    else '' end                                                   level7,
+                case when node_name5 = 'R8Q' then node_name5||'U'
+				     when node_name5 in ('H03230628') then
+                             case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_name9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+					--when node_name3 in ('H03230628') then
+                    --    case when data_source in ('U') then node_name3 || 'U' else node_name3 end
+                    when node_name4 in ('H04230685', 'H04240301', 'H04230680') then
+                        case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                    else '' end                                                   level7_code,
+                integrate_channel,
+                ''                                                                customer,
+                ''                                                                parent_customer,
+                0 as is_double_count,
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then '体系外'
+					 when node_name3 in('H03230612','H03230627','H03230605') and coalesce(data_source,'S') in ('S','T','D')
+					 then '体系外'
+					 else ''
+					  end as level2_sub, --第2层级子名称
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then node_name3 || 'U'
+					 when node_name3 in('H03230612','H03230627','H03230605') and coalesce(data_source,'S') in ('S','T','D')
+					 then 'H03230618' || 'U'
+					 else ''
+					  end as level2_sub_code, --第2层级子名称
+				case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' then node_desc6
+					when node_name6 = 'H06230645' and a.integrate_channel = 'GD01' then case when node_desc8 like '%广州%' then '广州零售渠道'
+						                                         when node_desc7 like '%广州%' then '广州零售渠道'
+																 else '佛山零售渠道'
+																  end
+					when node_name5 = 'H05230607' and integrate_channel = 'GD01' then ''											  
+                    when node_name4 = 'H04230655' and channel_name is not null
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end new_level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name5 = node_name6 and node_name4 = 'H04230600' then ''
+					when node_name4 = 'H04230600' then node_name6
+					when node_name6 = 'H06230645' and a.integrate_channel = 'GD01' then case when node_desc8 like '%广州%' then 'H06230645-GZ'
+						                                    when node_desc7 like '%广州%' then 'H06230645-GZ'
+															else 'H06230645-FS'
+															 end
+					when node_name5 = 'H05230607' and integrate_channel = 'GD01' then ''
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end new_level5_code,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target
+                        else 0 end)                                               month_target,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target
+                        else 0 end)                                               month_double_count_target,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ') then target
+                        else 0 end)                                               quarter_target,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ') then target
+                        else 0 end)                                               quarter_double_count_target,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target
+                        else 0 end)                                               year_target,
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target
+                        else 0 end)                                               year_double_count_target,
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy') 
+                            then target
+                        else 0 end)                                               all_year_target,
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target
+                        else 0 end)                                               all_year_double_count_target,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then coalesce(target_high_value,0)
+                        else 0 end)                                               month_target_high_value,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(target_high_value,0)
+                        else 0 end)                                               quarter_target_high_value,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then coalesce(target_high_value,0)
+                        else 0 end)                                               year_target_high_value,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(target_high_value,0)
+                        else 0 end)                                               all_year_target_high_value,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then coalesce(target_1n,0)
+                        else 0 end)                                               month_target_1n,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(target_1n,0)
+                        else 0 end)                                               quarter_target_1n,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then coalesce(target_1n,0)
+                        else 0 end)                                               year_target_1n,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(target_1n,0)
+                        else 0 end)                                               all_year_target_1n,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target_package
+                        else 0 end)                                               month_target_package,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_package
+                        else 0 end)                                               quarter_target_package,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_package
+                        else 0 end)                                               year_target_package,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_package
+                        else 0 end)                                               all_year_target_package,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_word_impression
+                        else 0 end)                                               month_target_word_impression,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_word_impression
+                        else 0 end)                                               quarter_target_word_impression,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_word_impression
+                        else 0 end)                                               year_target_word_impression,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_word_impression
+                        else 0 end)                                               all_year_target_word_impression,
+                0                                                                 month_predition,
+                0                                                                 year_predition,
+                --新增上月目标
+                sum(case
+                        when stat_month =  to_char('${P_PERIOD_D}'::date - interval '1 months', 'yyyy-MM')
+                            then target
+                        else 0 end)                                               last_month_double_count_target,
+                --2025-03-31 新增	
+                sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_qjcp,0)
+						 else 0
+						  end
+				   ) as qjcp_month_target, --旗舰产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_qjcp,0)
+                        else 0 end) as qjcp_quarter_target, --旗舰产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_qjcp,0)
+                        else 0 end) as qjcp_year_target, --旗舰产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_fc,0)
+						 else 0
+						  end
+				   ) as fc_month_target, --辅材产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_fc,0)
+                        else 0 end) as fc_quarter_target, --辅材产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_fc,0)
+                        else 0 end) as fc_year_target, --辅材产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_1w,0)
+						 else 0
+						  end
+				   ) as iw_month_target, --IW产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_1w,0)
+                        else 0 end) as iw_quarter_target, --IW产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_1w,0)
+                        else 0 end) as iw_year_target, --IW产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_gd04,0)
+						 else 0
+						  end
+				   ) as gd04_month_target, --特惠品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_gd04,0)
+                        else 0 end) as gd04_quarter_target, --特惠品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_gd04,0)
+                        else 0 end) as gd04_year_target, --特惠品年目标
+				sum(case
+                        when stat_month =  to_char('${P_PERIOD_D}'::date + interval '1 months', 'yyyy-MM')
+                            then target
+                        else 0 end) as next_month_target --下个月目标 
+         from upload.upload_ct_sales_performance_target_t a
+                  left join dm.dm_md_sale_grp_reset_t b on a.sales_group = b.node_name9
+                  left join upload.upload_business_analysis_channel_t c on a.integrate_channel = c.channel_code
+         where substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+         group by level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code, integrate_channel,
+				  level2_sub, --第2层级子名称
+				  level2_sub_code, --第2层级子名称
+				  new_level5,
+				  new_level5_code
+         UNION ALL
+         --U部分
+         select node_desc2                 level1,
+                node_name2                 level1_code,
+                --''                         level2,
+				''                         level2, --ART+、梦之家、辅材、绿家的体系内不参与计算
+                node_name3 || '-U'         level2_code,
+                ''                         level3,
+                ''                         level3_code,
+                ''                         level4,
+                ''                         level4_code,
+                ''                         level5,
+                ''                         level5_code,
+                ''                         level6,
+                ''                         level6_code,
+                ''                         level7,
+                ''                         level7_code,
+                integrate_channel,
+                ''                         customer,
+                ''                         parent_customer,
+                0 as is_double_count,
+				'' level2_sub, --第2层级子名称
+				'' level2_sub_code, --第2层级子名称
+				'' new_level5,
+				'' new_level5_code,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') and is_double_count = 0
+                            then target
+                        else 0 end) * (-1) month_target,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target
+                        else 0 end) * (-1) month_double_count_target,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ') then target
+                        else 0 end) * (-1) quarter_target,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ') then target
+                        else 0 end) * (-1) quarter_double_count_target,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target
+                        else 0 end) * (-1) year_target,
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target
+                        else 0 end) * (-1) year_double_count_target,
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target
+                        else 0 end) * (-1) all_year_target,
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target
+                        else 0 end) * (-1) all_year_double_count_target,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target_high_value
+                        else 0 end) * (-1) month_target_high_value,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_high_value
+                        else 0 end) * (-1) quarter_target_high_value,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_high_value
+                        else 0 end) * (-1) year_target_high_value,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_high_value
+                        else 0 end) * (-1) all_year_target_high_value,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target_1n
+                        else 0 end) * (-1) month_target_1n,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_1n
+                        else 0 end) * (-1) quarter_target_1n,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_1n
+                        else 0 end) * (-1) year_target_1n,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_1n
+                        else 0 end) * (-1) all_year_target_1n,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM') then target_package
+                        else 0 end) * (-1) month_target_package,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_package
+                        else 0 end) * (-1) quarter_target_package,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_package
+                        else 0 end) * (-1) year_target_package,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_package
+                        else 0 end) * (-1) all_year_target_package,
+                sum(case
+                        when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_word_impression
+                        else 0 end) * (-1) month_target_word_impression,
+                sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then target_word_impression
+                        else 0 end) * (-1) quarter_target_word_impression,
+
+                sum(case
+                        when stat_month between to_char(to_date('${P_PERIOD_D}'), 'yyyy-01') and to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                            then target_word_impression
+                        else 0 end) * (-1) year_target_word_impression,
+
+                sum(case
+                        when substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then target_word_impression
+                        else 0 end) * (-1) all_year_target_word_impression,
+                0                          month_predition,
+                0                          year_predition,
+                --新增上月目标
+                sum(case
+                        when stat_month =  to_char('${P_PERIOD_D}'::date - interval '1 months', 'yyyy-MM')
+                            then target
+                        else 0 end) * (-1)   last_month_double_count_target,
+				--2025-03-31 新增	
+                sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_qjcp,0)
+						 else 0
+						  end
+				   ) as qjcp_month_target, --旗舰产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_qjcp,0)
+                        else 0 end) as qjcp_quarter_target, --旗舰产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_qjcp,0)
+                        else 0 end) as qjcp_year_target, --旗舰产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_fc,0)
+						 else 0
+						  end
+				   ) as fc_month_target, --辅材产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_fc,0)
+                        else 0 end) as fc_quarter_target, --辅材产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_fc,0)
+                        else 0 end) as fc_year_target, --辅材产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_1w,0)
+						 else 0
+						  end
+				   ) as iw_month_target, --IW产品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_1w,0)
+                        else 0 end) as iw_quarter_target, --IW产品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_1w,0)
+                        else 0 end) as iw_year_target, --IW产品年目标
+				sum(case when a.stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+				         then coalesce(a.target_gd04,0)
+						 else 0
+						  end
+				   ) as gd04_month_target, --特惠品月目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyyQ') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                            then coalesce(a.target_gd04,0)
+                        else 0 end) as gd04_quarter_target, --特惠品季目标
+				sum(case
+                        when to_char((stat_month || '-01')::date, 'yyyy') =
+                             to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                            then coalesce(a.target_gd04,0)
+                        else 0 end) as gd04_year_target, --特惠品年目标
+				sum(case
+                        when stat_month =  to_char('${P_PERIOD_D}'::date + interval '1 months', 'yyyy-MM')
+                            then target
+                        else 0 end) as next_month_target --下个月目标
+         from upload.upload_ct_sales_performance_target_t a
+                  left join dm.dm_md_sale_grp_reset_t b on a.sales_group = b.node_name9
+                  left join upload.upload_business_analysis_channel_t c on a.integrate_channel = c.channel_code
+         where substr(stat_month, 1, 4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+		   and a.data_source = 'U'
+         group by level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code, integrate_channel,
+				  level2_sub, --第2层级子名称
+				  level2_sub_code, --第2层级子名称
+				  new_level5,
+				  new_level5_code
+                  --销售预测
+         union all
+         select node_desc2                                                        level1,
+                node_name2                                                        level1_code,
+                case when node_name5 = 'R8Q' then node_desc5 
+				     when node_name5 = 'H03230628' then node_desc5
+				     else node_desc3 end level2,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				     else node_name3 end level2_code,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+				     when node_name3 in ('H03230618') then node_desc4 else '' end level3,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+                    when node_name3 in ('H03230618') then node_name4
+                    else '' end                                                   level3_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_desc5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level4,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_name5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level4_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+					when node_name4 = 'H04230600' then node_desc6
+                    when node_name4 = 'H04230655' and channel_name is not null
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+					when node_name4 = 'H04230600' then node_name6
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level5_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel = 'GD01'
+                        then node_desc8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel = 'GD01'
+                        then node_desc7
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel = 'GD01'
+                             then node_desc6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_desc5
+                    else '' end                                                   level6,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel = 'GD01'
+                        then node_name8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel = 'GD01'
+                        then node_name7
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel = 'GD01'
+                             then node_name6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_name5
+                    else '' end                                                   level6_code,
+                case when node_name5 = 'R8Q' then node_desc5||'体系内'
+				     when node_name5 in ('H03230628') then node_desc5 || '体系外'
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_desc9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc5 || '体系外'
+                    else '' end                                                   level7,
+                case when node_name5 = 'R8Q' then node_name5||'U'
+				     when node_name5 in ('H03230628') then node_name5
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_name9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name5
+                    when node_name4 in ('H04230685', 'H04240301', 'H04230680') then
+                        node_name5
+                    else '' end                                                   level7_code,
+                integrate_channel,
+                ''                                                                customer,
+                ''                                                                parent_customer,
+                0                                                                 is_double_count,
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then node_desc3 || '体系外'
+					 when node_name3 in('H03230612','H03230627','H03230605')
+					 then '体系外'
+					 else ''
+					  end as level2_sub, --第2层级子名称
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then node_name3 || 'U'
+					 when node_name3 in('H03230612','H03230627','H03230605')
+					 then 'H03230618' || 'U'
+					 else ''
+					  end as level2_sub_code, --第2层级子名称
+				case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+					when node_name4 = 'H04230600' then node_desc6
+					when node_name6 = 'H06230645' and a.integrate_channel = 'GD01' then case when node_desc8 like '%广州%' then '广州零售渠道'
+						                                    when node_desc7 like '%广州%' then '广州零售渠道'
+															else '佛山零售渠道'
+															 end
+                    when node_name4 = 'H04230655' and channel_name is not null
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_desc3
+                    else '' end                                                   new_level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+					when node_name4 = 'H04230600' then node_name6
+					when node_name6 = 'H06230645' and a.integrate_channel = 'GD01' then case when node_desc8 like '%广州%' then 'H06230645-GZ'
+						                                    when node_desc7 like '%广州%' then 'H06230645-GZ'
+															else 'H06230645-FS'
+															 end
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_name3
+                    else '' end                                                   new_level5_code,
+                0                                                                 month_target,
+                0                                                                 month_double_count_target,
+                0                                                                 quarter_target,
+                0                                                                 quarter_double_count_target,
+                0                                                                 year_target,
+                0                                                                 year_double_count_target,
+                0                                                                 all_year_target,
+                0                                                                 all_year_double_count_target,
+                0                                                                 month_target_high_value,
+                0                                                                 quarter_target_high_value,
+                0                                                                 year_target_high_value,
+                0                                                                 all_year_target_high_value,
+                0                                                                 month_target_1n,
+                0                                                                 quarter_target_1n,
+                0                                                                 year_target_1n,
+                0                                                                 all_year_target_1n,
+                0                                                                 month_target_package,
+                0                                                                 quarter_target_package,
+                0                                                                 year_target_package,
+                0                                                                 all_year_target_package,
+                0                                                                 month_target_word_impression,
+                0                                                                 quarter_target_word_impression,
+                0                                                                 year_target_word_impression,
+                0                                                                 all_year_target_word_impression,
+                sum(amount + n_amount)                                            month_predition,
+                sum(amount + n_amount)                                            year_predition,
+                0                                                                 last_month_double_count_target,
+				--2025-03-31 新增	
+                0 as qjcp_month_target, --旗舰产品月目标
+				0 as qjcp_quarter_target, --旗舰产品季目标
+				0 as qjcp_year_target, --旗舰产品年目标
+				0 as fc_month_target, --辅材产品月目标
+				0 as fc_quarter_target, --辅材产品季目标
+				0 as fc_year_target, --辅材产品年目标
+				0 as iw_month_target, --IW产品月目标
+				0 as iw_quarter_target, --IW产品季目标
+				0 as iw_year_target, --IW产品年目标
+				0 as gd04_month_target, --特惠品月目标
+				0 as gd04_quarter_target, --特惠品季目标
+				0 as gd04_year_target, --特惠品年目标
+				0 as next_month_target --下个月目标
+         from dwrotd.dwr_wm_sales_predict_t a
+                  left join dm.dm_md_sale_grp_reset_t b on a.dp_obj_code = b.node_name9
+                  left join upload.upload_business_analysis_channel_t c on a.integrate_channel = c.channel_code
+         where start_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+		   and coalesce(level2,'$$$') not in('ART+', 'DPI', '绿家', '辅材','梦之家')
+         group by level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code, integrate_channel,
+                  is_double_count,
+				  level2_sub,
+				  level2_sub_code,
+				  new_level5,
+				  new_level5_code
+         having month_predition != 0
+         union all--预测业绩部分，年累计预测为历史月业绩+当月销售预测
+         select node_desc2                                                        level1,
+                node_name2                                                        level1_code,
+                case when node_name5 = 'R8Q' then node_desc5
+                     when node_name5 = 'H03230628' then node_desc5
+    				else node_desc3 end level2,
+                case when node_name5 = 'R8Q' then node_name5 
+				     when node_name5 = 'H03230628' then node_name5
+				     else node_name3 end level2_code,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+				     when node_name3 in ('H03230618') then node_desc4 else '' end level3,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+                    when node_name3 in ('H03230618') then node_name4
+                    else '' end                                                   level3_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_desc5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level4,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_name5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level4_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+					when node_name4 = 'H04230600' then node_desc6
+                    when node_name4 = 'H04230655'
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+					when node_name4 = 'H04230600' then node_name6
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel_code
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level5_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel_code = 'GD01'
+                        then node_desc8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                        then node_desc7
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_desc6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_desc5
+                    else '' end                                                   level6,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4 --and integrate_channel_code = 'GD01'
+                        then node_name8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4 --and integrate_channel_code = 'GD01'
+                        then node_name7
+					when node_name4 = 'H04230600' and length(node_name6) = 4 --and integrate_channel_code = 'GD01'
+                             then node_name6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_name5
+                    else '' end                                                   level6_code,
+                case when node_name5 = 'R8Q' then node_desc5||'体系内'
+				     when node_name5 in ('H03230628') then
+                        node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_desc9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc5 || case when data_source in ('U') then '体系内' else '体系外' end
+                    else '' end                                                   level7,
+                case when node_name5 = 'R8Q' then node_name5||'U'
+				     when node_name5 in ('H03230628') then
+                        case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_name9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                    when node_name4 in ('H04230685', 'H04240301', 'H04230680') then
+                        case when data_source in ('U') then node_name5 || 'U' else node_name5 end
+                    else '' end                                                   level7_code,
+                integrate_channel_code,				
+                ''                                                                customer,
+                ''                                                                parent_customer,
+                0                                                                 is_double_count,
+                case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then '体系外' 
+					 when node_name3 in('H03230612','H03230627','H03230605') and data_source in ('S','T','D')
+					 then '体系外'
+					 else ''
+					  end as level2_sub, --第2层级子名称
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then node_name3 || 'U'
+					 when node_name3 in('H03230612','H03230627','H03230605') and data_source in ('S','T','D')
+					 then 'H03230618' || 'U'
+					 else ''
+					  end as level2_sub_code, --第2层级子名称
+				case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+					when node_name4 = 'H04230600' then node_desc6
+					when node_name6 = 'H06230645' and a.integrate_channel_code = 'GD01' then case when node_desc8 like '%广州%' then '广州零售渠道'
+						                                         when node_desc7 like '%广州%' then '广州零售渠道'
+																 else '佛山零售渠道'
+																  end
+                    when node_name4 = 'H04230655'
+                        then replace(node_desc5, '子公司', '') || substr(channel_name, 1, 2) || '渠道'
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_desc3
+                    else '' end                                                   new_level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+					when node_name4 = 'H04230600' then node_name6
+					when node_name6 = 'H06230645' and a.integrate_channel_code = 'GD01' then case when node_desc8 like '%广州%' then 'H06230645-GZ'
+						                                    when node_desc7 like '%广州%' then 'H06230645-GZ'
+															else 'H06230645-FS'
+															 end
+                    when node_name4 = 'H04230655'
+                        then node_name5 || a.integrate_channel_code
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_name3
+                    else '' end                                                   new_level5_code,
+                0                                                                 month_target,
+                0                                                                 month_double_count_target,
+                0                                                                 quarter_target,
+                0                                                                 quarter_double_count_target,
+                0                                                                 year_target,
+                0                                                                 year_double_count_target,
+                0                                                                 all_year_target,
+                0                                                                 all_year_double_count_target,
+                0                                                                 month_target_high_value,
+                0                                                                 quarter_target_high_value,
+                0                                                                 year_target_high_value,
+                0                                                                 all_year_target_high_value,
+                0                                                                 month_target_1n,
+                0                                                                 quarter_target_1n,
+                0                                                                 year_target_1n,
+                0                                                                 all_year_target_1n,
+                0                                                                 month_target_package,
+                0                                                                 quarter_target_package,
+                0                                                                 year_target_package,
+                0                                                                 all_year_target_package,
+                0                                                                 month_target_word_impression,
+                0                                                                 quarter_target_word_impression,
+                0                                                                 year_target_word_impression,
+                0                                                                 all_year_target_word_impression,
+                0                                                                 month_predition,
+                sum(last_month_all_year_achievement) / 10000                      year_predition,
+                0                                                                 last_month_double_count_target,
+				--2025-03-31 新增	
+                0 as qjcp_month_target, --旗舰产品月目标
+				0 as qjcp_quarter_target, --旗舰产品季目标
+				0 as qjcp_year_target, --旗舰产品年目标
+				0 as fc_month_target, --辅材产品月目标
+				0 as fc_quarter_target, --辅材产品季目标
+				0 as fc_year_target, --辅材产品年目标
+				0 as iw_month_target, --IW产品月目标
+				0 as iw_quarter_target, --IW产品季目标
+				0 as iw_year_target, --IW产品年目标
+				0 as gd04_month_target, --特惠品月目标
+				0 as gd04_quarter_target, --特惠品季目标
+				0 as gd04_year_target, --特惠品年目标
+				0 as next_month_target --下个月目标
+                from dm.ct_sales_performance_t a
+		 left join dm.dm_md_sale_grp_reset_t c
+		   on a.org_code = c.node_name9
+         left join upload.upload_business_analysis_channel_t d
+		   on a.integrate_channel_code = d.channel_code
+         where a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+           and c.node_name2 = 'H11000001'
+           and a.data_source != 'U'
+		   and last_month_all_year_achievement <> 0
+         group by level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code,
+                  integrate_channel_code,
+                  is_double_count,
+				  level2_sub, --第2层级子名称
+				  level2_sub_code, --第2层级子名称
+				  new_level5,
+				  new_level5_code
+         union all--'ART+','DPI','绿家','辅材'
+         select node_desc2                                                        level1,
+                node_name2                                                        level1_code,
+                case when node_name5 = 'R8Q' then node_desc5 
+				     when node_name5 = 'H03230628' then node_desc5
+				     else node_desc3 end level2,
+                case when node_name5 = 'R8Q' then node_name5 
+				     when node_name5 = 'H03230628' then node_name5
+				     else node_name3 end level2_code,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+				     when node_name3 in ('H03230618') then node_desc4 else '' end level3,
+                case when node_name5 = 'R8Q' then ''
+				     when node_name5 = 'H03230628' then ''
+                    when node_name3 in ('H03230618') then node_name4
+                    else '' end                                                   level3_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_desc5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level4,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 in ('H04230600', 'H04230655', 'H04230685', 'H04230680')
+                        then node_name5
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level4_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 = 'H04230600'
+                        then replace(node_desc5, '运营中心', '')
+                    when node_name4 = 'H04230655'
+                        then replace(node_desc5, '子公司', '')
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc3
+                    else '' end                                                   level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 = 'H04230600'
+                        then node_name5 || ''
+                    when node_name4 = 'H04230655'
+                        then node_name5 || ''
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name3
+                    else '' end                                                   level5_code,
+                case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4
+                        then node_desc8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4
+                        then node_desc7	
+					when node_name4 = 'H04230600' and length(node_name6) = 4
+                        then node_desc6	
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_desc5
+                    else '' end                                                   level6,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+				    when node_name4 = 'H04230600' and length(node_name8) = 4
+                        then node_name8
+                    when node_name4 = 'H04230600' and length(node_name7) = 4
+                        then node_name7
+					when node_name4 = 'H04230600' and length(node_name6) = 4
+                        then node_name6
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') or
+                         node_name4 in ('H04230685', 'H04230680') then node_name5
+                    else '' end                                                   level6_code,
+                case when node_name5 = 'R8Q' then node_desc5||'体系内'
+				     when node_name5 in ('H03230628') then node_desc5 || '体系外'
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_desc9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_desc5 || '体系外'
+                    else '' end                                                   level7,
+                case when node_name5 = 'R8Q' then node_name5||'U'
+				     when node_name5 in ('H03230628') then node_name5
+                    when node_name4 = 'H04230600' and length(node_name9) = 3 then node_name9
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627') then
+                        node_name5
+                    when node_name4 in ('H04230685', 'H04240301', 'H04230680') then
+                        node_name5
+                    else '' end                                                   level7_code,
+                ''                                                                integrate_channel,
+                ''                                                                customer,
+                ''                                                                parent_customer,
+                0                                                                 is_double_count,
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then '体系外'
+					 when node_name3 in('H03230612','H03230627','H03230605')
+					 then '体系外'
+					 else ''
+					  end as level2_sub, --第2层级子名称
+				case when node_name3 = 'H03230618' and node_name5 <> 'H03230628'
+				     then node_name3 || 'U'
+					 when node_name3 in('H03230612','H03230627','H03230605')
+					 then 'H03230618' ||'U'
+					 else ''
+					  end as level2_sub_code, --第2层级子名称
+				case when node_name5 = 'R8Q' then node_desc5
+				     when node_name5 = 'H03230628' then node_desc5
+                    when node_name4 = 'H04230600'
+                        then replace(node_desc5, '运营中心', '')
+                    when node_name4 = 'H04230655'
+                        then replace(node_desc5, '子公司', '')
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_desc3
+                    else '' end                                                   new_level5,
+                case when node_name5 = 'R8Q' then node_name5
+				     when node_name5 = 'H03230628' then node_name5
+                    when node_name4 = 'H04230600'
+                        then node_name5 || ''
+                    when node_name4 = 'H04230655'
+                        then node_name5 || ''
+                    when node_name3 in ('H04240301', 'H03230605', 'H03230612', 'H03230627','H03230628') then
+                        node_name3
+                    else '' end                                                   new_level5_code,
+                0                                                                 month_target,
+                0                                                                 month_double_count_target,
+                0                                                                 quarter_target,
+                0                                                                 quarter_double_count_target,
+                0                                                                 year_target,
+                0                                                                 year_double_count_target,
+                0                                                                 all_year_target,
+                0                                                                 all_year_double_count_target,
+                0                                                                 month_target_high_value,
+                0                                                                 quarter_target_high_value,
+                0                                                                 year_target_high_value,
+                0                                                                 all_year_target_high_value,
+                0                                                                 month_target_1n,
+                0                                                                 quarter_target_1n,
+                0                                                                 year_target_1n,
+                0                                                                 all_year_target_1n,
+                0                                                                 month_target_package,
+                0                                                                 quarter_target_package,
+                0                                                                 year_target_package,
+                0                                                                 all_year_target_package,
+                0                                                                 month_target_word_impression,
+                0                                                                 quarter_target_word_impression,
+                0                                                                 year_target_word_impression,
+                0                                                                 all_year_target_word_impression,
+                sum(adn_estimated_pickup_area)                                    month_predition,
+                sum(adn_estimated_pickup_area)                                    year_predition,
+                0                                                                 last_month_double_count_target,
+                --2025-03-31 新增	
+                0 as qjcp_month_target, --旗舰产品月目标
+				0 as qjcp_quarter_target, --旗舰产品季目标
+				0 as qjcp_year_target, --旗舰产品年目标
+				0 as fc_month_target, --辅材产品月目标
+				0 as fc_quarter_target, --辅材产品季目标
+				0 as fc_year_target, --辅材产品年目标
+				0 as iw_month_target, --IW产品月目标
+				0 as iw_quarter_target, --IW产品季目标
+				0 as iw_year_target, --IW产品年目标
+				0 as gd04_month_target, --特惠品月目标
+				0 as gd04_quarter_target, --特惠品季目标
+				0 as gd04_year_target, --特惠品年目标
+                0 as next_month_target --下个月目标				
+         from upload.upload_sd_forecast_adn_achievement_t a
+                  left join dm.dm_md_sale_grp_reset_t b on a.sales_department = b.node_desc9
+         where stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+           and node_desc9 in ('ART+', 'DPI', '绿家', '辅材','梦之家')
+         group by level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code, integrate_channel,
+                  is_double_count,
+				  level2_sub, --第2层级子名称
+				  level2_sub_code, --第2层级子名称
+				  new_level5,
+				  new_level5_code
+         having month_predition != 0
+     ),
+     result as (
+         select level1,
+                level1_code,
+                level2,
+                level2_code,
+                level3,
+                level3_code,
+                level4,
+                level4_code,
+                level5,
+                level5_code,
+                level6,
+                level6_code,
+                level7,
+                level7_code,
+                integrate_channel_code,
+                customer,
+                parent_customer,
+                double_count,
+                sum(day_achievement)                            day_achievement,
+                sum(last_year_day_achievement)                  last_year_day_achievement,
+                sum(month_achievement)                          month_achievement,
+                sum(last_period_month_achievement)              last_period_month_achievement,
+                sum(last_year_month_achievement)                last_year_month_achievement,
+                sum(last_year_all_month_achievement)            last_year_all_month_achievement,
+                sum(quarter_achievement)                        quarter_achievement,
+                sum(last_period_quarter_achievement)            last_period_quarter_achievement,
+                sum(last_year_quarter_achievement)              last_year_quarter_achievement,
+                sum(year_achievement)                           year_achievement,
+                sum(last_year_achievement)                      last_year_achievement,
+                sum(last_all_year_achievement)                  last_all_year_achievement,
+                sum(high_value_month_achievement)               high_value_month_achievement,
+                sum(high_value_last_period_month_achievement)   high_value_last_period_month_achievement,
+                sum(high_value_last_year_month_achievement)     high_value_last_year_month_achievement,
+                sum(high_value_quarter_achievement)             high_value_quarter_achievement,
+                sum(high_value_last_period_quarter_achievement) high_value_last_period_quarter_achievement,
+                sum(high_value_last_year_quarter_achievement)   high_value_last_year_quarter_achievement,
+                sum(high_value_year_achievement)                high_value_year_achievement,
+                sum(high_value_last_year_achievement)           high_value_last_year_achievement,
+                sum(month_stand_a_gross_profit)                 month_stand_a_gross_profit,
+                sum(last_period_month_stand_a_gross_profit)     last_period_month_stand_a_gross_profit,
+                sum(last_year_month_stand_a_gross_profit)       last_year_month_stand_a_gross_profit,
+                sum(quarter_stand_a_gross_profit)               quarter_stand_a_gross_profit,
+                sum(last_period_quarter_stand_a_gross_profit)   last_period_quarter_stand_a_gross_profit,
+                sum(last_year_quarter_stand_a_gross_profit)     last_year_quarter_stand_a_gross_profit,
+                sum(year_stand_a_gross_profit)                  year_stand_a_gross_profit,
+                sum(last_year_stand_a_gross_profit)             last_year_stand_a_gross_profit,
+                sum(month_notax)                                month_notax,
+                sum(last_period_month_notax)                    last_period_month_notax,
+                sum(last_year_month_notax)                      last_year_month_notax,
+                sum(quarter_notax)                              quarter_notax,
+                sum(last_period_quarter_notax)                  last_period_quarter_notax,
+                sum(last_year_quarter_notax)                    last_year_quarter_notax,
+                sum(year_notax)                                 year_notax,
+                sum(last_year_notax)                            last_year_notax,
+                sum(word_impression_month_achievement)          word_impression_month_achievement,
+                sum(word_impression_quarter_achievement)        word_impression_quarter_achievement,
+                sum(word_impression_year_achievement)           word_impression_year_achievement,
+                sum(package_month_achievement)                  package_month_achievement,
+                sum(package_quarter_achievement)                package_quarter_achievement,
+                sum(package_year_achievement)                   package_year_achievement,
+                sum(n1_month_achievement)                       n1_month_achievement,
+                sum(n1_quarter_achievement)                     n1_quarter_achievement,
+                sum(n1_year_achievement)                        n1_year_achievement,
+                sum(large_spec_month_achievement)               large_spec_month_achievement,
+                sum(large_spec_quarter_achievement)             large_spec_quarter_achievement,
+                sum(large_spec_year_achievement)                large_spec_year_achievement,
+                sum(month_sales_area)                           month_sales_area,
+                sum(quarter_sales_area)                         quarter_sales_area,
+                sum(year_sales_area)                            year_sales_area,
+                sum(gd04_month_sales_area)                      gd04_month_sales_area,
+                sum(gd04_quarter_sales_area)                    gd04_quarter_sales_area,
+                sum(gd04_year_sales_area)                       gd04_year_sales_area,
+                sum(engineering_adjust_month_achievement)       engineering_adjust_month_achievement,
+                sum(engineering_adjust_quarter_achievement)     engineering_adjust_quarter_achievement,
+                sum(engineering_adjust_year_achievement)        engineering_adjust_year_achievement,
+                sum(share_warehouse_month_achievement)          share_warehouse_month_achievement,
+                sum(share_warehouse_quarter_achievement)        share_warehouse_quarter_achievement,
+                sum(share_warehouse_year_achievement)           share_warehouse_year_achievement,
+                sum(other_adjust_month_achievement)             other_adjust_month_achievement,
+                sum(other_adjust_quarter_achievement)           other_adjust_quarter_achievement,
+                sum(other_adjust_year_achievement)              other_adjust_year_achievement,
+                sum(month_amb_cost)                             month_amb_cost,
+                sum(last_period_month_amb_cost)                 last_period_month_amb_cost,
+                sum(last_year_month_amb_cost)                   last_year_month_amb_cost,
+                sum(quarter_amb_cost)                           quarter_amb_cost,
+                sum(last_period_quarter_amb_cost)               last_period_quarter_amb_cost,
+                sum(last_year_quarter_amb_cost)                 last_year_quarter_amb_cost,
+                sum(year_amb_cost)                              year_amb_cost,
+                sum(last_year_amb_cost)                         last_year_amb_cost,
+                sum(month_amb_gross_profit)                     month_amb_gross_profit,
+                sum(last_period_month_amb_gross_profit)         last_period_month_amb_gross_profit,
+                sum(last_year_month_amb_gross_profit)           last_year_month_amb_gross_profit,
+                sum(quarter_amb_gross_profit)                   quarter_amb_gross_profit,
+                sum(last_period_quarter_amb_gross_profit)       last_period_quarter_amb_gross_profit,
+                sum(last_year_quarter_amb_gross_profit)         last_year_quarter_amb_gross_profit,
+                sum(year_amb_gross_profit)                      year_amb_gross_profit,
+                sum(last_year_amb_gross_profit)                 last_year_amb_gross_profit,
+                sum(month_target)                               month_target,
+                sum(month_double_count_target)                  month_double_count_target,
+                sum(quarter_target)                             quarter_target,
+                sum(quarter_double_count_target)                quarter_double_count_target,
+                sum(year_target)                                year_target,
+                sum(year_double_count_target)                   year_double_count_target,
+                sum(all_year_target)                            all_year_target,
+                sum(all_year_double_count_target)               all_year_double_count_target,
+                sum(month_target_high_value)                    month_target_high_value,
+                sum(quarter_target_high_value)                  quarter_target_high_value,
+                sum(year_target_high_value)                     year_target_high_value,
+                sum(all_year_target_high_value)                 all_year_target_high_value,
+                sum(month_target_1n)                            month_target_1n,
+                sum(quarter_target_1n)                          quarter_target_1n,
+                sum(year_target_1n)                             year_target_1n,
+                sum(all_year_target_1n)                         all_year_target_1n,
+                sum(month_target_package)                       month_target_package,
+                sum(quarter_target_package)                     quarter_target_package,
+                sum(year_target_package)                        year_target_package,
+                sum(all_year_target_package)                    all_year_target_package,
+                sum(month_target_word_impression)               month_target_word_impression,
+                sum(quarter_target_word_impression)             quarter_target_word_impression,
+                sum(year_target_word_impression)                year_target_word_impression,
+                sum(all_year_target_word_impression)            all_year_target_word_impression,
+                sum(month_predition)                            month_predition,
+                sum(year_predition)                             year_predition,
+                sum(month_a_cost)                               month_a_cost,
+                sum(last_period_month_a_cost)                   last_period_month_a_cost,
+                sum(last_year_month_a_cost)                     last_year_month_a_cost,
+                sum(quarter_a_cost)                             quarter_a_cost,
+                sum(last_period_quarter_a_cost)                 last_period_quarter_a_cost,
+                sum(last_year_quarter_a_cost)                   last_year_quarter_a_cost,
+                sum(year_a_cost)                                year_a_cost,
+                sum(last_year_a_cost)                           last_year_a_cost,
+                sum(month_a_gross_profit)                       month_a_gross_profit,
+                sum(last_period_month_a_gross_profit)           last_period_month_a_gross_profit,
+                sum(last_year_month_a_gross_profit)             last_year_month_a_gross_profit,
+                sum(quarter_a_gross_profit)                     quarter_a_gross_profit,
+                sum(last_period_quarter_a_gross_profit)         last_period_quarter_a_gross_profit,
+                sum(last_year_quarter_a_gross_profit)           last_year_quarter_a_gross_profit,
+                sum(year_a_gross_profit)                        year_a_gross_profit,
+                sum(last_year_a_gross_profit)                   last_year_a_gross_profit,
+                sum(last_day_achievement)                       last_day_achievement,
+                sum(high_value_day_achievement)                 high_value_day_achievement,
+                sum(week_avg_day_achievement)                   week_avg_day_achievement,
+                sum(last_month_day_achievement)                 last_month_day_achievement,
+                sum(last_month_double_count_target)             last_month_double_count_target,
+				--2025-03-31新增
+                sum(qjcp_month_achievement) as qjcp_month_achievement, --旗舰产品月业绩
+                sum(qjcp_quarter_achievement) as qjcp_quarter_achievement, --旗舰产品季业绩
+                sum(qjcp_year_achievement) as qjcp_year_achievement, --旗舰产品年业绩
+                sum(iw_month_achievement) as iw_month_achievement, --IW产品月业绩
+                sum(iw_quarter_achievement) as iw_quarter_achievement, --IW产品季业绩
+                sum(iw_year_achievement) as iw_year_achievement, --IW产品年业绩
+                sum(fc_month_achievement) as fc_month_achievement, --辅材产品月业绩
+                sum(fc_quarter_achievement) as fc_quarter_achievement, --辅材产品季业绩
+                sum(fc_year_achievement) as fc_year_achievement, --辅材产品年业绩
+                --2025-03-31 新增	
+                sum(qjcp_month_target) as qjcp_month_target, --旗舰产品月目标
+				sum(qjcp_quarter_target) as qjcp_quarter_target, --旗舰产品季目标
+				sum(qjcp_year_target) as qjcp_year_target, --旗舰产品年目标
+				sum(fc_month_target) as fc_month_target, --辅材产品月目标
+				sum(fc_quarter_target) as fc_quarter_target, --辅材产品季目标
+				sum(fc_year_target) as fc_year_target, --辅材产品年目标
+				sum(iw_month_target) as iw_month_target, --IW产品月目标
+				sum(iw_quarter_target) as iw_quarter_target, --IW产品季目标
+				sum(iw_year_target) as iw_year_target, --IW产品年目标
+				sum(gd04_month_target) as gd04_month_target, --特惠品月目标
+				sum(gd04_quarter_target) as gd04_quarter_target, --特惠品季目标
+				sum(gd04_year_target) as gd04_year_target, --特惠品年目标
+                sum(last_11month_all_month_achievement) as last_11month_all_month_achievement, --11个月前整月业绩
+                sum(next_month_target) as next_month_target, --下个月目标	
+                level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	            level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+                new_level5,
+				new_level5_code				
+         from (
+                  select level1,
+                         level1_code,
+                         level2,
+                         level2_code,
+                         level3,
+                         level3_code,
+                         level4,
+                         level4_code,
+                         level5,
+                         level5_code,
+                         level6,
+                         level6_code,
+                         level7,
+                         level7_code,
+                         integrate_channel_code,
+                         customer,
+                         parent_customer,
+                         double_count,
+                         day_achievement,
+                         last_year_day_achievement,
+                         month_achievement,
+                         last_period_month_achievement,
+                         last_year_month_achievement,
+                         last_year_all_month_achievement,
+                         quarter_achievement,
+                         last_period_quarter_achievement,
+                         last_year_quarter_achievement,
+                         year_achievement,
+                         last_year_achievement,
+                         last_all_year_achievement,
+                         high_value_month_achievement,
+                         high_value_last_period_month_achievement,
+                         high_value_last_year_month_achievement,
+                         high_value_quarter_achievement,
+                         high_value_last_period_quarter_achievement,
+                         high_value_last_year_quarter_achievement,
+                         high_value_year_achievement,
+                         high_value_last_year_achievement,
+                         month_stand_a_gross_profit,
+                         last_period_month_stand_a_gross_profit,
+                         last_year_month_stand_a_gross_profit,
+                         quarter_stand_a_gross_profit,
+                         last_period_quarter_stand_a_gross_profit,
+                         last_year_quarter_stand_a_gross_profit,
+                         year_stand_a_gross_profit,
+                         last_year_stand_a_gross_profit,
+                         month_notax,
+                         last_period_month_notax,
+                         last_year_month_notax,
+                         quarter_notax,
+                         last_period_quarter_notax,
+                         last_year_quarter_notax,
+                         year_notax,
+                         last_year_notax,
+                         word_impression_month_achievement,
+                         word_impression_quarter_achievement,
+                         word_impression_year_achievement,
+                         package_month_achievement,
+                         package_quarter_achievement,
+                         package_year_achievement,
+                         n1_month_achievement,
+                         n1_quarter_achievement,
+                         n1_year_achievement,
+                         large_spec_month_achievement,
+                         large_spec_quarter_achievement,
+                         large_spec_year_achievement,
+                         month_sales_area,
+                         quarter_sales_area,
+                         year_sales_area,
+                         gd04_month_sales_area,
+                         gd04_quarter_sales_area,
+                         gd04_year_sales_area,
+                         engineering_adjust_month_achievement,
+                         engineering_adjust_quarter_achievement,
+                         engineering_adjust_year_achievement,
+                         share_warehouse_month_achievement,
+                         share_warehouse_quarter_achievement,
+                         share_warehouse_year_achievement,
+                         other_adjust_month_achievement,
+                         other_adjust_quarter_achievement,
+                         other_adjust_year_achievement,
+                         month_amb_cost,
+                         last_period_month_amb_cost,
+                         last_year_month_amb_cost,
+                         quarter_amb_cost,
+                         last_period_quarter_amb_cost,
+                         last_year_quarter_amb_cost,
+                         year_amb_cost,
+                         last_year_amb_cost,
+                         month_amb_gross_profit,
+                         last_period_month_amb_gross_profit,
+                         last_year_month_amb_gross_profit,
+                         quarter_amb_gross_profit,
+                         last_period_quarter_amb_gross_profit,
+                         last_year_quarter_amb_gross_profit,
+                         year_amb_gross_profit,
+                         last_year_amb_gross_profit,
+                         0 month_target,
+                         0 month_double_count_target,
+                         0 quarter_target,
+                         0 quarter_double_count_target,
+                         0 year_target,
+                         0 year_double_count_target,
+                         0 all_year_target,
+                         0 all_year_double_count_target,
+                         0 month_target_high_value,
+                         0 quarter_target_high_value,
+                         0 year_target_high_value,
+                         0 all_year_target_high_value,
+                         0 month_target_1n,
+                         0 quarter_target_1n,
+                         0 year_target_1n,
+                         0 all_year_target_1n,
+                         0 month_target_package,
+                         0 quarter_target_package,
+                         0 year_target_package,
+                         0 all_year_target_package,
+                         0 month_target_word_impression,
+                         0 quarter_target_word_impression,
+                         0 year_target_word_impression,
+                         0 all_year_target_word_impression,
+                         0 month_predition,
+                         0 year_predition,
+                         month_a_cost,
+                         last_period_month_a_cost,
+                         last_year_month_a_cost,
+                         quarter_a_cost,
+                         last_period_quarter_a_cost,
+                         last_year_quarter_a_cost,
+                         year_a_cost,
+                         last_year_a_cost,
+                         month_a_gross_profit,
+                         last_period_month_a_gross_profit,
+                         last_year_month_a_gross_profit,
+                         quarter_a_gross_profit,
+                         last_period_quarter_a_gross_profit,
+                         last_year_quarter_a_gross_profit,
+                         year_a_gross_profit,
+                         last_year_a_gross_profit,
+                         last_day_achievement,
+                         high_value_day_achievement,
+                         --2025/03/18新增周与上月均值
+                         week_avg_day_achievement,
+                         last_month_day_achievement,
+                         0 last_month_double_count_target,
+						 --2025-03-31新增
+                         qjcp_month_achievement, --旗舰产品月业绩
+                         qjcp_quarter_achievement, --旗舰产品季业绩
+                         qjcp_year_achievement, --旗舰产品年业绩
+                         iw_month_achievement, --IW产品月业绩
+                         iw_quarter_achievement, --IW产品季业绩
+                         iw_year_achievement, --IW产品年业绩
+                         fc_month_achievement, --辅材产品月业绩
+                         fc_quarter_achievement, --辅材产品季业绩
+                         fc_year_achievement, --辅材产品年业绩
+                         --2025-03-31 新增	
+                         0 as qjcp_month_target, --旗舰产品月目标
+				         0 as qjcp_quarter_target, --旗舰产品季目标
+				         0 as qjcp_year_target, --旗舰产品年目标
+				         0 as fc_month_target, --辅材产品月目标
+				         0 as fc_quarter_target, --辅材产品季目标
+				         0 as fc_year_target, --辅材产品年目标
+				         0 as iw_month_target, --IW产品月目标
+				         0 as iw_quarter_target, --IW产品季目标
+				         0 as iw_year_target, --IW产品年目标
+				         0 as gd04_month_target, --特惠品月目标
+				         0 as gd04_quarter_target, --特惠品季目标
+				         0 as gd04_year_target, --特惠品年目标
+                         last_11month_all_month_achievement, --11个月前整月业绩
+                         0 as next_month_target, --下个月目标	
+                         level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	                     level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+                         new_level5,
+				         new_level5_code						 
+                  from base
+                  union all
+                  select level1,
+                         level1_code,
+                         level2,
+                         level2_code,
+                         level3,
+                         level3_code,
+                         level4,
+                         level4_code,
+                         level5,
+                         level5_code,
+                         level6,
+                         level6_code,
+                         level7,
+                         level7_code,
+                         integrate_channel,
+                         customer,
+                         parent_customer,
+                         is_double_count,
+                         0 day_achievement,
+                         0 last_year_day_achievement,
+                         0 month_achievement,
+                         0 last_period_month_achievement,
+                         0 last_year_month_achievement,
+                         0 last_year_all_month_achievement,
+                         0 quarter_achievement,
+                         0 last_period_quarter_achievement,
+                         0 last_year_quarter_achievement,
+                         0 year_achievement,
+                         0 last_year_achievement,
+                         0 last_all_year_achievement,
+                         0 high_value_month_achievement,
+                         0 high_value_last_period_month_achievement,
+                         0 high_value_last_year_month_achievement,
+                         0 high_value_quarter_achievement,
+                         0 high_value_last_period_quarter_achievement,
+                         0 high_value_last_year_quarter_achievement,
+                         0 high_value_year_achievement,
+                         0 high_value_last_year_achievement,
+                         0 month_stand_a_gross_profit,
+                         0 last_period_month_stand_a_gross_profit,
+                         0 last_year_month_stand_a_gross_profit,
+                         0 quarter_stand_a_gross_profit,
+                         0 last_period_quarter_stand_a_gross_profit,
+                         0 last_year_quarter_stand_a_gross_profit,
+                         0 year_stand_a_gross_profit,
+                         0 last_year_stand_a_gross_profit,
+                         0 month_notax,
+                         0 last_period_month_notax,
+                         0 last_year_month_notax,
+                         0 quarter_notax,
+                         0 last_period_quarter_notax,
+                         0 last_year_quarter_notax,
+                         0 year_notax,
+                         0 last_year_notax,
+                         0 word_impression_month_achievement,
+                         0 word_impression_quarter_achievement,
+                         0 word_impression_year_achievement,
+                         0 package_month_achievement,
+                         0 package_quarter_achievement,
+                         0 package_year_achievement,
+                         0 n1_month_achievement,
+                         0 n1_quarter_achievement,
+                         0 n1_year_achievement,
+                         0 large_spec_month_achievement,
+                         0 large_spec_quarter_achievement,
+                         0 large_spec_year_achievement,
+                         0 month_sales_area,
+                         0 quarter_sales_area,
+                         0 year_sales_area,
+                         0 gd04_month_sales_area,
+                         0 gd04_quarter_sales_area,
+                         0 gd04_year_sales_area,
+                         0 engineering_adjust_month_achievement,
+                         0 engineering_adjust_quarter_achievement,
+                         0 engineering_adjust_year_achievement,
+                         0 share_warehouse_month_achievement,
+                         0 share_warehouse_quarter_achievement,
+                         0 share_warehouse_year_achievement,
+                         0 other_adjust_month_achievement,
+                         0 other_adjust_quarter_achievement,
+                         0 other_adjust_year_achievement,
+                         0 month_amb_cost,
+                         0 last_period_month_amb_cost,
+                         0 last_year_month_amb_cost,
+                         0 quarter_amb_cost,
+                         0 last_period_quarter_amb_cost,
+                         0 last_year_quarter_amb_cost,
+                         0 year_amb_cost,
+                         0 last_year_amb_cost,
+                         0 month_amb_gross_profit,
+                         0 last_period_month_amb_gross_profit,
+                         0 last_year_month_amb_gross_profit,
+                         0 quarter_amb_gross_profit,
+                         0 last_period_quarter_amb_gross_profit,
+                         0 last_year_quarter_amb_gross_profit,
+                         0 year_amb_gross_profit,
+                         0 last_year_amb_gross_profit,
+                         month_target,
+                         month_double_count_target,
+                         quarter_target,
+                         quarter_double_count_target,
+                         year_target,
+                         year_double_count_target,
+                         all_year_target,
+                         all_year_double_count_target,
+                         month_target_high_value,
+                         quarter_target_high_value,
+                         year_target_high_value,
+                         all_year_target_high_value,
+                         month_target_1n,
+                         quarter_target_1n,
+                         year_target_1n,
+                         all_year_target_1n,
+                         month_target_package,
+                         quarter_target_package,
+                         year_target_package,
+                         all_year_target_package,
+                         month_target_word_impression,
+                         quarter_target_word_impression,
+                         year_target_word_impression,
+                         all_year_target_word_impression,
+                         month_predition,
+                         year_predition,
+                         0 month_a_cost,
+                         0 last_period_month_a_cost,
+                         0 last_year_month_a_cost,
+                         0 quarter_a_cost,
+                         0 last_period_quarter_a_cost,
+                         0 last_year_quarter_a_cost,
+                         0 year_a_cost,
+                         0 last_year_a_cost,
+                         0 month_a_gross_profit,
+                         0 last_period_month_a_gross_profit,
+                         0 last_year_month_a_gross_profit,
+                         0 quarter_a_gross_profit,
+                         0 last_period_quarter_a_gross_profit,
+                         0 last_year_quarter_a_gross_profit,
+                         0 year_a_gross_profit,
+                         0 last_year_a_gross_profit,
+                         0 last_day_achievement,
+                         0 high_value_day_achievement,
+             --2025/03/18新增周与上月均值
+                         0 week_avg_day_achievement,
+                         0 last_month_day_achievement,
+                         last_month_double_count_target,
+						 --2025-03-31新增
+                         0 as qjcp_month_achievement, --旗舰产品月业绩
+                         0 as qjcp_quarter_achievement, --旗舰产品季业绩
+                         0 as qjcp_year_achievement, --旗舰产品年业绩
+                         0 as iw_month_achievement, --IW产品月业绩
+                         0 as iw_quarter_achievement, --IW产品季业绩
+                         0 as iw_year_achievement, --IW产品年业绩
+						 0 as fc_month_achievement, --辅材产品月业绩
+                         0 as fc_quarter_achievement, --辅材产品季业绩
+                         0 as fc_year_achievement, --辅材产品年业绩
+						  --2025-03-31 新增	
+                         qjcp_month_target, --旗舰产品月目标
+				         qjcp_quarter_target, --旗舰产品季目标
+				         qjcp_year_target, --旗舰产品年目标
+				         fc_month_target, --辅材产品月目标
+				         fc_quarter_target, --辅材产品季目标
+				         fc_year_target, --辅材产品年目标
+				         iw_month_target, --IW产品月目标
+				         iw_quarter_target, --IW产品季目标
+				         iw_year_target, --IW产品年目标
+				         gd04_month_target, --特惠品月目标
+				         gd04_quarter_target, --特惠品季目标
+				         gd04_year_target, --特惠品年目标
+						 0 as last_11month_all_month_achievement, --11个月前整月业绩
+                         next_month_target, --下个月目标
+						 level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	                     level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+						 new_level5,
+				         new_level5_code
+                  from target) aa
+         group by integrate_channel_code,
+                  customer,
+                  parent_customer,
+                  double_count,
+                  level1,
+                  level1_code,
+                  level2,
+                  level2_code,
+                  level3,
+                  level3_code,
+                  level4,
+                  level4_code,
+                  level5,
+                  level5_code,
+                  level6,
+                  level6_code,
+                  level7,
+                  level7_code,
+				  level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	              level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+				  new_level5,
+				  new_level5_code
+     ),
+     level4_rank as ( --根据人资2025年的考评方案要求，报名排名逻辑调整为运中+子公司的排名，不再分开排，按9+5
+         select distinct level4_code,
+                         row_number() over (order by level4_finish_rate desc ) level4_rank,
+                         row_number()
+                         over (order by level4_quarter_finish_rate desc )      level4_quarter_rank,
+                         row_number()
+                         over (order by level4_year_finish_rate desc )         level4_year_rank
+         from (
+                  select distinct level3_code,
+                                  level4_code,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then month_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) end level4_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then quarter_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) end level4_quarter_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then year_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) end level4_year_finish_rate
+                  from result
+                  where level3_code in ('H04230600', 'H04230655')
+				    and coalesce(level4_code,'###') <> 'H05230636'
+		            and coalesce(level2_code,'###') <> 'R8Q'
+                  group by level3_code,
+                           level4_code
+              ) aa
+     ),
+     level5_rank as ( --根据人资2025年的考评方案要求，报名排名逻辑调整为运中+子公司的排名，不再分开排，按9+5
+         select distinct level3_code,
+                         level5_code,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_finish_rate desc )                          level5_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_finish_rate desc )         level5_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_quarter_finish_rate desc )                  level5_quarter_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_quarter_finish_rate desc ) level5_quarter_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_year_finish_rate desc )                     level5_year_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_year_finish_rate desc )    level5_year_rank
+         from (
+                  select distinct level3_code,
+                                  level5_code,
+                                  integrate_channel_code,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then month_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) end              level5_not_double_count_finish_rate,
+                                  case
+                                      when sum(month_double_count_target) = 0
+                                          then 0
+                                      else sum(month_achievement) /
+                                           sum(month_double_count_target) end   level5_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then quarter_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) end              level5_not_double_count_quarter_finish_rate,
+                                  case
+                                      when sum(quarter_double_count_target) = 0
+                                          then 0
+                                      else sum(quarter_achievement) /
+                                           sum(quarter_double_count_target) end level5_quarter_finish_rate,
+                                  case
+                                      when sum(year_double_count_target) = 0
+                                          then 0
+                                      else sum(year_achievement) /
+                                           sum(year_double_count_target) end    level5_year_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then year_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) end              level5_not_double_count_year_finish_rate
+                  from result
+                  where level3_code in ('H04230600', 'H04230655')
+                    and level5_code != level4_code
+					and coalesce(level4_code,'###') <> 'H05230636'
+		            and coalesce(level2_code,'###') <> 'R8Q'
+                  group by level3_code,
+                           level5_code,
+                           integrate_channel_code
+              ) aa
+     ),
+     level6_rank as (
+         select distinct level3_code,
+                         level6_code,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_finish_rate desc )                          level6_double_rank,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_not_double_count_finish_rate desc )         level6_rank,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_quarter_finish_rate desc )                  level6_quarter_double_rank,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_not_double_count_quarter_finish_rate desc ) level6_quarter_rank,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_year_finish_rate desc )                     level6_year_double_rank,
+                         row_number()
+                         over (partition by level3_code,integrate_channel_code order by level6_not_double_count_year_finish_rate desc )    level6_year_rank
+         from (
+                  select distinct level3_code,
+                                  level6_code,
+                                  integrate_channel_code,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then month_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) end              level6_not_double_count_finish_rate,
+                                  case
+                                      when sum(month_double_count_target) = 0
+                                          then 0
+                                      else sum(month_achievement) /
+                                           sum(month_double_count_target) end   level6_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then quarter_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) end              level6_not_double_count_quarter_finish_rate,
+                                  case
+                                      when sum(quarter_double_count_target) = 0
+                                          then 0
+                                      else sum(quarter_achievement) /
+                                           sum(quarter_double_count_target) end level6_quarter_finish_rate,
+                                  case
+                                      when sum(year_double_count_target) = 0
+                                          then 0
+                                      else sum(year_achievement) /
+                                           sum(year_double_count_target) end    level6_year_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then year_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) end              level6_not_double_count_year_finish_rate
+                  from result
+                  where level3_code in ('H04230600', 'H04230655')
+                    and level6_code is not null
+					and coalesce(level4_code,'###') <> 'H05230636'
+		            and coalesce(level2_code,'###') <> 'R8Q'
+                  group by level3_code,
+                           level6_code,
+                           integrate_channel_code
+              ) aa
+     ),
+     level7_rank as ( --根据人资2025年的考评方案要求，报名排名逻辑调整为运中+子公司的排名，不再分开排，按9+5
+         select distinct level3_code,
+                         level7_code,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_finish_rate desc )                          level7_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_not_double_count_finish_rate desc )         level7_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_quarter_finish_rate desc )                  level7_quarter_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_not_double_count_quarter_finish_rate desc ) level7_quarter_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_year_finish_rate desc )                     level7_year_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level7_not_double_count_year_finish_rate desc )    level7_year_rank
+         from (
+                  select distinct level3_code,
+                                  level7_code,
+                                  integrate_channel_code,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then month_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) end              level7_not_double_count_finish_rate,
+                                  case
+                                      when sum(month_double_count_target) = 0
+                                          then 0
+                                      else sum(month_achievement) /
+                                           sum(month_double_count_target) end   level7_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then quarter_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) end              level7_not_double_count_quarter_finish_rate,
+                                  case
+                                      when sum(quarter_double_count_target) = 0
+                                          then 0
+                                      else sum(quarter_achievement) /
+                                           sum(quarter_double_count_target) end level7_quarter_finish_rate,
+                                  case
+                                      when sum(year_double_count_target) = 0
+                                          then 0
+                                      else sum(year_achievement) /
+                                           sum(year_double_count_target) end    level7_year_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then year_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) end              level7_not_double_count_year_finish_rate
+                  from result
+                  where level3_code in ('H04230600', 'H04230655')
+                    and level7_code is not null
+                    and level7_code != level5_code
+                    and level7_code != level4_code
+					and level7 != level5
+					and coalesce(level4_code,'###') <> 'H05230636'
+		            and coalesce(level2_code,'###') <> 'R8Q'
+                  group by level3_code,
+                           level7_code,
+                           integrate_channel_code
+              ) aa
+     ),
+     new_level5_rank as ( --根据人资2025年的考评方案要求，报名排名逻辑调整为运中+子公司的排名，不再分开排，按9+5
+         select distinct level3_code,
+                         new_level5_code,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_finish_rate desc )                          new_level5_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_finish_rate desc )         new_level5_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_quarter_finish_rate desc )                  new_level5_quarter_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_quarter_finish_rate desc ) new_level5_quarter_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_year_finish_rate desc )                     new_level5_year_double_rank,
+                         row_number()
+                         over (partition by integrate_channel_code order by level5_not_double_count_year_finish_rate desc )    new_level5_year_rank
+         from (
+                  select distinct level3_code,
+                                  new_level5_code,
+                                  integrate_channel_code,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then month_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then month_target
+                                                   else 0 end) end              level5_not_double_count_finish_rate,
+                                  case
+                                      when sum(month_double_count_target) = 0
+                                          then 0
+                                      else sum(month_achievement) /
+                                           sum(month_double_count_target) end   level5_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then quarter_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then quarter_target
+                                                   else 0 end) end              level5_not_double_count_quarter_finish_rate,
+                                  case
+                                      when sum(quarter_double_count_target) = 0
+                                          then 0
+                                      else sum(quarter_achievement) /
+                                           sum(quarter_double_count_target) end level5_quarter_finish_rate,
+                                  case
+                                      when sum(year_double_count_target) = 0
+                                          then 0
+                                      else sum(year_achievement) /
+                                           sum(year_double_count_target) end    level5_year_finish_rate,
+                                  case
+                                      when sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) = 0
+                                          then 0
+                                      else sum(case
+                                                   when double_count = 0 then year_achievement
+                                                   else 0 end) /
+                                           sum(case
+                                                   when double_count = 0 then all_year_target
+                                                   else 0 end) end              level5_not_double_count_year_finish_rate
+                  from result
+                  where level3_code in ('H04230600', 'H04230655')
+                    and new_level5_code != level4_code
+					and coalesce(level4_code,'###') <> 'H05230636'
+		            and coalesce(level2_code,'###') <> 'R8Q'
+                  group by level3_code,
+                           new_level5_code,
+                           integrate_channel_code
+              ) aa
+     )
+select level1,
+       level1_code,
+       level2,
+       level2_code,
+       level3,
+       a.level3_code,
+       level4,
+       a.level4_code,
+       level5,
+       a.level5_code,
+       level6,
+       a.level6_code,
+       level7,
+       a.level7_code,
+       integrate_channel_code,
+       customer,
+       parent_customer,
+       double_count,
+       day_achievement,
+       last_year_day_achievement,
+       month_achievement,
+       last_period_month_achievement,
+       last_year_month_achievement,
+       last_year_all_month_achievement,
+       quarter_achievement,
+       last_period_quarter_achievement,
+       last_year_quarter_achievement,
+       year_achievement,
+       last_year_achievement,
+       last_all_year_achievement,
+       high_value_month_achievement,
+       high_value_last_period_month_achievement,
+       high_value_last_year_month_achievement,
+       high_value_quarter_achievement,
+       high_value_last_period_quarter_achievement,
+       high_value_last_year_quarter_achievement,
+       high_value_year_achievement,
+       high_value_last_year_achievement,
+       month_stand_a_gross_profit,
+       last_period_month_stand_a_gross_profit,
+       last_year_month_stand_a_gross_profit,
+       quarter_stand_a_gross_profit,
+       last_period_quarter_stand_a_gross_profit,
+       last_year_quarter_stand_a_gross_profit,
+       year_stand_a_gross_profit,
+       last_year_stand_a_gross_profit,
+       month_notax,
+       last_period_month_notax,
+       last_year_month_notax,
+       quarter_notax,
+       last_period_quarter_notax,
+       last_year_quarter_notax,
+       year_notax,
+       last_year_notax,
+       word_impression_month_achievement,
+       word_impression_quarter_achievement,
+       word_impression_year_achievement,
+       package_month_achievement,
+       package_quarter_achievement,
+       package_year_achievement,
+       n1_month_achievement,
+       n1_quarter_achievement,
+       n1_year_achievement,
+       large_spec_month_achievement,
+       large_spec_quarter_achievement,
+       large_spec_year_achievement,
+       month_sales_area,
+       quarter_sales_area,
+       year_sales_area,
+       gd04_month_sales_area,
+       gd04_quarter_sales_area,
+       gd04_year_sales_area,
+       engineering_adjust_month_achievement,
+       engineering_adjust_quarter_achievement,
+       engineering_adjust_year_achievement,
+       share_warehouse_month_achievement,
+       share_warehouse_quarter_achievement,
+       share_warehouse_year_achievement,
+       other_adjust_month_achievement,
+       other_adjust_quarter_achievement,
+       other_adjust_year_achievement,
+       month_amb_cost,
+       last_period_month_amb_cost,
+       last_year_month_amb_cost,
+       quarter_amb_cost,
+       last_period_quarter_amb_cost,
+       last_year_quarter_amb_cost,
+       year_amb_cost,
+       last_year_amb_cost,
+       month_amb_gross_profit,
+       last_period_month_amb_gross_profit,
+       last_year_month_amb_gross_profit,
+       quarter_amb_gross_profit,
+       last_period_quarter_amb_gross_profit,
+       last_year_quarter_amb_gross_profit,
+       year_amb_gross_profit,
+       last_year_amb_gross_profit,
+       month_target,
+       month_double_count_target,
+       quarter_target,
+       quarter_double_count_target,
+       year_target,
+       year_double_count_target,
+       all_year_target,
+       all_year_double_count_target,
+       month_target_high_value,
+       quarter_target_high_value,
+       year_target_high_value,
+       all_year_target_high_value,
+       month_target_1n,
+       quarter_target_1n,
+       year_target_1n,
+       all_year_target_1n,
+       month_target_package,
+       quarter_target_package,
+       year_target_package,
+       all_year_target_package,
+       month_target_word_impression,
+       quarter_target_word_impression,
+       year_target_word_impression,
+       all_year_target_word_impression,
+       null as level4_rank,
+       null as level4_quarter_rank,
+       null as level4_year_rank,
+       null as level5_rank,
+       null as level5_double_rank,
+       null as level5_quarter_rank,
+       null as level5_quarter_double_rank,
+       null as level5_year_rank,
+       null as level5_year_double_rank,
+       null as level6_rank,
+       null as level6_double_rank,
+       null as level6_quarter_rank,
+       null as level6_quarter_double_rank,
+       null as level6_year_rank,
+       null as level6_year_double_rank,
+       null as level7_rank,
+       null as level7_double_rank,
+       null as level7_quarter_rank,
+       null as level7_quarter_double_rank,
+       null as level7_year_rank,
+       null as level7_year_double_rank,
+       case when double_count = 0 then month_achievement else 0 end   no_double_count_month_achievement,
+       case when double_count = 0 then quarter_achievement else 0 end no_double_count_quarter_achievement,
+       case when double_count = 0 then year_achievement else 0 end    no_double_count_year_achievement,
+       to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')                     calday,
+       current_timestamp                                              dw_last_update_date,
+       month_predition,
+       year_predition,
+       month_a_cost,
+       last_period_month_a_cost,
+       last_year_month_a_cost,
+       quarter_a_cost,
+       last_period_quarter_a_cost,
+       last_year_quarter_a_cost,
+       year_a_cost,
+       last_year_a_cost,
+       month_a_gross_profit,
+       last_period_month_a_gross_profit,
+       last_year_month_a_gross_profit,
+       quarter_a_gross_profit,
+       last_period_quarter_a_gross_profit,
+       last_year_quarter_a_gross_profit,
+       year_a_gross_profit,
+       last_year_a_gross_profit,
+       last_day_achievement,
+       high_value_day_achievement,
+   --2025/03/18新增周与上月均值
+       week_avg_day_achievement,
+       last_month_day_achievement,  
+       last_month_double_count_target,
+	   --2025-03-31新增
+       qjcp_month_achievement, --旗舰产品月业绩
+       qjcp_quarter_achievement, --旗舰产品季业绩
+       qjcp_year_achievement, --旗舰产品年业绩
+       iw_month_achievement, --IW产品月业绩
+       iw_quarter_achievement, --IW产品季业绩
+       iw_year_achievement, --IW产品年业绩
+	   fc_month_achievement, --辅材产品月业绩
+	   fc_quarter_achievement, --辅材产品季业绩
+	   fc_year_achievement, --辅材产品年业绩
+       qjcp_month_target, --旗舰产品月目标
+	   qjcp_quarter_target, --旗舰产品季目标
+	   qjcp_year_target, --旗舰产品年目标
+	   fc_month_target, --辅材产品月目标
+	   fc_quarter_target, --辅材产品季目标
+	   fc_year_target, --辅材产品年目标
+	   iw_month_target, --IW产品月目标
+	   iw_quarter_target, --IW产品季目标
+	   iw_year_target, --IW产品年目标
+	   gd04_month_target, --特惠品月目标
+	   gd04_quarter_target, --特惠品季目标
+	   gd04_year_target, --特惠品年目标	
+	   last_11month_all_month_achievement, --11个月前整月业绩
+       next_month_target, --下个月目标	  
+       level2_sub, --第2层级子名称：为了区分国内营销系统体系内外，不改变原来的层级架构
+	   level2_sub_code, --第2层级子编码：为了区分国内营销系统体系内外，不改变原来的层级架构
+       a.new_level5,
+	   a.new_level5_code,
+	   null as new_level5_double_rank,
+	   null as new_level5_quarter_rank,
+	   null as new_level5_quarter_double_rank,
+	   null as new_level5_year_rank,
+	   null as new_level5_year_double_rank
+from result a
+         --left join level4_rank l4 on coalesce(a.level4_code, '#') = coalesce(l4.level4_code, '#')
+         --left join level5_rank l5 on coalesce(a.level5_code, '#') = coalesce(l5.level5_code, '#')
+         --left join level6_rank l6 on coalesce(a.level6_code, '#') = coalesce(l6.level6_code, '#')
+         --left join level7_rank l7 on coalesce(a.level7_code, '#') = coalesce(l7.level7_code, '#')
+		 --left join new_level5_rank nl5 on coalesce(a.new_level5_code, '#') = coalesce(nl5.new_level5_code, '#')
+where 1 = 1

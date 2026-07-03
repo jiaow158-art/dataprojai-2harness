@@ -1,0 +1,192 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2023/11/10 14:58:06 GMT+08:00
+-- description:基于ZJFTAB2的积分底表1
+-- history list: CONCAT(SUBSTRING(ZJFFW, 1, 2), '00')
+-- UPDATE FROM 15000571 时间<2023-01-16> 优化维度销售组（WBS）兜底逻辑，135行(T3.ZVKGRP IS NOT NULL OR T3.ZVKGRP <> '')改为(T3.ZVKGRP IS NOT NULL AND T3.ZVKGRP <> '')
+-- UPDATE FROM 15000571 时间<2024-01-24> 新增审计口径积分分类，文本，分配，客户参考，采购订单类型5个字段并修改了订单类型逻辑
+-- UPDATE FROM 15000571 时间<2024-01-30> 过账日期 ，操作日期数据清洗为带-格式的日期
+-- UPDATE FROM 15000571 时间<2024-02-23> 增量逻辑改为 period_id_m >= '${PERIOD_ID_M}'
+-- UPDATE FROM ZHZ 20250623 管理口径积分分类剔除ZE
+-- ******************************************************************** -- --
+--优化性能SQL
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+WITH ZJFTAB2_T AS (
+select
+*
+from SDI.SDI_ZJFTAB2_1001 
+WHERE (ZJFBGLX LIKE 'A0%' OR ZJFBGLX LIKE 'Z%') AND period_id_m >='${start_date}'--日期格式为202312
+)
+, TMP1 AS ( 
+SELECT 
+CONCAT(SUBSTRING(T1.ZJFFW, 1, 2), '00')AS COMP_CODE,--公司代码
+T1.ZJFGGBH AS ZJFGGBH,--更改记录编号/凭证号
+T1.ZJFGGIT AS ZJFGGIT, -- 行项目
+CONCAT(T1.ZJFNF,'-',substring(T1.ZJFYF,3,2)) AS CALMONTH,--年份/月份
+T1.KUNNR AS CUSTOMER,--客户编码
+T1.ZJFFW AS SALESORG,--销售组织
+T1.VTWEG AS DISTR_CHAN, --分销渠道
+T1.ZJFLX AS ZJFLX,--积分类型
+T2.ZJFMS AS ZJFMS,--积分类型描述
+T1.ZJFBGLX AS ZJFBGLX,--积分变更类型
+T3.ZJFMS AS ZJFBGLXMS,--积分变更类型描述
+from_unixtime(unix_timestamp(T1.BUDAT, 'yyyyMMdd'), 'yyyy-MM-dd')  AS BUDAT,--过账日期  
+from_unixtime(unix_timestamp(T1.ERDAT, 'yyyyMMdd'), 'yyyy-MM-dd')  AS ERDAT,--操作日期 
+T1.VBELN AS VBELN,--销售订单
+T1.POSNR AS POSNR,--销售订单行项目
+T1.VBELN_VF AS VBELN_VF,--开票抬头
+T1.POSNR_VF AS POSNR_VF, --开票项目
+'' AS OrderType,--订单类型
+T1.MATNR AS MATERIAL,--物料编码
+T4.material_name AS material_text,--物料描述
+T1.KWMENG AS KWMENG,--订单数量
+'' AS OrderArea ,--订单面积
+T1.VRKME AS SALESUNIT ,--销售单位
+T1.ZCXBS AS Offset_mark,--冲销标识
+T1.WBSID AS WBSID,--WBS号
+T5.POST1 AS WBS_Description,--WBS描述
+T1.ZQZRQ AS ReconciliationDate,--清账日期
+T1.ZQZBS AS ReconciliationFlag,--清账标识
+'' AS ProductionRegion,--产区
+T1.ZJFYEN-T1.ZJFYEO AS PointsValue,--积分金额
+'' AS PolicyName, --政策名称
+T1.NETWR AS NetPrice2,--静价2
+'' AS EngineeringChange,--工程变更
+'' AS ASPricingDate,--定价日期
+'' AS RC_ACCOUNT,--总账科目
+'' AS RC_ACCOUNT_Description,--总账科目描述
+T5.PSPHI AS PSPHI, --项目号   销售组（主档+WBS）用得上
+T1.ZJFBZ AS points_text ,--文本
+T1.ZJFFP AS points_distribution ,--分配
+T1.period_id_m --分区字段
+FROM  ZJFTAB2_T T1
+LEFT JOIN SDI.SDI_ZJFCON1_1001 T2
+ON T1.ZJFLX = T2.ZJFLX
+LEFT JOIN SDI.SDI_ZJFCON3_1001 T3
+ON T1.ZJFBGLX = T3.ZJFBGLX
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T4
+ON T1.MATNR = T4.material_num
+LEFT JOIN  SDI.SDI_PRPS_1001 T5
+ON T1.WBSID = T5.POSID
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_GL_POINTS_Voucher_F partition(period_id_m)
+SELECT 
+T1.COMP_CODE,--公司代码
+T1.ZJFGGBH,--更改记录编号/凭证号
+T1.ZJFGGIT,-- 行项目
+T1.CALMONTH,--年份/月份
+T1.CUSTOMER,--客户编码
+T1.SALESORG,--销售组织
+T1.DISTR_CHAN, --分销渠道
+T1.ZJFLX,--积分类型
+T1.ZJFMS,--积分类型描述
+T1.ZJFBGLX,--积分变更类型
+T1.ZJFBGLXMS,--积分变更类型描述
+T1.BUDAT,--过账日期
+T1.ERDAT,--操作日期
+T1.VBELN,--销售订单
+T1.POSNR,--销售订单行项目
+T1.VBELN_VF,--开票抬头
+T1.POSNR_VF, --开票项目
+T1.OrderType,--订单类型
+T1.MATERIAL,--物料编码
+T1.material_text,--物料描述
+T1.KWMENG,--订单数量
+T1.OrderArea ,--订单面积
+T1.SALESUNIT ,--销售单位
+T1.Offset_mark,--冲销标识
+T1.WBSID,--WBS号
+T1.WBS_Description,--WBS描述
+T1.ReconciliationDate,--清账日期
+T1.ReconciliationFlag,--清账标识
+T1.ProductionRegion,--产区
+T1.PointsValue,--积分金额
+T1.PolicyName, --政策名称
+T1.NetPrice2,--静价2
+T1.EngineeringChange,--工程变更
+T1.ASPricingDate,--定价日期
+T1.RC_ACCOUNT,--总账科目
+T1.RC_ACCOUNT_Description,--总账科目描述
+--T1.PSPHI, --项目号   销售组（主档+WBS）用得上
+ CASE
+    WHEN T1.ZJFBGLX LIKE 'Z%' AND T1.ZJFBGLX NOT IN ('ZC','ZJ','ZE','ZG') THEN 'A'
+    ELSE NULL
+  END AS PointsCategoryCode,--管理口径积分分类编码
+  CASE
+    WHEN T1.ZJFBGLX LIKE 'Z%' AND T1.ZJFBGLX NOT IN ('ZC','ZJ','ZE','ZG') THEN '预提积分-手工'
+    ELSE NULL
+  END AS PointsCategory ,--管理口径积分分类
+  CASE
+    WHEN T1.ZJFLX = '00' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '01'
+    WHEN T1.ZJFLX = '13' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '02'
+    WHEN T1.ZJFLX = '06' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '03'
+    ELSE NULL
+  END AS PointsBusinessScopeCode,--管理口径使用积分业务范围编码
+  CASE
+    WHEN T1.ZJFLX = '00' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '常规积分'
+    WHEN T1.ZJFLX = '13' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '工程积分'
+    WHEN T1.ZJFLX = '06' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '宣传资料积分'
+    ELSE NULL
+  END AS UsePointsBusinessScope,--管理口径使用积分业务范围
+  T2.sales_group_code  AS sales_group_code,--销售组（主档）
+    CASE
+    WHEN T1.WBSID IS NULL OR T1.WBSID = ''  THEN T2.sales_group_code
+    WHEN (T1.WBSID IS NOT NULL AND T1.WBSID <> '') AND (T3.ZVKGRP IS NOT NULL AND T3.ZVKGRP <> '') THEN T3.ZVKGRP
+    ELSE T2.sales_group_code
+  END AS sales_group_code_WBS, --销售组（主档+WBS）
+  '' AS sales_group_code_actual, -- 销售组（实际）
+     CURRENT_TIMESTAMP AS last_update_date,--最后更新日期
+    'N' AS DEL_FLAG ,--删除标识
+    CASE 
+        WHEN ZJFBGLX = 'ZF' AND (ZJFLX = '00' OR ZJFLX = '13') THEN '政策外'
+        WHEN ZJFBGLX <> 'ZF' AND (ZJFLX = '00' OR ZJFLX = '13') THEN '政策内'
+    END AS score_classification,    --审计口径积分分类
+    T1.points_text, --文本
+    T1.points_distribution, --分配
+    ''  AS client_reference,--客户参考
+    ''  AS purchase_ordertype,--采购订单类型
+    T1.period_id_m
+  FROM TMP1  T1  
+  LEFT JOIN DWRDIM.DWR_DIM_CUST_SALES_AREA_D T2
+  ON 
+    T1.SALESORG = T2.sales_org_code 
+    AND  T1.CUSTOMER = T2.src_cust_num 
+    AND T1.DISTR_CHAN  = T2.distribution_chnl_code
+    AND T2.end_date ='4712-12-31' AND T2.del_flag = 'N'
+  LEFT JOIN SDI.SDI_PROJ_1001 T3
+  ON  T1.PSPHI= T3.PSPNR 
+
+
+  
+--select *from DWRFIN.DWR_GL_POINTS_Voucher_F where VBELN_VF = '8300034441'
+-- select  count(*) from DWRFIN.DWR_GL_POINTS_Voucher_F
+  
+--TRUNCATE TABLE  DWRFIN.DWR_GL_POINTS_Voucher_F
+--  select count(*)
+-- from SDI.SDI_ZJFTAB2_1001 
+-- WHERE ZJFBGLX LIKE 'A0%' OR ZJFBGLX LIKE 'Z%'
+
+-- SELECT * FROM TMP1 T1  WHERE T1.ZJFBGLX = 'B1' AND T1.ZJFLX = '00'
+    
+-- select
+-- *
+-- from SDI.SDI_ZJFTAB2_1001 
+-- WHERE ZJFBGLX = 'B1' AND ZJFLX = '00' AND (ZJFBGLX  LIKE 'A0%' OR ZJFBGLX LIKE 'Z%')
+    
+--  SELECT ZVKGRP FROM SDI.SDI_PROJ_1001
+--select * from SDI.SDI_ZJFTAB2_1001 where ZJFBGLX = 'B1' AND ZJFLX = '00'
+
+-- SELECT * FROM SDI.SDI_ZJFTAB2_1001 
+
+-- WHEN T1.ZJFLX = '06' AND (T1.ZJFBGLX = 'B1' OR T1.ZJFBGLX = 'C2') THEN '宣传资料积分'
+
+-- select * from SDI.SDI_ZJFTAB2_1001  where VBELN_VF = '8300034441' and zjfggbh = '2000000660'
+    -- SELECT * FROM  DWRDIM.DWR_DIM_CUST_SALES_AREA_D  WHERE src_cust_num = '1000001429' AND sales_org_code = '7600' AND distribution_chnl_code = '01'
+--SELECT * FROM DWRFIN.DWR_GL_POINTS_Voucher_F

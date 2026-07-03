@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_BI0_TSALES_GRP",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

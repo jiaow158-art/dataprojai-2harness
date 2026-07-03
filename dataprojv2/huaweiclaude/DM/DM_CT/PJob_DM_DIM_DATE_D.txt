@@ -1,0 +1,103 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/10/24 17:49:04 GMT+08:00
+-- ******************************************************************** --
+with tmp_data as(
+select
+       date_add("2018-01-01", t.pos) as predict_date_day
+     from(
+         select
+           posexplode(
+             split(
+               repeat(
+                 "m",
+				datediff("2030-12-31", "2018-01-01")
+               ),"m"
+             )
+           )
+       ) t
+ )
+INSERT OVERWRITE TABLE DM.DM_DIM_DATE_D
+select 
+    replace(predict_date_day,'-','')     as DAY_ID,  			-- 日期ID(yyyymmdd)
+    concat(year(predict_date_day),weekofyear(predict_date_day)) as WEEK_ID, -- 周ID
+    replace(substring(predict_date_day,1,7),'-','') as MONTH_ID,   -- 月ID(YYYYMM)
+    concat(year(predict_date_day),'0',quarter(predict_date_day)) as QTR_ID , -- 季度ID
+    case when MONTH(predict_date_day) > 6 then concat(year(predict_date_day),'02') else concat(year(predict_date_day),'01') end as HALF_ID, -- 半年ID
+    year(predict_date_day) as YEAR_ID ,  -- 年ID(YYYY)
+    predict_date_day                           as DAY_DT,               -- 日期(yyyy-mm-dd) 
+    concat(year(predict_date_day),'年',month(predict_date_day),'月',day(predict_date_day),'日')        as DAY_FULL_DT,           -- 日(yyyy年mm月dd日)  
+    day(predict_date_day)    as DAY_SHORT_NAME   , -- 日_缩写(DD)
+    concat(day(predict_date_day),'日') as DAY_SHORT_NAME_CN, -- 日_缩写_中文
+    IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7))           as DAY_SHORT_NAME_WEEK_ID,  -- 周ID
+    case when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 1 then '周一'
+            when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 2 then '周二'
+            when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 3 then '周三'
+            when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 4 then '周四'
+            when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 5 then '周五'
+            when IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)) = 6 then '周六'
+        else '周日'
+        end DAY_SHORT_NAME_WEEK,  -- 周几
+    weekofyear(predict_date_day) as WEEK_SHORT_NAME, -- 周_缩写_ID
+    concat('第',weekofyear(predict_date_day),'周') as WEEK_SHORT_NAME_CN, -- 周_缩写_中文
+    replace(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),'-','') as DAY_ID_WSTART, -- 日_开始周
+	CAST(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) AS STRING) as DAY_WSTART_DT, -- 日_开始周DT
+    replace(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),'-','') as DAY_ID_WEND, -- 日_结束周
+	CAST(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) AS STRING) as DAY_WEND_DT, -- 日_结束周DT
+    concat(replace(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),'-',''),
+	   '~',replace(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),'-',''))  as WEEK_RANGE_FULL_NAME,  -- 周范围
+	concat(replace(substring(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) - interval 35 days,1,10),'-',''),
+	'~',replace(substring(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) - interval 35 days,1,10),'-','')) as WEEK_RANGE_FULL_NAME_5WAGO, -- 周范围_前5周
+	concat(replace(substring(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),6,5),'-','.'),
+	   '~',replace(substring(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end),6,5),'-','.')) as WEEK_RANGE_SHORT_NAME,-- 周范围_缩写
+    concat(replace(substring(date_add(predict_date_day,1 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) - interval 35 days,6,5),'-','.'),
+    '~',replace(substring(date_add(predict_date_day,7 - case when dayofweek(predict_date_day) = 1 then 7 else dayofweek(predict_date_day) - 1 end) - interval 35 days,6,5),'-','.')) as WEEK_RANGE_SHORT_NAME_5WAGO,  -- 周范围_前5周_缩写
+    month(predict_date_day) as MONTH_SHORT_NAME, -- 月缩写
+    concat(month(predict_date_day),'月') as MONTH_SHORT_NAME_CN, -- 月缩写_中文
+    quarter(predict_date_day) as QTR_SHORT_NAME, -- 季度_缩写
+    concat(quarter(predict_date_day),'季度') as QTR_SHORT_NAME_CN, -- 季度缩写_中文
+    case when MONTH(predict_date_day) > 6 then '2' else '1'  end as HALF_SHORT_NAME, -- 半年_缩写
+    case when MONTH(predict_date_day) > 6 then '下半年' else '上半年'  end as HALF_SHORT_NAME_CN, -- 半年_缩写_中文
+    year(predict_date_day) as YEAR_SHORT_NAME,-- 年_缩写
+    concat(year(predict_date_day),'年') as YEAR_SHORT_NAME_CN,-- 年_缩写_中文
+    concat(year(predict_date_day),'/', case when month(predict_date_day) < 10 then concat(0,month(predict_date_day)) else month(predict_date_day) end) as MONTH_FULL_NAME, -- 月_全称
+    concat(year(predict_date_day),'年', case when month(predict_date_day) < 10 then concat(0,month(predict_date_day)) else month(predict_date_day) end,'月') as MONTH_FULL_NAME_CN,  -- 月_全称_中文
+    concat(year(predict_date_day),'/Q',quarter(predict_date_day) ) as QTR_FULL_NAME, --季度_全称
+    concat(year(predict_date_day),'年第',quarter(predict_date_day) ,'季度') as QTR_FULL_NAME, --季度_全称
+    concat(year(predict_date_day),'/H',case when MONTH(predict_date_day) > 6 then '2' else '1' end) as HALF_FULL_NAME, -- 半年_全称
+    concat(year(predict_date_day),'年',case when MONTH(predict_date_day) > 6 then '下半年' else '上半年'  end) as HALF_FULL_NAME_CN, -- 半年_全称_中文
+    IF(pmod(datediff(predict_date_day, '1920-01-01') - 3, 7)='0', 7,pmod(datediff(predict_date_day, '1920-01-01') - 3, 7))   as DAY_OF_WEEK, -- 日_所属_周
+    month(predict_date_day) as DAY_OF_MONTH, -- 日_所属_月
+    replace(date_add(predict_date_day,-1),'-','') as DAY_ID_DAGO, -- 昨天
+	CAST(date_add(predict_date_day,-1) AS STRING) as DAY_DAGO_DT, -- 昨天DT
+    replace(date_add(predict_date_day,-7),'-','') as DAY_ID_WAGO, -- 上一周
+	CAST(date_add(predict_date_day,-7) AS STRING) as DAY_WAGO_DT, -- 上一周DT
+    replace(ADD_MONTHS(predict_date_day,-1),'-','') as DAY_ID_MAGO,-- 上月
+	CAST(ADD_MONTHS(predict_date_day,-1) AS STRING) as DAY_MAGO_DT,-- 上月DT
+    replace(ADD_MONTHS(predict_date_day,-3),'-','') as DAY_ID_QAGO , -- 上个季度
+	CAST(ADD_MONTHS(predict_date_day,-3) AS STRING) as DAY_QAGO_DT , -- 上个季度DT
+    replace(ADD_MONTHS(predict_date_day,-12),'-','') as DAY_ID_YAGO , -- 去年
+	CAST(ADD_MONTHS(predict_date_day,-12) AS STRING) as DAY_YAGO_DT , -- 去年DT
+    replace(trunc(predict_date_day,'MM'),'-','')  AS DAY_ID_MBEGIN, -- 当月第一天
+	CAST(trunc(predict_date_day,'MM') AS STRING)  AS DAY_MBEGIN_DT, -- 当月第一天DT
+    replace(last_day(predict_date_day),'-','') as DAY_ID_MEND, -- 当月最后一天
+	CAST(last_day(predict_date_day) AS STRING) as DAY_MEND_DT, -- 当月最后一天DT
+    replace(date_add(trunc(predict_date_day,'MM'),-1),'-','') as DAY_ID_MEND_MAGO, -- 上个月末
+	CAST(date_add(trunc(predict_date_day,'MM'),-1) AS STRING) as DAY_MEND_MAGO_DT, -- 上个月末DT
+    replace(add_months(last_day(predict_date_day),-12),'-','') as DAY_ID_MEND_YAGO,-- 日_最后一天_上年
+	CAST(add_months(last_day(predict_date_day),-12) AS STRING) as DAY_MEND_YAGO_DT,-- 日_最后一天_上年DT
+    replace(cast(to_date(concat(year(predict_date_day),'-',lpad(ceil(month(predict_date_day)/3) * 3-2,2,0),'-01')) as string),'-','')            as DAY_ID_QBEGIN,   -- 当季第一天
+	CAST(to_date(concat(year(predict_date_day),'-',lpad(ceil(month(predict_date_day)/3) * 3-2,2,0),'-01')) as string)            as DAY_QBEGIN_DT,   -- 当季第一天DT
+	replace(last_day(to_date(concat(year(predict_date_day),'-',lpad(ceil(month(predict_date_day)/3) * 3,2,0),'-01'))),'-','')   as DAY_ID_QEND,    -- 当季最后一天
+	CAST(last_day(to_date(concat(year(predict_date_day),'-',lpad(ceil(month(predict_date_day)/3) * 3,2,0),'-01'))) AS STRING)   as DAY_QEND_DT,    -- 当季最后一天DT
+    replace(trunc(predict_date_day,'YY'),'-','') AS DAY_ID_YBEGIN, -- 当前年第一天
+	CAST(trunc(predict_date_day,'YY') AS STRING) AS DAY_YBEGIN_DT, -- 当前年第一天DT
+    replace(last_day(add_months(trunc(predict_date_day,'YY'),11)),'-','') AS DAY_ID_YEND, -- 当前年最后一天
+	CAST(last_day(add_months(trunc(predict_date_day,'YY'),11)) AS STRING) AS DAY_YEND_DT, -- 当前年最后一天DT
+    replace(add_months(last_day(add_months(trunc(predict_date_day,'YY'),11)),-12),'-','') as DAY_ID_YEND_YAGO,--日_最后一年_上年
+	CAST(add_months(last_day(add_months(trunc(predict_date_day,'YY'),11)),-12) AS STRING) as DAY_YEND_YAGO_DT,--日_最后一年_上年DT
+    substring(last_day(predict_date_day),-2) as MONTH_DAYS, -- 月天数
+    IF(replace(predict_date_day,'-','') = replace(last_day(predict_date_day),'-',''),'Y','N') AS MONTH_END_DAY_FLAG, -- 是否为当月最后一天
+    CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+from tmp_data t;

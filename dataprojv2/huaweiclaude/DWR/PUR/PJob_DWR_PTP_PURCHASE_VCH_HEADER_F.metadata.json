@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_VCH_HEADER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/PUR",
+    "description": "SAP采购凭证抬头表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

@@ -1,0 +1,230 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/06/22 14:14:43 GMT+08:00
+-- qinyongjian 20240401 新增新品标识、绿灯产品标识字段
+-- qinyongjian 20240704 qyj 新增运营部和运营线组字段
+-- qinyongjian 20240925 qyj 新增工程计划单类型的进一步划分
+-- huangwenbin 20251201 新增字段：ka类型、nka紧急订单标志
+-- ******************************************************************** --
+DELETE FROM DM.DM_SO_ZL_ORDER_ZJ_PRE_T
+WHERE TJ_MONTH = substr(current_date - interval '1 day',1,7)
+;
+
+INSERT INTO DM.DM_SO_ZL_ORDER_ZJ_PRE_T(
+zjhd
+,zjhdid
+,matnr
+,maktx
+,menge
+,werks
+,zcjrq
+,zjsrq
+,zsprq
+,post1
+,zjfkhrq
+,zvkgrp
+,sfxyjg
+,xqjhsx
+,zxsry
+,extwg
+,ddzt
+,jhdhzt
+,sfzdjf
+,xqsl
+,cpsdhgc
+,yssj
+,spjjyy
+,dw
+,hx
+,syqy
+,dlkjmj
+,ts
+,ysfs
+,sfzlkh
+,zlkhmc
+,gcmc
+,sjjd
+,gcdzs
+,gcdzcs
+,gcdzjd
+,gcdzq
+,cytj
+,yqsm
+,pernr
+,pernrname
+,zby2
+,gcjhrq
+,jgts
+,zhuangtai
+,sxsm
+,jhdbz
+,czjhdhh
+,jjyy
+,matkl
+,yl06
+,prart
+,ps_psp_pnr
+,zposid
+,zsfdt
+,kunnr
+,zghcq
+,def_dl_date
+,charg
+,zzzjh
+,ztsbm
+,ztsbz
+,ztssb
+,ztscc
+,ztshd
+,ztsys
+,ztsyq
+,prdha
+,groes
+,wlgg
+,pspnr
+,cppc_period
+,is_xh
+,bstdk
+,kz_date
+,first_confirm_date
+,zxmkc
+,thdat
+,zljcksl
+,is_hzj
+,is_hzt
+,is_zdzj
+,is_zdzt
+,is_zdjfzj
+,is_zdjfzt
+,tj_month
+,dw_last_update_date
+,stat_month
+,area
+,zj_qty
+,yt_date
+,zt_qty
+,unit_area
+,department
+,new_material_flag
+,grelight_material_flag
+,operate_depart
+,operate_group
+,gc_type3
+,ka_type
+,is_ka_name
+)
+SELECT
+t1.zjhd
+,t1.zjhdid
+,t1.matnr
+,t1.maktx
+,t1.menge
+,t1.werks
+,t1.zcjrq
+,t1.zjsrq
+,t1.zsprq
+,t1.post1
+,t1.zjfkhrq
+,t1.zvkgrp
+,t1.sfxyjg
+,t1.xqjhsx
+,t1.zxsry
+,t1.extwg
+,t1.ddzt
+,t1.jhdhzt
+,t1.sfzdjf
+,t1.xqsl
+,t1.cpsdhgc
+,t1.yssj
+,t1.spjjyy
+,t1.dw
+,t1.hx
+,t1.syqy
+,t1.dlkjmj
+,t1.ts
+,t1.ysfs
+,t1.sfzlkh
+,t1.zlkhmc
+,t1.gcmc
+,t1.sjjd
+,t1.gcdzs
+,t1.gcdzcs
+,t1.gcdzjd
+,t1.gcdzq
+,t1.cytj
+,t1.yqsm
+,t1.pernr
+,t1.pernrname
+,t1.zby2
+,t1.gcjhrq
+,t1.jgts
+,t1.zhuangtai
+,t1.sxsm
+,t1.jhdbz
+,t1.czjhdhh
+,t1.jjyy
+,t1.matkl
+,t1.yl06
+,t1.prart
+,t1.ps_psp_pnr
+,t1.zposid
+,t1.zsfdt
+,t1.kunnr
+,t1.zghcq
+,t1.def_dl_date
+,t1.charg
+,t1.zzzjh
+,t1.ztsbm
+,t1.ztsbz
+,t1.ztssb
+,t1.ztscc
+,t1.ztshd
+,t1.ztsys
+,t1.ztsyq
+,t1.prdha
+,t1.groes
+,t1.wlgg
+,t1.pspnr
+,t1.cppc_period
+,t1.is_xh
+,t1.bstdk
+,t1.kz_date
+,t1.first_confirm_date
+,t1.zxmkc
+,t1.thdat
+,t1.zljcksl
+,t1.is_hzj
+,t1.is_hzt
+,t1.is_zdzj
+,t1.is_zdzt
+,t1.is_zdjfzj
+,t1.is_zdjfzt
+,substr(t1.BSTDK,1,4)||'-'||substr(t1.BSTDK,5,2) as tj_month
+,t1.dw_last_update_date
+,t1.stat_month
+,T1.unit_area as area
+,T1.zj_qty
+,T1.yt_date
+,T1.zt_qty
+,T1.unit_area
+,t1.department
+,t1.new_material_flag
+,t1.grelight_material_flag
+,t1.operate_depart
+,t1.operate_group
+,case 
+	when ddzt like '%样板间%' then '样板间'
+	when ddzt like '%补货%' then '补货'
+	else '大货'
+end gc_type3
+,t1.ka_type
+,t1.is_ka_name
+FROM DM.DM_SO_ZL_ORDER_T t1
+where t1.zcjrq >= '20220101'
+--and t1.is_zdjfzj in('是','否')
+and t1.stat_month = replace(substr(current_date - interval '1 day',1,7),'-','')
+and substr(t1.BSTDK,1,6) = t1.stat_month
+and t1.werks not like '%80'
+and t1.YL06<>'B'
+;

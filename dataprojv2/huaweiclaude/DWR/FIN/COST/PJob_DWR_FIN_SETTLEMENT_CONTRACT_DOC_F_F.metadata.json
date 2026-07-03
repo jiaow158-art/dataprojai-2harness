@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_FIN_SETTLEMENT_CONTRACT_DOC_F_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "对公结算单仅关联整体合同（不关联支付条款）支付情况模型",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

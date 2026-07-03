@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PTP_PURCHASE_VCH_HIS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PTP",
+    "description": "SAP采购凭证历史表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipur"
+}

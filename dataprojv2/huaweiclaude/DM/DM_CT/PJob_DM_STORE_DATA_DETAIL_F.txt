@@ -1,0 +1,55 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/06/07 13:54:09 GMT+08:00
+-- description:单店产出报表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE DM.DM_STORE_DATA_DETAIL_F
+select
+T1.MONTH AS CALMONTH,
+T2.SHENG AS PROVINCE ,
+T2.SHI AS CITY,
+T2.qu AS AREA,
+T1.outStoreId,
+SUM(T2.MDDPZSM) AS operating_area,
+COUNT(DISTINCT employeeId) AS EMPLOYEE_QTY,
+SUM(finishedAmount/10000) AS FINISHEDAMOUNT,
+current_timestamp AS DW_LAST_UPDATE_DATE,
+T1.PERIOD_ID_M AS PERIOD_ID_M
+from 
+SDI.SDI_STORE_DATA_1037 T1 
+join DWIMD.DWI_MD_SHOP_INFO_OA_T T2 
+on T1.outStoreId = T2.xjmdbh 
+where T1.period_id_m  = '${PERIOD_ID_M}'
+GROUP BY 
+T1.MONTH,
+T2.SHENG,
+T2.SHI,
+T2.qu,
+T1.outStoreId,
+T1.PERIOD_ID_M
+
+
+-- CREATE TABLE  DM.DM_STORE_DATA_DETAIL_F(
+-- CALMONTH STRING COMMENT '统计月份',
+-- PROVINCE STRING COMMENT '省份',
+-- CITY STRING COMMENT '城市',
+-- AREA STRING COMMENT '区',
+-- OUTSTOREID STRING COMMENT '门店ID',
+-- OPERATING_AREA  NUMERIC(38,10) COMMENT '门店经营面积',
+-- EMPLOYEE_QTY NUMERIC(38,10) COMMENT '导购数',
+-- FINISHEDAMOUNT NUMERIC(38,10) COMMENT '成交金额',
+-- DW_LAST_UPDATE_DATE TIMESTAMP,
+-- PERIOD_ID_M VARCHAR(255)
+-- )
+-- PARTITIONED BY (PERIOD_ID_M VARCHAR(255));

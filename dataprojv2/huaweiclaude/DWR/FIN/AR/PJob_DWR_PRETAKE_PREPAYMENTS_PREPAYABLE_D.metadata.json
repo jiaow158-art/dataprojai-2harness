@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PRETAKE_PREPAYMENTS_PREPAYABLE_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

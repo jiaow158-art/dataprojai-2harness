@@ -1,0 +1,503 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/31 10:14:45 GMT+08:00
+-- update 20240716 qyj 修改wbs线组逻辑和雇员逻辑
+-- update 20240926 杨俊华 增加业绩预计单价
+-- update 20241021 qyj 增加商机号字段
+-- update 20260416 wjh 关于组织架构的逻辑调整
+-- ******************************************************************** --
+set hive.cbo.enable=true;				--性能优化SQL
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+
+with t1 as(
+	SELECT
+		a.zjhd,
+		a.zjhdid,
+		a.matnr,
+		a.maktx,
+		a.menge, --评审后需求数量
+		a.werks,
+		a.zcjrq, --创建日期
+		a.zjsrq,
+		a.zsprq,
+		c.post1,
+		a.zjfkhrq,
+		f.bezei AS zvkgrp,
+		a.sfxyjg,
+		a.xqjhsx,
+		c.zxsry,
+		--d.EXTWG,
+		a.ddzt --计划订单类型
+		,a.jhdhzt
+		,a.sfzdjf--是否整单交付
+		,a.xqsl
+		,a.cpsdhgc
+		,a.yssj
+		,a.spjjyy
+		,a.dw
+		,a.hx
+		,a.syqy
+		,a.dlkjmj
+		,a.ts
+		,a.ysfs
+		,a.sfzlkh
+		,a.zlkhmc
+		,a.gcmc
+		,a.sjjd
+		,a.gcdzs
+		,a.gcdzcs
+		,a.gcdzjd
+		,a.gcdzq
+		,a.cytj
+		,a.yqsm
+		,a.pernr
+		,a.pernrname
+		,a.zby2
+		,a.gcjhrq
+		,a.jgts
+		,a.zhuangtai
+		,a.sxsm
+		,a.jhdbz
+		,a.czjhdhh
+		,a.jjyy
+		--d.matkl,
+		,d.yl06
+		,b.prart
+		,b.PSPNR as ps_psp_pnr
+		,a.zposid
+		,a.zsfdt
+		,a.kunnr
+		,a.zghcq
+		,a.def_dl_date
+		,a.charg
+		,a.zzzjh
+		,ztsbm
+		,a.ztsbz
+		,a.ztssb
+		,a.ztscc
+		,a.ztshd
+		,a.ztsys
+		,a.ztsyq
+		,d.PRDHA
+		,d.GROES
+		,d.WLGG
+		,b.PSPNR
+		,d.cppc_period --产品排产周期
+		,case when a.ZBY2 like '%现货%' or a.ZBY2 like '%不%排产%' or a.ZBY2 like '%留货%' or a.ZBY2 like '%现款%' or a.ZBY2 like          '%无%排产%'	or a.ZBY2 like '%有货%' or a.ZBY2 like '%有库存%' or a.ZBY2 like '%库存%备%' then '是'
+			  when a.XQJHSX = '现货' then '是'
+			  when a.JJYY = '转换订单' then '是'
+			  when a.YQSM like '%现货%' then '是'
+			  when a.WERKS like '%80' then '是'
+			  when d.YL06 = 'B' then '是'
+		 else '否'
+		 end as is_xh, --是否为现货
+		 case when coalesce(a.ZZZJH,'') <> '' then a.ZZZJH
+			  when coalesce(a.DEF_DL_DATE,'') <> '' then a.DEF_DL_DATE
+			  when coalesce(a.ZCJRQ,'') <> '' then substr(replace(date_add(a.ZCJRQ,d.cppc_period),'-',''),1,8)
+		 end as BSTDK --客户需求交货日期
+		,case when a.ddzt = '战略工程计划订单' and k.product_code is null and substr(d.PRDHA,1,4) in('1001','1008') then 60
+			  when a.ddzt = '单体工程批量销售订单' and k.product_code is null and substr(d.PRDHA,1,4) in('1001','1008') then 60
+			  when a.ddzt = '零售计划订单' then 15
+			  when a.ddzt = '战略工程计划订单' then 30
+			  when a.ddzt = '门店装修计划订单' then 15
+			  when a.ddzt = '单体工程批量销售订单' then 30
+			  when a.ddzt = '工程补货销售订单' then 15
+			  when a.ddzt = '工程样板间销售订单' then 15
+			  when a.ddzt = '零售销售订单' and a.zcjrq < '20210701' then 15
+			  when a.ddzt = '零售销售订单' and a.zcjrq >= '20210701' then 7
+		 else 30
+		 end as kz_date --控制天数
+		,e.vkgrp
+		,partment
+		,d.matkl 
+		,d.EXTWG
+		,coalesce(ws.wbs_state,'') as wbs_state
+		,c.zunnr
+		,coalesce(a.VKORG,c.zxszz ) as zxszz
+		,g.name1 as cust_name
+		,d.material_area
+		,a.znka --KA类型
+		,'' as znka_kunnr --KA客户
+		,a.znka_type --KA客户产品类型
+		,a.znka_flag
+	FROM sdi.sdi_zpst005_1001 AS a
+	JOIN sdi.sdi_prps_1001 AS b ON a.zjhdid = b.posid and b.DEL_FLAG = 'N'
+	JOIN sdi.sdi_proj_1001 AS c ON b.psphi = c.pspnr and c.DEL_FLAG = 'N'
+	LEFT JOIN (SELECT objnr,
+					 case when count(case when  stat in ('I0076') then 1 end )=1 then '标记删除'
+						  when count(case when  stat in ('I0043','I0061','I0062','I0063','I0064','I0005') then 1 end)=6 then '撤销中' end as wbs_state
+			  FROM  sdi.sdi_jest_1001 
+			  where stat in ('I0076','I0043','I0061','I0062','I0063','I0064','I0005') and inact = ''
+			  group by objnr
+			  ) ws ON b.objnr = ws.objnr
+	JOIN (select d.*
+	            ,d.laeng*d.breit/1000/1000 as material_area 
+				,case when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A001' and d.GROES in('600X600','800X800') then 25
+					  when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A001' and d.GROES in('1200X600') then 45
+					  when substr(d.PRDHA,1,4) = '1001' and d.WLGG = 'A002' then 45
+					  when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A001' and d.GROES = '800X800' then 30
+					  when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A001' and d.GROES = '1200X600' then 45
+					  when substr(d.PRDHA,1,4) = '1008' and d.WLGG = 'A002' then 45
+					  when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A001' and d.GROES in('600X600','1200X600','800X800') then 15
+					  when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A001' and d.GROES in('900X600','900X900') then 25
+					  when substr(d.PRDHA,1,4) = '1006' and d.WLGG = 'A002' then 25
+					  when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A001' and d.GROES in('1500X750','1800X900') then 15
+					  when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A001' and d.GROES in('2700X1000','2600X800','2400X800','2400X1200') then 25
+					  when substr(d.PRDHA,1,4) = '1003' and d.WLGG = 'A002' then 35
+					  when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES = '600X600' then 15
+					  when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES = '900X600' then 25
+					  when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A001' and d.GROES in('900X900','800X800','600X100','1200X196','1200X200','600X150','200X200','600X300','1200X600','600X298','1500X750','900X146','900X150') then 25
+					  when substr(d.PRDHA,1,4) = '1004' and d.WLGG = 'A002' then 25
+					  when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('300X300','600X300') then 10
+					  when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('800X400','800X300') then 15
+					  when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A001' and d.GROES in('300X100','1200X400','900X300','400X400','200X50','300X75') then 25
+					  when substr(d.PRDHA,1,4) = '1002' and d.WLGG = 'A002' then 25
+					  when substr(d.PRDHA,1,7) = '1004057' and d.WLGG in ('A001','A002') then 25
+					  else 30
+					   end as cppc_period --产品排产周期 
+			from sdi.sdi_mara_1001 AS d
+			where DEL_FLAG = 'N') d ON a.matnr = d.matnr
+	LEFT JOIN sdi.sdi_knvv_1001 e ON c.zunnr = e.kunnr AND e.vkorg = coalesce(a.VKORG,c.zxszz) AND e.vtweg = '06' AND e.DEL_FLAG ='N'
+	LEFT JOIN sdi.sdi_tvgrt_1001 f ON e.vkgrp =  f.vkgrp and f.mandt='800' and f.spras='1' and f.DEL_FLAG = 'N'
+	left join (
+	        select sale_grp,case when lev2_name ='瓷砖事业部' and lev3_name='国内营销中心' and lev4_name in('区域运营中心','直营经营管理板块','工程营销中心')                           then lev5_name
+                                when lev2_name ='瓷砖事业部' and lev3_name='国内营销中心' and lev4_name in('家装大包部')  then lev4_name
+                                when lev2_name ='瓷砖事业部' and lev3_name='国内营销中心' then  concat(lev3_name,'-其他')  
+                                when lev2_name ='瓷砖事业部' then lev3_name
+                                else '其它'  end partment 
+            from dm.dm_rpt_sale_grp_t
+	) par On e.vkgrp = par.sale_grp 
+	left join sdi.sdi_kna1_1001  g On c.zunnr = g.kunnr and g.mandt='800'
+	left join (select distinct product_code from SDI.SDI_ZOSS_ORD_QUTY_X_1001 c where DEL_FLAG = 'N') k
+	on a.MATNR = k.product_code
+	WHERE 1=1
+	-- and d.matkl = '1000010'
+	-- and d.EXTWG = '10010'
+	-- and a.zhuangtai in('当前有效','恢复有效')
+	-- and a.MENGE > 0
+	-- and substr(a.WERKS,1,2) in('12','13','15','16','17','18','19','75','77','79','8A')  
+	-- and a.werks not like '%80'
+	-- and a.matnr not like '%_B'
+	and a.del_flag='N'
+),
+t2 as(
+	select h.*
+		  ,sum(zxmkc) over(PARTITION BY mat_pspnr,matnr,werks ORDER BY BUDAT asc) as total_zxmkc
+	from(
+		select mat_pspnr
+			  ,matnr
+			  ,werks
+			  ,BUDAT
+			  ,sum(case when h.bwart = '415' and h.shkzg = 'S' then h.menge
+						when h.bwart = '415' and h.shkzg = 'H' then -1 * coalesce(h.menge,0)
+						when h.bwart = '411' and h.shkzg = 'H' then -1 * coalesce(h.menge,0)
+						else 0
+						 end) as zxmkc --已转入的项目库存
+		from sdi.sdi_MATDOC_1001 h
+		where bwart IN('415','411')
+		and sobkz = 'Q'
+		and DEL_FLAG = 'N'
+		group by  mat_pspnr
+				  ,matnr
+				  ,werks
+				  ,BUDAT
+		  ) h
+),
+t3 as(
+	select 
+		h.mat_pspnr
+		,h.matnr
+		,h.werks
+		,min(case when h.total_zxmkc >= a.menge then h.BUDAT end) as BUDAT
+		,sum(h.zxmkc) as total_zxmkc
+		,max(case when h.zxmkc>0 then h.BUDAT end) as max_budat
+	from t2 h
+	inner join t1 a
+	on h.matnr = a.matnr
+	AND h.mat_pspnr = a.PSPNR
+	AND h.werks = a.werks
+	group by h.mat_pspnr
+			,h.matnr
+			,h.werks
+),
+t4 as(
+	select i.*
+		  ,sum(zljcksl) over(PARTITION BY mat_pspnr,matnr,werks ORDER BY BUDAT asc) as total_zljcksl
+	from(
+		select mat_pspnr
+			   ,matnr
+			   ,werks
+			   ,BUDAT
+			   ,sum(case when i.bwart in('602','653','688') then -1 * i.menge
+						  when i.bwart in('601','652','687') then i.menge
+						  else 0
+						   end) as zljcksl --累计出库数量
+		from sdi.sdi_MATDOC_1001 i
+		where bwart IN ('601','652','602','653','687','688')
+		and sobkz = 'Q'
+		and DEL_FLAG = 'N'
+		group by mat_pspnr
+				,matnr
+				,werks
+				,BUDAT
+	) i
+),
+t5 as(
+	select 
+		h.mat_pspnr
+		,h.matnr
+		,h.werks
+		,min(case when h.total_zljcksl >= a.menge then h.BUDAT end) as BUDAT
+		,sum(h.zljcksl) as total_zljcksl
+	from t4 h
+	inner join t1 a
+	on h.matnr = a.matnr
+	AND h.mat_pspnr = a.PSPNR
+	AND h.werks = a.werks
+	group by h.mat_pspnr
+			,h.matnr
+			,h.werks
+),
+mspr as (
+	SELECT wbs as pspnr,
+		   material as matnr,
+		   plant as werks,
+		   sum(stock_qty) as prlab 
+	FROM SDI.SDI_ZCDSV_TOTALSTCK_1001 T
+	WHERE spec_type ='Q'
+	GROUP BY wbs,
+			 material,
+			 plant  
+)
+,t6 as(
+	select 
+		a.zjhd,
+		a.zjhdid,
+		a.matnr,
+		a.maktx,
+		a.menge, --评审后需求数量
+		a.werks,
+		a.zcjrq, --创建日期
+		a.zjsrq,
+		a.zsprq,
+		a.post1,
+		a.zjfkhrq,
+		a.zvkgrp,
+		a.sfxyjg,
+		a.xqjhsx,
+		a.zxsry,
+		a.EXTWG,
+		a.ddzt --计划订单类型
+		,a.jhdhzt
+		,a.sfzdjf--是否整单交付
+		,a.xqsl
+		,a.cpsdhgc
+		,a.yssj
+		,a.spjjyy
+		,a.dw
+		,a.hx
+		,a.syqy
+		,a.dlkjmj
+		,a.ts
+		,a.ysfs
+		,a.sfzlkh
+		,a.zlkhmc
+		,a.gcmc
+		,a.sjjd
+		,a.gcdzs
+		,a.gcdzcs
+		,a.gcdzjd
+		,a.gcdzq
+		,a.cytj
+		,a.yqsm
+		,a.pernr
+		,a.pernrname
+		,a.zby2
+		,a.gcjhrq
+		,a.jgts
+		,a.zhuangtai
+		,a.sxsm
+		,a.jhdbz
+		,a.czjhdhh
+		,a.jjyy
+		,a.matkl
+		,a.yl06,
+		a.prart,
+		a.ps_psp_pnr,
+		a.zposid
+		,a.zsfdt
+		,a.kunnr
+		,a.zghcq
+		,a.def_dl_date
+		,a.charg
+		,a.zzzjh
+		,ztsbm
+		,a.ztsbz
+		,a.ztssb
+		,a.ztscc
+		,a.ztshd
+		,a.ztsys
+		,a.ztsyq
+		,a.PRDHA
+		,a.GROES
+		,a.WLGG
+		,a.PSPNR
+		,a.cppc_period --产品排产周期
+		,a.is_xh, --是否为现货
+		coalesce(b.BSTDK,a.BSTDK) as BSTDK --客户需求交货日期
+		,a.kz_date --控制天数
+		,c.BUDAT as FIRST_CONFIRM_DATE--首次确认数量日期
+		,c.max_budat as last_CONFIRM_DATE
+		,c.total_zxmkc as zxmkc --已转入的项目库存
+		,d.BUDAT as thdat --最晚提货日期
+		,coalesce(d.total_zljcksl,0) as zljcksl -- 累计提货数量
+		,a.vkgrp
+		,a.partment
+		,coalesce(e.prlab,0) as prlab -- 剩余项目库存
+		,a.wbs_state
+		,a.zunnr
+		,a.zxszz 
+		,a.cust_name
+		,a.material_area
+		,a.znka
+		,a.znka_kunnr
+		,a.znka_type
+		,a.znka_flag
+	from t1 a
+	left join(
+			  select zjhd
+					,max(BSTDK) as BSTDK
+				from t1
+			   where sfzdjf = '是'
+			   GROUP BY zjhd
+			 ) b
+	on a.zjhd = b.zjhd
+	left join t3 c
+	on c.matnr = a.matnr
+	AND c.mat_pspnr = a.PSPNR
+	AND c.werks = a.werks
+	left join t5 d
+	on d.matnr = a.matnr
+	AND d.mat_pspnr = a.PSPNR
+	AND d.werks = a.werks
+	left join mspr e On e.matnr = a.matnr
+	AND e.pspnr = a.PSPNR
+	AND e.werks = a.werks
+),
+salesman2 as(
+select kunnr,vkorg,vtweg,spart,
+       concat_ws(',',collect_list( a.pernr)) as salesman_num,
+       concat_ws(',',collect_list( b.nachn)) salesman_name
+from sdi.sdi_knvp_1001 a  
+left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.pernr  = b.pernr 
+where a.mandt='800'
+and a.pernr<>'00000000'
+group by kunnr,vkorg,vtweg,spart
+)
+INSERT OVERWRITE TABLE dm.dm_otd_wbs_plan_order_det_t 
+select 
+	a.zjhd, --计划单号
+	a.zjhdid, --计划单行号
+	a.matnr, --物料编码
+	a.maktx, --物料名称
+	a.menge, --评审后需求数量
+	a.werks, --工厂
+	a.zcjrq, --创建日期
+	a.zjsrq, --计划单有效结束日期
+	a.zsprq, --审批交货日期
+	a.post1, --PS: 短描述 (第一行文本)
+	a.zjfkhrq, --交付客户日期
+	a.zvkgrp, --描述
+	a.sfxyjg, --是否需要加工
+	a.xqjhsx, --需求计划属性
+	a.zxsry, --销售人员
+	a.EXTWG, --外部物料组
+	a.ddzt --计划订单类型
+	,a.jhdhzt --计划单行状态
+	,a.sfzdjf--是否整单交付
+	,a.xqsl --数量
+	,a.cpsdhgc --工厂(自有或外部)
+	,a.yssj --运输时间（天）
+	,a.spjjyy --评审拒绝原因
+	,a.dw --单位（片）
+	,a.hx --户型
+	,a.syqy --使用区域
+	,a.dlkjmj --空间独立面积（㎡）
+	,a.ts --套数
+	,a.ysfs --运输方式
+	,a.sfzlkh --是否战略客户
+	,a.zlkhmc --战略客户名称
+	,a.gcmc --工程名称
+	,a.sjjd --商机阶段
+	,a.gcdzs --工程地址-省
+	,a.gcdzcs --工程地址-市
+	,a.gcdzjd --工程地址-街道
+	,a.gcdzq --工程地址-区
+	,a.cytj --承运条件
+	,a.yqsm --延期说明(改为评审备注)
+	,a.pernr --员工号
+	,a.pernrname --员工号(创建人)名称
+	,a.zby2 --备用2
+	,a.gcjhrq --工厂交货日期
+	,a.jgts --加工天数
+	,a.zhuangtai --状态
+	,a.sxsm --手动失效说明
+	,a.jhdbz --计划单备注
+	,a.czjhdhh --参照计划单行号
+	,a.jjyy --拒绝原因
+	,a.matkl --物料组
+	,a.yl06,
+	a.prart, --项目类型
+	a.ps_psp_pnr,
+	a.zposid --首层WBS
+	,a.zsfdt --是否打托
+	,a.kunnr --客户编码
+	,a.zghcq --供货产区
+	,a.def_dl_date --默认交货时间
+	,a.charg --批次
+	,a.zzzjh --希望最早交货日期
+	,ztsbm --包装箱打特殊编码
+	,a.ztsbz --特殊包装物包装
+	,a.ztssb --特殊砖底商标
+	,a.ztscc --特殊尺寸
+	,a.ztshd --特殊厚度
+	,a.ztsys --微调纹理或颜色
+	,a.ztsyq --其他特殊要求
+	,a.PRDHA --产品层次
+	,a.GROES --大小/量纲
+	,a.WLGG --菜单说明
+	,a.PSPNR
+	,a.cppc_period --产品排产周期
+	,a.is_xh --是否为现货
+	,a.BSTDK --客户需求交货日期
+	,a.kz_date --控制天数
+	,a.FIRST_CONFIRM_DATE--首次确认数量日期
+	,a.last_CONFIRM_DATE
+	,a.zxmkc --已转入的项目库存
+	,a.thdat --最晚提货日期
+	,a.zljcksl --累计提货数量
+	,wbs.sales_grp as vkgrp--a.vkgrp as vkgrp
+	,a.partment 
+	,a.prlab  -- 剩余项目库存
+	,a.wbs_state  -- wbs状态
+	, '06' as vtweg  -- 分销渠道
+	,current_timestamp() as dw_last_update_date --数据同步时间
+	,a.zunnr
+	,a.cust_name
+	,a.zxszz
+	,wbs.sales_emp as salesman_num_list --b.salesman_num as salesman_num_list
+	,emp.emp_name as salesman_name_list--b.salesman_name as salesman_name_list
+	,prc.yj_unit_price/a.material_area as yj_unit_price
+	,wbs.business_opportunity --商机号
+	,a.znka
+	,a.znka_kunnr
+	,a.znka_type
+    ,a.znka_flag
+ from t6 a
+ left join salesman2 b ON a.zunnr = b.kunnr and a.zxszz =b.vkorg and b.vtweg='06' and b.spart='00' 
+ left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbs on a.zjhdid = wbs.wbs_level3
+ left JOIN (select *,dense_rank() over(order by stat_month desc) as rk from DWRDIM.DWR_DIM_SAP_EMP_INFO_F) emp on wbs.sales_emp = emp.emp_num and emp.rk = 1
+ left join dwrltc.dwr_bo_wbs_material_price  prc ON  substr(a.zjhdid,1,10) = substr(prc.wbs_num,1,10) and a.matnr = prc.material_num;

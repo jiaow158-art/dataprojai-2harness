@@ -1,0 +1,39 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/27 14:46:32 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM_SW.DM_PAM_SCAN_OUTSTOCK_T
+select a.plan_no as plan_item_num,-- '计划项目号',
+       b.lading_billno as pick_up_num,-- '提货单号',
+	   a.factory_code ,-- '工厂编码',
+	   c.factory_name ,--  '工厂名称',
+	   CASE WHEN a.type='1' THEN '销售出库'
+		   WHEN STATUS='2' THEN '返工出库'
+		   WHEN STATUS='3' THEN '调拨出库'
+           WHEN STATUS='4' THEN '报废出库'
+        ELSE '预留单领用出库' 
+        END AS out_stock_type,-- '出库单类型' ,
+	    CASE WHEN a.close_status ='0' then '未关闭'
+			 ELSE '已关闭' 
+		END AS close_type, -- '是否关闭' ,
+		a.customer_code , -- '客户编码',
+		a.customer_name , -- '客户名称',
+	    a.create_time as bill_create_time, -- '单据创建时间',
+	    a.shipping_date , -- '发货日期',
+		a.warehouse_code , -- '仓库编码' ,
+		a.warehouse_name ,-- '仓库名称',
+		b.product_code , -- '产品编码' ,
+		b.product_name , -- '产品名称' ,
+		d.category_name ,--  '产品类别', 
+		b.number as plan_qty, -- '计划数量',
+		b.actual_number as actual_outstock_qty, -- '实际出库数量', 
+		(b.actual_number - b.report_number ) as bar_code_qty, -- '条码数量' ,
+	    ((b.actual_number - b.report_number )/b.actual_number)  as scan_outstock_rate, -- '扫码出库率（R/Q）'
+	    current_timestamp() as dw_last_update_date -- 数据同步时间
+from SDI.SDI_wms_bill_out_apply_1022 a 
+left join SDI.SDI_wms_bill_out_apply_lading_1022 b on a.id = b.apply_id
+left join SDI.SDI_base_factory_1022 c on a.factory_code = c.factory_code
+left join SDI.SDI_base_product_info_1022 d on b.product_code = d.product_code
+where a.flag = '1'
+and a.`status` in('3','4','5');

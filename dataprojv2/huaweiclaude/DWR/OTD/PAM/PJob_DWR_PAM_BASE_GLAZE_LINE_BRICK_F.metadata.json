@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PAM_BASE_GLAZE_LINE_BRICK_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PAM",
+    "description": "车间釉线入砖模型",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

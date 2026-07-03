@@ -1,0 +1,16 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:特性 销售部门(DWR)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRFIN.DWR_GL_SALES_DEPT_F
+SELECT
+   SALES_DEPT_CODE,
+   language_no,
+   SALES_DEPT_DESC,
+  'N' AS DEL_FLAG ,   -- 删除标志
+  current_timestamp() as DW_LAST_UPDATE_DATE   -- 同步数据时间
+FROM DWIFIN.DWI_GL_SALES_DEPT_T
+WHERE DEL_FLAG = 'N';

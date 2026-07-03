@@ -1,0 +1,16 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:特性 销售部门(DWS)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+DELETE FROM DWRFIN.DWR_GL_SALES_DEPT_F;
+INSERT INTO DWRFIN.DWR_GL_SALES_DEPT_F
+SELECT
+     SALES_DEPT_CODE,
+	 language_no,
+	 SALES_DEPT_DESC,
+	 DEL_FLAG,
+	 DW_LAST_UPDATE_DATE
+FROM DWRFIN.DWR_GL_SALES_DEPT_F_TMP;

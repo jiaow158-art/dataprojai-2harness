@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_STORE_DATA_T_HIS",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD",
+    "description": "门店主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_EXCLUSIVE_TMP",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "专属仓库存",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

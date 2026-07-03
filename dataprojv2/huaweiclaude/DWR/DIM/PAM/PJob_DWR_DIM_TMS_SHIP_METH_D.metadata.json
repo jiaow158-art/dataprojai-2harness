@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_TMS_SHIP_METH_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/PAM",
+    "description": "TMS区域运输方式主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

@@ -1,0 +1,170 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/06/21 10:12:48 GMT+08:00
+-- description:瓷砖天然气中间表(重庆)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+WITH CQ_GAS_DETAIL_DATA AS( -- 重庆气表明细数据
+	SELECT site, -- 基地编码
+		   use_date, -- 使用日期
+		   gas_code, -- 天然气代码
+		   sum(nvl(cur_yl,0)) AS GAS_YL -- 气表用量
+	FROM SDI.SDI_z_gas_use_1006 -- 天然气记录
+	WHERE delete_flag = 1
+	AND site = '1800'
+	AND use_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD 
+	GROUP BY site, -- 基地编码
+			 use_date, -- 使用日期
+			 gas_code -- 天然气代码
+),
+CQ_GAS_TOTAL_DATA AS( -- 重庆气表汇总数据
+	SELECT site, -- 基地编码
+		   use_date, -- 使用日期
+		   sum(CASE WHEN gas_code LIKE '%ZB%' THEN GAS_YL ELSE 0 END) AS GAS_TOTAL_QTY, -- 总表用量
+		   sum(CASE WHEN gas_code NOT LIKE '%ZB%' THEN GAS_YL ELSE 0 END) AS GAS_TOTAL_YL_QTY -- 气表用量之和
+	FROM CQ_GAS_DETAIL_DATA
+	GROUP BY site, -- 基地编码
+			 use_date -- 使用日期
+),
+CQ_GAS_DATA as( -- 重庆用气数据
+	SELECT t1.site, -- 基地编码
+		   t1.use_date, -- 使用日期
+		   t1.gas_code, -- 天然气代码
+		   t1.GAS_YL, -- 气表用量
+		   nvl(t2.GAS_TOTAL_QTY,0) AS GAS_TOTAL_QTY, -- 总表用量
+		   nvl(t2.GAS_TOTAL_YL_QTY,0) AS GAS_TOTAL_YL_QTY, -- 气表用量之和
+		   t1.GAS_YL + ((t1.GAS_YL / nvl(t2.GAS_TOTAL_YL_QTY,0)) * (nvl(t2.GAS_TOTAL_QTY,0) - nvl(t2.GAS_TOTAL_YL_QTY,0))) AS share_gas_qty -- 分摊后的用气量
+	FROM CQ_GAS_DETAIL_DATA T1
+	LEFT JOIN CQ_GAS_TOTAL_DATA T2
+	ON T1.site = T2.site
+	AND T1.use_date = T2.use_date
+),
+CQ_TA2_DETAIL_DATA AS( -- 重庆TA2数据
+	SELECT t.shift_date ,  -- 班次日期
+		   t.site,
+		   t.odo_drier
+	FROM SDI.SDI_d_powder_output_report_1006 T
+	WHERE t.equipent_serial_no = 'TA2' -- 设备编号
+	AND t.delete_flag = 1
+	AND t.site = '1800'
+	AND t.shift_date >=  CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+),
+CQ_dim_date as (    -- 日期维度,发散维度用
+	select day_dt 
+	     from dm.dm_dim_date_d 
+	  where day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) 
+	    and day_dt >=  CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+),
+CQ_ACTUAL_TA2_DATA AS( -- 重庆TA2实际数据
+	SELECT t.shift_date ,  -- 班次日期
+		   t.site,
+		   SUM(T.odo_drier) AS odo_drier
+	FROM CQ_TA2_DETAIL_DATA T
+	GROUP BY t.shift_date,
+			 t.site 
+),
+CQ_DIM_TA2_DATA AS( -- 重庆TA2维度数据
+	SELECT  t.site
+	FROM CQ_TA2_DETAIL_DATA T
+	GROUP BY t.site 
+),
+SDI_D_POWDER_OUTPUT_REPORT_1006_DATA AS( -- 粉料产量记录表(未有TA2的数据，补0)
+	SELECT t1.day_dt AS shift_date,
+		   t2.site,
+		   nvl(t3.odo_drier,0) AS odo_drier
+	FROM CQ_dim_date T1
+	LEFT JOIN CQ_DIM_TA2_DATA t2
+	ON 1 = 1
+	LEFT JOIN CQ_ACTUAL_TA2_DATA t3
+	ON t1.day_dt = t3.shift_date
+	AND t2.site = t3.site
+),
+CQ_GAS_VALUE_DATA AS( -- 重庆气耗值数据
+	SELECT T1.key_value 
+	FROM SDI.SDI_iap_dict_item_t_1006 T1 -- 字典表从表
+	JOIN SDI.SDI_iap_dict_t_1006 T2 -- 字典表主表
+	ON T1.iap_dict_id = T2.id
+	AND T2.code = 'NX202405131807'
+),
+CQ_ADD_DATA AS( --重庆加成数据
+	SELECT t.shift_date ,  -- 班次日期
+		   t.site,
+		   sum(nvl(odo_drier,0)) * MAX(t1.key_value) AS odo_drier -- 当班产量 (当班产量T * 气耗值)
+	FROM SDI_d_powder_output_report_1006_DATA t -- 粉料产量记录表
+	LEFT JOIN CQ_GAS_VALUE_DATA t1
+	ON 1 = 1
+	WHERE t.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')  -- 3月前的1号开始，调度传昨天,格式：YYYY-MM-DD 
+	GROUP BY t.shift_date,
+			 t.site 
+),
+CQ_GAS_RESULT_DATA_01 AS( -- 重庆气结果数据01
+	SELECT t1.site, -- 基地编码
+		   t1.use_date, -- 使用日期
+		   t1.gas_code, -- 天然气代码
+		   CASE WHEN t1.gas_code LIKE '%PW1%' THEN t1.share_gas_qty + t2.odo_drier
+		        ELSE t1.share_gas_qty END CQ_GAS_QTY -- 重庆用气量
+	FROM CQ_GAS_DATA T1
+	LEFT JOIN CQ_ADD_DATA T2
+	ON T1.site = T2.site
+	AND T1.use_date = T2.shift_date
+),
+CQ_GAS_RESULT_DATA_02 AS( -- 重庆气结果数据02
+	SELECT t1.site AS SITE_CODE, -- 基地编码
+		   t1.use_date AS START_DATE, -- 使用日期
+		   t2.memo2 AS PRODUCT_LINE_CODE, -- 分级产线编码，要关联sdi_dj_powerconsumption_costcenter_maintenance_1006的分级产线，取出关系
+		   t2.memo1 AS COST_CENTER_CODE, -- 成本中心编码
+		   UPPER(t1.gas_code) AS GAS_CODE, -- 天然气编码
+		   SUM(NVL(t1.CQ_GAS_QTY,0)) AS CQ_GAS_QTY -- 重庆用气量
+	FROM CQ_GAS_RESULT_DATA_01 T1
+	LEFT JOIN sdi.sdi_z_gas_name_1006 T2-- 天然气名称维护表
+	ON T1.site = T2.site
+	AND UPPER(T1.gas_code) = UPPER(T2.gas_code)
+	AND T2.delete_flag = 1
+	AND T2.site = '1800'
+	WHERE 1 = 1
+	AND t2.memo1 IS NOT NULL
+	GROUP BY t1.site,
+			 t1.use_date,
+			 t2.memo1,
+			 t2.memo2,
+			 UPPER(t1.gas_code)
+),
+CQ_GAS_RESULT_DATA AS( -- 重庆气的结果数据
+	SELECT t1.START_DATE, -- 使用日期
+		   t1.SITE_CODE, -- 基地编码
+		   t2.work_shop AS work_shop_code, -- 车间编码
+		   t2.product_line AS product_line_code, -- 产线编码
+		   t2.work_no_code AS work_no_code, -- 工序编码
+		   t1.COST_CENTER_CODE, -- 成本中心编码
+		   t1.GAS_CODE, -- 天然气编码
+		   t1.CQ_GAS_QTY AS gas_qty -- 用气量
+	FROM CQ_GAS_RESULT_DATA_02 T1
+	LEFT JOIN SDI.sdi_dj_powerconsumption_costcenter_maintenance_1006 T2 -- 各基地成本中心和车间产线对应关系表
+	ON T1.SITE_CODE = T2.site
+	AND t1.COST_CENTER_CODE = T2.cost_center
+	AND T2.delete_flag = 1
+	AND T2.site = '1800'
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_GAS_CQ_F PARTITION(PERIOD_ID_M)
+SELECT t1.START_DATE, -- 使用日期
+	   t1.SITE_CODE, -- 基地编码
+	   t1.work_shop_code, -- 车间编码
+	   t1.product_line_code, -- 产线编码
+	   t1.work_no_code, -- 工序编码
+	   t1.COST_CENTER_CODE, -- 成本中心编码
+	   t1.GAS_CODE, -- 天然气编码
+	   t1.gas_qty, -- 用气量
+	   'N' AS del_flag , -- 数据删除标识
+	   CURRENT_TIMESTAMP() AS dw_last_update_date , -- 同步数据时间
+	   SUBSTRING(t1.START_DATE,1,7) AS PERIOD_ID_M -- 分区字段
+FROM CQ_GAS_RESULT_DATA t1;

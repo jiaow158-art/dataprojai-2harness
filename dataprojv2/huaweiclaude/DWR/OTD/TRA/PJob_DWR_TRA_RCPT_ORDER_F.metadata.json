@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_TRA_RCPT_ORDER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/TRA",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

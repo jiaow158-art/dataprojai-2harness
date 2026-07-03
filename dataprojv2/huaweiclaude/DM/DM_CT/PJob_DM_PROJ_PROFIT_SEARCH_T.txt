@@ -1,0 +1,129 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/04/23 09:30:07 GMT+08:00
+-- description:LTC工程毛利率接口查询
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_proj_profit_search_t where substr(calday,1,7) between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}';
+insert into dm.dm_proj_profit_search_t
+with tmp as (
+select
+ a.stat_day as calday
+,a.sales_dist as sales_area_code 
+,a.sales_dist___t as sales_area_name
+,a.customer as customer_code
+,a.customer___t as customer_name
+,coalesce(a.zzkunnr,a.customer) as par_customer_code
+,coalesce(a.zzkunnr___t,a.customer___t) as par_customer_name
+,b.node_name5 
+,b.node_desc5 
+,a.a_overall_profit_amt
+,a.amb_profit_amt--"阿米巴整体毛利",
+,a.notax_sales_net_amt  --不含税销售净额(管理)
+from dm.dm_ambv2_profit_t  a
+left join dm.dm_rpt_sales_group_t b
+on a.sales_grp = b.node_name9 
+where 1=1 and a.integrate_channel = 'GD03'
+and a.calmonth between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}' and b.node_desc2 = '瓷砖事业部'
+AND COALESCE(a.data_source,'NAL') not in ('U')
+)
+,tmp1 as (
+select 
+ calday
+,sales_area_code
+,sales_area_name
+,sum(a_overall_profit_amt) as a_overall_profit_amt
+,sum(amb_profit_amt) as amb_profit_amt 
+,sum(notax_sales_net_amt) as notax_sales_net_amt
+from tmp 
+where sales_area_code is not null 
+group by 
+ calday
+,sales_area_code
+,sales_area_name
+)
+,tmp2 as (
+select 
+ calday
+,customer_code
+,customer_name
+,par_customer_code
+,par_customer_name
+,sum(a_overall_profit_amt) as a_overall_profit_amt
+,sum(amb_profit_amt) as amb_profit_amt 
+,sum(notax_sales_net_amt) as notax_sales_net_amt
+from tmp 
+where par_customer_code is not null 
+group by 
+ calday
+,customer_code
+,customer_name
+,par_customer_code
+,par_customer_name
+)
+,tmp3 as (
+select 
+ calday
+,node_name5
+,node_desc5
+,sum(a_overall_profit_amt) as a_overall_profit_amt
+,sum(amb_profit_amt) as amb_profit_amt 
+,sum(notax_sales_net_amt) as notax_sales_net_amt
+from tmp 
+where node_name5 is not null 
+group by 
+ calday
+,node_name5
+,node_desc5
+)
+,tmp0 as (
+select 
+ '0' as flag --销售地区
+,calday
+,'' as customer_code
+,'' as customer_name
+,sales_area_code as cal_colum_code
+,sales_area_name as cal_colum_name
+,a_overall_profit_amt
+,amb_profit_amt 
+,notax_sales_net_amt
+from tmp1 a 
+union all 
+select
+ '1' as flag  --客户
+,calday
+,customer_code
+,customer_name
+,par_customer_code as cal_colum_code
+,par_customer_name as cal_colum_name
+,a_overall_profit_amt
+,amb_profit_amt 
+,notax_sales_net_amt
+from tmp2
+union all 
+select 
+ '2' as flag --子公司
+,calday
+,'' as customer_code
+,'' as customer_name
+,node_name5 as cal_colum_code
+,node_desc5 as cal_colum_name
+,a_overall_profit_amt
+,amb_profit_amt 
+,notax_sales_net_amt
+from tmp3
+)
+select 
+ flag 
+,calday
+,customer_code
+,customer_name
+,cal_colum_code
+,cal_colum_name
+,a_overall_profit_amt
+,amb_profit_amt 
+,notax_sales_net_amt
+,current_date() as dw_last_update_date 
+from tmp0

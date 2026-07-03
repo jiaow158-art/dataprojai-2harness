@@ -1,0 +1,43 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/07 14:19:41 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_MOS_EMP_INFO_T
+SELECT A.ID --ID
+      ,A.ACCOUNT AS EMP_NUM --用户账号
+	  ,A.NAME AS EMP_NAME --用户名称
+	  ,A.REAL_NAME --真实名称
+	  ,A.REAL_PHONE AS REAL_PHONE_NUM --真实电话
+	  ,A.ROLE_ID --角色ID
+	  ,A.ROLE_NAME --角色名称
+	  ,CASE WHEN A.ROLE_NAME = '导购' THEN '导购'
+	        WHEN A.ROLE_NAME IN('门店','门店,驻店设计师') THEN '店长'
+			 END AS POST_NAME --岗位名称
+	  ,A.TYPE AS USER_TYPE_CODE --用户类型编码
+	  ,CASE WHEN A.TYPE = 1 THEN '普通'
+	        WHEN A.TYPE = 2 THEN '分销'
+			 END AS USER_TYPE_NAME --用户类型描述
+	  ,A.DEPARTMENT_ID AS DEPT_ID --部门ID
+	  ,A.DEPARTMENT_NAME AS DEPT_NAME --部门名称
+	  ,A.CLIENT_ID AS CUST_ID --客户ID
+	  ,A.CLIENT_CODE AS CUST_NUM --客户编码	  
+	  ,A.CLIENT_NAME AS CUST_NAME --客户名称
+	  ,B.MKT_ID --营销部ID
+	  ,B.MKT_NAME --营销部名称
+	  ,B.SALE_GRP_ID --线组ID
+	  ,B.SALE_GRP_NAME --线组名称
+	  ,B.BUSI_ID --参与业务ID
+	  ,COALESCE(B.PROV_NAME,A.PROVINCE) AS PROV_NAME --省份
+	  ,COALESCE(B.CITY_NAME,A.CITY) AS CITY_NAME --城市
+	  ,COALESCE(B.DIST_NAME,A.DISTRICT) AS DIST_NAME --区/县
+	  ,COALESCE(B.ADDR,A.ADDRESS) AS ADDR --详细地址
+	  ,A.PHONE AS PHONE_NUM --联系方式
+	  ,A.SCORE AS TOT_SCORE --总积分
+	  ,A.CREATE_TIME --创建时间
+	  ,A.MODIFY_TIME AS UPDATE_TIME --更新时间
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_SYS_USER_1012 A
+  LEFT JOIN DWRDIM.DWR_DIM_MOS_STORE_INFO_T B
+    ON A.CLIENT_ID = B.ID
+ WHERE A.STOP_FLAG = 0

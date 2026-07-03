@@ -1,0 +1,41 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/07/23 09:58:13 GMT+08:00
+-- description:新产线维护信息表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+-- create table dm.dm_pam_base_new_production_line_info_t (
+-- site_code string comment '基地代码',
+-- work_shop_code string comment '车间代码',
+-- product_line_code string comment '产线代码',
+-- item_type string comment '物料类型',
+-- material_value string comment '物料值',
+-- effective_start_date timestamp comment '有效开始日期',
+-- effective_end_date timestamp comment '有效结束日期',
+-- creater string	comment '创建人姓名',
+-- create_time timestamp comment '创建时间',
+-- updater string	comment '修改人姓名',
+-- update_time timestamp comment '修改时间',
+-- DEL_FLAG  string comment  '删除标识',
+-- DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+insert overwrite table dm.dm_pam_base_new_production_line_info_t 
+select 
+site as site_code -- '基地代码',
+,work_shop as work_shop_code -- '车间代码',
+,product_line as product_line_code -- '产线代码',
+,item_type --- '物料类型',
+,material_value -- '物料值',
+,effective_start_date --'有效开始日期',
+,effective_end_date -- '有效结束日期',
+,creater -- '创建人姓名',
+,create_time-- '创建时间',
+,updater -- '修改人姓名',
+,update_time --'修改时间',
+,'N' AS DEL_FLAG  -- '删除标识',
+,current_timestamp as DW_LAST_UPDATE_DATE -- '最后更新时间'
+from sdi.sdi_dp_maintenance_information_table_new_production_line_1006
+where delete_flag = 1 

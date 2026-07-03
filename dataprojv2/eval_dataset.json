@@ -1,0 +1,2649 @@
+{
+  "meta": {
+    "created": "2026-06-08",
+    "snapshot_date": "2026-06-08",
+    "last_verified": "2026-06-25T18:33:22",
+    "domains": [
+      "fin-cost",
+      "inventory",
+      "ar",
+      "sales-performance"
+    ],
+    "description": "Offline evaluation dataset for Skills accuracy tracking",
+    "total": 55,
+    "passed": 30,
+    "failed": 0,
+    "runner": "run_eval.py"
+  },
+  "questions": [
+    {
+      "domain": "fin-cost",
+      "pattern": "trend_monthly",
+      "question": "2026年各月费用总额趋势",
+      "sql": "SELECT year, month, SUM(local_currency_amt) as total_amount\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year = '2026'\n    GROUP BY year, month ORDER BY year, month",
+      "row_count": 6,
+      "elapsed_ms": 1651,
+      "data": [
+        {
+          "year": "2026",
+          "month": "2026-01",
+          "total_amount": -1062691881.9435
+        },
+        {
+          "year": "2026",
+          "month": "2026-02",
+          "total_amount": 219944020.9675
+        },
+        {
+          "year": "2026",
+          "month": "2026-03",
+          "total_amount": 297032335.0819
+        },
+        {
+          "year": "2026",
+          "month": "2026-04",
+          "total_amount": -750693064.6261
+        },
+        {
+          "year": "2026",
+          "month": "2026-05",
+          "total_amount": 258847097.6126
+        },
+        {
+          "year": "2026",
+          "month": "2026-06",
+          "total_amount": -26142233.4017
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "breakdown_category",
+      "question": "2026年5月各功能范围费用排名",
+      "sql": "SELECT config_name as func_scope, SUM(amount) as total\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month = '2026-05' GROUP BY config_name ORDER BY total DESC LIMIT 10",
+      "row_count": 9,
+      "elapsed_ms": 816,
+      "data": [
+        {
+          "func_scope": "制造费用",
+          "total": 197877894.43
+        },
+        {
+          "func_scope": "生产成本",
+          "total": 112623379.63
+        },
+        {
+          "func_scope": "营业费用",
+          "total": 45422286.83
+        },
+        {
+          "func_scope": "管理费用",
+          "total": 25659228.58
+        },
+        {
+          "func_scope": "研发支出",
+          "total": 18207170.62
+        },
+        {
+          "func_scope": "物流费用",
+          "total": 12927913.37
+        },
+        {
+          "func_scope": "物流成本",
+          "total": 11884723.5826
+        },
+        {
+          "func_scope": "财务费用",
+          "total": 830788.69
+        },
+        {
+          "func_scope": null,
+          "total": 0.0
+        }
+      ],
+      "checksum": "rows=9"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "topn_costcenter",
+      "question": "2026年5月成本中心费用Top10",
+      "sql": "SELECT cost_center_code, SUM(local_currency_amt) as total_amount\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year = '2026' AND month = '2026-05'\n    GROUP BY cost_center_code ORDER BY total_amount DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 446,
+      "data": [
+        {
+          "cost_center_code": null,
+          "total_amount": 110344071.22
+        },
+        {
+          "cost_center_code": "1010DA9000",
+          "total_amount": 4159494.05
+        },
+        {
+          "cost_center_code": "1919CF0001",
+          "total_amount": 3699959.86
+        },
+        {
+          "cost_center_code": "1313WC0001",
+          "total_amount": 3476695.15
+        },
+        {
+          "cost_center_code": "1313IB0001",
+          "total_amount": 3468217.92
+        },
+        {
+          "cost_center_code": "7900XA0001",
+          "total_amount": 2987044.74
+        },
+        {
+          "cost_center_code": "1510CF9000",
+          "total_amount": 2780782.05
+        },
+        {
+          "cost_center_code": "1515IB0001",
+          "total_amount": 2654161.94
+        },
+        {
+          "cost_center_code": "1515WC0001",
+          "total_amount": 2384703.78
+        },
+        {
+          "cost_center_code": "8375DA0002",
+          "total_amount": 2372092.98
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "topn_mfg_cost",
+      "question": "2026年5月制造费用按成本中心Top10",
+      "sql": "SELECT cost_center, cost_center_describe, SUM(amount) as total\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month = '2026-05' AND functional_scope = '4105'\n      AND acc_acount NOT IN ('0041011040','0041011030','0061507000')\n    GROUP BY cost_center, cost_center_describe ORDER BY total DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 732,
+      "data": [
+        {
+          "cost_center": "1500MA0002",
+          "cost_center_describe": "造粉(原料一)",
+          "total": 7740873.4
+        },
+        {
+          "cost_center": "1300MB0004",
+          "cost_center_describe": "水煤浆车间",
+          "total": 7489549.65
+        },
+        {
+          "cost_center": "1818MA0004",
+          "cost_center_describe": "成型二-烧成",
+          "total": 6920735.63
+        },
+        {
+          "cost_center": "1800MA0003",
+          "cost_center_describe": "原料-造粉",
+          "total": 6099162.28
+        },
+        {
+          "cost_center": "1500MA0001",
+          "cost_center_describe": "球磨(原料一)",
+          "total": 6076484.59
+        },
+        {
+          "cost_center": "1500MA0059",
+          "cost_center_describe": "素烧(成型十一)",
+          "total": 5301938.8
+        },
+        {
+          "cost_center": "1300MA0045",
+          "cost_center_describe": "分级包装",
+          "total": 5178332.9
+        },
+        {
+          "cost_center": "1300MA0002",
+          "cost_center_describe": "原料车间一球磨",
+          "total": 4323071.74
+        },
+        {
+          "cost_center": "1800MA0002",
+          "cost_center_describe": "原料-球磨",
+          "total": 3928197.77
+        },
+        {
+          "cost_center": "1800MA0015",
+          "cost_center_describe": "成型六-烧成",
+          "total": 3471247.8
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "budget_vs_actual",
+      "question": "2026年1-5月费用预算vs实际对比",
+      "sql": "SELECT month, SUM(amount) as actual, SUM(budget_cost) as budget,\n           SUM(amount) - SUM(budget_cost) as gap\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month >= '2026-01' AND month <= '2026-05'\n    GROUP BY month ORDER BY month",
+      "row_count": 5,
+      "elapsed_ms": 5189,
+      "data": [
+        {
+          "month": "2026-01",
+          "actual": 252490641.9165,
+          "budget": 84533263.38,
+          "gap": 167957378.5365
+        },
+        {
+          "month": "2026-02",
+          "actual": 98071115.1075,
+          "budget": 66727828.2,
+          "gap": 31343286.9075
+        },
+        {
+          "month": "2026-03",
+          "actual": 384605100.8219,
+          "budget": 94845760.14,
+          "gap": 289759340.6819
+        },
+        {
+          "month": "2026-04",
+          "actual": 417223344.8439,
+          "budget": 100285384.37,
+          "gap": 316937960.4739
+        },
+        {
+          "month": "2026-05",
+          "actual": 425433385.7326,
+          "budget": 100767922.17,
+          "gap": 324665463.5626
+        }
+      ],
+      "checksum": "rows=5"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "yoy_comparison",
+      "question": "2026年1-5月费用同比分析",
+      "sql": "SELECT month, SUM(amount) as current, SUM(ly_amount) as last_year,\n           CASE WHEN SUM(ly_amount) > 0\n                THEN ROUND((SUM(amount) - SUM(ly_amount)) / SUM(ly_amount) * 100, 2)\n                ELSE NULL END as yoy_pct\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month >= '2026-01' AND month <= '2026-05'\n    GROUP BY month ORDER BY month",
+      "row_count": 5,
+      "elapsed_ms": 5333,
+      "data": [
+        {
+          "month": "2026-01",
+          "current": 252490641.9165,
+          "last_year": 161364306.5904,
+          "yoy_pct": 56.47
+        },
+        {
+          "month": "2026-02",
+          "current": 98071115.1075,
+          "last_year": 221255105.0772,
+          "yoy_pct": -55.68
+        },
+        {
+          "month": "2026-03",
+          "current": 384605100.8219,
+          "last_year": 439011098.6415,
+          "yoy_pct": -12.39
+        },
+        {
+          "month": "2026-04",
+          "current": 417223344.8439,
+          "last_year": 461979083.6793,
+          "yoy_pct": -9.69
+        },
+        {
+          "month": "2026-05",
+          "current": 425433385.7326,
+          "last_year": 463253657.763,
+          "yoy_pct": -8.16
+        }
+      ],
+      "checksum": "rows=5"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "account_topn",
+      "question": "2026年5月费用科目Top10",
+      "sql": "SELECT general_ledger_account, SUM(local_currency_amt) as total\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year = '2026' AND month = '2026-05'\n    GROUP BY general_ledger_account ORDER BY total DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 419,
+      "data": [
+        {
+          "general_ledger_account": "0054010300",
+          "total": 402636039.57
+        },
+        {
+          "general_ledger_account": "0054010100",
+          "total": 369475054.79
+        },
+        {
+          "general_ledger_account": "0031410600",
+          "total": 270750361.6
+        },
+        {
+          "general_ledger_account": "0041011030",
+          "total": 252196546.18
+        },
+        {
+          "general_ledger_account": "0021710101",
+          "total": 87568454.11
+        },
+        {
+          "general_ledger_account": "0061503000",
+          "total": 76256110.29
+        },
+        {
+          "general_ledger_account": "0060101000",
+          "total": 55222411.11
+        },
+        {
+          "general_ledger_account": "0010020731",
+          "total": 52370206.74
+        },
+        {
+          "general_ledger_account": "0010020205",
+          "total": 49539145.19
+        },
+        {
+          "general_ledger_account": "0041011010",
+          "total": 45305714.35
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "ratio_analysis",
+      "question": "2026年各功能范围期间费用占比",
+      "sql": "SELECT month, config_name,\n           SUM(amount) as total,\n           SUM(period_expense) as period_expense,\n           ROUND(SUM(period_expense) / NULLIF(SUM(amount),0) * 100, 2) as expense_ratio\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month >= '2026-01' AND month <= '2026-05'\n    GROUP BY month, config_name ORDER BY month, config_name LIMIT 20",
+      "row_count": 20,
+      "elapsed_ms": 5184,
+      "data": [
+        {
+          "month": "2026-01",
+          "config_name": "制造费用",
+          "total": 113978375.85,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "物流成本",
+          "total": 9772962.5365,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "物流费用",
+          "total": 12612221.87,
+          "period_expense": 12612221.87,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "生产成本",
+          "total": 40658745.02,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "研发支出",
+          "total": 11907030.79,
+          "period_expense": 11523501.35,
+          "expense_ratio": 96.78
+        },
+        {
+          "month": "2026-01",
+          "config_name": "管理费用",
+          "total": 26128355.85,
+          "period_expense": 26128355.85,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "营业费用",
+          "total": 36491225.27,
+          "period_expense": 36491225.27,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": "财务费用",
+          "total": 941724.73,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-01",
+          "config_name": null,
+          "total": 0.0,
+          "period_expense": 0.0,
+          "expense_ratio": null
+        },
+        {
+          "month": "2026-02",
+          "config_name": "制造费用",
+          "total": 24976923.36,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "物流成本",
+          "total": 2859519.8175,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "物流费用",
+          "total": 7541243.9,
+          "period_expense": 7541243.9,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "生产成本",
+          "total": 4174132.53,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "研发支出",
+          "total": 7253886.34,
+          "period_expense": 7220081.4,
+          "expense_ratio": 99.53
+        },
+        {
+          "month": "2026-02",
+          "config_name": "管理费用",
+          "total": 24516240.37,
+          "period_expense": 24516240.37,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "营业费用",
+          "total": 25929648.83,
+          "period_expense": 25929648.83,
+          "expense_ratio": 100.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": "财务费用",
+          "total": 819519.96,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-02",
+          "config_name": null,
+          "total": 0.0,
+          "period_expense": 0.0,
+          "expense_ratio": null
+        },
+        {
+          "month": "2026-03",
+          "config_name": "制造费用",
+          "total": 203980595.62,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        },
+        {
+          "month": "2026-03",
+          "config_name": "物流成本",
+          "total": 7352620.8619,
+          "period_expense": 0.0,
+          "expense_ratio": 0.0
+        }
+      ],
+      "checksum": "rows=20"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "profit_region",
+      "question": "2026年5月各销售区域毛利排名",
+      "sql": "SELECT months, sales_region,\n           SUM(gross_profit) as gp,\n           ROUND(SUM(gross_profit) / NULLIF(SUM(notax_sales_net_amt), 0) * 100, 2) as gross_margin\n    FROM dwrfin.dwrfin_cost_sales_gross_profit_d\n    WHERE months = '202605' GROUP BY months, sales_region ORDER BY gp DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 173,
+      "data": [
+        {
+          "months": "202605",
+          "sales_region": "区域运营中心",
+          "gp": 121414956.5999,
+          "gross_margin": 30.83
+        },
+        {
+          "months": "202605",
+          "sales_region": "工程营销中心",
+          "gp": 9337909.8709,
+          "gross_margin": 22.98
+        },
+        {
+          "months": "202605",
+          "sales_region": "零售营销中心",
+          "gp": 673556.3364,
+          "gross_margin": 6.3
+        },
+        {
+          "months": "202605",
+          "sales_region": "国内营销副总裁",
+          "gp": 566749.0,
+          "gross_margin": 100.0
+        },
+        {
+          "months": "202605",
+          "sales_region": "高端品牌营销中心",
+          "gp": 294919.35,
+          "gross_margin": 17.85
+        },
+        {
+          "months": "202605",
+          "sales_region": "江西基地",
+          "gp": 246592.12,
+          "gross_margin": 99.86
+        },
+        {
+          "months": "202605",
+          "sales_region": "整装营销中心",
+          "gp": 142539.53,
+          "gross_margin": 31.05
+        },
+        {
+          "months": "202605",
+          "sales_region": "工程七组",
+          "gp": 111894.69,
+          "gross_margin": 26.4
+        },
+        {
+          "months": "202605",
+          "sales_region": "重庆基地",
+          "gp": 60478.43,
+          "gross_margin": 99.84
+        },
+        {
+          "months": "202605",
+          "sales_region": "生态新材营销中心",
+          "gp": 33691.2711,
+          "gross_margin": 10.04
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "fin-cost",
+      "pattern": "summary_year",
+      "question": "2024-2026年各年费用总额汇总",
+      "sql": "SELECT year, SUM(local_currency_amt) as total,\n           COUNT(DISTINCT cost_center_code) as cc_cnt,\n           COUNT(DISTINCT general_ledger_account) as acct_cnt\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year >= '2024'\n    GROUP BY year ORDER BY year",
+      "row_count": 3,
+      "elapsed_ms": 4390,
+      "data": [
+        {
+          "year": "2024",
+          "total": 181575041.1221,
+          "cc_cnt": 5900,
+          "acct_cnt": 534
+        },
+        {
+          "year": "2025",
+          "total": -240705521.6665,
+          "cc_cnt": 5467,
+          "acct_cnt": 522
+        },
+        {
+          "year": "2026",
+          "total": -1063703726.3093,
+          "cc_cnt": 4104,
+          "acct_cnt": 497
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "topn_material",
+      "question": "2026年5月库存量Top10物料",
+      "sql": "SELECT material, material___t, SUM(quantity) as total_qty,\n           COUNT(DISTINCT plant) as factory_cnt, SUM(zsjkcje) as total_amount\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth = '202605' GROUP BY material, material___t\n    ORDER BY total_qty DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 12166,
+      "data": [
+        {
+          "material": "LN63111_A",
+          "material___t": "600X300瓷片白砖",
+          "total_qty": 2328784.0,
+          "factory_cnt": 27,
+          "total_amount": 7164980.408748
+        },
+        {
+          "material": "LN63720_A",
+          "material___t": "600X300岁月720",
+          "total_qty": 1277599.0,
+          "factory_cnt": 23,
+          "total_amount": 3743476.80448
+        },
+        {
+          "material": "LN63290_A",
+          "material___t": "600X300瓷片",
+          "total_qty": 1148591.0,
+          "factory_cnt": 22,
+          "total_amount": 3490833.4944
+        },
+        {
+          "material": "QFG801034_A",
+          "material___t": "800X800卡帕灰",
+          "total_qty": 880670.0,
+          "factory_cnt": 3,
+          "total_amount": 13527090.3
+        },
+        {
+          "material": "LN630742_A",
+          "material___t": "600X300冰河时代",
+          "total_qty": 825528.0,
+          "factory_cnt": 9,
+          "total_amount": 2559154.94
+        },
+        {
+          "material": "CFG800653_A",
+          "material___t": "800X800爱丁堡灰",
+          "total_qty": 692429.0,
+          "factory_cnt": 19,
+          "total_amount": 9891398.289556
+        },
+        {
+          "material": "LX630734_A",
+          "material___t": "600X300清浅",
+          "total_qty": 563458.0,
+          "factory_cnt": 9,
+          "total_amount": 1546289.730504
+        },
+        {
+          "material": "FG607064_A",
+          "material___t": "600X600爱琴海灰",
+          "total_qty": 551767.0,
+          "factory_cnt": 23,
+          "total_amount": 4153769.66
+        },
+        {
+          "material": "CFG800641_A",
+          "material___t": "800X800安卡拉",
+          "total_qty": 550380.0,
+          "factory_cnt": 18,
+          "total_amount": 7839587.961761
+        },
+        {
+          "material": "LX630731_A",
+          "material___t": "600X300清浅",
+          "total_qty": 540398.0,
+          "factory_cnt": 8,
+          "total_amount": 1605866.475309
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "aging_structure",
+      "question": "最近三个月库存库龄结构及长库龄占比",
+      "sql": "SELECT calmonth,\n           SUM(quantity) as total_qty,\n           SUM(zsjkcje) as total_amount,\n           SUM(wbzq_6_amt) as wbzq_0_6m,\n           SUM(wbzq_6_12_amt) as wbzq_6_12m,\n           SUM(wbzq_12_24_amt) as wbzq_12_24m,\n           SUM(wbzq_24_amt) as wbzq_24m_plus,\n           ROUND(SUM(wbzq_12_24_amt + wbzq_24_amt) / NULLIF(SUM(zsjkcje),0) * 100, 2) as long_aged_pct\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth IN ('202604','202605','202606')\n    GROUP BY calmonth ORDER BY calmonth",
+      "row_count": 3,
+      "elapsed_ms": 1397,
+      "data": [
+        {
+          "calmonth": "202604",
+          "total_qty": 91015115.953,
+          "total_amount": 1466785275.398168,
+          "wbzq_0_6m": 653916704.776724,
+          "wbzq_6_12m": 356719882.033492,
+          "wbzq_12_24m": 230122963.589137,
+          "wbzq_24m_plus": 226024545.083815,
+          "long_aged_pct": 31.1
+        },
+        {
+          "calmonth": "202605",
+          "total_qty": 93979931.945,
+          "total_amount": 1463116734.67753,
+          "wbzq_0_6m": 678755576.36211,
+          "wbzq_6_12m": 319615516.310723,
+          "wbzq_12_24m": 222301199.59261,
+          "wbzq_24m_plus": 242443262.497087,
+          "long_aged_pct": 31.76
+        },
+        {
+          "calmonth": "202606",
+          "total_qty": 94629891.686,
+          "total_amount": 1472667069.963894,
+          "wbzq_0_6m": 681716366.012862,
+          "wbzq_6_12m": 315214457.836577,
+          "wbzq_12_24m": 228238460.657812,
+          "wbzq_24m_plus": 247496605.541643,
+          "long_aged_pct": 32.3
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "factory_comparison",
+      "question": "2026年5月各工厂库存金额Top10",
+      "sql": "SELECT plant___t, COUNT(DISTINCT material) as sku_cnt,\n           SUM(quantity) as total_qty, SUM(zsjkcje) as total_amount\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth = '202605' GROUP BY plant___t\n    ORDER BY total_amount DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 10472,
+      "data": [
+        {
+          "plant___t": "丰城东鹏-国内",
+          "sku_cnt": 11868,
+          "total_qty": 29104413.44,
+          "total_amount": 417560284.952
+        },
+        {
+          "plant___t": "清远纳福娜-国内",
+          "sku_cnt": 9097,
+          "total_qty": 15662595.176,
+          "total_amount": 217589900.58848
+        },
+        {
+          "plant___t": "重庆智能家居-国内",
+          "sku_cnt": 4005,
+          "total_qty": 10448036.0,
+          "total_amount": 165982533.51
+        },
+        {
+          "plant___t": "澧县新鹏-国内",
+          "sku_cnt": 5988,
+          "total_qty": 12811072.88,
+          "total_amount": 105352789.7826
+        },
+        {
+          "plant___t": "江门东鹏智能家居-国内",
+          "sku_cnt": 2961,
+          "total_qty": 455220.888,
+          "total_amount": 87519287.281681
+        },
+        {
+          "plant___t": "山西东鹏新材料-国内",
+          "sku_cnt": 1483,
+          "total_qty": 6065198.0,
+          "total_amount": 71854357.77675
+        },
+        {
+          "plant___t": "江西东鹏卫浴-国内",
+          "sku_cnt": 1903,
+          "total_qty": 339825.0,
+          "total_amount": 66884009.42
+        },
+        {
+          "plant___t": "佛山东鹏-国内",
+          "sku_cnt": 4690,
+          "total_qty": 222532.558,
+          "total_amount": 54608608.302685
+        },
+        {
+          "plant___t": "重庆石湾东鹏陶瓷-国内",
+          "sku_cnt": 6402,
+          "total_qty": 4283989.838,
+          "total_amount": 40943214.136737
+        },
+        {
+          "plant___t": "丰城东鹏",
+          "sku_cnt": 11434,
+          "total_qty": 1878709.0,
+          "total_amount": 35005065.74
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "long_aged_detail",
+      "question": "2026年5月长库龄（24月+）物料Top10",
+      "sql": "SELECT material, material___t, plant___t,\n           quantity, zsjkcje, wbzq_24_amt as aged_24m_plus\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth = '202605' AND wbzq_24_amt > 0\n    ORDER BY wbzq_24_amt DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 606,
+      "data": [
+        {
+          "material": "LN63129_A",
+          "material___t": "600X300翡翠石（万科地产）",
+          "plant___t": "堆龙德庆和盈-清仓",
+          "quantity": 32272.0,
+          "zsjkcje": 14298755.04,
+          "aged_24m_plus": 14298755.04
+        },
+        {
+          "material": "LN63129_A",
+          "material___t": "600X300翡翠石（万科地产）",
+          "plant___t": "堆龙德庆和盈-清仓",
+          "quantity": 27520.0,
+          "zsjkcje": 12193286.4,
+          "aged_24m_plus": 12193286.4
+        },
+        {
+          "material": "LN63129_A",
+          "material___t": "600X300翡翠石（万科地产）",
+          "plant___t": "堆龙德庆和盈-清仓",
+          "quantity": 16904.0,
+          "zsjkcje": 7489655.28,
+          "aged_24m_plus": 7489655.28
+        },
+        {
+          "material": "WT09G198237_A",
+          "material___t": "1800X900维亚灰",
+          "plant___t": "丰城东鹏-国内",
+          "quantity": 4861.0,
+          "zsjkcje": 7340450.27,
+          "aged_24m_plus": 7340450.27
+        },
+        {
+          "material": "MG62770934_A",
+          "material___t": "2600X1200灰色大理石光面岩板 6mm 工程款",
+          "plant___t": "佛山东鹏-国内",
+          "quantity": 8111.0,
+          "zsjkcje": 6921765.18,
+          "aged_24m_plus": 6921765.18
+        },
+        {
+          "material": "CFG802362_A",
+          "material___t": "800X800微·卡迪灰",
+          "plant___t": "丰城东鹏-国内",
+          "quantity": 119559.0,
+          "zsjkcje": 6535094.94,
+          "aged_24m_plus": 6535094.94
+        },
+        {
+          "material": "MG62770934_A",
+          "material___t": "2600X1200灰色大理石光面岩板 6mm 工程款",
+          "plant___t": "佛山东鹏-国内",
+          "quantity": 7320.0,
+          "zsjkcje": 6246741.6,
+          "aged_24m_plus": 6246741.6
+        },
+        {
+          "material": "LN63720_A",
+          "material___t": "600X300岁月720",
+          "plant___t": "丰城东鹏",
+          "quantity": 1732400.0,
+          "zsjkcje": 6236640.0,
+          "aged_24m_plus": 6236640.0
+        },
+        {
+          "material": "T10GK150412_A",
+          "material___t": "1500X750夜澜灰-抗菌岩板",
+          "plant___t": "清远纳福娜",
+          "quantity": 139542.0,
+          "zsjkcje": 5993328.9,
+          "aged_24m_plus": 5993328.9
+        },
+        {
+          "material": "FG809115_A",
+          "material___t": "800X800微·素雅灰",
+          "plant___t": "清远纳福娜",
+          "quantity": 107283.0,
+          "zsjkcje": 5884472.55,
+          "aged_24m_plus": 5884472.55
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "cxc_daily",
+      "question": "2026年6月第一周各基地仓协销日报",
+      "sql": "SELECT stat_date, belong_area_name,\n           stock_area_month_start, stock_area_month_end,\n           sales_stock_out_area_day, stock_in_area_day\n    FROM dm.dm_rpt_wm_cxc_day_sum\n    WHERE stat_date BETWEEN '20260601' AND '20260606'\n    ORDER BY stat_date, belong_area_name LIMIT 20",
+      "row_count": 20,
+      "elapsed_ms": 234,
+      "data": [
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 184541.0,
+          "stock_area_month_end": 183118.0,
+          "sales_stock_out_area_day": 1423.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 5201.0,
+          "stock_area_month_end": 5201.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 4885.0,
+          "stock_area_month_end": 4885.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 16286.0,
+          "stock_area_month_end": 16286.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 59644.0,
+          "stock_area_month_end": 59433.0,
+          "sales_stock_out_area_day": 164.0,
+          "stock_in_area_day": -3.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 430.0,
+          "stock_area_month_end": 430.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 57700.0,
+          "stock_area_month_end": 57398.0,
+          "sales_stock_out_area_day": 302.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        },
+        {
+          "stat_date": "20260601",
+          "belong_area_name": "OEM",
+          "stock_area_month_start": 0.0,
+          "stock_area_month_end": 0.0,
+          "sales_stock_out_area_day": 0.0,
+          "stock_in_area_day": 0.0
+        }
+      ],
+      "checksum": "rows=20"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "transit_category",
+      "question": "2026年6月在途库存按品类汇总",
+      "sql": "SELECT doc_month, category_name,\n           SUM(deliver_qty) as in_transit_qty,\n           SUM(deliver_amount) as in_transit_amt\n    FROM dm.dm_b1_transit_inventory_t\n    WHERE doc_month = '2026-06' GROUP BY doc_month, category_name\n    ORDER BY in_transit_amt DESC LIMIT 10",
+      "row_count": 9,
+      "elapsed_ms": 1010,
+      "data": [
+        {
+          "doc_month": "2026-06",
+          "category_name": "整装",
+          "in_transit_qty": null,
+          "in_transit_amt": null
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": null,
+          "in_transit_qty": 3150424.522,
+          "in_transit_amt": 56617334.93
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "陶瓷",
+          "in_transit_qty": 63807.0,
+          "in_transit_amt": 9582610.51
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "智能",
+          "in_transit_qty": 8505.0,
+          "in_transit_amt": 8286231.46
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "大五金",
+          "in_transit_qty": 36168.0,
+          "in_transit_amt": 7748358.0
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "浴室家居",
+          "in_transit_qty": 15045.0,
+          "in_transit_amt": 7556231.2
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "休闲",
+          "in_transit_qty": 5087.913,
+          "in_transit_amt": 2375161.19
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "小五金",
+          "in_transit_qty": 62529.0,
+          "in_transit_amt": 1054263.82
+        },
+        {
+          "doc_month": "2026-06",
+          "category_name": "配件",
+          "in_transit_qty": 2301.76,
+          "in_transit_amt": 451160.09
+        }
+      ],
+      "checksum": "rows=9"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "trend_monthly",
+      "question": "2026年上半年库存总金额与库龄趋势",
+      "sql": "SELECT calmonth, SUM(zsjkcje) as total_amount,\n           SUM(wbzq_6_amt) as aged_0_6, SUM(wbzq_24_amt) as aged_24plus\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth >= '202601' AND calmonth <= '202606'\n    GROUP BY calmonth ORDER BY calmonth",
+      "row_count": 6,
+      "elapsed_ms": 6199,
+      "data": [
+        {
+          "calmonth": "202601",
+          "total_amount": 1501058583.167422,
+          "aged_0_6": 758332269.539441,
+          "aged_24plus": 202055369.961494
+        },
+        {
+          "calmonth": "202602",
+          "total_amount": 1485520344.857576,
+          "aged_0_6": 633483924.52807,
+          "aged_24plus": 204029684.888016
+        },
+        {
+          "calmonth": "202603",
+          "total_amount": 1450460742.602376,
+          "aged_0_6": 620671390.261957,
+          "aged_24plus": 218983123.400693
+        },
+        {
+          "calmonth": "202604",
+          "total_amount": 1466785275.398168,
+          "aged_0_6": 653916704.776724,
+          "aged_24plus": 226024545.083815
+        },
+        {
+          "calmonth": "202605",
+          "total_amount": 1463116734.67753,
+          "aged_0_6": 678755576.36211,
+          "aged_24plus": 242443262.497087
+        },
+        {
+          "calmonth": "202606",
+          "total_amount": 1472667069.963894,
+          "aged_0_6": 681716366.012862,
+          "aged_24plus": 247496605.541643
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "product_hierarchy",
+      "question": "2026年5月库存按产品层次汇总（前两级）",
+      "sql": "SELECT zprodh1___t, zprodh2___t,\n           COUNT(DISTINCT material) as sku_cnt,\n           SUM(quantity) as total_qty, SUM(zsjkcje) as total_amount\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth = '202605' AND zprodh1___t IS NOT NULL\n    GROUP BY zprodh1___t, zprodh2___t\n    ORDER BY total_amount DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 12272,
+      "data": [
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "岩板",
+          "sku_cnt": 5510,
+          "total_qty": 10505136.0,
+          "total_amount": 410905956.602899
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "晶理石",
+          "sku_cnt": 11573,
+          "total_qty": 23841034.0,
+          "total_amount": 349758568.255848
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "仿古砖",
+          "sku_cnt": 9545,
+          "total_qty": 19259306.38,
+          "total_amount": 201297024.807358
+        },
+        {
+          "zprodh1___t": "洁具",
+          "zprodh2___t": "陶瓷",
+          "sku_cnt": 2621,
+          "total_qty": 771975.0,
+          "total_amount": 135469153.769431
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "精瓷中板",
+          "sku_cnt": 1087,
+          "total_qty": 15013270.0,
+          "total_amount": 97840221.200459
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "瓷片",
+          "sku_cnt": 4214,
+          "total_qty": 17832016.0,
+          "total_amount": 51418693.348151
+        },
+        {
+          "zprodh1___t": "卫浴成品",
+          "zprodh2___t": "大五金",
+          "sku_cnt": 4178,
+          "total_qty": 301041.0,
+          "total_amount": 41200443.06
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "REX",
+          "sku_cnt": 604,
+          "total_qty": 95347.0,
+          "total_amount": 31234347.85
+        },
+        {
+          "zprodh1___t": "洁具",
+          "zprodh2___t": "智能坐便器",
+          "sku_cnt": 650,
+          "total_qty": 31974.0,
+          "total_amount": 25394372.274133
+        },
+        {
+          "zprodh1___t": "瓷砖",
+          "zprodh2___t": "ART+",
+          "sku_cnt": 1180,
+          "total_qty": 629041.0,
+          "total_amount": 20857956.218964
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "warehouse_type",
+      "question": "仓库库存按类型+财务类别汇总（面积）",
+      "sql": "SELECT warehouse_type, fin_cate,\n           COUNT(DISTINCT material_num) as sku_cnt,\n           SUM(stock_area) as total_area\n    FROM dm.dm_dp_api_warehouse_stock\n    GROUP BY warehouse_type, fin_cate ORDER BY total_area DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 199,
+      "data": [
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "抛釉砖",
+          "sku_cnt": 3721,
+          "total_area": 10565961.8788
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "大板",
+          "sku_cnt": 1666,
+          "total_area": 8954252.595
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "仿古砖",
+          "sku_cnt": 2893,
+          "total_area": 5739393.98158
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "精瓷中板",
+          "sku_cnt": 486,
+          "total_area": 4169999.66
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "瓷片",
+          "sku_cnt": 769,
+          "total_area": 2578237.99
+        },
+        {
+          "warehouse_type": "专属库存",
+          "fin_cate": "抛釉砖",
+          "sku_cnt": 1172,
+          "total_area": 901493.317788
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "超大板",
+          "sku_cnt": 692,
+          "total_area": 801164.3724
+        },
+        {
+          "warehouse_type": "专属库存",
+          "fin_cate": "大板",
+          "sku_cnt": 803,
+          "total_area": 694278.81
+        },
+        {
+          "warehouse_type": "工厂可用库存",
+          "fin_cate": "世界印象",
+          "sku_cnt": 477,
+          "total_area": 672995.8336
+        },
+        {
+          "warehouse_type": "专属库存",
+          "fin_cate": "仿古砖",
+          "sku_cnt": 1014,
+          "total_area": 483189.958678
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "inventory",
+      "pattern": "defective_factory",
+      "question": "各工厂残次品出库量Top10",
+      "sql": "SELECT factory_werks_name, COUNT(DISTINCT material_num) as sku_cnt,\n           SUM(quantity) as total_qty\n    FROM dm.dm_wm_defective_product_stockout_t\n    GROUP BY factory_werks_name ORDER BY total_qty DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 850,
+      "data": [
+        {
+          "factory_werks_name": "丰城东鹏-国内",
+          "sku_cnt": 5043,
+          "total_qty": 60325898.579
+        },
+        {
+          "factory_werks_name": "重庆石湾东鹏陶瓷-国内",
+          "sku_cnt": 1641,
+          "total_qty": 37734679.5
+        },
+        {
+          "factory_werks_name": "清远纳福娜-国内",
+          "sku_cnt": 4024,
+          "total_qty": 35359112.433
+        },
+        {
+          "factory_werks_name": "澧县新鹏-国内",
+          "sku_cnt": 2224,
+          "total_qty": 29837684.713
+        },
+        {
+          "factory_werks_name": "山西东鹏新材料-国内",
+          "sku_cnt": 652,
+          "total_qty": 27381692.0
+        },
+        {
+          "factory_werks_name": "重庆智能家居-国内",
+          "sku_cnt": 1921,
+          "total_qty": 15632660.0
+        },
+        {
+          "factory_werks_name": "淄博卡普尔-国内",
+          "sku_cnt": 375,
+          "total_qty": 11953006.0
+        },
+        {
+          "factory_werks_name": "重庆石湾东鹏陶瓷-清仓",
+          "sku_cnt": 1852,
+          "total_qty": 11191454.0
+        },
+        {
+          "factory_werks_name": "澧县新鹏-清仓",
+          "sku_cnt": 2201,
+          "total_qty": 11148557.5
+        },
+        {
+          "factory_werks_name": "丰城东鹏-清仓",
+          "sku_cnt": 3769,
+          "total_qty": 9283118.48
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "pattern": "topn_customer",
+      "question": "最新应收余额Top10客户",
+      "sql": "SELECT cust_code, cust_name,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(n_overdue_receivables) as n_overdue\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'\n  AND (special_general_ledger IS NULL OR special_general_ledger = '')\nGROUP BY cust_code, cust_name\nORDER BY balance DESC\nLIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 105,
+      "data": [
+        {
+          "cust_code": "0000007200",
+          "cust_name": "佛山市乐淘陶科技有限公司",
+          "balance": "261613498.62",
+          "overdue": "108877073.10",
+          "n_overdue": "152736425.52"
+        },
+        {
+          "cust_code": "0000008300",
+          "cust_name": "上海东鹏陶瓷有限公司",
+          "balance": "187682343.09",
+          "overdue": "520875241.99",
+          "n_overdue": "-333192898.90"
+        },
+        {
+          "cust_code": "0000008A00",
+          "cust_name": "重庆石湾东鹏陶瓷有限公司",
+          "balance": "158595314.95",
+          "overdue": "41649226.64",
+          "n_overdue": "116946088.31"
+        },
+        {
+          "cust_code": "0000007900",
+          "cust_name": "佛山市东鹏陶瓷有限公司",
+          "balance": "143146902.68",
+          "overdue": "420604422.68",
+          "n_overdue": "-277457520.00"
+        },
+        {
+          "cust_code": "0000008200",
+          "cust_name": "广州市东鹏陶瓷有限责任公司",
+          "balance": "93060625.22",
+          "overdue": "382233090.67",
+          "n_overdue": "-289172465.45"
+        },
+        {
+          "cust_code": "0000001300",
+          "cust_name": "清远纳福娜陶瓷有限公司",
+          "balance": "90905692.50",
+          "overdue": "90723874.81",
+          "n_overdue": "181817.69"
+        },
+        {
+          "cust_code": "0000008100",
+          "cust_name": "深圳东鹏陶瓷有限公司",
+          "balance": "89108263.43",
+          "overdue": "728898146.79",
+          "n_overdue": "-639789883.36"
+        },
+        {
+          "cust_code": "0000001800",
+          "cust_name": "重庆市东鹏智能家居有限公司",
+          "balance": "69495670.12",
+          "overdue": "69495670.12",
+          "n_overdue": "0.00"
+        },
+        {
+          "cust_code": "0000007500",
+          "cust_name": "堆龙德庆和盈商贸有限公司",
+          "balance": "57854167.95",
+          "overdue": "19463363.39",
+          "n_overdue": "38390804.56"
+        },
+        {
+          "cust_code": "0000001500",
+          "cust_name": "丰城市东鹏陶瓷有限公司",
+          "balance": "57435653.61",
+          "overdue": "56960011.94",
+          "n_overdue": "475641.67"
+        }
+      ],
+      "checksum": "rows=10",
+      "domain": "ar"
+    },
+    {
+      "pattern": "aging_structure",
+      "question": "最近三个月应收账龄结构及逾期占比",
+      "sql": "SELECT query_date,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(overdue_receivables) as overdue_total,\n       SUM(n_overdue_receivables) as n_overdue_total,\n       ROUND(SUM(overdue_receivables) / NULLIF(SUM(local_currency_balance_sum),0) * 100, 2) as overdue_pct\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date IN ('2026-05-02','2026-05-31','2026-06-02','2026-06-07')\nGROUP BY query_date\nORDER BY query_date",
+      "row_count": 4,
+      "elapsed_ms": 122,
+      "data": [
+        {
+          "query_date": "2026-05-02",
+          "total_balance": "4685002048.16",
+          "overdue_total": "20437309550.34",
+          "n_overdue_total": "-15752307502.18",
+          "overdue_pct": "436.23"
+        },
+        {
+          "query_date": "2026-05-31",
+          "total_balance": "7745921555.82",
+          "overdue_total": "30509315579.28",
+          "n_overdue_total": "-22763394023.46",
+          "overdue_pct": "393.88"
+        },
+        {
+          "query_date": "2026-06-02",
+          "total_balance": "5167405756.70",
+          "overdue_total": "20452365263.46",
+          "n_overdue_total": "-15284959506.76",
+          "overdue_pct": "395.80"
+        },
+        {
+          "query_date": "2026-06-07",
+          "total_balance": "2632826417.45",
+          "overdue_total": "10237389413.41",
+          "n_overdue_total": "-7604562995.96",
+          "overdue_pct": "388.84"
+        }
+      ],
+      "checksum": "rows=4",
+      "domain": "ar"
+    },
+    {
+      "pattern": "aging_bucket_detail",
+      "question": "最新账龄分段汇总（2023新版）",
+      "sql": "SELECT\n  SUM(overdue_receivables_1_90_day_2023_after) as d_0_90,\n  SUM(overdue_receivables_91_275_day_2023_after) as d_91_275,\n  SUM(overdue_receivables_276_730_day_2023_after) as d_276_730,\n  SUM(overdue_receivables_731_1460_day_2023_after) as d_731_1460,\n  SUM(overdue_receivables_1461_day_2023_after) as d_1461_plus\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'",
+      "row_count": 1,
+      "elapsed_ms": 52,
+      "data": [
+        {
+          "d_0_90": "376912059.65",
+          "d_91_275": "48933638.05",
+          "d_276_730": "2523087.02",
+          "d_731_1460": "352440.33",
+          "d_1461_plus": "21478.97"
+        }
+      ],
+      "checksum": "rows=1",
+      "domain": "ar"
+    },
+    {
+      "pattern": "overdue_customer",
+      "question": "最新逾期客户Top10",
+      "sql": "SELECT c_name, sales_grp___t,\n       ysye as balance, yqe as overdue,\n       ROUND(yqe / NULLIF(ysye, 0) * 100, 2) as overdue_pct\nFROM dm.dm_ar_overdue_receivables_t\nWHERE ed_mon = '202606'\n  AND yqe > 0\n  AND (is_ignore IS NULL OR is_ignore = 0)\nORDER BY yqe DESC\nLIMIT 10",
+      "row_count": 0,
+      "elapsed_ms": 58,
+      "data": [],
+      "checksum": "rows=0",
+      "domain": "ar"
+    },
+    {
+      "pattern": "collection_monthly",
+      "question": "2026年上半年回款月度趋势",
+      "sql": "SELECT year, month,\n       SUM(all_collection_amt) as total_collection,\n       SUM(collection_amt) as matched,\n       ROUND(SUM(collection_amt) / NULLIF(SUM(all_collection_amt), 0) * 100, 2) as match_rate\nFROM dwrfin.dwr_ar_collection_detail_f\nWHERE year = '2026'\nGROUP BY year, month\nORDER BY year, month",
+      "row_count": 6,
+      "elapsed_ms": 199,
+      "data": [
+        {
+          "year": "2026",
+          "month": "2026-01",
+          "total_collection": "298603685.1300000000",
+          "matched": "4212194.1500000000",
+          "match_rate": "1.41"
+        },
+        {
+          "year": "2026",
+          "month": "2026-02",
+          "total_collection": "112294086.6800000000",
+          "matched": "3992979.4200000000",
+          "match_rate": "3.56"
+        },
+        {
+          "year": "2026",
+          "month": "2026-03",
+          "total_collection": "536767693.6400000000",
+          "matched": "5452396.1400000000",
+          "match_rate": "1.02"
+        },
+        {
+          "year": "2026",
+          "month": "2026-04",
+          "total_collection": "485237254.2900000000",
+          "matched": "3176489.4800000000",
+          "match_rate": "0.65"
+        },
+        {
+          "year": "2026",
+          "month": "2026-05",
+          "total_collection": "537696621.9500000000",
+          "matched": "7782252.1100000000",
+          "match_rate": "1.45"
+        },
+        {
+          "year": "2026",
+          "month": "2026-06",
+          "total_collection": "101411372.2000000000",
+          "matched": "979017.7600000000",
+          "match_rate": "0.97"
+        }
+      ],
+      "checksum": "rows=6",
+      "domain": "ar"
+    },
+    {
+      "pattern": "balance_trend",
+      "question": "2026年应收余额月度趋势",
+      "sql": "SELECT year, month,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(current_local_currency_balance) as current_balance\nFROM dwrfin.dwr_ar_receivable_balance_f\nWHERE year = '2026'\nGROUP BY year, month\nORDER BY year, month",
+      "row_count": 6,
+      "elapsed_ms": 841,
+      "data": [
+        {
+          "year": "2026",
+          "month": "2026-01",
+          "cust_cnt": "19574",
+          "total_balance": "8082625844.37",
+          "current_balance": "3463403299.80"
+        },
+        {
+          "year": "2026",
+          "month": "2026-02",
+          "cust_cnt": "19597",
+          "total_balance": "7762203799.14",
+          "current_balance": "-320422045.23"
+        },
+        {
+          "year": "2026",
+          "month": "2026-03",
+          "cust_cnt": "19678",
+          "total_balance": "6372483879.92",
+          "current_balance": "-1389719919.22"
+        },
+        {
+          "year": "2026",
+          "month": "2026-04",
+          "cust_cnt": "19781",
+          "total_balance": "8328975647.30",
+          "current_balance": "1956491767.38"
+        },
+        {
+          "year": "2026",
+          "month": "2026-05",
+          "cust_cnt": "19878",
+          "total_balance": "8932559293.35",
+          "current_balance": "603583646.05"
+        },
+        {
+          "year": "2026",
+          "month": "2026-06",
+          "cust_cnt": "19898",
+          "total_balance": "9312825535.42",
+          "current_balance": "380266242.07"
+        }
+      ],
+      "checksum": "rows=6",
+      "domain": "ar"
+    },
+    {
+      "pattern": "devalue_by_class",
+      "question": "最新坏账减值按客户分类汇总",
+      "sql": "SELECT cust_class_name,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(overdue_1_90_amt + overdue_91_275_amt + overdue_276_730_amt\n           + overdue_731_1460_amt + overdue_1461_amt) as total_devalue\nFROM dwrfin.dwr_ar_credit_devalue_f\nWHERE query_date = '2026-06-07'\nGROUP BY cust_class_name\nORDER BY balance DESC\nLIMIT 10",
+      "row_count": 2,
+      "elapsed_ms": 138,
+      "data": [
+        {
+          "cust_class_name": null,
+          "cust_cnt": "19092",
+          "balance": "3547872831.06",
+          "overdue": "10878649816.87",
+          "total_devalue": "10094686272.38"
+        },
+        {
+          "cust_class_name": "工程客户（无自动运费）",
+          "cust_cnt": "236",
+          "balance": "51546932.64",
+          "overdue": "50924945.90",
+          "total_devalue": "10892005.88"
+        }
+      ],
+      "checksum": "rows=2",
+      "domain": "ar"
+    },
+    {
+      "pattern": "turnover_days",
+      "question": "应收周转天数趋势（2022年数据）",
+      "sql": "SELECT calmonth, dept, zzts as turnover_days\nFROM dwrfin.dwr_ar_receivable_turnover_days_f\nWHERE calmonth >= '202201'\nORDER BY calmonth, dept\nLIMIT 20",
+      "row_count": 20,
+      "elapsed_ms": 19,
+      "data": [
+        {
+          "calmonth": "202201",
+          "dept": "上海子公司",
+          "turnover_days": "212.9351725225"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "云南子公司",
+          "turnover_days": "52.3144785530"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "商机资源开发部",
+          "turnover_days": "107.6113836775"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "工程市场中心",
+          "turnover_days": "283.4707243056"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "工程支持中心",
+          "turnover_days": "-70953.2123690263"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "幕墙工程中心",
+          "turnover_days": "-0.2897090226"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "广佛子公司",
+          "turnover_days": "144.7254782528"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "广西子公司",
+          "turnover_days": "109.8162638689"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "恒大，华夏，泰禾",
+          "turnover_days": "1353.3308135661"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "战略工程中心",
+          "turnover_days": "337.7463319436"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "深圳子公司",
+          "turnover_days": "175.6965946008"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "瓷砖事业部",
+          "turnover_days": "234.0093684874"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "直营经营管理板块",
+          "turnover_days": "164.4352751071"
+        },
+        {
+          "calmonth": "202201",
+          "dept": "陕西子公司",
+          "turnover_days": "86.9392388417"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "上海子公司",
+          "turnover_days": "217.2068741155"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "云南子公司",
+          "turnover_days": "53.5748833030"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "商机资源开发部",
+          "turnover_days": "104.3933250093"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "工程市场中心",
+          "turnover_days": "293.1254678978"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "工程支持中心",
+          "turnover_days": "-67729.3125479172"
+        },
+        {
+          "calmonth": "202202",
+          "dept": "幕墙工程中心",
+          "turnover_days": "-0.0867590704"
+        }
+      ],
+      "checksum": "rows=20",
+      "domain": "ar"
+    },
+    {
+      "pattern": "analysis_wbs",
+      "question": "最新综合分析按WBS汇总",
+      "sql": "SELECT wbs_level1_desc,\n       SUM(receivables_am) as receivables,\n       SUM(overdue_receivables) as overdue,\n       SUM(all_collection_amt) as collection,\n       ROUND(AVG(collection_rate), 2) as avg_coll_rate\nFROM dm.dm_ar_analysis_rpt_f\nWHERE calmonth = '2026-06'\nGROUP BY wbs_level1_desc\nORDER BY receivables DESC\nLIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 1146,
+      "data": [
+        {
+          "wbs_level1_desc": "广州恒大材料设备",
+          "receivables": "350054411.7000000000",
+          "overdue": "350054411.7000000000",
+          "collection": "8769563.6200000000",
+          "avg_coll_rate": "0.02"
+        },
+        {
+          "wbs_level1_desc": null,
+          "receivables": "308971821.2900000000",
+          "overdue": "203146700.1600000000",
+          "collection": "40559332280.2800000000",
+          "avg_coll_rate": "12.90"
+        },
+        {
+          "wbs_level1_desc": "深圳恒大材料设备有限公司（恒大地产项目）",
+          "receivables": "40655680.4900000000",
+          "overdue": "40655680.4900000000",
+          "collection": "255030640.9300000000",
+          "avg_coll_rate": "0.12"
+        },
+        {
+          "wbs_level1_desc": "上海昆太实业(蓝光地产昆明金桂街)",
+          "receivables": "29381654.1700000000",
+          "overdue": "29381654.1700000000",
+          "collection": "18121274.6500000000",
+          "avg_coll_rate": "0.36"
+        },
+        {
+          "wbs_level1_desc": "广州恒乾材料设备有限公司",
+          "receivables": "27320711.5100000000",
+          "overdue": "27320711.5100000000",
+          "collection": "-823123.7500000000",
+          "avg_coll_rate": "-0.01"
+        },
+        {
+          "wbs_level1_desc": "广州恒隆设备材料有限公司（恒大）",
+          "receivables": "14245986.2200000000",
+          "overdue": "14245986.2200000000",
+          "collection": "4965281.5800000000",
+          "avg_coll_rate": "0.21"
+        },
+        {
+          "wbs_level1_desc": "深圳恒大材料设备有限公司(博德人造石）",
+          "receivables": "8598337.9800000000",
+          "overdue": "8598337.9800000000",
+          "collection": "0E-10",
+          "avg_coll_rate": "0.00"
+        },
+        {
+          "wbs_level1_desc": "天津体北金茂府项目",
+          "receivables": "8504874.5300000000",
+          "overdue": "2059259.6700000000",
+          "collection": "7589018.5700000000",
+          "avg_coll_rate": "0.46"
+        },
+        {
+          "wbs_level1_desc": "河北荣盛建筑（湛江中央广场A区裙楼装修工程）",
+          "receivables": "7304104.6300000000",
+          "overdue": "7304104.6300000000",
+          "collection": "466171.2000000000",
+          "avg_coll_rate": "0.03"
+        },
+        {
+          "wbs_level1_desc": "九号科技全国战略连锁项目2026年新产品标段",
+          "receivables": "6536517.9500000000",
+          "overdue": "0E-10",
+          "collection": "2592479.0500000000",
+          "avg_coll_rate": "0.28"
+        }
+      ],
+      "checksum": "rows=10",
+      "domain": "ar"
+    },
+    {
+      "pattern": "collection_topn_customer",
+      "question": "2026年6月回款金额Top10客户",
+      "sql": "SELECT cust_code, cust_name,\n       SUM(all_collection_amt) as total,\n       SUM(collection_amt) as matched,\n       SUM(non_confirm_amt) as unconfirmed\nFROM dwrfin.dwr_ar_collection_detail_f\nWHERE year = '2026' AND month = '2026-06'\nGROUP BY cust_code, cust_name\nORDER BY total DESC\nLIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 199,
+      "data": [
+        {
+          "cust_code": "1000011528",
+          "cust_name": "中国证券登记结算有限责任公司深圳分公司",
+          "total": "2515093.2200000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "1000015005",
+          "cust_name": "广筑源(佛山)商贸有限公司",
+          "total": "2194478.5000000000",
+          "matched": "0E-10",
+          "unconfirmed": "4478.5000000000"
+        },
+        {
+          "cust_code": "0000312397",
+          "cust_name": "合肥东鹏",
+          "total": "2020000.0000000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "0000321714",
+          "cust_name": "湖北武汉樟品建材",
+          "total": "1737550.3500000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "1000004650",
+          "cust_name": "龙信海悦置业(海安)",
+          "total": "1600000.0000000000",
+          "matched": "0E-10",
+          "unconfirmed": "1600000.0000000000"
+        },
+        {
+          "cust_code": "0000353535",
+          "cust_name": "重庆艺南建材",
+          "total": "1600000.0000000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "1000008695",
+          "cust_name": "圣都家居装饰上海分公司",
+          "total": "1574820.8200000000",
+          "matched": "0E-10",
+          "unconfirmed": "1574820.8200000000"
+        },
+        {
+          "cust_code": "0000310590",
+          "cust_name": "江西创东建材有限公司",
+          "total": "1523000.0000000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "0000310277",
+          "cust_name": "郑州东鹏(撤销)",
+          "total": "1300000.0000000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        },
+        {
+          "cust_code": "0000317171",
+          "cust_name": "江苏南京创想东鹏",
+          "total": "1132992.1000000000",
+          "matched": "0E-10",
+          "unconfirmed": "0E-10"
+        }
+      ],
+      "checksum": "rows=10",
+      "domain": "ar"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "org_monthly_achievement",
+      "question": "今年卫浴事业部业绩情况",
+      "sql": "SELECT calmonth,\n       SUM(ambperformance) as total_achievement,\n       SUM(notax_sales_net_amt) as notax_amt,\n       SUM(zxsmj) as sales_area\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE calmonth >= '2026-01' AND calmonth <= '2026-06'\n  AND node_desc2 = '卫浴事业部'\n  AND data_source IN ('S', 'T', 'D', '')\nGROUP BY calmonth\nORDER BY calmonth",
+      "row_count": 6,
+      "elapsed_ms": 8057,
+      "data": [
+        {
+          "calmonth": "2026-01",
+          "total_achievement": "63813379.3937250000",
+          "notax_amt": "59028232.6200000000",
+          "sales_area": "17590.0880752300"
+        },
+        {
+          "calmonth": "2026-02",
+          "total_achievement": "12614011.1468860000",
+          "notax_amt": "12266077.0200000000",
+          "sales_area": "1346.4327570000"
+        },
+        {
+          "calmonth": "2026-03",
+          "total_achievement": "81549260.6614630000",
+          "notax_amt": "71078564.6600000000",
+          "sales_area": "14622.6500664700"
+        },
+        {
+          "calmonth": "2026-04",
+          "total_achievement": "51264219.9677690000",
+          "notax_amt": "44990844.8500000000",
+          "sales_area": "10075.7768138400"
+        },
+        {
+          "calmonth": "2026-05",
+          "total_achievement": "65702540.8501420000",
+          "notax_amt": "59011760.8463080000",
+          "sales_area": "17176.0555397200"
+        },
+        {
+          "calmonth": "2026-06",
+          "total_achievement": "11712138.8230330000",
+          "notax_amt": "10242193.5964830000",
+          "sales_area": "4568.8026474200"
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "org_monthly_achievement",
+      "question": "2026年4月瓷砖事业部达成情况",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual, SUM(notax_sales_net_amt) as notax_amt FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-04' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-04",
+          "actual": "472816360.5523800000",
+          "notax_amt": "422495713.4848750000"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "org_monthly_achievement",
+      "question": "2026年3月卫浴事业部达成情况",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual, SUM(notax_sales_net_amt) as notax_amt FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-03' AND node_desc2 = '卫浴事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-03",
+          "actual": "81549260.6614630000",
+          "notax_amt": "71078564.6600000000"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "org_monthly_with_yoy",
+      "question": "2026年5月瓷砖事业部同比对比",
+      "sql": "SELECT SUM(month_achievement) as cur_month, SUM(last_year_month_achievement) as yoy_month, (SUM(month_achievement) - SUM(last_year_month_achievement)) / NULLIF(SUM(last_year_month_achievement),0) * 100 as yoy_rate FROM dm.ct_sales_performance_t WHERE calday = '20260531'",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "cur_month": "513896841.5999240000",
+          "yoy_month": "582566798.7729420000",
+          "yoy_rate": "-11.78748210808738881200"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "org_monthly_with_yoy",
+      "question": "2026年4月瓷砖事业部同比对比",
+      "sql": "SELECT SUM(month_achievement) as cur_month, SUM(last_year_month_achievement) as yoy_month, (SUM(month_achievement) - SUM(last_year_month_achievement)) / NULLIF(SUM(last_year_month_achievement),0) * 100 as yoy_rate FROM dm.ct_sales_performance_t WHERE calday = '20260430'",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "cur_month": "481836661.9646800000",
+          "yoy_month": "613459525.9730470000",
+          "yoy_rate": "-21.45583505278390464200"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "channel_breakdown",
+      "question": "2026年5月瓷砖事业部按整合渠道1达成",
+      "sql": "SELECT integrate_channel, integrate_channel__t, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND integrate_channel IS NOT NULL GROUP BY integrate_channel, integrate_channel__t ORDER BY actual DESC",
+      "row_count": 3,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel": "GD01",
+          "integrate_channel__t": "零售渠道",
+          "actual": "222351383.7467830000"
+        },
+        {
+          "integrate_channel": "GD03",
+          "integrate_channel__t": "工程渠道",
+          "actual": "213050224.5707410000"
+        },
+        {
+          "integrate_channel": "GD02",
+          "integrate_channel__t": "整装渠道",
+          "actual": "69804722.8653000000"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "channel_breakdown",
+      "question": "2026年5月卫浴事业部按整合渠道1达成",
+      "sql": "SELECT integrate_channel, integrate_channel__t, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '卫浴事业部' AND data_source IN ('S','T','D','') AND integrate_channel IS NOT NULL GROUP BY integrate_channel, integrate_channel__t ORDER BY actual DESC",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel": "GD06",
+          "integrate_channel__t": "国贸",
+          "actual": null
+        },
+        {
+          "integrate_channel": "GD02",
+          "integrate_channel__t": "整装渠道",
+          "actual": null
+        },
+        {
+          "integrate_channel": "GD99",
+          "integrate_channel__t": "跨事业部交易-工程",
+          "actual": null
+        },
+        {
+          "integrate_channel": "GD03",
+          "integrate_channel__t": "工程渠道",
+          "actual": "24166970.9676840000"
+        },
+        {
+          "integrate_channel": "GD01",
+          "integrate_channel__t": "零售渠道",
+          "actual": "21011474.7234960000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "product_brand_topn",
+      "question": "2026年5月瓷砖事业部TOP10产品品牌",
+      "sql": "SELECT product_brand_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND product_brand_name IS NOT NULL AND ambperformance > 0 GROUP BY product_brand_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "product_brand_name": "微理石",
+          "actual": "86017806.5128000000"
+        },
+        {
+          "product_brand_name": "天然理石",
+          "actual": "58857289.6578000000"
+        },
+        {
+          "product_brand_name": "素色",
+          "actual": "49153351.0058000000"
+        },
+        {
+          "product_brand_name": "微韵石",
+          "actual": "36289479.7976950000"
+        },
+        {
+          "product_brand_name": "四合一",
+          "actual": "30659569.1320000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "product_brand_topn",
+      "question": "2026年4月瓷砖事业部TOP10产品品牌",
+      "sql": "SELECT product_brand_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-04' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND product_brand_name IS NOT NULL AND ambperformance > 0 GROUP BY product_brand_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "product_brand_name": "微理石",
+          "actual": "81931444.6732000000"
+        },
+        {
+          "product_brand_name": "天然理石",
+          "actual": "55515241.4883000000"
+        },
+        {
+          "product_brand_name": "素色",
+          "actual": "45987256.4132000000"
+        },
+        {
+          "product_brand_name": "微韵石",
+          "actual": "34574574.9917000000"
+        },
+        {
+          "product_brand_name": "四合一",
+          "actual": "29987888.6939000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "customer_topn",
+      "question": "2026年5月瓷砖事业部TOP10客户",
+      "sql": "SELECT customer, cust_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND customer IS NOT NULL AND ambperformance > 0 GROUP BY customer, cust_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "customer": "1000014139",
+          "cust_name": "电商国补客编",
+          "actual": "28733431.0630000000"
+        },
+        {
+          "customer": "0000312397",
+          "cust_name": "安徽领创联合建材有限公司",
+          "actual": "9757959.8833000000"
+        },
+        {
+          "customer": "0000352516",
+          "cust_name": "杭州东箭完整家居有限公司",
+          "actual": "9219844.5285000000"
+        },
+        {
+          "customer": "0000321714",
+          "cust_name": "武汉樟品建材有限公司",
+          "actual": "9191256.5781000000"
+        },
+        {
+          "customer": "0000310590",
+          "cust_name": "江西创东建材有限公司",
+          "actual": "6653873.3582000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "customer_topn",
+      "question": "2026年5月卫浴事业部TOP10客户",
+      "sql": "SELECT customer, cust_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '卫浴事业部' AND data_source IN ('S','T','D','') AND customer IS NOT NULL AND ambperformance > 0 GROUP BY customer, cust_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "customer": "0000312536",
+          "cust_name": "As American Inc",
+          "actual": "7721058.9833090000"
+        },
+        {
+          "customer": "0000316418",
+          "cust_name": "深圳市港辉鸿发贸易有限公司",
+          "actual": "3082674.4537000000"
+        },
+        {
+          "customer": "0000310635",
+          "cust_name": "湖南锦辉铭商贸有限公司",
+          "actual": "2440725.4313000000"
+        },
+        {
+          "customer": "1000013973",
+          "cust_name": "福建良塑科技有限公司",
+          "actual": "2437968.0053000000"
+        },
+        {
+          "customer": "1000005712",
+          "cust_name": "天猫-东鹏洁具官方旗舰店",
+          "actual": "1923669.1617000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "target_achievement_rate",
+      "question": "2026年5月各事业部预算达成率排名",
+      "sql": "SELECT node_desc2, SUM(ambperformance) as actual, SUM(ambperformance_ys) as budget, SUM(ambperformance) / NULLIF(SUM(ambperformance_ys),0) * 100 as achv_rate FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND data_source IN ('S','T','D','') AND node_desc2 IS NOT NULL GROUP BY node_desc2 ORDER BY achv_rate DESC",
+      "row_count": 6,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "node_desc2": "过渡部门",
+          "actual": "43963.2037000000",
+          "budget": null,
+          "achv_rate": null
+        },
+        {
+          "node_desc2": "公司层面",
+          "actual": "0E-10",
+          "budget": null,
+          "achv_rate": null
+        },
+        {
+          "node_desc2": "国际营销中心",
+          "actual": "14702200.5849040000",
+          "budget": "16100681.2200000000",
+          "achv_rate": "91.31415238903785960400"
+        },
+        {
+          "node_desc2": "卫浴事业部",
+          "actual": "65702540.8501420000",
+          "budget": "81461900.0000000000",
+          "achv_rate": "80.65431919724681108600"
+        },
+        {
+          "node_desc2": "瓷砖事业部",
+          "actual": "505206331.1828240000",
+          "budget": "673771500.0900000000",
+          "achv_rate": "74.98184935328079854700"
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "target_achievement_rate",
+      "question": "2026年4月各事业部预算达成率排名",
+      "sql": "SELECT node_desc2, SUM(ambperformance) as actual, SUM(ambperformance_ys) as budget, SUM(ambperformance) / NULLIF(SUM(ambperformance_ys),0) * 100 as achv_rate FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-04' AND data_source IN ('S','T','D','') AND node_desc2 IS NOT NULL GROUP BY node_desc2 ORDER BY achv_rate DESC",
+      "row_count": 6,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "node_desc2": "过渡部门",
+          "actual": "0E-10",
+          "budget": null,
+          "achv_rate": null
+        },
+        {
+          "node_desc2": "公司层面",
+          "actual": "0E-10",
+          "budget": null,
+          "achv_rate": null
+        },
+        {
+          "node_desc2": "国际营销中心",
+          "actual": "14707253.2872070000",
+          "budget": "13788805.4500000000",
+          "achv_rate": "106.6608223644710300"
+        },
+        {
+          "node_desc2": "瓷砖事业部",
+          "actual": "472816360.5523800000",
+          "budget": "596425500.0300000000",
+          "achv_rate": "79.27500761261842388000"
+        },
+        {
+          "node_desc2": "丽适岩板",
+          "actual": "1757839.8908160000",
+          "budget": "2486400.0000000000",
+          "achv_rate": "70.69819380694980695000"
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "budget_vs_actual",
+      "question": "2026年5月瓷砖事业部预算vs实际",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual, SUM(ambperformance_ys) as budget, SUM(ambperformance) - SUM(ambperformance_ys) as diff FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-05",
+          "actual": "505206331.1828240000",
+          "budget": "673771500.0900000000",
+          "diff": "-168565168.9071760000"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "budget_vs_actual",
+      "question": "2026年4月瓷砖事业部预算vs实际",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual, SUM(ambperformance_ys) as budget, SUM(ambperformance) - SUM(ambperformance_ys) as diff FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-04' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth",
+      "row_count": 1,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-04",
+          "actual": "472816360.5523800000",
+          "budget": "596425500.0300000000",
+          "diff": "-123609139.4776200000"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "region_breakdown",
+      "question": "2026年5月瓷砖事业部按省份达成TOP10",
+      "sql": "SELECT region_province_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND region_province_name IS NOT NULL AND ambperformance > 0 GROUP BY region_province_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "region_province_name": "广东",
+          "actual": "116609721.6738000000"
+        },
+        {
+          "region_province_name": "江苏",
+          "actual": "35308983.3673000000"
+        },
+        {
+          "region_province_name": "浙江",
+          "actual": "32037616.9094000000"
+        },
+        {
+          "region_province_name": "湖南",
+          "actual": "30683714.7771000000"
+        },
+        {
+          "region_province_name": "山东",
+          "actual": "28649254.9234000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "region_breakdown",
+      "question": "2026年5月卫浴事业部按省份达成TOP10",
+      "sql": "SELECT region_province_name, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '卫浴事业部' AND data_source IN ('S','T','D','') AND region_province_name IS NOT NULL AND ambperformance > 0 GROUP BY region_province_name ORDER BY actual DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "region_province_name": "广东",
+          "actual": "24490184.8180000000"
+        },
+        {
+          "region_province_name": "福建",
+          "actual": "4102329.0907000000"
+        },
+        {
+          "region_province_name": "浙江",
+          "actual": "3674006.5116000000"
+        },
+        {
+          "region_province_name": "湖南",
+          "actual": "2707047.8551000000"
+        },
+        {
+          "region_province_name": "江苏",
+          "actual": "2150385.4006000000"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "high_value_analysis",
+      "question": "2026年5月高值产品按渠道达成",
+      "sql": "SELECT integrate_channel_code, SUM(high_value_month_achievement) as hv_amt FROM dm.ct_sales_performance_t WHERE calday = '20260531' GROUP BY integrate_channel_code ORDER BY hv_amt DESC",
+      "row_count": 3,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel_code": "GD03",
+          "hv_amt": "18957536.4206040000"
+        },
+        {
+          "integrate_channel_code": "GD01",
+          "hv_amt": "0E-10"
+        },
+        {
+          "integrate_channel_code": "GD02",
+          "hv_amt": "0E-10"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "high_value_analysis",
+      "question": "2026年4月高值产品按渠道达成",
+      "sql": "SELECT integrate_channel_code, SUM(high_value_month_achievement) as hv_amt FROM dm.ct_sales_performance_t WHERE calday = '20260430' GROUP BY integrate_channel_code ORDER BY hv_amt DESC",
+      "row_count": 3,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel_code": "GD03",
+          "hv_amt": "16941929.9850180000"
+        },
+        {
+          "integrate_channel_code": "GD01",
+          "hv_amt": "0E-10"
+        },
+        {
+          "integrate_channel_code": "GD02",
+          "hv_amt": "0E-10"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "cross_division_rank",
+      "question": "2026年5月各事业部业绩排名",
+      "sql": "SELECT node_desc2, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND data_source IN ('S','T','D','') AND node_desc2 IS NOT NULL GROUP BY node_desc2 ORDER BY actual DESC",
+      "row_count": 6,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "node_desc2": "瓷砖事业部",
+          "actual": "505206331.1828240000"
+        },
+        {
+          "node_desc2": "卫浴事业部",
+          "actual": "65702540.8501420000"
+        },
+        {
+          "node_desc2": "国际营销中心",
+          "actual": "14702200.5849040000"
+        },
+        {
+          "node_desc2": "丽适岩板",
+          "actual": "1207635.0076000000"
+        },
+        {
+          "node_desc2": "过渡部门",
+          "actual": "43963.2037000000"
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "cross_division_rank",
+      "question": "2026年4月各事业部业绩排名",
+      "sql": "SELECT node_desc2, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-04' AND data_source IN ('S','T','D','') AND node_desc2 IS NOT NULL GROUP BY node_desc2 ORDER BY actual DESC",
+      "row_count": 6,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "node_desc2": "瓷砖事业部",
+          "actual": "472816360.5523800000"
+        },
+        {
+          "node_desc2": "卫浴事业部",
+          "actual": "51264219.9677690000"
+        },
+        {
+          "node_desc2": "国际营销中心",
+          "actual": "14707253.2872070000"
+        },
+        {
+          "node_desc2": "丽适岩板",
+          "actual": "1757839.8908160000"
+        },
+        {
+          "node_desc2": "公司层面",
+          "actual": "0E-10"
+        }
+      ],
+      "checksum": "rows=6"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "yoy_growth_warning",
+      "question": "2026年5月同比下滑的渠道",
+      "sql": "SELECT integrate_channel_code, SUM(month_achievement) as cur, SUM(last_year_month_achievement) as yoy, (SUM(month_achievement) - SUM(last_year_month_achievement)) / NULLIF(SUM(last_year_month_achievement),0) * 100 as yoy_rate FROM dm.ct_sales_performance_t WHERE calday = '20260531' GROUP BY integrate_channel_code HAVING SUM(month_achievement) < SUM(last_year_month_achievement) ORDER BY yoy_rate ASC",
+      "row_count": 3,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel_code": "GD02",
+          "cur": "69806269.9892000000",
+          "yoy": "85733490.9871000000",
+          "yoy_rate": "-18.57759530671218065100"
+        },
+        {
+          "integrate_channel_code": "GD01",
+          "cur": "225047033.0127830000",
+          "yoy": "269676247.9020000000",
+          "yoy_rate": "-16.54918267234094677100"
+        },
+        {
+          "integrate_channel_code": "GD03",
+          "cur": "219043538.5979410000",
+          "yoy": "227157059.8838420000",
+          "yoy_rate": "-3.57176716851762974400"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "yoy_growth_warning",
+      "question": "2026年4月同比下滑的渠道",
+      "sql": "SELECT integrate_channel_code, SUM(month_achievement) as cur, SUM(last_year_month_achievement) as yoy, (SUM(month_achievement) - SUM(last_year_month_achievement)) / NULLIF(SUM(last_year_month_achievement),0) * 100 as yoy_rate FROM dm.ct_sales_performance_t WHERE calday = '20260430' GROUP BY integrate_channel_code HAVING SUM(month_achievement) < SUM(last_year_month_achievement) ORDER BY yoy_rate ASC",
+      "row_count": 3,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "integrate_channel_code": "GD02",
+          "cur": "65842983.1897000000",
+          "yoy": "90649111.2537000000",
+          "yoy_rate": "-27.36499864248530627500"
+        },
+        {
+          "integrate_channel_code": "GD01",
+          "cur": "217247309.6822310000",
+          "yoy": "276291219.6910270000",
+          "yoy_rate": "-21.37017241258121152300"
+        },
+        {
+          "integrate_channel_code": "GD03",
+          "cur": "198746369.0927490000",
+          "yoy": "246519195.0283200000",
+          "yoy_rate": "-19.37894772457085218200"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "monthly_trend",
+      "question": "瓷砖事业部2026年1-5月业绩趋势",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth BETWEEN '2026-01' AND '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth ORDER BY calmonth",
+      "row_count": 5,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-01",
+          "actual": "235326388.2424600000"
+        },
+        {
+          "calmonth": "2026-02",
+          "actual": "45844138.7265000000"
+        },
+        {
+          "calmonth": "2026-03",
+          "actual": "427430907.2870940000"
+        },
+        {
+          "calmonth": "2026-04",
+          "actual": "472816360.5523800000"
+        },
+        {
+          "calmonth": "2026-05",
+          "actual": "505206331.1828240000"
+        }
+      ],
+      "checksum": "rows=5"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "monthly_trend",
+      "question": "卫浴事业部2026年1-5月业绩趋势",
+      "sql": "SELECT calmonth, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth BETWEEN '2026-01' AND '2026-05' AND node_desc2 = '卫浴事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth ORDER BY calmonth",
+      "row_count": 5,
+      "elapsed_ms": 0,
+      "data": [
+        {
+          "calmonth": "2026-01",
+          "actual": "63813379.3937250000"
+        },
+        {
+          "calmonth": "2026-02",
+          "actual": "12614011.1468860000"
+        },
+        {
+          "calmonth": "2026-03",
+          "actual": "81549260.6614630000"
+        },
+        {
+          "calmonth": "2026-04",
+          "actual": "51264219.9677690000"
+        },
+        {
+          "calmonth": "2026-05",
+          "actual": "65702540.8501420000"
+        }
+      ],
+      "checksum": "rows=5"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/02/10 11:32:51 GMT+08:00
+-- ******************************************************************** --
+SELECT MONTH_ID FROM DM.dm_dim_date_d  
+WHERE MONTH_ID BETWEEN '201801' AND '202303' 
+GROUP BY MONTH_ID

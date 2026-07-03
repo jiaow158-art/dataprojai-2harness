@@ -1,0 +1,214 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/01/10 14:08:28 GMT+08:00
+-- describe:DM_SW.DM_SO_TRANSIT_INVENTORY_ALL_T的新逻辑
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with dim_data as 
+(
+select distinct substring(day_mend_dt,1,7) day_mend_dt
+from dm.dm_dim_date_d
+where day_dt >= '2023-01-01'
+and day_dt <= CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01')   -- 传昨天，小于当月1号
+)
+
+,operation_center_data as(  -- 客户数据
+     select case when length(cust_code) <=6 then concat('0000',cust_code) else cust_code end as cust_code  ,
+        abbreviation as cust_short_name,
+        is_rtm --是否是RTM的客户
+     from sdi.sdi_b1_customer_data_1037
+     where cust_type = 'SW'
+)
+--RTM-B1:采购订单-在途数量
+,rtm_b1 as (
+select 
+	substring(t1.creation_date,1,7) as stat_month--使用创建日期
+	,t2.distributor_code as cust_code
+	,COALESCE(t3.cust_short_name,t2.distributor_name) as cust_short_name--运中（简称）--需要调整为简称 - t2.distributor_name
+	,t2.source_code as sap_delivery_num--SAP提货单号
+	,t1.product_code as material_num--物料编码
+	,t1.product_name as material_name--物料名称
+	,null as pickup_goods_date--总部出库时间
+	,null as in_stock_date--运中入库时间
+	,0 as pickup_goods_qty--总部出库数量
+	,0 as in_stock_qty--云中入库数量
+	,sum(case when t2.order_status <> 'CANCELLED' then t1.po_qty - t1.in_qty - t1.stop_qty else 0 end)  as in_transit_qty--在途数量:采购数量 - 已入库数量 - 中止数量
+	,sum(case when t2.order_status <> 'CANCELLED' then (t1.po_qty - t1.in_qty - t1.stop_qty)*t1.tax_price else 0 end)  as in_transit_amt--在途金额
+	,null as return_date
+	,0 as return_qty
+from SDI.sdi_dtwms_po_line_1031 t1
+left join SDI.sdi_dtwms_po_headers_1031 t2 on t1.po_header_id = t2.po_header_id
+join operation_center_data t3 on t2.distributor_code = t3.cust_code and t3.is_rtm = 'Y'
+where 1=1
+group by 
+substring(t1.creation_date,1,7)
+,t2.distributor_code
+,COALESCE(t3.cust_short_name,t2.distributor_name)
+,t2.source_code
+,t1.product_code
+,t1.product_name
+)
+
+--SAP-B1在途数量:采购预留发票未清
+,sap_b1 as 
+(
+select 
+substring(t1.sap_delivery_date,1,7) as stat_month	--提货日期
+,t1.CUST_CODE		-- 供应商编码
+,COALESCE(t3.cust_short_name,cust.CUST_NAME) as cust_short_name		-- 供应商名称
+,t1.SAP_DELIVERY_NUM as sap_delivery_num--SAP提货单号
+,t1.MATERIAL_NUM as material_num	--物料编码
+,t1.MATERIAL_NAME as material_name	--物料名称
+,null as pickup_goods_date--总部出库时间
+,null as in_stock_date--运中入库时间
+,0 as pickup_goods_qty--总部出库数量
+,0 as in_stock_qty--云中入库数量
+,sum(t1.outstand_qty)  as in_transit_qty--在途数量:采购数量 - 已入库数量 - 中止数量
+,sum(t1.outstand_qty*t1.PRICE) as in_transit_amt--在途金额
+,null as return_date
+,0 as return_qty
+from DM.DM_B1_PUR_INTOWH_T t1
+--left join dwiotd.dwi_wm_b1_opch_t t2 on t1.docentry = t2.docentry 
+left join operation_center_data t3 on t1.CUST_CODE = t3.cust_code
+LEFT JOIN DWRDIM.dwr_dim_cust_general_d cust ON t1.CUST_CODE = cust.cust_num   and cust.end_date ='4712-12-31'
+where 1=1
+group by
+substring(t1.sap_delivery_date,1,7)
+,t1.CUST_CODE	
+,COALESCE(t3.cust_short_name,cust.CUST_NAME) 
+,t1.SAP_DELIVERY_NUM 
+,t1.MATERIAL_NUM 
+,t1.MATERIAL_NAME
+)
+,orgin_data as 
+(
+select t1.stat_month,
+	   t1.cust_code,
+	   t1.cust_short_name,
+	   t1.sap_delivery_num,
+	   t1.material_num,
+	   t2.material_name,
+	   t1.pickup_goods_date,
+	   t1.in_stock_date,
+	   t1.pickup_goods_qty,
+	   t1.in_stock_qty,
+	   case when t1.in_transit_qty < 0 or t1.cust_code not in ('湖南锦辉铭','广西升钻','福建万艺祥','江西高时') then 0 else t1.in_transit_qty end in_transit_qty,
+	   current_timestamp() as dw_last_update_date ,
+	   case when t1.in_transit_amt < 0 or t1.cust_code not in ('湖南锦辉铭','广西升钻','福建万艺祥','江西高时') then 0 else t1.in_transit_amt end in_transit_amt,
+	   t1.return_date,
+	   t1.return_qty,
+	   row_number() over(PARTITION by t1.sap_delivery_num,t1.cust_code,t1.material_num order by t1.pickup_goods_date desc) rn
+from DM_SW.DM_SO_TRANSIT_INVENTORY_T t1
+join dwimd.dwi_md_data_material_general_t t2
+on t1.material_num = t2.material_num
+where t2.product_level1_code in ('30','40')
+and t2.external_matl_group_code <> '10050'
+)
+,all_data as 
+(
+select 
+	t1.stat_month
+	,t1.cust_short_name
+	,t1.sap_delivery_num
+	,t1.material_num
+	,t1.material_name
+	,t1.pickup_goods_qty
+	,t1.in_stock_qty
+	,t1.in_transit_qty
+	,t1.in_transit_amt
+	,t1.return_qty
+from orgin_data t1
+union all 
+select
+	t2.day_mend_dt as stat_month
+	,t1.cust_short_name
+	,t1.sap_delivery_num
+	,t1.material_num
+	,t1.material_name
+	,t1.pickup_goods_qty
+	,t1.in_stock_qty
+	,t1.in_transit_qty
+	,t1.in_transit_amt
+	,t1.return_qty
+from rtm_b1 t1
+left join dim_data t2 on concat(t2.day_mend_dt,'-01') between  concat(t1.stat_month,'-01') and add_months(concat(t1.stat_month,'-01'),3)
+where t1.in_transit_qty <> 0
+union all 
+select
+	t2.day_mend_dt as stat_month
+	,t1.cust_short_name
+	,t1.sap_delivery_num
+	,t1.material_num
+	,t1.material_name
+	,t1.pickup_goods_qty
+	,t1.in_stock_qty
+	,t1.in_transit_qty
+	,t1.in_transit_amt
+	,t1.return_qty
+from sap_b1 t1
+left join dim_data t2 on concat(t2.day_mend_dt,'-01') between  concat(t1.stat_month,'-01') and add_months(concat(t1.stat_month,'-01'),3)
+where t1.in_transit_qty <> 0
+)
+,sum_data as 
+(
+select 
+	t1.stat_month
+	,t1.cust_short_name
+	,t1.sap_delivery_num
+	,t1.material_num
+	,t2.material_name
+	,sum(COALESCE(t1.pickup_goods_qty,0)) as pickup_goods_qty
+	,sum(COALESCE(t1.in_stock_qty,0)) as in_stock_qty
+	,sum(COALESCE(t1.in_transit_qty,0)) as in_transit_qty
+	,sum(COALESCE(t1.in_transit_amt,0)) as in_transit_amt
+	,sum(COALESCE(t1.return_qty,0)) as return_qty
+from all_data t1
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T t2 on t1.material_num = t2.material_num
+group by 
+t1.stat_month
+,t1.cust_short_name
+,t1.sap_delivery_num
+,t1.material_num
+,t2.material_name
+)
+
+INSERT OVERWRITE TABLE DM_SW.dm_so_transit_inventory_all_t_new PARTITION(partition_ym)
+select 
+	t1.stat_month
+	,t1.cust_short_name as cust_code 
+	,t1.cust_short_name
+	,t1.sap_delivery_num
+	,t1.material_num
+	,t1.material_name
+	,t2.pickup_goods_date
+	,t2.in_stock_date
+	,t1.pickup_goods_qty
+	,t1.in_stock_qty
+	,t1.in_transit_qty
+	,current_timestamp() as dw_last_update_date
+	,t1.in_transit_amt
+	,t2.return_date
+	,t1.return_qty
+	,t1.stat_month as partition_ym
+from sum_data t1
+left join orgin_data t2 on t1.stat_month = t2.stat_month 
+		and t1.cust_short_name = t2.cust_short_name and t1.sap_delivery_num = t2.sap_delivery_num and t1.material_num = t2.material_num
+left join orgin_data t3 on t1.cust_short_name = t3.cust_short_name and t1.sap_delivery_num = t3.sap_delivery_num and t1.material_num = t3.material_num and t3.rn = 1
+where 1=1 
+-- 因为记录90，需要剔除：新增部分可能多出来的一个月数据
+and ((t2.material_num is not null) or (t3.material_num is null ))
+and t1.STAT_MONTH >= 
+	CASE
+		WHEN substring('${PERIOD_ID_D}',-2) IN ('01','02','03') THEN SUBSTRING(ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3),1,7) --1月：>=10月 传昨天，所在月份1号的前3个月
+	ELSE
+	   SUBSTRING('${PERIOD_ID_D}',1,7)  -- 传昨天，当月
+	END

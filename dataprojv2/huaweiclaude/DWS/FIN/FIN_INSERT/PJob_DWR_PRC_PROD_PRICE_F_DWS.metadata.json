@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PRC_PROD_PRICE_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "产品定价",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

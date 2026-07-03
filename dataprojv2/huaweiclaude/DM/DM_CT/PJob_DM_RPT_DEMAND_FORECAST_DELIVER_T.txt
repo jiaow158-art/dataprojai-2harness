@@ -1,0 +1,172 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/01 10:24:38 GMT+08:00
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with tmp as(
+select
+     t1.vbeln as order_no,t1.posnr as order_item_no,
+     t1.MATNR as material_num,
+     t4.material_name,
+     lve2_code as prod_name3, 
+     t4.DIMENSION,
+     case when t1.VTWEG = '06' THEN '工程'
+             WHEN t4.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+             WHEN t1.VTWEG = '08' THEN '大包'
+             WHEN t4.RESERVED_FIELD_1 IN( 'G103','G104','G102') AND t4.RESERVED_FIELD_3 = 'A9' THEN '大包' 
+             ELSE '零售' END as channel_name,
+     t1.vkgrp,
+     t5.lev4_code as sale_grp_name1,
+     t5.lev5_code as sub_grp_name1,
+     t5.lev3_code as sale_grp_name0, 
+     case when   t1.werks not like '%80'
+and t1.matnr not like '%_B'
+and coalesce(t1.CZJHDH,'')=''  
+and t1.ERNAM not like '10%' then (case when WQRSL<=0 and coalesce(t1.CHARG,'')='' then KWMENG else greatest(WQRSL,0) end)*(case when t1.meins  = 'M2' then 1 else t4.product_area end ) else 0 end as nodeliver_area,  -- 销售订单未交总数
+    case when coalesce(t1.CHARG,'')<>'' then greatest(coalesce(t1.VMENG,0)-coalesce(t1.MENGEF,0),0)*(case when t1.meins  = 'M2' then 1 else t4.product_area end ) end as delivernosend_area,-- 留备货数
+    t1.bstdk as expect_date,
+    t1.first_confirm_date as first_confirm_date,
+    lve3_code as prod_name4
+from dm.dm_otd_sales_order_det_t  t1
+left join 
+(
+select 
+t1.material_num
+,t1.material_name
+,LENGTH_1--长度
+,WIDTH--宽度
+,DIMENSION--规格
+,WIDTH*LENGTH_1/1000/1000 as product_area -- 面积
+,t1.RESERVED_FIELD_1
+,t1.RESERVED_FIELD_3
+,COALESCE(t2.lve2_code,'其他品类') lve2_code
+,COALESCE(t2.lve3_code,'其他杂类') lve3_code
+from dwimd.dwi_md_data_material_general_t t1
+left join dm.dm_rpt_prod_level_t  t2 On t1.product_level3_code = t2.prod_code3 
+ WHERE t1.group_num='800'
+
+) t4  ON  t1.MATNR = t4.material_num
+left join  DM.DM_RPT_SALE_GRP_T t5 ON t1.vkgrp = t5.sale_grp 
+where t1.MATKL IN('1000010')   -- 瓷砖
+--and t1.EXTWG = '10010'  
+and t5.lev2_code ='瓷砖事业部'
+and substr(t1.WERKS,1,2) in('12','13','15','16','17','18','19','75','77','79','8A')  
+and substr(t1.LGORT,1,2) not in('00','BC')  and t1.LGORT<>'GFZ'
+and coalesce(t1.ABGRU,'') in('')
+and substr(t1.VBELN,1,3) not in ('113')
+
+        
+union all
+
+select t1.zjhd ,t1.zjhdid,
+     t1.MATNR as material_num,
+     t4.material_name,
+     t4.lve2_code as prod_name3, 
+     t4.DIMENSION,
+     case when t1.VTWEG = '06' THEN '工程'
+             WHEN t4.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+             WHEN t1.VTWEG = '08' THEN '大包'
+             WHEN t4.RESERVED_FIELD_1 IN( 'G103','G104','G102') AND t4.RESERVED_FIELD_3 = 'A9' THEN '大包' 
+             ELSE '零售' END as channel_name,
+     t1.vkgrp,
+     t5.lev4_code as sale_grp_name1,
+     t5.lev5_code as sub_grp_name1,
+     t5.lev3_code as sale_grp_name0, 
+     case when  
+ t1.werks not like '%80'
+and t1.matnr not like '%_B'
+and coalesce(t1.jjyy, '') <>'转换订单' then greatest((t1.menge-(t1.prlab+t1.zljcksl)),0) else 0  end *t4.product_area  as nodeliver_area, 
+        greatest((t1.prlab),0) *t4.product_area as delivernosend_area,
+    t1.bstdk as expect_date,
+    t1.first_confirm_date as first_confirm_date,
+    lve3_code as prod_name4
+from dm.dm_otd_wbs_plan_order_det_t  t1
+left join 
+(
+select 
+t1.material_num
+,t1.material_name
+,LENGTH_1--长度
+,WIDTH--宽度
+,DIMENSION--规格
+,WIDTH*LENGTH_1/1000/1000 as product_area -- 面积
+,COALESCE(t2.lve2_code,'其他品类') lve2_code
+,COALESCE(t2.lve3_code,'其他杂类') lve3_code
+,t1.RESERVED_FIELD_1
+,t1.RESERVED_FIELD_3
+from dwimd.dwi_md_data_material_general_t t1
+left join dm.dm_rpt_prod_level_t  t2 On t1.product_level3_code = t2.prod_code3 
+ WHERE t1.group_num='800'
+
+) t4  ON  t1.MATNR = t4.material_num
+left join  DM.DM_RPT_SALE_GRP_T t5 ON t1.vkgrp = t5.sale_grp
+where t1.matkl = '1000010'
+--and t1.EXTWG = '10010'
+and t5.lev2_code ='瓷砖事业部'
+and t1.zhuangtai in('当前有效','恢复有效','') 
+AND t1.zjsrq>= '20221011'-- REPLACE(SUBSTRING('20221011',1,10),'-','') 
+and t1.wbs_state <>'标记删除'
+and t1.MENGE > 0
+and substr(t1.WERKS,1,2) in('12','13','15','16','17','18','19','75','77','79','8A')
+),
+tmp2 as(
+select case when prod_name3 in('原石','玻化砖') then '抛光砖'
+            when prod_name3 in('抛釉砖','空气净化砖','通体大理石','新材','ART+','DPI','抛釉砖(不含空气净化砖)') 
+			  or (prod_name3 = '世界印象' and dimension = '900X900')
+			then '抛釉砖'
+            when prod_name3 in('715岩板','918岩板','超大板','大板') 
+              or (prod_name3 = '世界印象' and dimension in('1200X1200','1500X750','1800X900','2400X1800','2400X800','2600X800','2800X1200','4800X2400')) then '大板'
+            when prod_name3 = '瓷片' then '瓷片'
+            when prod_name3 = '精瓷中板' then '中板'
+            when prod_name3 = '仿古砖'
+			  or (prod_name3 = '世界印象' and dimension not in('1200X1200','1500X750','1800X900','2400X1800','2400X800','2600X800','2800X1200','4800X2400','900X900')) then '仿古砖'
+            when prod_name3 = '景观砖' then '景观砖'
+            when prod_name3 in('其他瓷砖','其他品类') then '其他品类'
+             end as prod_name
+       ,case when sale_grp_name1 = '工程市场中心' then '战略工程中心'
+	         when sale_grp_name1 in('直营经营管理板块','区域运营中心') then sub_grp_name1
+			  end as sub_grp_name, --运营中心
+	    a.*
+from  tmp as a
+where (sale_grp_name1 in('直营经营管理板块','区域运营中心') or sale_grp_name0 in ('梦之家事业部','国际营销') or (sale_grp_name1 = '工程市场中心' and (sub_grp_name1 is null or sub_grp_name1 not in ('Z033'))))
+and (prod_name3 in('原石','玻化砖','抛釉砖','空气净化砖','通体大理石','新材','ART+','DPI','715岩板','918岩板','超大板'
+                 ,'世界印象','瓷片','精瓷中板','仿古砖','景观砖','其他瓷砖','其他品类','抛釉砖(不含空气净化砖)','大板'
+				 ) or (prod_name3 = '其他品类' and prod_name4 = '其他杂类'))
+and (a.nodeliver_area>0 or a.delivernosend_area>0)
+)
+INSERT OVERWRITE TABLE DM.DM_RPT_DEMAND_FORECAST_DELIVER_T partition (stat_month)
+select t1.order_no,t1.order_item_no,t1.material_num,t1.material_name, t1.channel_name,t1.vkgrp,
+       t1.prod_name ,
+       case when t1.prod_name = '抛光砖' and t1.dimension in('600X600','800X800') then t1.dimension
+            when t1.prod_name = '抛光砖' then '其他规格'
+			when t1.prod_name = '抛釉砖' and t1.dimension in('600X600','800X800','1200X600') then t1.dimension
+			when t1.prod_name = '抛釉砖' then '其他规格'
+			when t1.prod_name = '大板' and t1.dimension in('1500X750','2600X800','1800X900') then t1.dimension
+			when t1.prod_name = '大板' then '其他规格'
+			when t1.prod_name = '瓷片' and t1.dimension in('300X300','600X300','800X400') then t1.dimension
+			when t1.prod_name = '瓷片' then '其他规格'
+			when t1.prod_name = '中板' and t1.dimension in('600X300','800X400') then t1.dimension
+			when t1.prod_name = '中板' then '其他规格'
+			when t1.prod_name = '仿古砖' and t1.dimension in('600X298','600X600','800X800','1200X600') then t1.dimension
+			when t1.prod_name = '仿古砖' then '其他规格'
+			when t1.prod_name = '景观砖' and t1.dimension in('600X600','1200X600') then t1.dimension
+			when t1.prod_name = '景观砖' then '其他规格'
+			when t1.prod_name = '其他品类' then '其他规格'
+			 end as dimension,
+       case when t1.sub_grp_name = '佛山子公司' or t1.sub_grp_name = '广州子公司' then '广佛子公司' else t1.sub_grp_name end sub_grp_name,
+       t1.nodeliver_area,
+       t1.delivernosend_area,
+       CURRENT_TIMESTAMP() as  dw_last_update_date ,
+       t1.prod_name3 ,
+       t1.expect_date,
+       t1.first_confirm_date,
+       SUBSTRING('${PERIOD_ID_D}',1,6) as stat_month --REPLACE(SUBSTRING('20221011',1,7),'-','') as stat_month
+       from tmp2 as t1 ;

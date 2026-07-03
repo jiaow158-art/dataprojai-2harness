@@ -1,0 +1,34 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/12 14:36:33 GMT+08:00
+-- UPDATE FROM CHENZHIYONG 20230215 新增经销商:321991
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_ITL1_T
+SELECT
+	'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+	CUSTCODE AS customer_code, -- 客户编码
+	LogEntry, -- 日志内部标识
+	ItemCode, -- 物料代码
+	SysNumber, -- 系统编号
+	Quantity, -- 数量
+	AllocQty, -- 已分配数量
+	MdAbsEntry, -- MD Abs Entry
+	ReleaseQty, -- 下达数量
+	PickedQty, -- 拣配的数量
+	CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_CT_ITL1_1010
+UNION ALL
+SELECT
+	'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+	CUSTCODE AS customer_code, -- 客户编码
+	LogEntry, -- 日志内部标识
+	ItemCode, -- 物料代码
+	SysNumber, -- 系统编号
+	Quantity, -- 数量
+	AllocQty, -- 已分配数量
+	MdAbsEntry, -- MD Abs Entry
+	ReleaseQty, -- 下达数量
+	PickedQty, -- 拣配的数量
+	CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_SW_ITL1_1010;

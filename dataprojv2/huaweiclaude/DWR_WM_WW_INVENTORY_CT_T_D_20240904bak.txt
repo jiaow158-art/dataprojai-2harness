@@ -1,0 +1,12 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/11/01 09:16:31 GMT+08:00
+-- ******************************************************************** --
+
+
+insert INTO DWROTD.DWR_WM_WW_INVENTORY_CT_T_D_20240904bak
+select * from  DWROTD.DWR_WM_WW_INVENTORY_CT_T_D where period_id_d >= concat(substr('${PERIOD_ID_D}',1,8),'01') and period_id_d <=LAST_DAY('${PERIOD_ID_D}')
+
+
+

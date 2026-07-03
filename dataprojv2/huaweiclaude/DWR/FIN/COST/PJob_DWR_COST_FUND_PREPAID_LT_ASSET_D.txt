@@ -1,0 +1,56 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2023/06/02 14:22:17 GMT+08:00
+-- desc：资金成本-预付长期资产款 dwrfin.dwr_cost_fund_prepaid_lt_asset_d
+-- 新增 资金成本 字段 zhz 20230729
+-- 新增是否计算资金成本字段 zhz 20230801
+-- ******************************************************************** --
+set hive.exec.dynamic.partition=ture;
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE dwrfin.dwr_cost_fund_prepaid_lt_asset_d partition (period_id_m)
+select
+  '${period_id_m}'      as year_month                     --年月,
+  ,a.belnr              as acct_voucher                   --会计凭证,
+  ,a.rbukrs             as comp_code                      --"公司代码",
+  ,a.blart              as voucher_type                   --"凭证类型",
+  ,a.racct              as general_ledger_account         --"总账科目",
+  ,a.rwcur              as currency                       --"货币",
+  ,b.lifnr              as supplier_code                  --"供应商编码",
+  ,c.name_org1          as supplier_desc                  --"供应商描述",
+  ,c.bpkind             as supplier_property              --"供应商属性",
+  ,d.text40             as supplier_property_desc         --"供应商属性描述",
+  ,sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '2020-12' then a.hsl else 0 end) 
+                        as currency_balance_202012        --"截止2020余额",
+  ,sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '${period_id_m}' then a.hsl else 0 end) 
+                        as current_currency_balance       --"截止当月余额",
+  ,sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '${period_id_m1}' then a.hsl else 0 end) 
+                        as last_month_currency_balance    --"截止上月余额",
+  ,current_timestamp()  as dw_last_update_date            --数据同步时间
+  ,(sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '${period_id_m}' then a.hsl else 0 end)
+  +sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '${period_id_m1}' then a.hsl else 0 end)
+  -sum(case when substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '2020-12' then a.hsl else 0 end) * 2) / 2 * 0.04 / 12 as period_fund_cost_asset --资金成本
+  ,case when a.rbukrs = '1900' and b.lifnr in ('0001012766','0001010130') then '否' else '是' end as supplier_property_flag --是否计算资金成本
+  ,'${period_id_m}'     as period_id_m			          --"分区（月）"
+from sdi.sdi_acdoca_1001 a
+left join sdi.sdi_lfa1_1001 b on b.lifnr = a.lifnr
+left join sdi.sdi_but000_1001 c on c.partner = b.lifnr
+left join sdi.sdi_tb004t_1001 d on d.bpkind = c.bpkind and d.spras = '1'
+where a.racct in ('0016030900')
+and substr(a.budat,1,4)||'-'||substr(a.budat,5,2) <= '${period_id_m}'
+group by   
+  a.belnr ,
+  a.rbukrs ,
+  a.blart ,
+  a.racct ,
+  a.rwcur ,
+  b.lifnr ,
+  c.name_org1 ,
+  c.bpkind ,
+  d.text40
+  
+--   alter table dwrfin.dwr_cost_fund_prepaid_lt_asset_d add columns(supplier_property_flag varchar(10)) cascade;

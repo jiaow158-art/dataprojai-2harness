@@ -1,0 +1,49 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：瓷砖阿米巴业绩和A成本不含税收入线组维度
+-- create time: 2022/12/15 10:41:28 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_CT_AMB_PERFORMANCE_A_COST_NI_TAX_INCOME_LG_D WHERE month = '${PERIOD_ID_M}';
+INSERT INTO DM.DM_CT_AMB_PERFORMANCE_A_COST_NI_TAX_INCOME_LG_D
+select a.months 				as month,
+       a.node_name9             as saels_group,
+       sum(sales_amt)           as sales_amt,
+       sum(notax_sales_net_amt) as notax_sales_net_amt,
+       CURRENT_TIMESTAMP() 	    as dw_last_update_date
+from (
+         --业绩
+         select a.calmonth                             months,
+                sum(coalesce(zxsyj_kjy, 0) + zxsyj_zd) sales_amt,
+                0                                      notax_sales_net_amt,
+                node_name9
+         from dm.dm_rpt_group_achievement_amb_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         where b.node_desc2 = '瓷砖事业部'
+		 and calmonth = '${PERIOD_ID_M}'
+         group by node_name9, calmonth
+         union all
+         --不含税
+         select t1.calmonth           months,
+                0                     sales_amt,
+                sum(nvl(zbhsje, 0) - nvl(zsyjf, 0) + nvl(zfdje, 0) - nvl(zytjf_xt, 0) -
+                    nvl(zytjf_sg, 0)) notax_sales_net_amt,
+                node_name9
+         FROM DM.DM_ZZT_XSSR_T t1
+                  left join DM.DM_RPT_SALES_GROUP_T t2 on t1.sales_grp = t2.node_name9
+                  left join dwimd.dwi_md_data_material_general_t t4 on t1.material = t4.material_num
+                  left join DM.DM_RPT_PROD_LEVEL_T t3
+                            on coalesce(t4.product_level3_code, t4.product_level2_code, '其他杂类') =
+                               coalesce(t3.prod_code3, t3.lve4_code, '其他杂类')
+         where 1 = 1
+		   and calmonth = '${PERIOD_ID_M}'
+           and t2.node_desc2 = '瓷砖事业部'
+           and (bill_type in
+                ('ZF2', 'ZF21', 'ZRE1', 'ZRE2', 'ZS1', 'ZS11', 'ZS2', 'ZS21', 'ZG2', 'ZGS2', 'ZL2', 'ZLS1', 'ZTS1',
+                 'ZT1', 'ZT2', 'ZT3', 'ZTS2', 'ZTS3', 'ZP1') or bill_type is null)
+           and (t4.matl_group_code not in ('9000010', '8000010', '7000011', '7000010') or t4.matl_group_code is null)
+           and (zkpzt <> 'E' or zkpzt is null)
+           and (CUST_GROUP <> 'Z0' or CUST_GROUP is null)
+         group by node_name9, t1.calmonth
+     ) a
+ group by a.months, a.node_name9

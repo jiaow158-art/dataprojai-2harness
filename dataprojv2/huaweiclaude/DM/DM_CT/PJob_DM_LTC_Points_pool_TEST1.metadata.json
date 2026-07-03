@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_Points_pool_TEST1",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "卫浴工程积分明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "DWR_MD_GENERAL_CONFIG_CODE_R_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

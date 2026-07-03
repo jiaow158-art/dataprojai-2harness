@@ -1,0 +1,16 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/16 10:26:53 GMT+08:00
+-- table desc:头部装企主档信息(DWI)
+-- update from chenzhiyong 20220316 add
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_SO_HEADER_DECBUSINESS_INFO_T
+SELECT
+  MANDT,
+  ZQBM,
+  ZQMC,
+  'N' AS DEL_FLAG,
+  current_timestamp() as DW_LAST_UPDATE_DATE
+FROM SDI.SDI_ZTBZQ_1001
+WHERE DEL_FLAG = 'N';

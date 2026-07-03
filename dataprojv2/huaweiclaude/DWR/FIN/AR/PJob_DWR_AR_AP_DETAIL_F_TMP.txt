@@ -1,0 +1,129 @@
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+SET hive.exec.dynamic.partition=true;  
+SET hive.exec.dynamic.partition.mode=nonstrict; 
+SET hive.exec.max.dynamic.partitions.pernode = 1000;
+SET hive.exec.max.dynamic.partitions=1000;
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_AP_DETAIL_F PARTITION(PERIOD_ID_M) 
+SELECT
+S.GROUP_NUM                          AS          GROUP_NUM,
+S.FISCAL_YEAR                        AS          FISCAL_YEAR,
+S.COMPANY_ID                         AS          COMPANY_ID,
+S.COMPANY_CODE                       AS          COMPANY_CODE,
+COM.COMPANY_NAME                     AS          COMPANY_NAME,
+S.CUST_ID                            AS          CUST_ID,
+S.CUST_NUM                           AS          CUST_NUM,
+CUS.CUST_NAME                        AS          CUST_NAME,
+S.SUPPLIER_OR_CREDITOR_ID            AS          SUPPLIER_OR_CREDITOR_ID,
+S.SUPPLIER_OR_CREDITOR_NUM           AS          SUPPLIER_OR_CREDITOR_NUM,
+SUP.supplier_or_creditor_name        AS          SUPPLIER_OR_CREDITOR_NAME,
+S.ACCOUNT_NUM                        AS          ACCOUNT_NUM,
+ACC.GL_ACCOUNT_NAME                  AS          ACCOUNT_NAME,
+S.account_voucher_num                AS          account_voucher_num,
+S.LEDGER_POST_ITEM                   AS          LEDGER_POST_ITEM,
+S.LEDGER_CODE                        AS          LEDGER_CODE,
+S.ACC_VOUCHER_LINE_ITEM_QTY          AS          ACC_VOUCHER_LINE_ITEM_QTY,
+HEAD1.OBJECT_KEY                     AS          OBJECT_KEY,
+S.REFERENCE_PROCESS                  AS          REFERENCE_PROCESS,
+S.BILL_SHORT_NUM                     AS          BILL_SHORT_NUM,
+S.VOUCHER_TYPE                       AS          VOUCHER_TYPE,
+S.VOUCHER_DATE                       AS          VOUCHER_DATE,
+S.VOUCHER_POST_DATE                  AS          POST_DATE,
+S.ITEM_TEXT                          AS          ITEM_TEXT,
+S.SQUARE_UP_BILL_NUM                 AS          SQUARE_UP_BILL_NUM,
+S.ACCOUNT_PERIOD                     AS          ACCOUNT_PERIOD,
+S.FUNCTION_SCOPE                     AS          FUNCTION_SCOPE,
+HEAD1.LOCAL_CURRENCY_CODE            AS          LOCAL_CURRENCY_CODE,
+S.POST_PERIOD                        AS          POST_PERIOD,
+S.COST_CENTER                        AS          COST_CENTER,
+S.RELEVANT_INVOICE_LINE_ITEM         AS          RELEVANT_INVOICE_LINE_ITEM,
+S.MATERIAL_NUM                       AS          MATERIAL_NUM,
+S.OFFSET_ACCOUNT_NUM                 AS          OFFSET_ACCOUNT_NUM,
+S.QUANTITY                           AS          QUANTITY,
+HEAD3.SALES_PURCHASE_TAX_CODE        AS          SALES_PURCHASE_TAX_CODE,
+S.CASH_FLOW                          AS          CASH_FLOW, 
+S.SQUARE_UP_DATE                     AS          SQUARE_UP_DATE,
+S.VOUCHER_STATUS                     AS          VOUCHER_STATUS, 
+S.PURCHASE_VOUCHER_NUM               AS          PURCHASE_VOUCHER_NUM, 
+S.BUSINESS_SCOPE                     AS          BUSINESS_SCOPE, 
+S.ACCOUNT_TYPE                       AS          ACCOUNT_TYPE, 
+S.PURCHASE_VOUCHER_ITEM_NUM          AS          PURCHASE_VOUCHER_ITEM_NUM, 
+S.GL_TRANSACTION_TYPE                AS          GL_TRANSACTION_TYPE, 
+S.TRADE_PARTNER_COMPANY_ID           AS          TRADE_PARTNER_COMPANY_ID, 
+HEAD1.CURRENCY_CODE                  AS          CURRENCY_CODE,
+HEAD3.DRAFT_DUE_DATE                 AS          DRAFT_DUE_DATE,
+CUST.PAY_TERM_CODE                   AS          PAY_TERM_CODE,
+HEAD1.EX_RATE                        AS          EX_RATE,
+HEAD3.SETTLEMENT_PAYMENT_CARD        AS          SETTLEMENT_PAYMENT_CARD,
+S.TRANSACTION_TYPE                   AS          TRANSACTION_TYPE,
+S.TRADE_PARTNER_BUSINESS_SCOPE       AS          TRADE_PARTNER_BUSINESS_SCOPE,
+S.BAL_TC_AMT                         AS          BAL_TC_AMT,
+S.COMPANY_CURRENCY_CODE              AS          COMPANY_CURRENCY_CODE,
+S.COMPANY_CURRENCY_AMT               AS          COMPANY_CURRENCY_AMT,
+S.TC_AMT                             AS          TC_AMT,
+S.GLOBAL_CURRENCY_CODE               AS          GLOBAL_CURRENCY_CODE,
+S.GLOBAL_CURRENCY_FIXED_AMT          AS          GLOBAL_CURRENCY_FIXED_AMT,
+S.GLOBAL_CURRENCY_AMT                AS          GLOBAL_CURRENCY_AMT,
+HEAD1.BUSINESS_TRANSACTION           AS          BUSINESS_TRANSACTION,  
+HEAD3.CREDIT_CONTROL_SCOPE           AS          CREDIT_CONTROL_SCOPE,
+HEAD3.GL_ACCOUNT                     AS          GL_ACCOUNT,
+HEAD3.CONTRACT_NUMBER                AS          CONTRACT_NUMBER,
+HEAD3.CONTRACT_TYPE                  AS          CONTRACT_TYPE,
+HEAD3.SALE_VOUCHER_NUM               AS          SALE_VOUCHER_NUM,
+HEAD3.BILL_VOUCHER_NUM               AS          BILL_VOUCHER_NUM,
+HEAD3.CASH_FLOW_TYPE                 AS          CASH_FLOW_TYPE,
+D.DRAFT_DRAWER_NAME                  AS          DRAFT_DRAWER_NAME,
+D.DRAFT_DRAWEE_NAME                  AS          DRAFT_DRAWEE_NAME,
+D.DRAFT_SIGN_DATE                    AS          DRAFT_SIGN_DATE,
+D.BANK_NAME                          AS          BANK_NAME,
+D.DRAFT_LONG_NUM                     AS          DRAFT_LONG_NUM,
+S.DEL_FLAG                           AS          DEL_FLAG,
+CURRENT_TIMESTAMP()                  AS          DW_LAST_UPDATE_DATE,
+S.PERIOD_ID 						 AS          PERIOD_ID_M
+FROM DWIFIN.DWI_GL_ACCOUNT_VOUCHER_T  S
+INNER JOIN DWIMD.DWI_MD_COMPANY_T COM   --关联公司主数据
+ON  COM.COMPANY_ID = S.COMPANY_ID 
+AND COM.END_DATE ='4712-12-31' 
+AND COM.GROUP_NUM = S.GROUP_NUM 
+AND COM.DEL_FLAG = 'N' 
+INNER JOIN DWIMD.DWI_MD_CUST_GENERAL_T CUS   --关联客户主数据
+ON CUS.CUST_ID = S.CUST_ID 
+AND CUS.END_DATE ='4712-12-31' 
+AND CUS.GROUP_NUM = S.GROUP_NUM 
+AND CUS.DEL_FLAG = 'N' 
+INNER JOIN DWIMD.DWI_MD_SUPPLIER_GENERAL_T SUP   --关联供应商主数据
+ON SUP.SUPPLIER_OR_CREDITOR_ID = S.SUPPLIER_OR_CREDITOR_ID 
+AND SUP.group_num = S.GROUP_NUM
+AND SUP.END_DATE ='4712-12-31' 
+AND SUP.DEL_FLAG = 'N'
+LEFT JOIN DWIFIN.DWI_GENERAL_LEDGER_ACCOUNT_T ACC     --和科目表关联取帐目表名称
+ON ACC.GROUP_NUM  = S.GROUP_NUM 
+AND ACC.LANG_CODE ='1' 
+AND ACC.ACCOUNT_STATEMENT_CODE = S.ACCOUNT_TABLE 
+AND ACC.GL_ACCOUNT_NUM = S.ACCOUNT_NUM       
+LEFT JOIN DWIFIN.DWI_GL_ACCOUNT_VOUCHER_HEAD_T HEAD1   --和会计凭证抬头关联取本币
+ON HEAD1.fiscal_year = S.FISCAL_YEAR 
+AND HEAD1.group_num = S.GROUP_NUM  
+AND HEAD1.COMPANY_ID  = S.COMPANY_ID 
+AND HEAD1.ACCOUNT_VOUCHER_NUM = S.ACCOUNT_VOUCHER_NUM 
+LEFT JOIN DWIFIN.DWI_GL_ACCOUNT_VOUCHER_PROJ_T HEAD3   --和会计核算凭证项目关联
+ON HEAD3.fiscal_year = S.FISCAL_YEAR 
+AND HEAD3.group_num = S.GROUP_NUM 
+AND HEAD3.COMPANY_ID  = S.COMPANY_ID 
+AND HEAD3.ACCOUNT_VOUCHER_NUM = S.ACCOUNT_VOUCHER_NUM  
+AND HEAD3.ACC_VOUCHER_LINE_ITEM_QTY = S.ACC_VOUCHER_LINE_ITEM_QTY
+LEFT JOIN DWIMD.DWI_MD_CUST_COMP_CODE_T CUST    --和客户公司主数据关联
+ON CUST.CUST_ID = S.CUST_ID 
+AND CUST.company_id = S.COMPANY_ID  
+AND CUST.group_num = S.GROUP_NUM  
+AND CUST.END_DATE ='4712-12-31'
+AND CUST.DEL_FLAG = 'N'   
+LEFT JOIN DWIFIN.DWI_GL_DRAFT_VOUCHER_T D        --和汇票凭证段关联
+ON  S.ACCOUNT_VOUCHER_NUM  = D.ACCOUNT_VOUCHER_NUM 
+AND S.GROUP_NUM  = D.GROUP_NUM 
+AND S.ACC_VOUCHER_LINE_ITEM_QTY = D.ACC_VOUCHER_LINE_ITEM_QTY 
+AND S.COMPANY_ID =D.COMPANY_ID 
+AND S.FISCAL_YEAR =D.FISCAL_YEAR 
+WHERE SUBSTR(S.ACCOUNT_NUM, 1, 6) IN ('001131','001111','002121','002111');

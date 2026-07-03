@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_OTD_WBS_STOCK_DETAIL",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

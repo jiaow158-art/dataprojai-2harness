@@ -1,0 +1,705 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：集团日报
+-- create time: 2022/09/08 11:34:54 GMT+08:00
+-- ******************************************************************** --
+DELETE
+FROM DM.DM_RPT_GROUP_DAILY_PAPER_T
+WHERE CALDAY = to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd');
+
+INSERT INTO DM.DM_RPT_GROUP_DAILY_PAPER_T
+("事业部编码",
+ "事业部名称",
+ "系统编码",
+ "系统名称",
+ "瓷砖三级编码",
+ "瓷砖三级名称",
+ "子公司编码",
+ "子公司名称",
+ "权限",
+ "当日销售业绩",
+ "当月销售业绩",
+ "当月毛利额",
+ "当月不含税销售净额",
+ "去年同期销售业绩",
+ "去年累计销售业绩",
+ "当年累计销售业绩",
+ "当年累计毛利额",
+ "当年累计不含税销售净额",
+ CALDAY)
+with 卫浴渠道 as (
+    select distinct distr_chan_code, distr_chan
+    from DM.DM_RPT_SALES_ACHIEVEMENT_SEND_RPT_T a
+             join dwrfin.dwr_gl_sales_group_v b on a.sales_grp_code = b.sales_group
+    where b.utilities_dept in ('11000002')
+      and distr_chan is not null),
+     旧数据 as (
+         select sum(zmle_qntq)      zmle_qntq,
+                sum(zxsyj_qntq)     zxsyj_qntq,
+                sum(zxsyj_qnlj)     zxsyj_qnlj,
+                sum(zbhsxsje_qnlj)  zbhsxsje_qnlj,
+                sum(zbhsxsje_qntq)  zbhsxsje_qntq,
+                sum(zmle_qnlj)      zmle_qnlj,
+                subcompany_big_area oldsubcompany_big_area
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+         where calday = to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd')
+           and subcompany_big_area in ('33000063')
+         group by subcompany_big_area
+     ),
+     关联销售部 as (
+         select sales_grp,
+                distr_chan,
+                zqdzhdesc,
+                distr_chandesc,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                    else 0 end                            zxsyj_dr,
+                zmle_dr,
+                zbhsxsje_dr,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                    else 0 end                            zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                    else 0 end                            zxsyj_sy,
+                zmle_sy,
+                zbhsxsje_sy,
+                zxsyj_qntq,
+                zmle_qntq,
+                zbhsxsje_qntq,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                    else 0 end                            zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                zxsyj_qnlj,
+                zmle_qnlj,
+                zbhsxsje_qnlj,
+                coalesce(sales_dept, subcompany_big_area) sales_dept,
+                sales_dept_name,
+                sales_group,
+                utilities_dept,
+                system,
+                subcompany_big_area,
+                case subcompany_big_area_name
+                    when '鹏美' then '鹏美绿家'
+                    when '艺耐' then '卫浴艺耐品牌'
+                    else subcompany_big_area_name end     subcompany_big_area_name,
+                "CUST_GR_CM",
+                extmatlgrp,
+                cust_grp1
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+         where calday = to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd')
+     ),
+     瓷砖事业部 as (
+         select '11000001'              事业部编码,
+                '瓷砖事业部'                 事业部名称,
+                case
+                    when subcompany_big_area in
+                         ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                          '33000065', '33000066', '33000067', '33000068', '33000069',
+                          '33000003', '33000004', '33000005', '33000006', '33000007', '33000008', '33000046',
+                          '33000027', '33000030', '33000056')
+                        then '22000001'--国内营销系统
+                    when subcompany_big_area in ('33000002') then '22000005' --国际营销系统
+                    when subcompany_big_area in ('33000054', '33000055') then '22000016' --瓷砖梦之家系统
+                    when subcompany_big_area in ('33000057') and extmatlgrp != '100060' then '33000057'-- 瓷砖跨事业部交易
+                    when subcompany_big_area in ('00000000') and sales_grp = 'Z67' then 'Z67'--瓷砖包销业务
+                    else '33000072' end 系统编码,
+                case
+                    when subcompany_big_area in
+                         ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                          '33000065', '33000066', '33000067', '33000068', '33000069',
+                          '33000003', '33000004', '33000005', '33000006', '33000007', '33000008', '33000046',
+                          '33000027', '33000030', '33000056')
+                        then '国内营销系统（分区域）'
+                    when subcompany_big_area in ('33000002') then '国际营销系统' --
+                    when subcompany_big_area in ('33000054', '33000055') then '瓷砖梦之家系统' --
+                    when subcompany_big_area in ('33000057') and extmatlgrp != '100060' then '瓷砖跨事业部交易'
+                    when subcompany_big_area in ('00000000') and sales_grp = 'Z67' then '瓷砖包销业务'--瓷砖包销业务
+                    else '乐陶陶' end      系统名称,
+                case
+                    when subcompany_big_area in
+                         ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                          '33000065', '33000066', '33000067', '33000068', '33000069')
+                        then 'quyuyunyingzhongxin'--区域运营中心
+                    when subcompany_big_area in ('33000003', '33000004', '33000005', '33000006', '33000007', '33000008')
+                        then '22000004'--直营系统
+                    when subcompany_big_area = '33000046' then '33000046'--工程市场中心
+                    when subcompany_big_area in ('33000027', '33000030', '33000056') then '22000003' --市场系统
+                    else '' end         瓷砖三级编码,
+                case
+                    when subcompany_big_area in
+                         ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                          '33000065', '33000066', '33000067', '33000068', '33000069')
+                        then '区域运营中心'
+                    when subcompany_big_area in ('33000003', '33000004', '33000005', '33000006', '33000007', '33000008')
+                        then '直营系统'--
+                    when subcompany_big_area = '33000046' then '工程市场中心'--
+                    when subcompany_big_area in ('33000027', '33000030', '33000056') then '市场系统' --
+                    else '' end         瓷砖三级名称,
+                case
+                    when subcompany_big_area in
+                         ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                          '33000065', '33000066', '33000067', '33000068', '33000069', '33000003', '33000004',
+                          '33000005', '33000006', '33000007', '33000008')
+                        then subcompany_big_area
+                    when subcompany_big_area = '33000046' and sales_dept in ('Z033', 'Z031') then sales_dept
+                    when subcompany_big_area = '33000046' and sales_dept not in ('Z033', 'Z031')
+                        then 'zhangluegongchengzhongxin' --战略工程中心
+                    else '' end         子公司编码,
+                case
+                    when subcompany_big_area = '33000020' then '西北运营中心'
+                    when subcompany_big_area = '33000021' then '广东运营中心'
+                    when subcompany_big_area = '33000022' then '赣皖运营中心'
+                    when subcompany_big_area = '33000023' then '浙江运营中心'
+                    when subcompany_big_area = '33000024' then '西南运营中心'
+                    when subcompany_big_area = '33000025' then '京津冀运营中心'
+                    when subcompany_big_area = '33000064' then '湘鄂运营中心'
+                    when subcompany_big_area = '33000065' then '江苏运营中心'
+                    when subcompany_big_area = '33000066' then '晋豫运营中心'
+                    when subcompany_big_area = '33000067' then '山东运营中心'
+                    when subcompany_big_area = '33000068' then '闽琼运营中心'
+                    when subcompany_big_area = '33000069' then '黑吉辽运营中心'
+                    when subcompany_big_area = '33000003' then '深圳子公司'
+                    when subcompany_big_area = '33000004' then '广佛子公司'
+                    when subcompany_big_area = '33000005' then '上海子公司'
+                    when subcompany_big_area = '33000006' then '陕西子公司'
+                    when subcompany_big_area = '33000007' then '广西子公司'
+                    when subcompany_big_area = '33000008' then '云南子公司'
+                    when subcompany_big_area = '33000046' and sales_dept = 'Z031' then '幕墙工程中心'
+                    when subcompany_big_area = '33000046' and sales_dept = 'Z033' then '商机资源开发部'
+                    when subcompany_big_area = '33000046' and sales_dept not in ('Z033', 'Z031')
+                        then '战略工程中心' --
+                    else '' end         子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                1                       权限
+         from 关联销售部
+         where utilities_dept = '11000001'
+     ),
+     卫浴事业部 as (
+         select distinct '11000002'                               事业部编码,
+                         '卫浴事业部'                                  事业部名称,
+                         case
+                             when subcompany_big_area in ('33000009', '33000047') then '33000009'
+                             when subcompany_big_area = '33000012' then '33000012'
+                             when subcompany_big_area = '33000010' then '33000010'
+                             when subcompany_big_area in ('33000070', '33000071', '33000073') then 'feiquanzi'
+                             end                                  系统编码,
+                         case
+                             when subcompany_big_area in ('33000009', '33000047') then '营销中心（区域）'
+                             when subcompany_big_area = '33000012' then '国际营销'
+                             when subcompany_big_area = '33000010' then 'OEM'
+                             when subcompany_big_area in ('33000070', '33000071', '33000073') then '非全资'
+                             end                                  系统名称,
+                         ''                                       瓷砖三级编码,
+                         ''                                       瓷砖三级名称,
+                         case
+                             when subcompany_big_area in ('33000009', '33000047') then
+                                 (case
+                                      when sales_dept in ('X002', 'J105', 'X091', 'X003', 'X004')
+                                          then '卫浴其他'
+                                      else sales_dept end)
+                             when subcompany_big_area in ('33000070', '33000071', '33000073') then subcompany_big_area
+                             end                                  子公司编码,
+                         case
+                             when subcompany_big_area in ('33000009', '33000047') then
+                                 (case
+                                      when sales_dept in ('X002', 'J105', 'X091', 'X003', 'X004')
+                                          then '卫浴其他'
+                                      else sales_dept_name end)
+                             when subcompany_big_area in ('33000070', '33000071', '33000073')
+                                 then subcompany_big_area_name
+                             end                                  子公司名称,
+                         zxsyj_dr,
+                         zxsyj_dy,
+                         zmle_dy,
+                         zbhsxsje_dy,
+                         a.zxsyj_qntq + coalesce(b.zxsyj_qntq, 0) zxsyj_qntq,
+                         a.zxsyj_qnlj + coalesce(b.zxsyj_qnlj, 0) zxsyj_qnlj,
+                         zxsyj_dnlj,
+                         zmle_dnlj,
+                         zbhsxsje_dnlj,
+                         2                                        权限
+         from 关联销售部 a
+                  left join 旧数据 b
+                            on a.subcompany_big_area = b.oldsubcompany_big_area
+         where utilities_dept in ('11000002', '11000011', '11000012')
+           and 系统编码 is not null
+           and (subcompany_big_area not in ('33000011', '33000035', '33000062')
+             or (system != '00000000' and subcompany_big_area != '00000000'))
+     ),
+     卫浴事业部商用中心 as (
+         select '11000002'         事业部编码,
+                '卫浴事业部'            事业部名称,
+                '33000011'         系统编码,
+                '商用中心'             系统名称,
+                ''                 瓷砖三级编码,
+                ''                 瓷砖三级名称,
+                'kuashiyebujiaoyi' 子公司编码,
+                '瓷卫联动'             子公司名称,
+                2                  权限,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj
+         from 关联销售部
+         where (subcompany_big_area in ('33000035', '33000062')
+             or (system = '00000000' and subcompany_big_area = '00000000'))
+           and utilities_dept = '11000002'
+         union all
+         select '11000002' 事业部编码,
+                '卫浴事业部'    事业部名称,
+                '33000011' 系统编码,
+                '商用中心'     系统名称,
+                ''         瓷砖三级编码,
+                ''         瓷砖三级名称,
+                (case
+                     when "CUST_GR_CM" in ('A0', 'A1') then '11zhiyingka'--旧称直营KA
+                     when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                          ("CUST_GR_CM" = 'A6' and nvl(cust_grp1, 'qita') != 'JI') then '12jingxiaoshanggongcheng'--旧称经销商工程
+                     when "CUST_GR_CM" in ('B0', 'B1', 'A7') or ("CUST_GR_CM" = 'A6' and cust_grp1 = 'JI')
+                         then '13yunyingzhongxin'--旧称运营中心
+                    end)   子公司编码,
+                (case
+                     when "CUST_GR_CM" in ('A0', 'A1') then '直营KA'--旧称直营KA
+                     when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                          ("CUST_GR_CM" = 'A6' and nvl(cust_grp1, 'qita') != 'JI') then '工程代理商'--旧称经销商工程
+                     when "CUST_GR_CM" in ('B0', 'B1', 'A7') or ("CUST_GR_CM" = 'A6' and cust_grp1 = 'JI') then '平台/运营商'--旧称运营中心
+                    end)   子公司名称,
+                2          权限,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj
+         from 关联销售部
+         where utilities_dept = '11000002'
+           and ((subcompany_big_area in ('33000011', '33000047'))
+             or (subcompany_big_area = '33000009' and distr_chan = '06'))
+     ),
+     卫浴事业部营销中心渠道 as (
+         select '11000002'        事业部编码,
+                '卫浴事业部'           事业部名称,
+                '33000009qd'      系统编码,
+                '营销中心（渠道）'        系统名称,
+                ''                瓷砖三级编码,
+                ''                瓷砖三级名称,
+                c.distr_chan_code 子公司编码,
+                c.distr_chan      子公司名称,
+                2                 权限,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+                  join 卫浴渠道 c on a.distr_chan = c.distr_chan_code
+         where calday = to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd')
+           and utilities_dept = '11000002'
+           and subcompany_big_area in ('33000009', '33000047')
+           and c.distr_chan is not null
+     ),
+     家居事业部1 as (
+         select '11000003'                                                       事业部编码,
+                '家居事业部'                                                          事业部名称,
+                subcompany_big_area                                              系统编码,
+                (case
+                     when subcompany_big_area = '33000001' then '木地板'
+                     when subcompany_big_area = '33000014' then 'DPI'
+                     when subcompany_big_area = '33000016' then '绿家科技'
+                     when subcompany_big_area = '33000018' then '辅材'
+                     when subcompany_big_area = '33000019' then '整装家居'
+                     when subcompany_big_area = '33000033' then 'ART+'
+                     when subcompany_big_area = '33000058' then '家居阿米巴内部交易'
+                    end)                                                         系统名称,
+                ''                                                               瓷砖三级编码,
+                ''                                                               瓷砖三级名称,
+                subcompany_big_area                                              子公司编码,
+                (case
+                     when subcompany_big_area = '33000001' then '木地板'
+                     when subcompany_big_area = '33000014' then 'DPI'
+                     when subcompany_big_area = '33000016' then '绿家科技'
+                     when subcompany_big_area = '33000018' then '辅材'
+                     when subcompany_big_area = '33000019' then '整装家居'
+                     when subcompany_big_area = '33000033' then 'ART+'
+                     when subcompany_big_area = '33000058' then '家居阿米巴内部交易' end) 子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                3                                                                权限
+         from 关联销售部
+         where utilities_dept = '11000003'
+           and subcompany_big_area in
+               ('33000001', '33000014', '33000016', '33000018', '33000019', '33000033', '33000058')),
+     家居事业部2 as (
+         select '11000003'       事业部编码,
+                '家居事业部'          事业部名称,
+                'jiajukuashiybu' 系统编码,
+                '跨事业部交易'         系统名称,
+                ''               瓷砖三级编码,
+                ''               瓷砖三级名称,
+                'jiajukuashiybu' 子公司编码,
+                '跨事业部交易'         子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                3                权限
+         from 关联销售部
+         where utilities_dept = '11000003'
+           and (sales_dept like '%XA%')
+     ),
+     生态新材事业部 as (
+         select '11000010'                            事业部编码,
+                '生态新材事业部'                             事业部名称,
+                case
+                    when subcompany_big_area in ('33000049', '33000051', '33000052') then '4shengtaixincaiguoneiyewu'
+                    else subcompany_big_area end      系统编码,
+                case
+                    when subcompany_big_area in ('33000049', '33000051', '33000052') then '国内业务'
+                    else subcompany_big_area_name end 系统名称,
+                ''                                    瓷砖三级编码,
+                ''                                    瓷砖三级名称,
+                case
+                    when subcompany_big_area in ('33000049', '33000051', '33000052') then '4shengtaixincaiguoneiyewu'
+                    else subcompany_big_area end      子公司编码,
+                case
+                    when subcompany_big_area in ('33000049', '33000051', '33000052') then '国内业务'
+                    else subcompany_big_area_name end 子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                4                                     权限
+         from 关联销售部
+         where utilities_dept = '11000010'
+           and subcompany_big_area not in ('33000053', '33000060')
+     ),
+     生态阿米巴内部交易 as (
+         select '11000010'  事业部编码,
+                '生态新材事业部'   事业部名称,
+                '33000060'  系统编码,
+                '生态阿米巴内部交易' 系统名称,
+                ''          瓷砖三级编码,
+                ''          瓷砖三级名称,
+                '33000060'  子公司编码,
+                '生态阿米巴内部交易' 子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                4           权限
+         from 关联销售部
+         where utilities_dept = '11000010'
+           and (subcompany_big_area = '33000060' or sales_group like '%X%')
+     ),
+     瓷砖渠道 as (
+         select '11000001'         事业部编码,
+                '瓷砖事业部'            事业部名称,
+                '22000001qd'       系统编码,
+                '国内营销系统（渠道）'       系统名称,
+                ''                 瓷砖三级编码,
+                ''                 瓷砖三级名称,
+                "/BIC/ZQDZH"       子公司编码,
+                zqdzhdesc          子公司名称,
+                sum(zxsyj_dr)      zxsyj_dr,
+                sum(zxsyj_dy)      zxsyj_dy,
+                sum(zmle_dy)       zmle_dy,
+                sum(zbhsxsje_dy)   zbhsxsje_dy,
+                sum(zxsyj_qntq)    zxsyj_qntq,
+                sum(zxsyj_qnlj)    zxsyj_qnlj,
+                sum(zxsyj_dnlj)    zxsyj_dnlj,
+                sum(zmle_dnlj)     zmle_dnlj,
+                sum(zbhsxsje_dnlj) zbhsxsje_dnlj,
+                1                  权限
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+         where utilities_dept = '11000001'
+           and calday = to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd')
+           AND subcompany_big_area in
+               ('33000020', '33000021', '33000022', '33000023', '33000024', '33000025', '33000064',
+                '33000065', '33000066', '33000067', '33000068', '33000069',
+                '33000003', '33000004', '33000005', '33000006', '33000007', '33000008', '33000046',
+                '33000027', '33000030', '33000056')
+         group by "/BIC/ZQDZH", zqdzhdesc
+     ),
+     合并 as (
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 瓷砖事业部
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 卫浴事业部
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 卫浴事业部商用中心
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 卫浴事业部营销中心渠道
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 家居事业部1
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 家居事业部2
+         union all
+         select '11000003',
+                '家居事业部',
+                'jiajuxiaoji'      系统编码,
+                '小计'               系统名称,
+                '',
+                '',
+                'jiajuxiaoji'      子公司编码,
+                '小计'               子公司名称,
+                sum(zxsyj_dr)      zxsyj_dr,
+                sum(zxsyj_dy)      zxsyj_dy,
+                sum(zmle_dy)       zmle_dy,
+                sum(zbhsxsje_dy)   zbhsxsje_dy,
+                sum(zxsyj_qntq)    zxsyj_qntq,
+                sum(zxsyj_qnlj)    zxsyj_qnlj,
+                sum(zxsyj_dnlj)    zxsyj_dnlj,
+                sum(zmle_dnlj)     zmle_dnlj,
+                sum(zbhsxsje_dnlj) zbhsxsje_dnlj,
+                3
+         from 家居事业部1
+         where 子公司编码 in ('33000014', '33000016', '33000018', '33000019', '33000033', '33000058')
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 生态新材事业部
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 生态阿米巴内部交易
+         union all
+         select 事业部编码,
+                事业部名称,
+                系统编码,
+                系统名称,
+                瓷砖三级编码,
+                瓷砖三级名称,
+                子公司编码,
+                子公司名称,
+                zxsyj_dr,
+                zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                zxsyj_qntq,
+                zxsyj_qnlj,
+                zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                权限
+         from 瓷砖渠道
+     )
+select 事业部编码,
+       事业部名称,
+       系统编码,
+       系统名称,
+       瓷砖三级编码,
+       瓷砖三级名称,
+       子公司编码,
+       子公司名称,
+       权限,
+       zxsyj_dr                                 当日销售业绩,
+       zxsyj_dy                                 当月销售业绩,
+       zmle_dy                                  当月毛利额,
+       zbhsxsje_dy                              当月不含税销售净额,
+       zxsyj_qntq                               去年同期销售业绩,
+       zxsyj_qnlj                               去年累计销售业绩,
+       zxsyj_dnlj                               当年累计销售业绩,
+       zmle_dnlj                                当年累计毛利额,
+       zbhsxsje_dnlj                            当年累计不含税销售净额,
+       to_char(to_date('${PERIOD_ID_D}'),'yyyyMMdd') AS CALDAY
+from 合并
+where 1 = 1

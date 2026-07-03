@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_FIN_COST_BATHROOM_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/BW_RPT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

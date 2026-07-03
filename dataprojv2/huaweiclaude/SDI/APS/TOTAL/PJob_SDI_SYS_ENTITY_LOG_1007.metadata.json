@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_SYS_ENTITY_LOG_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/TOTAL",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

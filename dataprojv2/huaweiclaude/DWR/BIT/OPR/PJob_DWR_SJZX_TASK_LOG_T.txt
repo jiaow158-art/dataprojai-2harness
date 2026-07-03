@@ -1,0 +1,36 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/01/06 16:26:08 GMT+08:00
+-- update from huangwenbin 2025-07-07 增加字段：终端类型
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DWRBIT.DWR_SJZX_TASK_LOG_T
+SELECT A.SYNCID AS LOG_ID --日志ID
+      ,A.TASKID AS TASK_ID --任务ID
+	  ,A.TASKNAME AS TASK_NAME --任务名称
+	  ,A.RECORD_TIME AS REC_TIME --生成记录时间
+	  ,A.LOG_TIME --日志时间
+	  ,B.TEMPL_PATH_RTE --模板路径
+	  ,B.TEMPL_NAME --模板名称
+	  ,B.TEMPL_CODE --模板编码
+	  ,B.USER_NUM --用户账号
+	  ,B.USER_NAME --用户姓名
+	  ,CASE WHEN B.USER_NUM NOT LIKE '%,%' THEN 1
+	        ELSE LENGTH(B.USER_NUM) - LENGTH(REPLACE(B.USER_NUM,',',''))
+ 			 END AS USER_CNT --用户人数
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,B.TRML_TYPE_NAME --终端类型
+	  ,SUBSTR(A.LOG_TIME,1,10) AS STAT_DATE --分区日		 
+  FROM SDI.SDI_FINE_SCHEDULE_RECORD_1035 A
+  LEFT JOIN DWRBIT.DWR_SJZX_TASK_INFO_T B
+    ON A.TASKID = B.TASK_ID
+ WHERE SUBSTR(A.LOG_TIME,1,10) >= '${PERIOD_ID_D}'	

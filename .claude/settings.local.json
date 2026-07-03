@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "dws"
+  ],
+  "enableAllProjectMcpServers": true
+}

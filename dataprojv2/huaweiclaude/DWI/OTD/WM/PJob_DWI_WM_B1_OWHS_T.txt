@@ -1,0 +1,237 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/21 16:33:28 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_OWHS_T
+SELECT
+	'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+	custcode AS customer_code, -- 客户编码
+	WhsCode, -- 仓库编号
+	WhsName, -- 仓库名称
+	IntrnalKey, -- 内部代码
+	Grp_Code, -- 组代码
+	BalInvntAc, -- 库存科目
+	SaleCostAc, -- 销货成本科目
+	TransferAc, -- 分配科目
+	RevenuesAc, -- 收入科目
+	VarianceAc, -- 差异科目
+	DecreasAc, -- 库存冲销 - 减少科目
+	IncreasAc, -- 库存冲销 - 增加科目
+	ReturnAc, -- 销售退货科目
+	ExpensesAc, -- 费用科目
+	EURevenuAc, -- 收入科目 - 欧盟
+	EUExpensAc, -- 费用科目 - 欧盟
+	FrRevenuAc, -- 收入科目 - 外国
+	FrExpensAc, -- 费用科目 - 外国
+	VatGroup, -- 税收组
+	Street, -- 街道
+	Block, -- 街区
+	ZipCode, -- 邮政编码
+	City, -- 城市
+	County, -- 县
+	Country, -- 国家
+	State, -- 省
+	Location, -- 位置
+	DropShip, -- 供应商直接发货
+	ExmptIncom, -- 免税收入科目
+	UseTax, -- 允许使用税
+	PriceDifAc, -- 价格差异科目
+	ExchangeAc, -- 汇率差异科目
+	BalanceAcc, -- 货物清算科目
+	PurchaseAc, -- 采购科目
+	PAReturnAc, -- 采购退货科目
+	PurchOfsAc, -- 采购冲销科目
+	FedTaxID, -- 国税编号
+	Building, -- 楼/层/室
+	ShpdGdsAct, -- 已装运货物科目
+	VatRevAct, -- 收入科目中的增值税
+	DecresGlAc, -- 总账减少科目
+	IncresGlAc, -- 总账增加科目
+	Nettable, -- 做为物料需求计划处理的仓库
+	StokRvlAct, -- 库存重估科目
+	StkOffsAct, -- 库存重估冲销科目
+	WipAcct, -- 在制品库存科目
+	WipVarAcct, -- 在制品库存差异科目
+	CostRvlAct, -- 销货成本重估科目
+	CstOffsAct, -- 销货成本重估冲销科目
+	ExpClrAct, -- 费用清算科目
+	ExpOfstAct, -- 费用冲销科目
+	objType, -- 对象类型 - 历史记录
+	logInstanc, -- 日志实例 - 历史记录
+	createDate, -- 创建日期 - 历史记录
+	userSign2, -- 更新用户 - 历史记录
+	updateDate, -- 更新日期 - 历史记录
+	ARCMAct, -- 销售贷方科目
+	ARCMFrnAct, -- 销售贷方科目 - 国外
+	ARCMEUAct, -- 销售贷方科目 - 欧盟
+	ARCMExpAct, -- 免税贷方科目
+	APCMAct, -- 采购贷方科目
+	APCMFrnAct, -- 采购贷方科目 - 国外
+	APCMEUAct, -- 采购贷方科目 - 欧盟
+	RevRetAct, -- 收入退货科目
+	BPLid, -- 业务地点标识
+	OwnerCode, -- 所有者代码
+	NegStckAct, -- 负库存调整科目
+	StkInTnAct, -- 在途库存科目
+	AddrType, -- 地址类型
+	StreetNo, -- 街道号
+	PurBalAct, -- 采购余额科目
+	Excisable, -- 应纳税[是/否]
+	WhICenAct, -- 收入中央销售税科目（仓库）
+	WhOCenAct, -- 支出中央销售税科目（仓库）
+	WhShipTo, -- 运达方名称（仓库）
+	WipOffset, -- 在制品冲销损益科目
+	StockOffst, -- 库存冲销损益科目
+	StorKeeper, -- 仓库管理员
+	Shipper, -- 发货方
+	BinActivat, -- 库位已激活 [是/否]
+	BinSeptor, -- 库位分隔符
+	DftBinAbs, -- 缺省库位内部编号
+	DftBinEnfd, -- 强制缺省库位[是/否]
+	AutoIssMtd, -- 自动发货方法
+	ManageSnB, -- 供应商直接发货管理序列号和批次
+	RecItemsBy, -- 接收库位方法
+	RecBinEnab, -- 启用收货库位
+	GlblLocNum, -- 全球地点编号
+	RecvEmpBin, -- 仅限收到空库位
+	Inactive, -- 不可用
+	RecvMaxQty, -- 默认收货至最大库存
+	AutoRecvMd, -- 自动收货方法
+	RecvMaxWT, -- 接收重量，直到达到最大重量
+	RecvUpTo, -- 接收最大值
+	FreeChrgSA, -- 免费销售科目
+	FreeChrgPU, -- 免费采购科目
+	TaxOffice, -- 税务局
+	Address2, -- 地址名称 2
+	Address3, -- 地址名称 3
+	`External`, -- 外部
+	U_NotSum, -- 不合计数量
+	U_BtnFlag, -- 批次标识
+	U_IsJGC, -- 是否是加工厂
+	U_Modo_Id, -- 墨斗平台仓库Id号
+	U_Longitude, -- 经度
+	U_Latitude, -- 纬度
+	U_CanAutoSel, -- 可参与自动选批次
+	U_Priority, -- 优先级
+	U_Modo_Whs, -- 墨斗平台仓库代码
+	U_CompanyNo, -- 公司代码
+	U_Usable, -- 可售仓库
+	current_timestamp() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_CT_OWHS_1010
+UNION ALL
+SELECT
+'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+custcode AS customer_code, -- 客户编码
+WhsCode, -- 仓库编号
+WhsName, -- 仓库名称
+IntrnalKey, -- 内部代码
+Grp_Code, -- 组代码
+BalInvntAc, -- 库存科目
+SaleCostAc, -- 销货成本科目
+TransferAc, -- 分配科目
+RevenuesAc, -- 收入科目
+VarianceAc, -- 差异科目
+DecreasAc, -- 库存冲销 - 减少科目
+IncreasAc, -- 库存冲销 - 增加科目
+ReturnAc, -- 销售退货科目
+ExpensesAc, -- 费用科目
+EURevenuAc, -- 收入科目 - 欧盟
+EUExpensAc, -- 费用科目 - 欧盟
+FrRevenuAc, -- 收入科目 - 外国
+FrExpensAc, -- 费用科目 - 外国
+VatGroup, -- 税收组
+Street, -- 街道
+Block, -- 街区
+ZipCode, -- 邮政编码
+City, -- 城市
+County, -- 县
+Country, -- 国家
+State, -- 省
+Location, -- 位置
+DropShip, -- 供应商直接发货
+ExmptIncom, -- 免税收入科目
+UseTax, -- 允许使用税
+PriceDifAc, -- 价格差异科目
+ExchangeAc, -- 汇率差异科目
+BalanceAcc, -- 货物清算科目
+PurchaseAc, -- 采购科目
+PAReturnAc, -- 采购退货科目
+PurchOfsAc, -- 采购冲销科目
+FedTaxID, -- 国税编号
+Building, -- 楼/层/室
+ShpdGdsAct, -- 已装运货物科目
+VatRevAct, -- 收入科目中的增值税
+DecresGlAc, -- 总账减少科目
+IncresGlAc, -- 总账增加科目
+Nettable, -- 做为物料需求计划处理的仓库
+StokRvlAct, -- 库存重估科目
+StkOffsAct, -- 库存重估冲销科目
+WipAcct, -- 在制品库存科目
+WipVarAcct, -- 在制品库存差异科目
+CostRvlAct, -- 销货成本重估科目
+CstOffsAct, -- 销货成本重估冲销科目
+ExpClrAct, -- 费用清算科目
+ExpOfstAct, -- 费用冲销科目
+objType, -- 对象类型 - 历史记录
+logInstanc, -- 日志实例 - 历史记录
+createDate, -- 创建日期 - 历史记录
+userSign2, -- 更新用户 - 历史记录
+updateDate, -- 更新日期 - 历史记录
+ARCMAct, -- 销售贷方科目
+ARCMFrnAct, -- 销售贷方科目 - 国外
+ARCMEUAct, -- 销售贷方科目 - 欧盟
+ARCMExpAct, -- 免税贷方科目
+APCMAct, -- 采购贷方科目
+APCMFrnAct, -- 采购贷方科目 - 国外
+APCMEUAct, -- 采购贷方科目 - 欧盟
+RevRetAct, -- 收入退货科目
+BPLid, -- 业务地点标识
+OwnerCode, -- 所有者代码
+NegStckAct, -- 负库存调整科目
+StkInTnAct, -- 在途库存科目
+AddrType, -- 地址类型
+StreetNo, -- 街道号
+PurBalAct, -- 采购余额科目
+Excisable, -- 应纳税[是/否]
+WhICenAct, -- 收入中央销售税科目（仓库）
+WhOCenAct, -- 支出中央销售税科目（仓库）
+WhShipTo, -- 运达方名称（仓库）
+WipOffset, -- 在制品冲销损益科目
+StockOffst, -- 库存冲销损益科目
+StorKeeper, -- 仓库管理员
+Shipper, -- 发货方
+BinActivat, -- 库位已激活 [是/否]
+BinSeptor, -- 库位分隔符
+DftBinAbs, -- 缺省库位内部编号
+DftBinEnfd, -- 强制缺省库位[是/否]
+AutoIssMtd, -- 自动发货方法
+ManageSnB, -- 供应商直接发货管理序列号和批次
+RecItemsBy, -- 接收库位方法
+RecBinEnab, -- 启用收货库位
+GlblLocNum, -- 全球地点编号
+RecvEmpBin, -- 仅限收到空库位
+Inactive, -- 不可用
+RecvMaxQty, -- 默认收货至最大库存
+AutoRecvMd, -- 自动收货方法
+RecvMaxWT, -- 接收重量，直到达到最大重量
+RecvUpTo, -- 接收最大值
+FreeChrgSA, -- 免费销售科目
+FreeChrgPU, -- 免费采购科目
+TaxOffice, -- 税务局
+Address2, -- 地址名称 2
+Address3, -- 地址名称 3
+`External`, -- 外部
+U_NotSum, -- 不合计数量
+U_BtnFlag, -- 批次标识
+U_IsJGC, -- 是否是加工厂
+U_Modo_Id, -- 墨斗平台仓库Id号
+U_Longitude, -- 经度
+U_Latitude, -- 纬度
+U_CanAutoSel, -- 可参与自动选批次
+U_Priority, -- 优先级
+U_Modo_Whs, -- 墨斗平台仓库代码
+U_CompanyNo, -- 公司代码
+U_Usable, -- 可售仓库
+current_timestamp() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_SW_OWHS_1010;

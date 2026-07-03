@@ -1,0 +1,11 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "dws"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)"
+    ]
+  }
+}

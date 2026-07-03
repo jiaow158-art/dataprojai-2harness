@@ -1,0 +1,49 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2024/06/15 10:50:48 GMT+08:00
+-- description:基地产销存报表数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from dm.dm_rpt_wm_cxc_month_sum; --where 
+insert into dm.dm_rpt_wm_cxc_month_sum
+select concat(substr(t1.stat_month,1,4),'-',substr(t1.stat_month,5,2)),
+       t1.factory as base,
+       t1.dimension_show,
+       stock_area_month_end as stock_area_month_end,
+        stock_area_month_start as stock_area_month_start,
+         sales_stock_out_area_month as sales_stock_out_area_month, 
+         stock_in_area_month as stock_in_area_month,
+         coalesce(t1.capacity,0) as production_plan,
+         coalesce(t1.sales_target,0) as sales_target
+from upload.upload_ps_factory_production_capacity t1
+left join  
+(
+select substr(t1.stat_date,1,6) as stat_month,
+       t0.factory,coalesce(t2.dimension_show,'其他') as dimension_show,
+        sum(stock_area_month_end)/10000 as stock_area_month_end,
+        sum(stock_area_month_start)/10000 as stock_area_month_start,
+         sum(sales_stock_out_area_month)/10000 as sales_stock_out_area_month, 
+         sum(stock_in_area_month)/10000 as stock_in_area_month
+from dm.dm_rpt_wm_cxc_day_sum t1 
+left join(select distinct factory,belong_area_name  from  upload.upload_ps_factory_production_capacity ) t0 on t1.belong_area_name=t0.factory
+left join upload.upload_ps_factory_production_capacity t2 
+on substr(t1.stat_date,1,6) = t2.stat_month 
+and t0.factory =t2.factory 
+and (t1.cat = t2.product_level2_name or  t2.product_level2_name='all')
+and ((t1.dimension = t2.dimension or t2.dimension='all')  
+and instr( coalesce(t2.dimension_exclude,'没有'),t1.dimension)=0
+)
+where t1.stat_date IN(select max(stat_date) from dm.dm_rpt_wm_cxc_day_sum group by substr(stat_date,1,6))
+group by t1.stat_date,t0.factory,t2.dimension_show
+) t2 on t1.factory = t2.factory and t1.dimension_show= t2.dimension_show and t1.stat_month  = t2.stat_month
+where t1.stat_month is not null
+ORDER BY t1.show_order,CASE WHEN t1.factory='清远基地' THEN 1
+              WHEN  t1.factory='江西基地' THEN 2
+              WHEN  t1.factory='重庆基地' THEN 3
+              WHEN  t1.factory='湖南基地' THEN 4
+              WHEN  t1.factory='山西基地' THEN 5
+              WHEN  t1.factory='山东基地' THEN 6
+              WHEN  t1.factory='华盛昌基地' THEN 7
+              ELSE 8 END, t1.capacity desc NULLS LAST;

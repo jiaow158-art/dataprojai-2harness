@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB56",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "逾期订单面积ZB56",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

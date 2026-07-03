@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_delivery_detail",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "卫浴工程发货单明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

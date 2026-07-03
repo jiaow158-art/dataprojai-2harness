@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DLN1_320170_1010_CT",
+    "type": "HiveSQL",
+    "directory": "/SDI/B1/CT/DLN1",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

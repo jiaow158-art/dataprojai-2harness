@@ -1,0 +1,237 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/07/09 15:00:33 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:PJob_DWS_DM_NORTH_ZB41
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--经营费用率（品质管理部）ZB41
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB41';
+with t1 as (
+select
+stat_month,
+sum(coalesce(extr_sales_notax_amt, 0)) as "对外不含税销售额",
+sum(coalesce(extr_sel_prty_1n_amt, 0)) as "1+N收入(对外卖出方)",
+sum(coalesce(sw_prod_income_amt, 0)) as "其中：卫浴产品收入",
+sum(coalesce(dpi_prod_income_amt, 0)) as "DPI产品收入",
+sum(coalesce(art_prod_income_amt, 0)) as "ART产品收入",
+sum(coalesce(aux_prod_income_amt, 0)) as "辅材产品收入",
+sum(coalesce(pkg_prod_income_amt, 0)) as "整装产品收入",
+sum(coalesce(wf_prod_income_amt, 0)) as "木地板收入",
+sum(coalesce(lj_prod_income_amt, 0)) as "绿家产品收入",
+sum(coalesce(new_prod_income_amt, 0)) as "新材产品收入",
+sum(coalesce(cross_div_extr_income_amt, 0)) as "跨事业部收入(对外卖出方)",
+sum(coalesce(cross_div_splr_income_amt, 0)) as "跨事业部收入(供货方)",
+sum(coalesce(div_extr_income_amt, 0)) as "事业部内部收入(对外卖出方)",
+sum(coalesce(div_splr_income_amt, 0)) as "事业部内部收入(供货方)",
+sum(coalesce(income_other_amt, 0)) as "收入(其他)",
+sum(coalesce(income_adj_amt, 0)) as "收入调整值",
+sum(coalesce(noincld_srvc_amt, 0)) as "减：服务费(FD)",
+sum(coalesce(incld_point_amt, 0)) as "加：使用积分",
+sum(coalesce(noincld_wthl_man_point_amt, 0)) as "减：预提积分-手工",
+sum(coalesce(noincld_wthl_sys_point_amt, 0)) as "减：预提积分-系统",
+sum(coalesce(clean_whs_income_amt, 0)) as "其中：清仓收入",
+sum(coalesce(sale_cost_amt, 0)) as "销售成本",
+sum(coalesce(lgstcs_cost_amt, 0)) as "物流成本",
+sum(coalesce(oth_cost_amt, 0)) as "其他成本",
+sum(coalesce(total_1n_cost_amt, 0)) as "1+N成本",
+sum(coalesce(sw_prod_cost_amt, 0)) as "其中：卫浴产品成本",
+sum(coalesce(dpi_prod_cost_amt, 0)) as "DPI产品成本",
+sum(coalesce(art_prod_cost_amt, 0)) as "ART产品成本",
+sum(coalesce(aux_prod_cost_amt, 0)) as "辅材产品成本",
+sum(coalesce(pkg_prod_cost_amt, 0)) as "整装产品成本",
+sum(coalesce(wf_prod_cost_amt, 0)) as "木地板成本",
+sum(coalesce(lj_prod_cost_amt, 0)) as "绿家产品成本",
+sum(coalesce(new_prod_cost_amt, 0)) as "新材产品成本",
+sum(coalesce(cross_div_extr_cost_amt, 0)) as "跨事业部成本(对外卖出方)",
+sum(coalesce(cross_div_splr_cost_amt, 0)) as "跨事业部成本(供货方)",
+sum(coalesce(div_extr_cost_amt, 0)) as "事业部内部成本(对外卖出方)",
+sum(coalesce(div_splr_cost_amt, 0)) as "事业部内部成本(供货方)",
+sum(coalesce(clean_whs_cost_amt, 0)) as "清仓成本",
+sum(coalesce(cost_adj_amt, 0)) as "成本调整值",
+sum(coalesce(total_1n_point_amt, 0)) as "1+N使用积分",
+sum(coalesce(total_1n_man_point_amt, 0)) as "1+N预提积分-手工",
+sum(coalesce(total_1n_sys_point_amt, 0)) as "1+N预提积分-系统",
+sum(coalesce(cross_div_point_amt, 0)) as "跨事业部使用积分",
+sum(coalesce(cross_div_man_point_amt, 0)) as "跨事业部预提积分-手工",
+sum(coalesce(cross_div_sys_point_amt, 0)) as "跨事业部预提积分-系统",
+sum(coalesce(div_point_amt, 0)) as "事业部内部使用积分",
+sum(coalesce(div_man_point_amt, 0)) as "事业部内部预提积分-手工",
+sum(coalesce(div_sys_point_amt, 0)) as "跨事业部内部预提积分-系统",
+sum(coalesce(addl_tax_amt, 0)) as "税金及附加(不含房产税+土地使用税)",
+sum(coalesce(hs_prpty_tax_amt, 0)) as "房产税",
+sum(coalesce(land_used_tax_amt, 0)) as "土地使用税",
+sum(coalesce(noincld_sale_fee_amt, 0)) as "销售费用",
+sum(coalesce(lgstcs_fee_amt, 0)) as "物流费用",
+sum(coalesce(mng_fee_amt, 0)) as "管理费用",
+sum(coalesce(dev_fee_amt, 0)) as "研发费用",
+sum(coalesce(fin_fee_amt, 0)) as "财务费用",
+sum(coalesce(int_fee_amt, 0)) as "其中：利息费用",
+sum(coalesce(int_income_amt, 0)) as "利息收入",
+sum(coalesce(noincld_div_shr_fee_amt, 0)) as "费用-分摊费用(事业部内部)",
+sum(coalesce(asset_impar_inv_dpre_1_amt, 0)) as "其中：资产减值-存货跌价(能明确责任的)",
+sum(coalesce(asset_impar_inv_dpre_2_amt, 0)) as "其中：资产减值-存货跌价(不能明确责任的)",
+sum(coalesce(asset_impar_inv_dpre_3_amt, 0)) as "其中：资产减值-存货跌价(外协寄售)",
+sum(coalesce(asset_impar_fixed_assets_amt,0)) as "资产减值-固定资产",
+sum(coalesce(cr_impar_loss_1_amt, 0)) as "信用减值损失-应收票据未逾期",
+sum(coalesce(cr_impar_loss_2_amt, 0)) as "信用减值损失-应收票据逾期",
+sum(coalesce(cr_impar_loss_3_amt, 0)) as "信用减值损失-应收账款未逾期",
+sum(coalesce(cr_impar_loss_4_amt, 0)) as "信用减值损失-应收账款逾期",
+sum(coalesce(cr_impar_loss_5_amt, 0)) as "信用减值损失-其他应收款",
+sum(coalesce(fr_val_chg_income_amt, 0)) as "公允价值变动收益",
+sum(coalesce(oth_income_amt, 0)) as "其他收益",
+sum(coalesce(inv_income_amt, 0)) as "投资收益(损失负)",
+sum(coalesce(asset_dspsl_income_amt, 0)) as "资产处置损益",
+sum(coalesce(sale_income_amt, 0)) as "对外销售额",
+sum(coalesce(cross_div_income_amt, 0)) as "跨事业部收入：",
+sum(coalesce(pj_coll_fee_amt, 0)) as "卫浴事业部收取鹏嘉品牌使用费",
+sum(coalesce(extr_sale_cost_amt, 0)) as "对外销售成本",
+sum(coalesce(cross_div_cost_amt, 0)) as "跨事业部成本",
+sum(coalesce(pj_pmt_fee_amt, 0)) as "鹏嘉支付卫浴事业部品牌使用费",
+sum(coalesce(total_1n_prft_amt, 0)) as "1+N利润",
+sum(coalesce(cross_div_prft_amt, 0)) as "跨事业利润",
+sum(coalesce(div_prft_amt, 0)) as "事业部内部利润",
+sum(coalesce(incld_oth_income_prft_amt, 0)) as "营业外收入",
+sum(coalesce(incld_oth_expd_prft_amt, 0)) as "营业外支出",
+sum(coalesce(amb_acc_rcvbl_int_amt, 0)) as "应收账款利息(阿米巴)",
+sum(coalesce(inv_int_amt, 0)) as "库存利息",
+sum(coalesce(fund_cost_1_amt, 0)) as "资金成本-预付长期资产款",
+sum(coalesce(fund_cost_2_amt, 0)) as "资金成本-固定资产",
+sum(coalesce(fund_cost_3_amt, 0)) as "资金成本-在建工程",
+sum(coalesce(fund_cost_4_amt, 0)) as "资金成本-无形资产",
+sum(coalesce(fund_cost_5_amt, 0)) as "资金成本-长期待摊费用(展厅装修)",
+sum(coalesce(splr_pay_cash_int_amt, 0)) as "供应商付现利息",
+sum(coalesce(est_bns_amt, 0)) as "预计奖金包",
+sum(coalesce(prtc_inv_eqty_amt, 0)) as "对外参股股权投资款(事业部基于业务需要)",
+sum(coalesce(overall_profit_amt, 0)) as "整体毛利",
+sum(coalesce(income_profit_amt, 0)) as "收入/汇总",
+sum(coalesce("1n_income_profit_amt", 0)) as "1+N收入/汇总",
+sum(coalesce(profit_1n_amt, 0)) as "1+N毛利",
+sum(coalesce(cross_profit_amt, 0)) as "跨事业部毛利",
+sum(coalesce(ext_profit_1n_amt, 0)) as "1+N对外分成毛利额",
+sum(coalesce(ext_cross_profit_amt, 0)) as "跨事业部对外分成毛利额",
+sum(coalesce(ext_dept_inner_profit_amt, 0)) as "事业部内部对外分成毛利额",
+sum(coalesce(oth_cost_amt_notz000, 0)) as "其他收益（非Z000）"
+from dm.dm_fi_ambv2_profit_sum_t A
+left join dm.dm_rpt_sales_group_t b 
+on a.sales_grp =b.node_name9 
+where A.dept_name in ('H11000001','11000001') 
+and B.node_name3 ='R03230631'
+group by stat_month 
+)
+,t2 as (select 
+stat_month 
+,"销售成本"+"物流成本"+"1+N成本"+"其他成本"+"跨事业部成本(对外卖出方)"+"跨事业部成本(供货方)"+"事业部内部成本(对外卖出方)"+"事业部内部成本(供货方)"+"成本调整值" as "销售成本合计"
+,"1+N对外分成毛利额"+"跨事业部对外分成毛利额"+"事业部内部对外分成毛利额" as 对外分成毛利额合计
+,"税金及附加(不含房产税+土地使用税)"+"房产税"+"土地使用税" as "税金及附加合计"
+,"销售费用"+"物流费用"+"管理费用"+"研发费用"+"费用-分摊费用(事业部内部)"+"财务费用" as "总费用合计"
+,"费用-分摊费用(事业部内部)" as "费用-分摊费用"
+,"其中：资产减值-存货跌价(不能明确责任的)"+"其中：资产减值-存货跌价(外协寄售)"+ "资产减值-固定资产" as "资产减值损失合计"
+,"信用减值损失-应收票据未逾期"+"信用减值损失-应收票据逾期"+"信用减值损失-应收账款未逾期"+"信用减值损失-应收账款逾期"+"信用减值损失-其他应收款" as "信用减值损失合计"
+,"公允价值变动收益" as "公允价值变动收益"
+,"其他收益" as "其他收益"
+,"投资收益(损失负)" as "投资收益"
+,"资产处置损益" as "资产处置损益"
+,"对外销售额"+"卫浴事业部收取鹏嘉品牌使用费" as "其他业务收入合计"
+,"对外销售成本"+"鹏嘉支付卫浴事业部品牌使用费" as "其他业务支出合计"
+,"营业外收入" as "营业外收入"
+,"营业外支出" as "营业外支出"
+,"应收账款利息(阿米巴)"+"库存利息"+"资金成本-预付长期资产款"+"资金成本-固定资产"+"资金成本-在建工程"+"资金成本-无形资产"+"资金成本-长期待摊费用(展厅装修)"+"供应商付现利息" as "资金成本合计"
+,"销售费用" as "销售费用"
+,"物流费用" as "物流费用"
+,"管理费用" as "管理费用"
+,"研发费用" as "研发费用"
+,"物流成本" as "物流成本"
+--,"对外不含税销售额"+"1+N收入(对外卖出方)"+"跨事业部收入(对外卖出方)"+"跨事业部收入(供货方)"+"事业部内部收入(对外卖出方)"+"事业部内部收入(供货方)"+"收入(其他)"+"收入调整值" as "不含税销售额合计"
+from t1)
+,t3 as (
+select 
+*
+,"销售费用"+"物流费用"+"管理费用"+"研发费用"+"费用-分摊费用"+"物流成本" as "经营费用"
+from t2
+)
+,t4 as (
+select 
+calmonth , sum(coalesce(notax_sales_net_amt,0)) as "不含税收入净额(管理)(数据来源为S、T)" 
+from DM.dm_ambv2_profit_t a
+left join dm.dm_rpt_sales_group_t b 
+on a.sales_grp =b.node_name9 
+where data_source in ('S','T')
+and b.node_name2 in ('H11000001')
+group by calmonth
+)
+,TT2 as (
+select 
+t3.stat_month as calmonth,
+'ZB41' as  ZB_CODE,
+case when  "不含税收入净额(管理)(数据来源为S、T)" = 0 then 0 else "经营费用"/"不含税收入净额(管理)(数据来源为S、T)" end as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from t3 left join t4 on t3.stat_month = t4.calmonth
+where t3.stat_month = '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB41' as  ZB_CODE,
+0 as 当月实绩,
+SUM("经营费用")/SUM("不含税收入净额(管理)(数据来源为S、T)") as 累计实绩,
+0 as 季度累计实绩
+from t3 left join t4 on t3.stat_month = t4.calmonth
+where t3.stat_month between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB41' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM("经营费用")/SUM("不含税收入净额(管理)(数据来源为S、T)") as 季度累计实绩
+from t3 left join t4 on t3.stat_month = t4.calmonth
+where    
+to_char((SUBSTRING(t3.stat_month,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(t3.stat_month,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+)
+,AMT as (
+select 
+calmonth,
+ZB_CODE,
+sum(当月实绩)*100 as CM_STAT_AMT,
+sum(累计实绩)*100 as ACC_STAT_AMT,
+sum(季度累计实绩)*100 as QTR_TGT_AMT
+from 
+TT2
+group by 
+calmonth,
+ZB_CODE
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx 
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month

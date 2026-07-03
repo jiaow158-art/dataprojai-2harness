@@ -1,0 +1,382 @@
+{
+  "functional_scopes": [
+    {
+      "code": "4105",
+      "name": "制造费用",
+      "rows": 6129,
+      "amount": 197877894.43
+    },
+    {
+      "code": "4101",
+      "name": "生产成本",
+      "rows": 39,
+      "amount": 112623379.63
+    },
+    {
+      "code": "5501",
+      "name": "营业费用",
+      "rows": 14373,
+      "amount": 45422286.83
+    },
+    {
+      "code": "5502",
+      "name": "管理费用",
+      "rows": 8974,
+      "amount": 25659228.58
+    },
+    {
+      "code": "4110",
+      "name": "研发支出",
+      "rows": 2739,
+      "amount": 18207170.62
+    },
+    {
+      "code": "5504",
+      "name": "物流费用",
+      "rows": 2340,
+      "amount": 12927913.37
+    },
+    {
+      "code": "1010",
+      "name": "物流成本",
+      "rows": 2189,
+      "amount": 11884723.5826
+    },
+    {
+      "code": "5503",
+      "name": "财务费用",
+      "rows": 155,
+      "amount": 830788.69
+    },
+    {
+      "code": null,
+      "name": null,
+      "rows": 3,
+      "amount": 0
+    }
+  ],
+  "top_accounts": [
+    {
+      "acct": "0054010300",
+      "desc": "主营业务成本-公司间",
+      "rows": 122847,
+      "amount": 402636039.57
+    },
+    {
+      "acct": "0054010100",
+      "desc": "主营业务成本",
+      "rows": 244088,
+      "amount": 369475054.79
+    },
+    {
+      "acct": "0031410600",
+      "desc": "利润分配-未分配利润",
+      "rows": 93,
+      "amount": 270750361.6
+    },
+    {
+      "acct": "0041011030",
+      "desc": "材料消耗-半成品",
+      "rows": 25228,
+      "amount": 252196546.18
+    },
+    {
+      "acct": "0021710101",
+      "desc": "应交增值税－进项",
+      "rows": 420,
+      "amount": 87568454.11
+    },
+    {
+      "acct": "0061503000",
+      "desc": "能源及水资源-气",
+      "rows": 502,
+      "amount": 76256110.29
+    },
+    {
+      "acct": "0060101000",
+      "desc": "人力资源-工资",
+      "rows": 8591,
+      "amount": 55222411.11
+    },
+    {
+      "acct": "0010020731",
+      "desc": "招商银行佛山分行南庄支行10601",
+      "rows": 183,
+      "amount": 52370206.74
+    },
+    {
+      "acct": "0010020205",
+      "desc": "中信银行佛山分行500950297",
+      "rows": 9,
+      "amount": 49539145.19
+    },
+    {
+      "acct": "0041011010",
+      "desc": "材料消耗-原材料-沙泥",
+      "rows": 10458,
+      "amount": 45305714.35
+    },
+    {
+      "acct": "0041011011",
+      "desc": "材料消耗-原材料-化工",
+      "rows": 27182,
+      "amount": 43924976.3
+    },
+    {
+      "acct": "0015060100",
+      "desc": "递延所得税资产",
+      "rows": 40,
+      "amount": 42680615.21
+    },
+    {
+      "acct": "0021710103",
+      "desc": "应交增值税－转出未交增值税",
+      "rows": 40,
+      "amount": 33680841.09
+    },
+    {
+      "acct": "0061502000",
+      "desc": "能源及水资源-电费",
+      "rows": 2448,
+      "amount": 30369737.69
+    },
+    {
+      "acct": "0060501030",
+      "desc": "资产使用费-折旧费-机械设备",
+      "rows": 11446,
+      "amount": 24698242.95
+    }
+  ],
+  "dwr_cost_cols": [
+    "year",
+    "month",
+    "voucher_date",
+    "posting_date",
+    "fin_voucher_code",
+    "fin_voucher_line_code",
+    "voucher_type_code",
+    "cost_center_code",
+    "cost_center_desc",
+    "func_scope_code",
+    "func_scope_name",
+    "comp_code",
+    "comp_desc",
+    "sales_group_code",
+    "sales_group_desc",
+    "wbs",
+    "wbs_desc",
+    "general_ledger_account",
+    "general_ledger_account_desc",
+    "sales_org_code",
+    "channel_code",
+    "material_code",
+    "material_desc",
+    "cust_code",
+    "cust_name",
+    "supplier_code",
+    "supplier_name",
+    "qty",
+    "local_currency_amt",
+    "manual_adjust_amt",
+    "sum_amt",
+    "origin_currency_amt",
+    "local_currency_unit",
+    "origin_currency_unit",
+    "material_voucher_code",
+    "profit_center_code",
+    "profit_center_desc",
+    "dw_last_update_date",
+    "cust_group_code",
+    "item_text",
+    "allocation",
+    "doc_number",
+    "bill_num",
+    "fin_voucher_ref",
+    "vkgrp_pa"
+  ],
+  "dm_fact_cols": [
+    "month",
+    "functional_scope",
+    "config_name",
+    "cost_center",
+    "cost_center_describe",
+    "acc_acount",
+    "gl_account_desc",
+    "sales_grp_code",
+    "node_desc9",
+    "node_desc1",
+    "node_desc2",
+    "node_desc3",
+    "node_desc4",
+    "node_desc5",
+    "node_desc6",
+    "node_desc7",
+    "node_desc8",
+    "node_name1",
+    "node_name2",
+    "node_name3",
+    "node_name4",
+    "node_name5",
+    "node_name6",
+    "node_name7",
+    "node_name8",
+    "node_name9",
+    "cost_center_code_1",
+    "cost_center_name_1",
+    "cost_center_code_2",
+    "cost_center_name_2",
+    "cost_center_code_3",
+    "cost_center_name_3",
+    "cost_center_code_4",
+    "cost_center_name_4",
+    "cost_center_code_5",
+    "cost_center_name_5",
+    "cost_center_code_6",
+    "cost_center_name_6",
+    "cost_center_code_7",
+    "cost_center_name_7",
+    "cost_center_code_8",
+    "cost_center_name_8",
+    "cost_center_code_9",
+    "cost_center_name_9",
+    "cost_center_code_10",
+    "cost_center_name_10",
+    "cost_center_code_11",
+    "cost_center_name_11",
+    "cost_center_code_12",
+    "cost_center_name_12",
+    "cost_center_code_13",
+    "cost_center_name_13",
+    "cost_center_code_14",
+    "cost_center_name_14",
+    "cost_center_code_15",
+    "cost_center_name_15",
+    "budget_gl_account",
+    "budget_gl_account_desc",
+    "expense_type_name",
+    "comp_code",
+    "comp_desc",
+    "cost_center_type",
+    "cost_center_type_desc",
+    "budget_cost",
+    "forecast_cost",
+    "amount",
+    "accrual_amount",
+    "reversal_amount",
+    "actual_reimb_amount",
+    "ly_amount",
+    "ly_accrual_amount",
+    "ly_reversal_amount",
+    "ly_actual_reimb_amount",
+    "period_expense",
+    "operating_expense",
+    "ly_period_expense",
+    "ly_operating_expense",
+    "manual_adjust_amt",
+    "ly_manual_adjust_amt",
+    "sum_amt",
+    "ly_sum_amt",
+    "dw_last_update_date",
+    "infoprov",
+    "period_expense_ys",
+    "operating_expense_ys",
+    "ly_period_expense_ys",
+    "ly_operating_expense_ys",
+    "period_expense_yc",
+    "operating_expense_yc",
+    "ly_period_expense_yc",
+    "ly_operating_expense_yc",
+    "wbs_top_level",
+    "wbs_top_level_desc"
+  ],
+  "gross_profit_cols": [
+    "days",
+    "months",
+    "node_desc2",
+    "node_desc3",
+    "sales_region",
+    "operation_center",
+    "prod_hierarchys",
+    "size_dim",
+    "integration_channel",
+    "factory_80_flag",
+    "budget_amt",
+    "budget_use_point",
+    "budget_accrual_point",
+    "budget_notax_sales_net_amt",
+    "budget_cost_a",
+    "budget_gross_profit",
+    "budget_sales_area",
+    "budget_sales_qty",
+    "budget_gross_margin",
+    "sales_amt",
+    "use_point",
+    "accrual_point_system",
+    "accrual_point_manual",
+    "notax_sales_net_amt",
+    "actual_cost",
+    "gross_profit",
+    "sales_qty",
+    "sales_area",
+    "last_year_sales_amt",
+    "last_year_use_point",
+    "last_year_accrual_point_system",
+    "last_year_accrual_point_manual",
+    "last_year_notax_sales_net_amt",
+    "last_year_actual_cost",
+    "last_year_gross_profit",
+    "last_year_sales_qty",
+    "last_year_sales_area",
+    "dw_last_update_date",
+    "main_cat_flag",
+    "main_cat_size_dim_flag",
+    "zqdzh23_1",
+    "zqdzh23_2",
+    "budget_standard_A_cost",
+    "budget_a_cost_gross_profit",
+    "key_product",
+    "is_high_value",
+    "fr_text"
+  ],
+  "cost_center_samples": [
+    {
+      "code": "1010DA9000",
+      "desc": "信用减值损失",
+      "amt": 4159494.05
+    },
+    {
+      "code": "1919CF0001",
+      "desc": "山西生产制造部",
+      "amt": 3699959.86
+    },
+    {
+      "code": "1313WC0001",
+      "desc": "清远仓",
+      "amt": 3476695.15
+    },
+    {
+      "code": "1313IB0001",
+      "desc": "新品研发试制",
+      "amt": 3468217.92
+    },
+    {
+      "code": "7900XA0001",
+      "desc": "在建工程",
+      "amt": 2987044.74
+    }
+  ],
+  "dwr_cost_date_range": {
+    "min_year": "2020",
+    "max_year": "2026",
+    "min_month": "2020-01",
+    "max_month": "2026-06"
+  },
+  "dm_fact_date_range": {
+    "min": "2021-01",
+    "max": "2027-12"
+  },
+  "gross_profit_date_range": {
+    "min": "202201",
+    "max": "202606"
+  }
+}

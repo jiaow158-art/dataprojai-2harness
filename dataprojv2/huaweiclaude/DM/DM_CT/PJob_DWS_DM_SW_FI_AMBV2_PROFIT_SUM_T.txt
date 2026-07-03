@@ -1,0 +1,3399 @@
+-- DWS sql
+-- ******************************************************************** --
+-- author: DP_10004701
+-- description:卫浴事业部利润表
+-- 20240912 "税金及附加" 逻辑调整
+-- 2025-04-30 zhz 修改阿米巴成本、阿米巴毛利以及增加全资限制
+-- 2025-09-01 wjh  修改资产减值-固定资产字段逻辑:增加Z000限制
+-- ******************************************************************** --
+delete from dm.dm_sw_fi_ambv2_profit_sum_t where stat_month = '${PERIOD_ID_M}';
+insert into dm.dm_sw_fi_ambv2_profit_sum_t
+with dwr_dim_cust_partner_d as 
+(
+select sales_org_code,cust_num,distribution_chnl_code,emp_num,
+row_number() over(partition by sales_org_code,cust_num,distribution_chnl_code order by emp_num) rk
+from dwrdim.dwr_dim_cust_partner_d
+where 1 = 1
+and partner_func_code= 'VE' and substr(end_date,1,10) = '4712-12-31'
+)
+,cust_only_06_1 as 
+(
+select SRC_CUST_NUM,substr(SALES_ORG_CODE,1,2) vkg1_2,DISTRIBUTION_CHNL_CODE from dwrdim.dwr_dim_cust_sales_area_d --限制组织前两位，客编只有1条记录
+where 1=1
+and COALESCE(CUST_ORDER_FROZEN_CODE,'NAL') in ('','NAL') 
+and substr(end_date,1,10) = '4712-12-31'
+group by SRC_CUST_NUM,substr(SALES_ORG_CODE,1,2),DISTRIBUTION_CHNL_CODE
+)
+,cust_only_06_2 as --客户只有06渠道
+(
+select SRC_CUST_NUM,vkg1_2 from cust_only_06_1 
+group by SRC_CUST_NUM,vkg1_2
+having sum(case when DISTRIBUTION_CHNL_CODE = '06' then -1 else 1 end ) = -1
+)
+,AA1 as (--商用中心，线组汇总
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,sum(prod_it_amt1) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230613' and coalesce(prod_channel_name,distribution_channel) = '06' --商用中心
+and substr(stat_month,1,4) = case when substr(stat_month,1,4) = substr('${PERIOD_ID_M}',1,4) 
+									then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name
+),
+AA2 as (--商用中心，中心汇总
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sum(prod_it_amt1) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230613' and coalesce(prod_channel_name,distribution_channel) = '06'
+and substr(stat_month,1,4) = case when substr(stat_month,1,4) = substr('${PERIOD_ID_M}',1,4) 
+									then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+)
+,AA as (--商用中心，各线组分摊比例
+select 
+AA1.stat_month,
+AA1.sales_grp,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" else 1/cnt end "销售/工厂比例"
+from AA1
+left join AA2 on AA1.stat_month = AA2.stat_month
+)
+,xsyj as -- 计算税金及附加（不含房产税+土地使用税） -卫浴
+(
+select
+xs.calmonth as stat_month,
+xs.sales_grp,
+SUBSTR(D.node_name2,2,999)  as dept_code,
+coalesce(wbse.sales_emp,dime.emp_num) as salesemply,--销售雇员
+xs.data_source,--数据来源
+'1' as "分类标识",
+sum(
+case 
+when d.node_name4 = 'H03230643' then xs.ambperformance *0.24/100 --营销中心
+when d.node_name4 = 'H03230613' and COALESCE(xs.data_source,'NAL') <> 'D' then xs.ambperformance *0.32/100 --商用中心
+else 0 end)  as "税金及附加(不含房产税+土地使用税)-卫浴"
+from dm.dm_ambv2_zzt_xssr_t xs
+left join dm.dm_rpt_sales_group_t D
+on xs.sales_grp = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on xs.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on xs.salesorg = dime.sales_org_code and xs.customer = dime.cust_num and xs.distr_chan = dime.distribution_chnl_code  
+		and dime.rk = 1
+where xs.calmonth  = '${PERIOD_ID_M}'
+group by 
+xs.calmonth,
+xs.sales_grp,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num) ,
+xs.data_source
+union all 
+-- 计算税金及附加（不含房产税+土地使用税） -卫浴 双计部分
+select
+xs.calmonth as stat_month,
+upsw.sales_grp,
+SUBSTR(D.node_name2,2,999)  as dept_code,
+coalesce(wbse.sales_emp,dime.emp_num) as salesemply,--销售雇员
+'D' as data_source,--数据来源
+'D' as "分类标识",
+sum(
+case 
+when d.node_name4 = 'H03230643' and COALESCE(xs.data_source,'NAL') <> 'D'  then xs.ambperformance *0.32/100 --营销中心
+when d.node_name4 = 'H03230613' and COALESCE(xs.data_source,'NAL') <> 'D'  then xs.ambperformance *0.32/100 --商用中心
+else 0 end)  as "税金及附加(不含房产税+土地使用税)-卫浴"
+from dm.dm_ambv2_zzt_xssr_t xs
+left join dm.dm_rpt_sales_group_t D
+on xs.sales_grp = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on xs.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on xs.salesorg = dime.sales_org_code and xs.customer = dime.cust_num and xs.distr_chan = dime.distribution_chnl_code  
+		and dime.rk = 1
+left join (select distinct sales_grp,salesman_id from upload.upload_sw_sales_double_count_t where substr(end_date,1,10) = '9999-12-31' )  upsw
+	on coalesce(wbse.sales_emp,dime.emp_num) = upsw.salesman_id 
+where xs.calmonth  = '${PERIOD_ID_M}'
+and xs.distr_chan = '06' 
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') 
+	or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+and upsw.salesman_id is not null
+group by 
+xs.calmonth,
+upsw.sales_grp,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num) ,
+xs.data_source
+)
+,fy as (
+select
+fy.month as stat_month,
+fy.sales_group_code as sales_grp,
+SUBSTR(D.node_name2,2,999) as dept_code,
+coalesce(wbse.sales_emp,dime.emp_num)  as salesemply,--销售雇员
+'' as data_source,--数据来源
+sum(case when fy.func_scope_code = '5501' and fy.general_ledger_account not in ('0054010600','0054010700','0056010300') then coalesce(fy.sum_amt,0) else 0 end) as "减：销售费用",
+sum(case when fy.func_scope_code = '5504' and fy.general_ledger_account not in ('0054010600','0054010700','0056010300') then coalesce(fy.sum_amt,0) else 0 end) as "物流费用",
+sum(case when fy.func_scope_code = '5502' and fy.general_ledger_account not in ('0054010600','0054010700','0056010300') then coalesce(fy.sum_amt,0) else 0 end) as "管理费用",
+sum(case when fy.func_scope_code = '4110' and fy.general_ledger_account not in ('0054010600','0054010700','0056010300') then coalesce(fy.sum_amt,0) else 0 end) as "研发费用",
+sum(case when fy.func_scope_code = '5503' then coalesce(fy.sum_amt,0) else 0 end)  as "财务费用",
+sum(case when fy.general_ledger_account = '0065010000' then coalesce(fy.sum_amt,0) else 0 end)  as "其中：利息费用",
+sum(case when fy.general_ledger_account = '0065020000' then coalesce(fy.sum_amt,0) else 0 end)  as "利息收入",
+sum(case when fy.general_ledger_account like '00607%' then coalesce(fy.sum_amt,0) else 0 end) as "税金及附加-瓷砖",
+sum(case when fy.comp_code = 'Z000' and fy.general_ledger_account = '0054010601' then coalesce(fy.sum_amt,0) else 0 end) as "主营业务成本-运费(费用类)"
+from DWRFIN.DWR_FIN_COST_D_COMPRE_SUBJ_T fy
+-- left join DWIMD.DWI_MD_COST_CENTER_INFO_T B
+-- on fy.cost_center_code = SUBSTR(B.zcost_center,5,99)
+left join dm.dm_rpt_sales_group_t D
+on fy.sales_group_code = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on fy.wbs = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on fy.sales_org_code = dime.sales_org_code and fy.cust_code = dime.cust_num and fy.channel_code = dime.distribution_chnl_code  
+		and dime.rk = 1
+where  substr(fy.cost_center_code,5,2) <> 'ZA' --排除工程物流费用
+and (fy.comp_code <> '7G00' or fy.comp_code is null ) and D.node_name2 <> 'R91000002'
+and month = '${PERIOD_ID_M}'
+group by
+month,
+fy.sales_group_code,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num) 
+)
+,af as (
+select
+ af.month as stat_month
+,SUBSTR(D.node_name2,2,999) as dept_code
+,af.sales_group_master_file as sales_grp
+,'1'	as  "分类标识"
+,coalesce(wbse.sales_emp, af.sales_emp_code)  as salesemply--销售雇员
+,'' as data_source--数据来源
+,sum(case when (af.cust_group_code <> 'Z0' or af.cust_group_code is null) and af.is_overdue_cust <> 'Y' and af.is_eliminate = 'N' then af.capital_cost else 0 end ) as "应收账款利息(阿米巴)"
+from DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F af
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on af.comp_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+left join dm.dm_rpt_sales_group_t D
+on af.sales_group_master_file = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on af.wbs = wbse.wbs_level3 and wbse.wbs_level3 is not null
+where (af.comp_code <> '7G00' or af.comp_code is null) and D.node_name2 <> 'R91000002'
+and af.month = '${PERIOD_ID_M}' and b.comp_type = '全资'
+group by
+ af.month
+,SUBSTR(D.node_name2,2,999)
+,af.sales_group_master_file
+,coalesce(wbse.sales_emp, af.sales_emp_code)
+union all --双计部分
+select
+ af.month as stat_month
+,SUBSTR(D.node_name2,2,999) as dept_code
+,upsw.sales_grp as sales_grp
+,'D'	as  "分类标识"
+,coalesce(wbse.sales_emp, af.sales_emp_code)  as salesemply--销售雇员
+,'D' as data_source--数据来源
+,sum(case when (af.cust_group_code <> 'Z0' or af.cust_group_code is null) and af.is_overdue_cust <> 'Y' and af.is_eliminate = 'N' then af.capital_cost else 0 end ) as "应收账款利息(阿米巴)"
+from DWRFIN.DWR_AR_COMMERCIAL_BILL_CAPITAL_COST_F af 
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on af.comp_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+join cust_only_06_2 cust06 on substr(af.comp_code,1,2) = cust06.vkg1_2 and af.cust_code = cust06.SRC_CUST_NUM
+left join dm.dm_rpt_sales_group_t D
+on af.sales_group_master_file = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on af.wbs = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join (select distinct sales_grp,salesman_id from upload.upload_sw_sales_double_count_t where substr(end_date,1,10) = '9999-12-31' )  upsw
+	on coalesce(wbse.sales_emp, af.sales_emp_code) = upsw.salesman_id 
+where (af.comp_code <> '7G00' or af.comp_code is null) and D.node_name2 <> 'R91000002'
+and af.month = '${PERIOD_ID_M}' and b.comp_type = '全资'
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+group by
+ af.month
+,SUBSTR(D.node_name2,2,999)
+,upsw.sales_grp
+,coalesce(wbse.sales_emp, af.sales_emp_code)
+
+)
+--业务收支
+,qt as (
+select
+qt.calmonth  as stat_month
+,SUBSTR(D.node_name2,2,999) as dept_code
+,qt.sales_grp
+,coalesce(wbse.sales_emp,dime.emp_num)  as salesemply--销售雇员
+,'' as data_source--数据来源
+,sum(case when qt.CUST_GROUP <> 'Z0' or qt.CUST_GROUP is null then coalesce(qt.zqtywsr_jgf_dd,0)+coalesce(qt.zqtywsr_ddy,0)+coalesce(qt.zqtywsr_jtj_ddy,0)+coalesce(qt.zzyywsr_jgf_fdd,0)+coalesce(qt.zzyywsr_pdsr,0)+coalesce(qt.zzyywsr_qt,0)
+ +coalesce(qt.zfdje,0)-coalesce(qt.zsyjf,0)-coalesce(qt.zytjf_xt,0)+coalesce(qt.zqtsrtzz,0) else 0 end ) as "对外销售额"
+,sum(case when qt.CUST_GROUP = 'Z0' then coalesce(qt.zqtywsr_jgf_dd,0)+coalesce(qt.zqtywsr_ddy,0)+coalesce(qt.zqtywsr_gsj,0)+coalesce(qt.zqtywsr_jtj_ddy,0)+coalesce(qt.zzyywsr_jgf_fdd,0)+coalesce(qt.zzyywsr_pdsr,0)+coalesce(qt.zzyywsr_qt,0)
+ +coalesce(qt.zfdje,0)-coalesce(qt.zsyjf,0)-coalesce(qt.zytjf_xt,0)+coalesce(qt.zqtsrtzz,0) else 0 end ) as "跨事业部收入"
+,sum(case when (qt.CUST_GROUP <> 'Z0' or qt.CUST_GROUP is null) and (qt.distr_chan <> '03' or qt.distr_chan is null) then coalesce(qt.zqtywzc_jgf_dd,0)+coalesce(qt.zqtywzc_ddy,0)+coalesce(qt.zqtywzc_jtj,0)+coalesce(qt.zqtywzc_jgf_fdd,0)+coalesce(qt.zqtywzc_qt_fdd,0)+coalesce(zqtzctzz,0)
+ else 0 end ) as "对外销售成本"
+,sum(case when qt.CUST_GROUP = 'Z0' then coalesce(qt.zqtywzc_jgf_dd_sj,0)+coalesce(qt.zqtywzc_ddy_sj,0)+coalesce(qt.zqtywzc_jtj,0)+coalesce(qt.zqtywzc_jgf_fdd,0)+coalesce(qt.zqtywzc_qt_fdd,0)+coalesce(qt.zqtywzc_gsj,0) else 0 end ) as "跨事业部成本"
+from dm.dm_zzt_xssr_qt_t qt
+left join dm.dm_rpt_sales_group_t D
+on qt.sales_grp = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on qt.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on qt.salesorg = dime.sales_org_code and qt.customer = dime.cust_num and qt.distr_chan = dime.distribution_chnl_code  
+		and dime.rk =  1
+where 1=1 and (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and qt.calmonth = '${PERIOD_ID_M}'
+group by
+qt.calmonth,
+qt.sales_grp,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num) 
+
+
+)
+--综合
+,sz as (
+select
+sz.month as stat_month ,
+SUBSTR(D.node_name2,2,999) as dept_code,
+sz.sales_group_code as sales_grp,
+coalesce(wbse.sales_emp,dime.emp_num)  as salesemply,--销售雇员
+'' as data_source,--数据来源
+sum(case when sz.comp_code = 'Z000' and sz.general_ledger_account = '0052020100' then sz.sum_amt else 0 end ) as "公允价值变动收益",
+sum(case when (sz.cust_group_code <> 'Z0' OR sz.cust_group_code is null ) and sz.general_ledger_account = '0052030100'  and sz.comp_code = 'Z000' then sz.sum_amt else 0 end ) as "其他收益",
+sum(case when sz.general_ledger_account = '0052030100' and sz.comp_code <> 'Z000' then sz.sum_amt else 0 end ) as "其他收益（非Z000）",
+sum(case when (sz.cust_group_code <> 'Z0' OR sz.cust_group_code is null ) and sz.general_ledger_account between '0052010000' and '0052019999' then sz.sum_amt else 0 end ) as "投资收益",
+sum(case when (sz.cust_group_code <> 'Z0' OR sz.cust_group_code is null ) and sz.general_ledger_account = '0055010100' then sz.sum_amt else 0 end ) as "资产处置损益",
+sum(case when sz.general_ledger_account between '0053010000' and '0053019999' then sz.sum_amt else 0 end ) as "营业外收入",
+sum(case when sz.general_ledger_account between '0056010000' and '0056019999' then sz.sum_amt else 0 end ) as "营业外支出",
+sum(case when substr(general_ledger_account,1,6) = '005402' and general_ledger_account not in ('0054020300','0054020400') then sum_amt else 0 end ) as "税金及附加",
+sum(case when sz.general_ledger_account = '0054020300' then sz.sum_amt else 0 end ) as "房产税",
+sum(case when sz.general_ledger_account = '0054020400' then sz.sum_amt else 0 end ) as "土地使用税",
+sum(case when sz.general_ledger_account = '0061003000' and sz.comp_code = 'Z000' then sz.sum_amt else 0 end ) as "信用减值损失-其他应收款",
+sum(case when sz.general_ledger_account = '0061002000' and sz.comp_code = 'Z000' then sz.sum_amt else 0 end ) as "资产减值-存货跌价(能明确责任的)-瓷砖",
+sum(case when sz.general_ledger_account = '0061002010' and sz.comp_code = 'Z000' then sz.sum_amt else 0 end ) as "资产减值--固定资产",
+sum(case when sz.general_ledger_account = '0061002020' and sz.comp_code = 'Z000' then sz.sum_amt else 0 end ) as "资产减值-存货跌价(能明确责任的)-新"
+from DWRFIN.DWR_FIN_COST_D_COMPRE_SUBJ_T sz
+left join dm.dm_rpt_sales_group_t D
+on sz.sales_group_code = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on sz.wbs = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on sz.sales_org_code = dime.sales_org_code and sz.cust_code = dime.cust_num and sz.channel_code = dime.distribution_chnl_code  
+		and dime.rk = 1
+where (sz.comp_code <> '7G00' or sz.comp_code is null ) and D.node_name2 <> 'R91000002'
+and sz.month =  '${PERIOD_ID_M}'
+group by
+sz.month ,
+sz.sales_group_code,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num)
+)
+--库存资金成本
+,zj as (
+select
+substr(month,1,4)||'-'||substr(month,5,2) as stat_month,
+substr(D.node_name2,2,999) as dept_code,
+sales_group_code as sales_grp,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+ 0 as "库存利息" --更换取数逻辑
+from DM.DM_FIN_STOCK_CAPITAL_COST_T a 
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on a.comp_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_code
+where ( a.comp_code <> '7G00' or a.comp_code is null ) 
+and substr(month,1,4)||'-'||substr(month,5,2) = '${PERIOD_ID_M}' --and sales_grp = 'R24'
+and D.node_name2 <> 'R91000002' and b.comp_type = '全资'
+group by
+substr(month,1,4)||'-'||substr(month,5,2),
+sales_group_code,
+substr(D.node_name2,2,999)
+
+)
+,tr as (
+select
+months as stat_month ,
+substr(D.node_name2,2,999) as dept_code,
+sales_group as sales_grp,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+sum(case when cost_fund_category = '资金成本-固定资产' and is_asset_fund_cost = '是' then period_fund_cost_asset else 0 end ) "资金成本-固定资产",
+sum(case when cost_fund_category = '资金成本-在建工程' and is_asset_fund_cost = '是' then period_fund_cost_asset else 0 end ) "资金成本-在建工程",
+sum(case when cost_fund_category = '资金成本-无形资产' and is_asset_fund_cost = '是' then period_fund_cost_asset else 0 end ) "资金成本-无形资产",
+sum(case when cost_fund_category = '资金成本-长期待摊费用' and is_asset_fund_cost = '是' then period_fund_cost_asset else 0 end ) "资金成本-长期待摊费用"
+from DWRFIN.DWR_COST_FUND_COST_FIXED_ASSETS_D A 
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on a.company_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group
+where (A.company_code <> '7G00' or A.company_code is null )
+and months = '${PERIOD_ID_M}' and D.node_name2 <> 'R91000002' and b.comp_type = '全资'
+group by
+months ,
+substr(D.node_name2,2,999),
+sales_group
+)
+,tr1 as (
+select
+ year_month as stat_month
+,substr(D.node_name2,2,999) as dept_code
+,b.sales_grp
+,'' as salesemply--销售雇员
+,'' as data_source--数据来源
+,sum(case when supplier_property_flag = '是' then period_fund_cost_asset end) as "资金成本-预付长期资产款"
+from DWRFIN.DWR_COST_FUND_PREPAID_LT_ASSET_D a
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on a.comp_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+left join dm.dm_rpt_sales_group_t D
+on b.sales_grp = D.node_name9
+where (a.comp_code <> '7G00' or a.comp_code is null ) 
+and year_month = '${PERIOD_ID_M}' and D.node_name2 <> 'R91000002'  and b.comp_type = '全资'
+group by
+ year_month
+,substr(D.node_name2,2,999)
+,b.sales_grp
+)
+,tr2 as (
+select
+ year_month as stat_month
+,substr(D.node_name2,2,999) as dept_code
+,b.sales_grp
+,'' as salesemply--销售雇员
+,'' as data_source--数据来源
+,sum(case when supplier_property_flag = '是' then current_cost_fund end ) as "供应商付现利息"
+from DWRFIN.DWR_COST_FUND_COST_SUPPLIER_D a
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on a.comp_code = b.comp_code and '${PERIOD_ID_M}' between substr(b.stat_date,1,7) and substr(b.end_date,1,7) 
+left join dm.dm_rpt_sales_group_t D
+on b.sales_grp = D.node_name9
+where (a.comp_code <> '7G00' or a.comp_code is null ) 
+and year_month = '${PERIOD_ID_M}' and D.node_name2 <> 'R91000002' and b.comp_type = '全资'
+group by
+ year_month
+,substr(D.node_name2,2,999)
+,b.sales_grp
+)
+,ch00_1 as (--当月
+select
+'${PERIOD_ID_M}' as stat_month,
+sales_grp,
+'' as salesemply,
+'' as data_source,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)  as dept_code,
+sum(case when (stockcat <> 'K' or stockcat is null) then contributory_value else 0 end) as "资产减值-存货跌价(不能明确责任的)当月",
+sum(case when stockcat = 'K' and comp_code <> '7100' then contributory_value else 0 end) as "资产减值-存货跌价(外协寄售)当月",
+sum(inventory_value_amb) as "资产减值-存货跌价(能明确责任的)当月",
+0 as "资产减值-存货跌价(不能明确责任的)上月",
+0 as "资产减值-存货跌价(外协寄售)上月",
+0 as "资产减值-存货跌价(能明确责任的)上月",
+sum(COALESCE(capital_cost_conv,0)) as "库存利息"
+from dm.dm_ambv2_chdj_grp_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+where (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and stat_month <> '2023-01' and stat_month = '${PERIOD_ID_M}'
+group by
+sales_grp,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)
+)
+,ch00_11 as ( --当月双计
+select
+'${PERIOD_ID_M}' as stat_month,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)  as dept_code,
+sum(case when (stockcat <> 'K' or stockcat is null) then contributory_value else 0 end) as "资产减值-存货跌价(不能明确责任的)当月",
+sum(case when stockcat = 'K' and comp_code <> '7100' then contributory_value else 0 end) as "资产减值-存货跌价(外协寄售)当月",
+sum(inventory_value_amb) as "资产减值-存货跌价(能明确责任的)当月",
+0 as "资产减值-存货跌价(不能明确责任的)上月",
+0 as "资产减值-存货跌价(外协寄售)上月",
+0 as "资产减值-存货跌价(能明确责任的)上月",
+sum(COALESCE(capital_cost_conv,0)) as "库存利息"
+from dm.dm_ambv2_chdj_grp_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+where (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and stat_month <> '2023-01' and stat_month = '${PERIOD_ID_M}'
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+and A.distribution_channel = '06'
+group by coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb) 
+)
+,ch00_2 as ( --上月
+select
+'${PERIOD_ID_M}' as stat_month,
+sales_grp,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)   as dept_code,
+0 as "资产减值-存货跌价(不能明确责任的)当月",
+0 as "资产减值-存货跌价(外协寄售)当月",
+0 as "资产减值-存货跌价(能明确责任的)当月",
+sum(case when (stockcat <> 'K' or stockcat is null) then contributory_value else 0 end ) as "资产减值-存货跌价(不能明确责任的)上月",
+sum(case when stockcat = 'K' and comp_code <> '7100' then contributory_value else 0 end ) as "资产减值-存货跌价(外协寄售)上月",
+sum(inventory_value_amb) as  "资产减值-存货跌价(能明确责任的)上月",
+sum(COALESCE(capital_cost_conv,0)) as "库存利息"
+from dm.dm_ambv2_chdj_grp_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+where stat_month <> '2022-12' and (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and stat_month = SUBSTR(TO_DATE(concat('${PERIOD_ID_M}','-01'),'YYYY-MM-DD') - INTERVAL '1 month',1,7)
+group by
+sales_grp,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)
+)
+,ch00_22 as ( --上月双计
+select
+'${PERIOD_ID_M}' as stat_month,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)   as dept_code,
+0 as "资产减值-存货跌价(不能明确责任的)当月",
+0 as "资产减值-存货跌价(外协寄售)当月",
+0 as "资产减值-存货跌价(能明确责任的)当月",
+sum(case when (stockcat <> 'K' or stockcat is null) then contributory_value else 0 end ) as "资产减值-存货跌价(不能明确责任的)上月",
+sum(case when stockcat = 'K' and comp_code <> '7100' then contributory_value else 0 end ) as "资产减值-存货跌价(外协寄售)上月",
+sum(inventory_value_amb) as  "资产减值-存货跌价(能明确责任的)上月",
+sum(COALESCE(capital_cost_conv,0)) as "库存利息"
+from dm.dm_ambv2_chdj_grp_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+where stat_month <> '2022-12' and (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and stat_month = SUBSTR(TO_DATE(concat('${PERIOD_ID_M}','-01'),'YYYY-MM-DD') - INTERVAL '1 month',1,7)
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+and A.distribution_channel = '06'
+group by coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb) 
+)
+,ch00 as (
+select --当月
+stat_month,
+sales_grp,
+salesemply,
+data_source,
+'1' as "分类标识",
+dept_code,
+sum("资产减值-存货跌价(不能明确责任的)当月") as "资产减值-存货跌价(不能明确责任的)当月",
+sum("资产减值-存货跌价(外协寄售)当月") as "资产减值-存货跌价(外协寄售)当月",
+sum("资产减值-存货跌价(能明确责任的)当月") as"资产减值-存货跌价(能明确责任的)当月" ,
+sum("资产减值-存货跌价(不能明确责任的)上月") as "资产减值-存货跌价(不能明确责任的)上月",
+sum("资产减值-存货跌价(外协寄售)上月") as "资产减值-存货跌价(外协寄售)上月",
+sum("资产减值-存货跌价(能明确责任的)上月") as "资产减值-存货跌价(能明确责任的)上月",
+sum("库存利息") as "库存利息"
+from ch00_1
+group by 
+stat_month,
+sales_grp,
+salesemply,
+data_source,
+dept_code
+union all
+select --上月
+stat_month,
+sales_grp,
+salesemply,
+data_source,
+'1' as "分类标识",
+dept_code,
+sum("资产减值-存货跌价(不能明确责任的)当月") as "资产减值-存货跌价(不能明确责任的)当月",
+sum("资产减值-存货跌价(外协寄售)当月") as "资产减值-存货跌价(外协寄售)当月",
+sum("资产减值-存货跌价(能明确责任的)当月") as"资产减值-存货跌价(能明确责任的)当月" ,
+sum("资产减值-存货跌价(不能明确责任的)上月") as "资产减值-存货跌价(不能明确责任的)上月",
+sum("资产减值-存货跌价(外协寄售)上月") as "资产减值-存货跌价(外协寄售)上月",
+sum("资产减值-存货跌价(能明确责任的)上月") as "资产减值-存货跌价(能明确责任的)上月",
+sum("库存利息") as "库存利息"
+from ch00_2
+group by 
+stat_month,
+sales_grp,
+salesemply,
+data_source,
+dept_code
+union all 
+select -- 当月双计
+AA.stat_month,
+AA.sales_grp,
+'' salesemply,
+'D' as data_source,
+'D' as "分类标识",
+dept_code,
+"资产减值-存货跌价(不能明确责任的)当月" * AA."销售/工厂比例" as "资产减值-存货跌价(不能明确责任的)当月",
+"资产减值-存货跌价(外协寄售)当月"  * AA."销售/工厂比例" as "资产减值-存货跌价(外协寄售)当月",
+"资产减值-存货跌价(能明确责任的)当月" * AA."销售/工厂比例"  as"资产减值-存货跌价(能明确责任的)当月" ,
+"资产减值-存货跌价(不能明确责任的)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(不能明确责任的)上月",
+"资产减值-存货跌价(外协寄售)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(外协寄售)上月",
+"资产减值-存货跌价(能明确责任的)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(外协寄售)上月",
+"库存利息"  * AA."销售/工厂比例" as "库存利息"
+from ch00_11
+left join AA on  1=1
+union all 
+select -- 上月双计
+AA.stat_month,
+AA.sales_grp,
+'' salesemply,
+'D' as data_source,
+'D' as "分类标识",
+dept_code,
+"资产减值-存货跌价(不能明确责任的)当月" * AA."销售/工厂比例" as "资产减值-存货跌价(不能明确责任的)当月",
+"资产减值-存货跌价(外协寄售)当月"  * AA."销售/工厂比例" as "资产减值-存货跌价(外协寄售)当月",
+"资产减值-存货跌价(能明确责任的)当月" * AA."销售/工厂比例"  as"资产减值-存货跌价(能明确责任的)当月" ,
+"资产减值-存货跌价(不能明确责任的)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(不能明确责任的)上月",
+"资产减值-存货跌价(外协寄售)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(外协寄售)上月",
+"资产减值-存货跌价(能明确责任的)上月" * AA."销售/工厂比例"  as "资产减值-存货跌价(外协寄售)上月",
+"库存利息"  * AA."销售/工厂比例" as "库存利息"
+from ch00_22
+left join AA on 1=1
+)
+,ch0 as (
+select
+'2023-01' as stat_month,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)  as dept_code,
+sales_grp,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as "分类标识",
+sum(case when stockcat <> 'K' or stockcat is null then contributory_value else 0 end) as "资产减值-存货跌价(不能明确责任的)01",
+sum(case when stockcat = 'K' and comp_code <> '7100' then contributory_value else 0 end) as "资产减值-存货跌价(外协寄售)01",
+sum(inventory_value_amb) as "资产减值-存货跌价(能明确责任的)01",
+0 as "资产减值-存货跌价(不能明确责任的)12",
+0 as "资产减值-存货跌价(外协寄售)12",
+0 as "资产减值-存货跌价(能明确责任的)12",
+sum(COALESCE(capital_cost_conv,0)) as "库存利息"
+from dm.dm_ambv2_chdj_grp_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+where stat_month = '2023-01' and (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+group by
+sales_grp,
+coalesce(SUBSTR(D.node_name2,2,999) ,zdpsyb)
+union all
+select
+'2023-01' as stat_month,
+coalesce(SUBSTR(D.node_name2,2,999) ,dept_code) as dept_code,
+sales_grp,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as "分类标识",
+0 as "资产减值-存货跌价(不能明确责任的)01",
+0 as "资产减值-存货跌价(外协寄售)01",
+0 as "资产减值-存货跌价(能明确责任的)01",
+sum(case when ztype = '资产减值-存货跌价（不能明确责任的）' then B.amount else 0 end) as "资产减值-存货跌价(不能明确责任的)12",
+sum(case when ztype = '资产减值-存货跌价（外协寄售）' then B.amount else 0 end) as "资产减值-存货跌价(外协寄售)12",
+sum(case when ztype = '资产减值-存货跌价（能明确责任的）' then B.amount else 0 end) as "资产减值-存货跌价(能明确责任的)12",
+0 as "库存利息"
+from upload.upload_credit_devalue_20221231_t B
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = B.sales_grp
+where D.node_name2 <> 'R91000002'
+group by
+sales_grp,
+coalesce(SUBSTR(D.node_name2,2,999) ,dept_code)
+)
+--存货跌价
+,ch as (
+select
+stat_month,
+sales_grp,
+dept_code,
+salesemply,--销售雇员
+data_source,--数据来源
+"分类标识"	,
+sum(coalesce("资产减值-存货跌价(不能明确责任的)01",0)-coalesce("资产减值-存货跌价(不能明确责任的)12",0)) as "资产减值-存货跌价(不能明确责任的)",
+sum(coalesce("资产减值-存货跌价(外协寄售)01",0)-coalesce("资产减值-存货跌价(外协寄售)12",0)) as "资产减值-存货跌价(外协寄售)",
+sum(coalesce("资产减值-存货跌价(能明确责任的)01",0)-coalesce("资产减值-存货跌价(能明确责任的)12",0)) as "资产减值-存货跌价(能明确责任的)",
+sum(coalesce("库存利息",0)) as "库存利息"
+from ch0
+group by
+stat_month,
+sales_grp,
+dept_code,
+salesemply,
+data_source,
+"分类标识"
+union all
+select
+stat_month,
+sales_grp,
+dept_code,
+salesemply,--销售雇员
+data_source,--数据来源
+"分类标识"	,
+sum(coalesce("资产减值-存货跌价(不能明确责任的)当月",0)-coalesce("资产减值-存货跌价(不能明确责任的)上月",0)) as "资产减值-存货跌价(不能明确责任的)",
+sum(coalesce("资产减值-存货跌价(外协寄售)当月",0)-coalesce("资产减值-存货跌价(外协寄售)上月",0)) "资产减值-存货跌价(外协寄售)",
+sum(coalesce("资产减值-存货跌价(能明确责任的)当月",0)-coalesce("资产减值-存货跌价(能明确责任的)上月",0)) "资产减值-存货跌价(能明确责任的)",
+sum(coalesce("库存利息",0)) as "库存利息"
+from ch00
+group by
+stat_month,
+sales_grp,
+dept_code,
+salesemply,
+data_source,
+"分类标识"
+--where stat_month <> '2023-01'
+)
+,ar00 as(
+select --当月
+'${PERIOD_ID_M}' as stat_month ,
+sales_group_master_file as sales_grp,
+cust_code,
+SUBSTR(D.node_name2,2,999)  as dept_code,
+sales_emp_code as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as "分类标识",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收票据未逾期当月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then overdue_1_month_sum else 0 end) as "信用减值损失-应收票据逾期当月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收账款未逾期当月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then overdue_receivables_sum else 0 end) as "信用减值损失-应收账款逾期当月",
+0 as "信用减值损失-应收票据未逾期上月",
+0 as "信用减值损失-应收票据逾期上月",
+0 as "信用减值损失-应收账款未逾期上月",
+0 as "信用减值损失-应收账款逾期上月"
+from DWRFIN.DWR_AR_CREDIT_DEVALUE_F A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_master_file
+where comp_code <> '7G00' and D.node_name2 <> 'R91000002' 
+and substr(query_date,1,7) <> '2023-01' and substr(query_date,1,7) = '${PERIOD_ID_M}'
+group by
+SUBSTR(D.node_name2,2,999) ,
+sales_group_master_file,
+cust_code,
+sales_emp_code
+union all
+select --当月双计:信用减值
+'${PERIOD_ID_M}' as stat_month ,
+upsw.sales_grp as sales_grp,
+cust_code,
+SUBSTR(D.node_name2,2,999)  as dept_code,
+sales_emp_code as salesemply,--销售雇员
+'D' as data_source,--数据来源
+'D' as "分类标识",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收票据未逾期当月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then overdue_1_month_sum else 0 end) as "信用减值损失-应收票据逾期当月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收账款未逾期当月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then overdue_receivables_sum else 0 end) as "信用减值损失-应收账款逾期当月",
+0 as "信用减值损失-应收票据未逾期上月",
+0 as "信用减值损失-应收票据逾期上月",
+0 as "信用减值损失-应收账款未逾期上月",
+0 as "信用减值损失-应收账款逾期上月"
+from DWRFIN.DWR_AR_CREDIT_DEVALUE_F A
+join cust_only_06_2 cust06 on substr(A.comp_code,1,2) = cust06.vkg1_2 and A.cust_code = cust06.SRC_CUST_NUM
+left join (select distinct sales_grp,salesman_id from upload.upload_sw_sales_double_count_t where substr(end_date,1,10) = '9999-12-31' )  upsw
+	on A.sales_emp_code = upsw.salesman_id 
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_master_file
+where comp_code <> '7G00' and D.node_name2 <> 'R91000002' 
+and substr(query_date,1,7) <> '2023-01' and substr(query_date,1,7) = '${PERIOD_ID_M}'
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+group by
+SUBSTR(D.node_name2,2,999) ,
+upsw.sales_grp,
+cust_code,
+sales_emp_code
+union all
+select --上月
+'${PERIOD_ID_M}' as stat_month ,
+sales_group_master_file as sales_grp,
+cust_code,
+SUBSTR(D.node_name2,2,999) as dept_code,
+sales_emp_code as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as  "分类标识",
+0 as "信用减值损失-应收票据未逾期当月",
+0 as "信用减值损失-应收票据逾期当月",
+0 as "信用减值损失-应收账款未逾期当月",
+0 as "信用减值损失-应收账款逾期当月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收票据未逾期上月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then overdue_1_month_sum else 0 end) as "信用减值损失-应收票据逾期上月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收账款未逾期上月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then overdue_receivables_sum else 0 end) as "信用减值损失-应收账款逾期上月"
+from DWRFIN.DWR_AR_CREDIT_DEVALUE_F A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_master_file
+where (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and substr(query_date,1,7) <> '2022-12' and substr(query_date,1,7) = SUBSTR(TO_DATE(concat('${PERIOD_ID_M}','-01'),'YYYY-MM-DD') - INTERVAL '1 month',1,7)
+group by
+SUBSTR(D.node_name2,2,999) ,
+sales_group_master_file,
+cust_code,
+sales_emp_code
+union all 
+select --上月双计
+'${PERIOD_ID_M}' as stat_month ,
+upsw.sales_grp as sales_grp,
+cust_code,
+SUBSTR(D.node_name2,2,999) as dept_code,
+sales_emp_code as salesemply,--销售雇员
+'D' as data_source,--数据来源
+'D' as  "分类标识",
+0 as "信用减值损失-应收票据未逾期当月",
+0 as "信用减值损失-应收票据逾期当月",
+0 as "信用减值损失-应收账款未逾期当月",
+0 as "信用减值损失-应收账款逾期当月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收票据未逾期上月",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+ then overdue_1_month_sum else 0 end) as "信用减值损失-应收票据逾期上月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收账款未逾期上月",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+ then overdue_receivables_sum else 0 end) as "信用减值损失-应收账款逾期上月"
+from DWRFIN.DWR_AR_CREDIT_DEVALUE_F A
+join cust_only_06_2 cust06 on substr(A.comp_code,1,2) = cust06.vkg1_2 and A.cust_code = cust06.SRC_CUST_NUM
+left join (select distinct sales_grp,salesman_id from upload.upload_sw_sales_double_count_t where substr(end_date,1,10) = '9999-12-31' )  upsw
+	on A.sales_emp_code = upsw.salesman_id
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_master_file
+where (comp_code <> '7G00' or comp_code is null ) and D.node_name2 <> 'R91000002'
+and substr(query_date,1,7) <> '2022-12' and substr(query_date,1,7) = SUBSTR(TO_DATE(concat('${PERIOD_ID_M}','-01'),'YYYY-MM-DD') - INTERVAL '1 month',1,7)
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+group by
+SUBSTR(D.node_name2,2,999) ,
+upsw.sales_grp,
+cust_code,
+sales_emp_code
+)
+,ar0 as(
+select
+'2023-01' as stat_month,
+sales_group_master_file as sales_grp,
+cust_code,
+SUBSTR(D.node_name2,2,999)  as dept_code,
+sales_emp_code as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as  "分类标识",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收票据未逾期01",
+sum(case when special_general_ledger in ('V') and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null)
+then overdue_1_month_sum else 0 end) as "信用减值损失-应收票据逾期01",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+then n_overdue_receivables_sum else 0 end) as "信用减值损失-应收账款未逾期01",
+sum(case when (special_general_ledger not in ('W','V') or special_general_ledger is null) and is_overdue_cust <> 'Y' and (cust_group_code <> 'Z0' or cust_group_code is null) and (general_ledger_account not in ('0011310200','0011330200') or general_ledger_account is null )
+then overdue_receivables_sum else 0 end) as "信用减值损失-应收账款逾期01",
+0 as "信用减值损失-应收票据未逾期12",
+0 as "信用减值损失-应收票据逾期12",
+0 as "信用减值损失-应收账款未逾期12",
+0 as "信用减值损失-应收账款逾期12"
+from DWRFIN.DWR_AR_CREDIT_DEVALUE_F A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_group_master_file
+where (comp_code <> '7G00' or comp_code is null ) and substr(query_date,1,7) = '2023-01' and D.node_name2 <> 'R91000002'
+group by
+--substr(query_date,1,4)||'-'||substr(query_date,5,2),
+sales_group_master_file,
+cust_code ,
+SUBSTR(D.node_name2,2,999),
+sales_emp_code
+union all
+select
+'2023-01' as stat_month,
+sales_grp,
+cust_num as cust_code,
+'' as salesemply,--销售雇员
+'' as data_source,--数据来源
+'1' as  "分类标识",
+coalesce(SUBSTR(D.node_name2,2,999) ,dept_code) as dept_code ,
+0,
+0,
+0,
+0,
+sum(case when ztype = '信用减值损失-应收票据未逾期' then B.amount else 0 end) as "信用减值损失-应收票据未逾期12",
+sum(case when ztype = '信用减值损失-应收票据逾期' then B.amount else 0 end) as "信用减值损失-应收票据逾期12",
+sum(case when ztype = '信用减值损失-应收账款未逾期' then B.amount else 0 end) as "信用减值损失-应收账款未逾期12",
+sum(case when ztype = '信用减值损失-应收账款逾期' then B.amount else 0 end) as "信用减值损失-应收账款逾期12"
+from upload.upload_credit_devalue_20221231_t B
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = B.sales_grp
+where D.node_name2 <> 'R91000002'
+group by
+coalesce(SUBSTR(D.node_name2,2,999) ,dept_code),
+sales_grp,
+cust_num
+)
+,ar as (
+select
+A.stat_month,
+A.sales_grp,
+A.cust_code,
+A.dept_code,
+A.salesemply,--销售雇员
+A.data_source,--数据来源
+A."分类标识",
+sum(coalesce(A."信用减值损失-应收票据未逾期01",0)-coalesce(A."信用减值损失-应收票据未逾期12",0)) as "信用减值损失-应收票据未逾期",
+sum(coalesce(A."信用减值损失-应收票据逾期01",0)-coalesce(A."信用减值损失-应收票据逾期12",0))  as "信用减值损失-应收票据逾期",
+sum(coalesce(A."信用减值损失-应收账款未逾期01",0)-coalesce(A."信用减值损失-应收账款未逾期12",0))  as "信用减值损失-应收账款未逾期",
+sum(coalesce(A."信用减值损失-应收账款逾期01",0)-coalesce(A."信用减值损失-应收账款逾期12",0)) as "信用减值损失-应收账款逾期"
+from ar0 A
+group by
+A.stat_month,
+A.sales_grp,
+A.cust_code,
+A.dept_code,
+A.salesemply,
+A.data_source,
+A."分类标识"
+union all
+select
+stat_month,
+sales_grp,
+cust_code,
+dept_code,
+salesemply,
+data_source,
+"分类标识",
+sum(coalesce("信用减值损失-应收票据未逾期当月",0)-coalesce("信用减值损失-应收票据未逾期上月",0)) as "信用减值损失-应收票据未逾期",
+sum(coalesce("信用减值损失-应收票据逾期当月",0)-coalesce("信用减值损失-应收票据逾期上月",0))  as "信用减值损失-应收票据逾期",
+sum(coalesce("信用减值损失-应收账款未逾期当月",0)-coalesce("信用减值损失-应收账款未逾期上月",0))  as "信用减值损失-应收账款未逾期",
+sum(coalesce("信用减值损失-应收账款逾期当月",0)-coalesce("信用减值损失-应收账款逾期上月",0)) as "信用减值损失-应收账款逾期"
+from ar00
+group by
+stat_month,
+sales_grp,
+cust_code,
+dept_code,
+salesemply,
+data_source,
+"分类标识"
+)
+,ar1 as (
+select
+stat_month ,
+sum("信用减值损失-应收票据未逾期") as "信用减值损失-应收票据未逾期",
+sum("信用减值损失-应收票据逾期") as "信用减值损失-应收票据逾期",
+sum("信用减值损失-应收账款未逾期") as "信用减值损失-应收账款未逾期",
+sum("信用减值损失-应收账款逾期") as "信用减值损失-应收账款逾期"
+from ar
+group by stat_month
+)
+,ar2 as (
+select
+stat_month ,
+dept_code,
+sales_grp,
+salesemply,
+data_source,
+"分类标识",
+sum("信用减值损失-应收票据未逾期") as "信用减值损失-应收票据未逾期",
+sum("信用减值损失-应收票据逾期") as "信用减值损失-应收票据逾期",
+sum("信用减值损失-应收账款未逾期") as "信用减值损失-应收账款未逾期",
+sum("信用减值损失-应收账款逾期") as "信用减值损失-应收账款逾期"
+from ar
+group by
+stat_month,
+sales_grp,
+dept_code,
+salesemply,
+data_source,
+"分类标识"
+)
+,fy1 as (
+select
+ stat_month
+,sum("减：销售费用") as "减：销售费用"
+,sum("物流费用") as "物流费用"
+,sum("管理费用") as "管理费用"
+,sum("研发费用") as "研发费用"
+,sum("财务费用") as "财务费用"
+,sum("其中：利息费用") as "其中：利息费用"
+,sum("利息收入") as "利息收入"
+,sum("主营业务成本-运费(费用类)") as "主营业务成本-运费(费用类)"
+from fy
+group by stat_month
+)
+,qt1 as (
+select
+ stat_month
+,sum("对外销售额") as "对外销售额"
+,sum("跨事业部收入") as "跨事业部收入"
+,sum("对外销售成本") as "对外销售成本"
+,sum("跨事业部成本") as "跨事业部成本"
+from qt
+group by stat_month
+)
+,sz1 as (
+select
+ stat_month
+,sum("公允价值变动收益") as "公允价值变动收益"
+,sum("其他收益") as "其他收益"
+,sum("其他收益（非Z000）") as "其他收益（非Z000）"
+,sum("投资收益") as "投资收益"
+,sum("资产处置损益") as "资产处置损益"
+,sum("营业外收入") as "营业外收入"
+,sum("营业外支出") as "营业外支出"
+,sum("税金及附加") as "税金及附加"
+,sum("房产税") as "房产税"
+,sum("土地使用税") as "土地使用税"
+,sum("信用减值损失-其他应收款") as "信用减值损失-其他应收款"
+,sum("资产减值--固定资产") as "资产减值--固定资产"
+,sum("资产减值-存货跌价(能明确责任的)-新") as "资产减值-存货跌价(能明确责任的)-新"
+from sz
+group by stat_month
+)
+,ch1 as (
+select
+ stat_month
+,sum("资产减值-存货跌价(不能明确责任的)") as "资产减值-存货跌价(不能明确责任的)"
+,sum("资产减值-存货跌价(外协寄售)") as "资产减值-存货跌价(外协寄售)"
+,sum("资产减值-存货跌价(能明确责任的)") as "资产减值-存货跌价(能明确责任的)"
+from ch
+group by
+stat_month
+)
+,ch2 as (
+select
+ stat_month
+,sales_grp
+,dept_code
+,salesemply--销售雇员
+,data_source--数据来源
+,"分类标识"	
+,sum("资产减值-存货跌价(不能明确责任的)") as "资产减值-存货跌价(不能明确责任的)"
+,sum("资产减值-存货跌价(外协寄售)") as "资产减值-存货跌价(外协寄售)"
+,sum("资产减值-存货跌价(能明确责任的)") as "资产减值-存货跌价(能明确责任的)"
+,sum("库存利息") as "库存利息"
+from ch
+group by
+ stat_month
+,sales_grp
+,dept_code
+,salesemply
+,data_source
+,"分类标识"
+)
+,data1 as (--集团
+select
+calmonth as stat_month ,
+'11000000' as dept_code,
+'' as sales_grp ,
+coalesce(wbse.sales_emp,dime.emp_num)  as salesemply,--销售雇员
+data_source,--数据来源
+--sum(ext_sales_income + income_1n + cross_income) as "不含税销售额合计",
+sum (ext_sales_income) as "对外不含税销售额",
+sum(income_1n) as "1+N收入(对外卖出方)：",
+sum(case when prod_property = 'B0001' then income_1n else 0 end)  as "其中：卫浴产品收入",
+sum(case when prod_property = 'C0001' then income_1n else 0 end)  as "DPI产品收入",
+sum(case when prod_property = 'C0002' then income_1n else 0 end)  as "ART产品收入",
+sum(case when prod_property = 'C0003' then income_1n else 0 end)  as "辅材产品收入",
+sum(case when prod_property = 'C0004' then income_1n else 0 end)  as "整装产品收入",
+sum(case when prod_property = 'C0005' then income_1n else 0 end)  as "木地板收入",
+sum(case when prod_property = 'C0006' then income_1n else 0 end)  as "绿家产品收入",
+sum(case when prod_property = 'D0001' then income_1n else 0 end)  as "新材产品收入",
+sum(cross_income)  as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+sum(zzyywsr_qt) as "收入(其他)",
+sum(zsrtzz)  as "收入调整值",
+-1 * sum(ZFDJE)  as "减：服务费(FD)",
+-1 * sum(ZSYJF)  as "加：使用积分",
+sum(ZYTJF_SG) as "减：预提积分-手工",
+sum(ZYTJF_XT)  as "减：预提积分-系统",
+-- =不含税销售额合计-减：服务费(FD)+加：使用积分-减：预提积分(手工)-减：预提积分(系统) as "不含税销售净额(管理)"
+sum(case when substr(plant,3,2) = '80' then ZZYYWSR_GN + ZYYWSR_WM + ZYYWSR_ZYCK + ZHWJZJGTZ + ZYYWSR_JTJ + ZFDJE + ZSYJF - ZYTJF_XT
+else 0 end ) as "其中：清仓收入",
+--  as "销售成本合计",
+sum(ext_act_sales_cost)  as "销售成本",
+0 as "阿米巴销售成本",
+sum(ZYYWCB_YF + ZYYWCB_ZXF)  as "物流成本",
+sum(ZZYYWCB_AZF) as "其他成本",
+sum(cost_1n)  as "1+N成本",
+sum(case when prod_property = 'B0001' then cost_1n else 0 end) as "其中：卫浴产品成本",
+sum(case when prod_property = 'C0001' then cost_1n else 0 end) as "DPI产品成本",
+sum(case when prod_property = 'C0002' then cost_1n else 0 end) as "ART产品成本",
+sum(case when prod_property = 'C0003' then cost_1n else 0 end) as "辅材产品成本",
+sum(case when prod_property = 'C0004' then cost_1n else 0 end) as "整装产品成本",
+sum(case when prod_property = 'C0005' then cost_1n else 0 end) as "木地板成本",
+sum(case when prod_property = 'C0006' then cost_1n else 0 end) as "绿家产品成本",
+sum(case when prod_property = 'D0001' then cost_1n else 0 end) as "新材产品成本",
+sum(cross_cost) as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+sum(case when bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and bill_type is not null and substr(plant,3,2) = '80'
+then ZYYWCB else 0 end) as "清仓成本",
+0 as "阿米巴清仓成本",
+sum(case when bus_area not in ('E000','F000','J000','H000','I000') or bus_area is null then zcbtzz else 0 end )  as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+sum(case when bus_area in ('G001') then zcbtzz else 0 end ) as "共享仓标A调整值",
+0 as "卫浴非全资调整值",
+--  as "整体毛利",
+--  as "1+N毛利",
+sum(case when income_1n <> 0 then -ZSYJF else 0 end) as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+sum(case when income_1n <> 0 then ZYTJF_XT else 0 end) as "1+N预提积分-系统", --**
+--  as "跨事业部毛利",
+sum(case when cross_income <> 0 then -ZSYJF else 0 end) as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+sum(case when cross_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部预提积分-系统", --**
+0  as "事业部内部毛利",
+sum(case when dept_inner_income <> 0 then -ZSYJF else 0 end) as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+sum(case when dept_inner_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部内部预提积分-系统", --**
+--  as "清仓毛利",
+--  as "税金及附加合计",
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "费用-分摊费用(事业部内部)",
+--  as "资产减值损失合计",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+--  as "信用减值损失合计",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+--  as "其他业务收入合计",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+--  as "其他业务支出合计",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+--  as "营业利润",
+sum(income_1n + (case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end) - cost_1n ) as "1+N利润",
+sum(income_1n + case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end ) as "1+N收入/汇总",
+sum(cross_income + case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end - cross_cost)  as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+--  as "资金成本合计",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+--0 as "阿米巴利润总额",
+--0 as "所得税",
+--0 as "阿米巴净利润",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+sum(act_cost_profit_amt) as "整体毛利",
+sum(notax_sales_net_amt) as "收入汇总",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "阿米巴成本",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+sum(income_1n + (case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end) - cost_1n ) as "1+N毛利",
+sum(cross_income + case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end - cross_cost)  as "跨事业部毛利",
+0 as "卫浴-销售成本"
+from dm.dm_ambv2_profit_t A
+left join dm.dm_rpt_sales_group_t D
+on D.node_name9 = A.sales_grp
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on A.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on A.salesorg = dime.sales_org_code and A.customer = dime.cust_num and A.distr_chan = dime.distribution_chnl_code  
+		and dime.rk = 1
+where data_source = 'S' and (cust_group <> 'Z0' or cust_group is null) and (comp_code <> '7G00' or comp_code is null )
+and D.node_name2 <> 'R91000002'
+group by
+calmonth,
+coalesce(wbse.sales_emp,dime.emp_num),
+data_source
+)
+,data2 as (--事业部
+select
+calmonth as stat_month,
+SUBSTR(D.node_name2,2,999) as dept_code,
+A.sales_grp,
+coalesce(wbse.sales_emp,dime.emp_num)  as salesemply,--销售雇员
+data_source,--数据来源
+'1'	as  "分类标识",
+--sum(ext_sales_income + income_1n + cross_income) as "不含税销售额合计",
+sum (ext_sales_income) as "对外不含税销售额",
+sum(income_1n) as "1+N收入(对外卖出方)：",
+sum(case when prod_property = 'B0001' then income_1n else 0 end)  as "其中：卫浴产品收入",
+sum(case when prod_property = 'C0001' then income_1n else 0 end)  as "DPI产品收入",
+sum(case when prod_property = 'C0002' then income_1n else 0 end)  as "ART产品收入",
+sum(case when prod_property = 'C0003' then income_1n else 0 end)  as "辅材产品收入",
+sum(case when prod_property = 'C0004' then income_1n else 0 end)  as "整装产品收入",
+sum(case when prod_property = 'C0005' then income_1n else 0 end)  as "木地板收入",
+sum(case when prod_property = 'C0006' then income_1n else 0 end)  as "绿家产品收入",
+sum(case when prod_property = 'D0001' then income_1n else 0 end)  as "新材产品收入",
+sum(case when data_source = 'S' then cross_income else 0 end)  as "跨事业部收入(对外卖出方)",
+sum(case when data_source = 'D' then cross_income else 0 end)  as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+sum(dept_inner_income) as "事业部内部收入(供货方)",
+sum(zzyywsr_qt) as "收入(其他)",
+sum(zsrtzz)  as "收入调整值",
+-1 * sum(ZFDJE)  as "减：服务费(FD)",
+-1 * sum(ZSYJF)  as "加：使用积分",
+sum(COALESCE(ZYTJF_SG,0) ) as "减：预提积分-手工",
+sum(ZYTJF_XT)  as "减：预提积分-系统",
+-- =不含税销售额合计-减：服务费(FD)+加：使用积分-减：预提积分(手工)-减：预提积分(系统) as "不含税销售净额(管理)"
+sum(case when substr(plant,3,2) = '80' then ZZYYWSR_GN + ZYYWSR_WM + ZYYWSR_ZYCK + ZHWJZJGTZ + ZYYWSR_JTJ + ZFDJE + ZSYJF - ZYTJF_XT
+else 0 end ) as "其中：清仓收入",
+--  as "销售成本合计",
+sum(ext_act_sales_cost)  as "销售成本", 
+sum(case when trading_mode = 'A' and data_source = 'S' then amb_internal_price else 0 end ) as "阿米巴销售成本",
+sum(case when trading_mode = 'A' then standard_price_a else 0 end) as "标A成本",
+sum(ZYYWCB_YF + ZYYWCB_ZXF)  as "物流成本",
+sum(ZZYYWCB_AZF) as "其他成本",
+sum(case when income_1n <> 0 then notax_sales_net_amt else 0 end)  as "1+N成本",
+sum(case when prod_property = 'B0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "其中：卫浴产品成本",
+sum(case when prod_property = 'C0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "DPI产品成本",
+sum(case when prod_property = 'C0002' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "ART产品成本",
+sum(case when prod_property = 'C0003' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "辅材产品成本",
+sum(case when prod_property = 'C0004' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "整装产品成本",
+sum(case when prod_property = 'C0005' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "木地板成本",
+sum(case when prod_property = 'C0006' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "绿家产品成本",
+sum(case when prod_property = 'D0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "新材产品成本",
+sum(case when data_source = 'S' and cross_income <> 0 then notax_sales_net_amt else 0 end ) as "跨事业部成本(对外卖出方)",
+sum(case when data_source = 'D' and  cross_income <> 0 then notax_sales_net_amt else 0 end)  as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+sum(case when data_source = 'U' and  cross_income <> 0 then notax_sales_net_amt else 0 end)  as "事业部内部成本(供货方)",
+sum(case when bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and bill_type is not null and substr(plant,3,2) = '80' and data_source = 'S' then ZYYWCB else 0 end) as "清仓成本",
+sum(case when bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and bill_type is not null and substr(plant,3,2) = '80' and data_source = 'S' then
+(amb_internal_price + case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end) else 0 end) as "阿米巴清仓成本",
+sum(case when bus_area not in ('E000','F000','J000','H000','I000') or bus_area is null then zcbtzz else 0 end)  as "成本调整值",
+sum(case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end + case when bus_area in ('G001') then amb_internal_price else 0 end )  as "阿米巴成本调整值(瓷砖)",
+sum(case when bus_area in ('G001') then standard_price_a else 0 end ) as "共享仓标A调整值",
+sum(case when data_source = 'W' then prod_cost_adjust else 0 end) as "卫浴非全资调整值",
+--  as "整体毛利",
+--  as "1+N毛利",
+sum(case when income_1n <> 0 then -ZSYJF else 0 end) as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+sum(case when income_1n <> 0 then ZYTJF_XT else 0 end) as "1+N预提积分-系统", --**
+--  as "跨事业部毛利",
+sum(case when cross_income <> 0 then -ZSYJF else 0 end) as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+sum(case when cross_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部预提积分-系统", --**
+sum(dept_inner_profit_amt)  as "事业部内部毛利",
+sum(case when dept_inner_income <> 0 then -ZSYJF else 0 end) as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+sum(case when dept_inner_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部内部预提积分-系统", --**
+--  as "清仓毛利",
+--  as "税金及附加合计",
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "费用-分摊费用(事业部内部)",
+--  as "资产减值损失合计",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+--  as "信用减值损失合计",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+--  as "其他业务收入合计",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+--  as "其他业务支出合计",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+--  as "营业利润",
+sum(profit_1n) as "1+N利润",
+--sum(case when trading_mode = 'B' then notax_sales_net_amt * rate_1n else 0 end ) as "1+N收入/汇总",
+sum(income_1n + case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end ) as "1+N收入/汇总",
+sum(cross_profit) as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+--  as "资金成本合计",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+--sum(ext_sales_profit + profit_1n_amt + cross_profit_amt + zsrtzz + zzyywsr_qt - case when bus_area not in ('E000','F000','J000','H000','I000')
+--or bus_area is null then zcbtzz else 0 end - ZYYWCB_YF - ZYYWCB_ZXF - ZZYYWCB_AZF) "整体毛利",
+sum(act_cost_profit_amt) "整体毛利",
+--sum(amb_profit_amt - ZYYWCB_YF - ZYYWCB_ZXF) as "阿米巴整体毛利",
+--阿米巴整体毛利 = 不含税销售额(管理)-阿米巴销售成本-1+N成本-跨事业部成本-主营业务成本(运费)-主营业务成本(装卸费)-('E000','F000','J000','H000','I000')调整值-'G001'内部结算价
+sum(notax_sales_net_amt - (case when trading_mode = 'A' and data_source = 'S' then amb_internal_price else 0 end)  - cost_1n - cross_cost - ZYYWCB_YF - ZYYWCB_ZXF
+ - case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end - case when bus_area in ('G001') then amb_internal_price else 0 end 
+ - ZZYYWCB_AZF
+ ) as "阿米巴整体毛利",
+--标A整体毛利 = 不含税销售额(管理)-标A成本-1+N成本-跨事业部成本-主营业务成本(运费)-主营业务成本(装卸费)
+sum(notax_sales_net_amt - case when trading_mode = 'A' then standard_price_a else 0 end - cost_1n - cross_cost - ZYYWCB_YF - ZYYWCB_ZXF) "标A整体毛利", ---20230901 肖丽贤提出注释安装费
+sum(notax_sales_net_amt) as "收入汇总",
+sum((notax_sales_net_amt + ext_act_sales_cost - amb_internal_price) * (ext_sales_rate + rate_1n + cross_rate) ) as "阿米巴收入汇总",
+sum((notax_sales_net_amt + ext_act_sales_cost - standard_price_a) * (ext_sales_rate + rate_1n + cross_rate) ) as "标A收入汇总",
+sum(amb_internal_price) as "阿米巴成本",
+sum(profit_1n_amt) as "1+N毛利",
+sum(cross_profit_amt) as "跨事业部毛利",
+sum(ext_profit_1n_amt) as "1+N对外分成毛利额",
+sum(ext_cross_profit_amt) as "跨事业部对外分成毛利额",
+sum(ext_dept_inner_profit_amt) as "事业部内部对外分成毛利额",
+sum(case when a.DATA_SOURCE = 'S' then 
+		 (case when a.notax_sales_net_amt <> 0 and (a.ext_sales_income + a.income_1n + a.cross_income - a.ZSYJF - a.ZYTJF_XT) = 0 then 0 else  
+		 (case when a.clearance_flag = '03' or substr(a.stor_loc,3,2) = '90' then a.notax_sales_net_amt 
+		 when a.val_type is not null  then a.ext_act_sales_cost / 0.89
+		 else a.amb_internal_avg_fac_price * a.zxssl end) end)
+		 when a.DATA_SOURCE = 'D' then a.notax_sales_net_amt else 0 end ) as "卫浴-销售成本" --逻辑调整：同步收入成本表逻辑
+-- sum(amb_bath_cost_amt)	 as "卫浴-销售成本"
+from dm.dm_ambv2_profit_t A
+left join dm.dm_rpt_sales_group_t D
+on A.sales_grp = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on A.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on A.salesorg = dime.sales_org_code and A.customer = dime.cust_num and A.distr_chan = dime.distribution_chnl_code  
+		and dime.rk = 1
+where 1=1 and (cust_group <> 'Z0' or cust_group is null)
+and (comp_code <> '7G00' or comp_code is null ) ---and data_source <> 'U'
+and D.node_name2 <> 'R91000002'
+group by
+calmonth ,
+A.sales_grp,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num),
+data_source
+union all 
+--1）卫浴销售单元利润表-收入成本部分双计：
+select
+calmonth as stat_month,
+SUBSTR(D.node_name2,2,999) as dept_code,
+upsw.sales_grp,
+coalesce(wbse.sales_emp,dime.emp_num)  as salesemply,
+'D' as data_source,
+'D'	as  "分类标识"	,
+sum (ext_sales_income) as "对外不含税销售额",
+sum(income_1n) as "1+N收入(对外卖出方)：",
+sum(case when prod_property = 'B0001' then income_1n else 0 end)  as "其中：卫浴产品收入",
+sum(case when prod_property = 'C0001' then income_1n else 0 end)  as "DPI产品收入",
+sum(case when prod_property = 'C0002' then income_1n else 0 end)  as "ART产品收入",
+sum(case when prod_property = 'C0003' then income_1n else 0 end)  as "辅材产品收入",
+sum(case when prod_property = 'C0004' then income_1n else 0 end)  as "整装产品收入",
+sum(case when prod_property = 'C0005' then income_1n else 0 end)  as "木地板收入",
+sum(case when prod_property = 'C0006' then income_1n else 0 end)  as "绿家产品收入",
+sum(case when prod_property = 'D0001' then income_1n else 0 end)  as "新材产品收入",
+sum(case when data_source = 'S' then cross_income else 0 end)  as "跨事业部收入(对外卖出方)",
+sum(case when data_source = 'D' then cross_income else 0 end)  as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+sum(dept_inner_income)  as "事业部内部收入(供货方)",
+sum(zzyywsr_qt) as "收入(其他)",
+sum(zsrtzz)  as "收入调整值",
+-1 * sum(ZFDJE)  as "减：服务费(FD)",
+-1 * sum(ZSYJF)  as "加：使用积分",
+sum(COALESCE(ZYTJF_SG,0) ) as "减：预提积分-手工",
+sum(ZYTJF_XT)  as "减：预提积分-系统",
+sum(case when substr(plant,3,2) = '80' then ZZYYWSR_GN + ZYYWSR_WM + ZYYWSR_ZYCK + ZHWJZJGTZ + ZYYWSR_JTJ + ZFDJE + ZSYJF - ZYTJF_XT
+else 0 end ) as "其中：清仓收入",
+sum(ext_act_sales_cost)  as "销售成本",
+sum(case when trading_mode = 'A' and data_source = 'S' and prod_property not in ('C0001','C0002','C0003','C0004','C0005','C0006') then amb_internal_price 
+		 when trading_mode = 'A' and data_source = 'S' and prod_property in ('C0001','C0002','C0003','C0004','C0005','C0006') then ext_act_sales_cost else 0 end ) as "阿米巴销售成本",
+sum(case when trading_mode = 'A' then standard_price_a else 0 end) as "标A成本",
+sum(ZYYWCB_YF + ZYYWCB_ZXF)  as "物流成本",
+sum(ZZYYWCB_AZF) as "其他成本",
+sum(case when income_1n <> 0 then notax_sales_net_amt else 0 end)  as "1+N成本",
+sum(case when prod_property = 'B0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "其中：卫浴产品成本",
+sum(case when prod_property = 'C0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "DPI产品成本",
+sum(case when prod_property = 'C0002' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "ART产品成本",
+sum(case when prod_property = 'C0003' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "辅材产品成本",
+sum(case when prod_property = 'C0004' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "整装产品成本",
+sum(case when prod_property = 'C0005' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "木地板成本",
+sum(case when prod_property = 'C0006' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "绿家产品成本",
+sum(case when prod_property = 'D0001' and income_1n <> 0 then notax_sales_net_amt else 0 end) as "新材产品成本",
+sum(case when data_source = 'S' and cross_income <> 0 then notax_sales_net_amt else 0 end ) as "跨事业部成本(对外卖出方)", 
+sum(case when data_source = 'D' and  cross_income <> 0 then notax_sales_net_amt else 0 end)  as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+sum(case when data_source = 'U' and  cross_income <> 0 then notax_sales_net_amt else 0 end)  as "事业部内部成本(供货方)",
+sum(case when bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and bill_type is not null and substr(plant,3,2) = '80' and data_source = 'S' then ZYYWCB else 0 end) as "清仓成本",
+sum(case when bill_type not in ('ZIG','ZIGS','ZIR','ZIRS','ZIV','ZIVS','ZIW','ZIWS') and bill_type is not null and substr(plant,3,2) = '80' and data_source = 'S' then
+(amb_internal_price + case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end) else 0 end) as "阿米巴清仓成本",
+sum(case when bus_area not in ('E000','F000','J000','H000','I000') or bus_area is null then zcbtzz else 0 end)  as "成本调整值",
+sum(case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end + case when bus_area in ('G001') then amb_internal_price else 0 end )  as "阿米巴成本调整值(瓷砖)",
+sum(case when bus_area in ('G001') then standard_price_a else 0 end ) as "共享仓标A调整值",
+sum(case when data_source = 'W' then prod_cost_adjust else 0 end) as "卫浴非全资调整值",
+sum(case when income_1n <> 0 then -ZSYJF else 0 end) as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+sum(case when income_1n <> 0 then ZYTJF_XT else 0 end) as "1+N预提积分-系统", --**
+sum(case when cross_income <> 0 then -ZSYJF else 0 end) as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+sum(case when cross_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部预提积分-系统", --**
+sum(dept_inner_profit_amt) as "事业部内部毛利",
+sum(case when dept_inner_income <> 0 then -ZSYJF else 0 end) as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+sum(case when dept_inner_income <> 0 then ZYTJF_XT else 0 end) as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+sum(profit_1n) as "1+N利润",
+sum(income_1n + case when income_1n <> 0 then (-ZSYJF-ZYTJF_XT) else 0 end ) as "1+N收入/汇总",
+sum(cross_profit) as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+sum(act_cost_profit_amt) "整体毛利",
+sum(notax_sales_net_amt - (case when trading_mode = 'A' and data_source = 'S' and prod_property not in ('C0001','C0002','C0003','C0004','C0005','C0006') then amb_internal_price 
+		 when trading_mode = 'A' and data_source = 'S' and prod_property in ('C0001','C0002','C0003','C0004','C0005','C0006') then ext_act_sales_cost else 0 end)  - cost_1n - cross_cost - ZYYWCB_YF - ZYYWCB_ZXF
+ - case when bus_area in ('E000','F000','J000','H000','I000') then zcbtzz else 0 end - case when bus_area in ('G001') then amb_internal_price else 0 end
+ - ZZYYWCB_AZF
+ ) as "阿米巴整体毛利",
+--标A整体毛利 = 不含税销售额(管理)-标A成本-1+N成本-跨事业部成本-主营业务成本(运费)-主营业务成本(装卸费)
+sum(notax_sales_net_amt - case when trading_mode = 'A' then standard_price_a else 0 end - cost_1n - cross_cost - ZYYWCB_YF - ZYYWCB_ZXF) "标A整体毛利", ---20230901 肖丽贤提出注释安装费
+sum(notax_sales_net_amt) as "收入汇总",
+sum((notax_sales_net_amt + ext_act_sales_cost - amb_internal_price) * (ext_sales_rate + rate_1n + cross_rate) ) as "阿米巴收入汇总",
+sum((notax_sales_net_amt + ext_act_sales_cost - standard_price_a) * (ext_sales_rate + rate_1n + cross_rate) ) as "标A收入汇总",
+sum(amb_internal_price) as "阿米巴成本",
+sum(profit_1n_amt) as "1+N毛利",
+sum(cross_profit_amt) as "跨事业部毛利",
+sum(ext_profit_1n_amt) as "1+N对外分成毛利额",
+sum(ext_cross_profit_amt) as "跨事业部对外分成毛利额",
+sum(ext_dept_inner_profit_amt) as "事业部内部对外分成毛利额",
+sum(case when a.DATA_SOURCE = 'S' then 
+		 (case when a.notax_sales_net_amt <> 0 and (a.ext_sales_income + a.income_1n + a.cross_income - a.ZSYJF - a.ZYTJF_XT) = 0 then 0 else  
+		 (case when a.clearance_flag = '03' or substr(a.stor_loc,3,2) = '90' then a.notax_sales_net_amt 
+		 when a.val_type is not null  then a.ext_act_sales_cost / 0.89
+		 else a.amb_internal_avg_fac_price * a.zxssl end) end)
+		 when a.DATA_SOURCE = 'D' then a.notax_sales_net_amt else 0 end ) as "卫浴-销售成本"----逻辑调整：同步收入成本表逻辑
+from dm.dm_ambv2_profit_t A
+left join dm.dm_rpt_sales_group_t D
+on A.sales_grp = D.node_name9
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbse on A.wbs_elemt = wbse.wbs_level3 and wbse.wbs_level3 is not null
+left join dwr_dim_cust_partner_d dime on A.salesorg = dime.sales_org_code and A.customer = dime.cust_num and A.distr_chan = dime.distribution_chnl_code  
+		and dime.rk = 1
+left join (select distinct sales_grp,salesman_id from upload.upload_sw_sales_double_count_t where substr(end_date,1,10) = '9999-12-31' )  upsw
+	on coalesce(wbse.sales_emp,dime.emp_num) = upsw.salesman_id 
+--	and A.sales_grp = upsw.sales_grp
+where 1=1 and (cust_group <> 'Z0' or cust_group is null)
+and (comp_code <> '7G00' or comp_code is null ) ---and data_source <> 'U'
+and D.node_name2 <> 'R91000002'
+and A.distr_chan = '06' 
+and (D.node_name3 in ('H03230643') or D.node_name4 in ('H03230643') or D.node_name5 in ('H03230643') or D.node_name6 in ('H03230643') or D.node_name7 in ('H03230643') or D.node_name8 in ('H03230643') )
+and upsw.salesman_id is not null
+group by
+calmonth ,
+upsw.sales_grp,
+SUBSTR(D.node_name2,2,999),
+coalesce(wbse.sales_emp,dime.emp_num),
+data_source
+)
+,tmp as (
+select ---集团
+A.stat_month,
+A.dept_code,
+A.sales_grp,
+A.salesemply,--销售雇员
+A.data_source,--数据来源
+'1'	as  "分类标识"	,
+-- "不含税销售额合计",
+"对外不含税销售额",
+"1+N收入(对外卖出方)：",
+"其中：卫浴产品收入",
+"DPI产品收入",
+"ART产品收入",
+"辅材产品收入",
+"整装产品收入",
+"木地板收入",
+"绿家产品收入",
+"新材产品收入",
+"跨事业部收入(对外卖出方)",
+"跨事业部收入(供货方)",
+"事业部内部收入(对外卖出方)",
+"事业部内部收入(供货方)",
+"收入(其他)",
+"收入调整值",
+"减：服务费(FD)",
+"加：使用积分",
+"减：预提积分-手工",
+"减：预提积分-系统",
+"其中：清仓收入",
+"销售成本",
+"物流成本",
+"其他成本",
+"1+N成本",
+"其中：卫浴产品成本",
+"DPI产品成本",
+"ART产品成本",
+"辅材产品成本",
+"整装产品成本",
+"木地板成本",
+"绿家产品成本",
+"新材产品成本",
+"跨事业部成本(对外卖出方)",
+"跨事业部成本(供货方)",
+"事业部内部成本(对外卖出方)",
+"事业部内部成本(供货方)",
+"清仓成本",
+"成本调整值",
+"阿米巴成本调整值(瓷砖)",
+"共享仓标A调整值",
+--  as "整体毛利",
+--  as "1+N毛利",
+"1+N使用积分",   --**
+"1+N预提积分-手工",  --**
+"1+N预提积分-系统", --**
+--  as "跨事业部毛利",
+"跨事业部使用积分", --**
+"跨事业部预提积分-手工", --**
+"跨事业部预提积分-系统", --**
+--  as "事业部内部毛利",
+"事业部内部使用积分", --**
+"事业部内部预提积分-手工", --**
+"跨事业部内部预提积分-系统", --**
+--  as "清仓毛利",
+--  as "税金及附加合计",
+sz1."税金及附加" as "税金及附加(不含房产税+土地使用税)",
+sz1."房产税" as "房产税",
+sz1."土地使用税" as "土地使用税",
+fy1."减：销售费用" as "减：销售费用",
+fy1."物流费用" as "物流费用",
+fy1."管理费用" as "管理费用",
+fy1."研发费用" as "研发费用",
+fy1."财务费用" as "财务费用",
+fy1."其中：利息费用" as "其中：利息费用",
+fy1."利息收入" as "利息收入",
+fy1."主营业务成本-运费(费用类)",
+"费用-分摊费用(事业部内部)",
+--  as "资产减值损失合计",
+ch1."资产减值-存货跌价(能明确责任的)" as "其中：资产减值-存货跌价(能明确责任的)",
+ch1."资产减值-存货跌价(不能明确责任的)" as "其中：资产减值-存货跌价(不能明确责任的)",
+ch1."资产减值-存货跌价(外协寄售)" as "其中：资产减值-存货跌价(外协寄售)",
+sz1."资产减值-存货跌价(能明确责任的)-新" as "资产减值-存货跌价(能明确责任的)-新",
+sz1."资产减值--固定资产" as "资产减值--固定资产",
+--  as "信用减值损失合计",
+ar1."信用减值损失-应收票据未逾期" as "信用减值损失-应收票据未逾期",
+ar1."信用减值损失-应收票据逾期" as "信用减值损失-应收票据逾期",
+ar1."信用减值损失-应收账款未逾期" as "信用减值损失-应收账款未逾期",
+ar1."信用减值损失-应收账款逾期" as "信用减值损失-应收账款逾期",
+sz1."信用减值损失-其他应收款" as "信用减值损失-其他应收款",
+sz1."公允价值变动收益" *-1  as "加: 公允价值变动收益(损失以“-”号填列)",
+sz1."其他收益" *-1 		 as "其他收益",
+sz1."其他收益（非Z000）" * -1 as "其他收益（非Z000）",
+sz1."投资收益" *-1  		as "投资收益(损失负)",
+sz1."资产处置损益" *-1     as "资产处置损益",
+--  as "其他业务收入合计",
+qt1."对外销售额"  as "对外销售额",
+qt1."跨事业部收入" as "跨事业部收入：",
+"卫浴事业部收取鹏嘉品牌使用费",
+--  as "其他业务支出合计",
+qt1."对外销售成本"  as "对外销售成本",
+qt1."跨事业部成本"  as "跨事业部成本",
+"鹏嘉支付卫浴事业部品牌使用费",
+--  as "营业利润",
+"1+N利润",
+"跨事业部利润",
+"事业部内部利润",
+-sz1."营业外收入" as "加：营业外收入",
+sz1."营业外支出" as "减：营业外支出",
+--  as "资金成本合计",
+"应收账款利息(阿米巴)",
+"库存利息",
+"资金成本-预付长期资产款",
+"资金成本-固定资产",
+"资金成本-在建工程",
+"资金成本-无形资产",
+"资金成本-长期待摊费用(展厅装修)",
+"供应商付现利息(参照前面单列)",
+"预计奖金包",
+"对外参股股权投资款(事业部基于业务需要)",
+"整体毛利",
+"收入汇总",
+"阿米巴销售成本",
+"阿米巴清仓成本",
+"阿米巴整体毛利",
+"阿米巴收入汇总",
+"1+N收入/汇总",
+"阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+"标A成本",
+"标A整体毛利",
+"标A收入汇总",
+"卫浴非全资调整值",
+"1+N毛利",
+"跨事业部毛利",
+"1+N对外分成毛利额",
+"跨事业部对外分成毛利额",
+"事业部内部对外分成毛利额",
+"卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from data1  A
+left join fy1 on A.stat_month = fy1.stat_month --and A.sales_grp = fy1.sales_grp
+left join qt1 on A.stat_month = qt1.stat_month --and A.sales_grp = qt1.sales_grp
+left join sz1 on A.stat_month = sz1.stat_month --and A.sales_grp = sz1.sales_grp
+left join ch1 on A.stat_month = ch1.stat_month --and A.sales_grp = ch1.sales_grp
+left join ar1 on A.stat_month = ar1.stat_month --and A.sales_grp = ch1.sales_grp
+union all
+select
+A.stat_month,
+A.dept_code,
+A.sales_grp,
+A.salesemply,--销售雇员
+A.data_source,--数据来源
+"分类标识"	,
+--sum(ext_sales_income + income_1n + cross_income) as "不含税销售额合计",
+"对外不含税销售额",
+"1+N收入(对外卖出方)：",
+"其中：卫浴产品收入",
+"DPI产品收入",
+"ART产品收入",
+"辅材产品收入",
+"整装产品收入",
+"木地板收入",
+"绿家产品收入",
+"新材产品收入",
+"跨事业部收入(对外卖出方)",
+"跨事业部收入(供货方)",
+"事业部内部收入(对外卖出方)",
+"事业部内部收入(供货方)",
+"收入(其他)",
+"收入调整值",
+"减：服务费(FD)",
+"加：使用积分",
+"减：预提积分-手工",
+"减：预提积分-系统",
+-- =不含税销售额合计-减：服务费(FD)+加：使用积分-减：预提积分(手工)-减：预提积分(系统) as "不含税销售净额(管理)"
+"其中：清仓收入",
+--  as "销售成本合计",
+"销售成本",
+"物流成本",
+"其他成本",
+"1+N成本",
+"其中：卫浴产品成本",
+"DPI产品成本",
+"ART产品成本",
+"辅材产品成本",
+"整装产品成本",
+"木地板成本",
+"绿家产品成本",
+"新材产品成本",
+"跨事业部成本(对外卖出方)",
+"跨事业部成本(供货方)",
+"事业部内部成本(对外卖出方)",
+"事业部内部成本(供货方)",
+"清仓成本",
+"成本调整值",
+"阿米巴成本调整值(瓷砖)",
+"共享仓标A调整值",
+--  as "整体毛利",
+--  as "1+N毛利",
+"1+N使用积分",   --**
+"1+N预提积分-手工",  --**
+"1+N预提积分-系统", --**
+--  as "跨事业部毛利",
+"跨事业部使用积分", --**
+"跨事业部预提积分-手工", --**
+"跨事业部预提积分-系统", --**
+--  as "事业部内部毛利",
+"事业部内部使用积分", --**
+"事业部内部预提积分-手工", --**
+"跨事业部内部预提积分-系统", --**
+--  as "清仓毛利",
+--  as "税金及附加合计",
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+"费用-分摊费用(事业部内部)",
+--  as "资产减值损失合计",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+--  as "信用减值损失合计",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+--  as "其他业务收入合计",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+"卫浴事业部收取鹏嘉品牌使用费",
+--  as "其他业务支出合计",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+"鹏嘉支付卫浴事业部品牌使用费",
+--  as "营业利润",
+"1+N利润",
+"跨事业部利润",
+"事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+--  as "资金成本合计",
+0 as"应收账款利息(阿米巴)",
+"库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+"预计奖金包",
+"对外参股股权投资款(事业部基于业务需要)",
+"整体毛利",
+"收入汇总",
+"阿米巴销售成本",
+"阿米巴清仓成本",
+"阿米巴整体毛利",
+"阿米巴收入汇总",
+"1+N收入/汇总",
+"阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+"标A成本",
+"标A整体毛利",
+"标A收入汇总",
+"卫浴非全资调整值",
+"1+N毛利",
+"跨事业部毛利",
+"1+N对外分成毛利额",
+"跨事业部对外分成毛利额",
+"事业部内部对外分成毛利额",
+"卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from data2 A
+union all
+select --事业部
+fy.stat_month,
+fy.dept_code,
+fy.sales_grp,
+fy.salesemply,--销售雇员
+fy.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+fy."减：销售费用" as "减：销售费用",
+fy."物流费用" as "物流费用",
+fy."管理费用" as "管理费用",
+fy."研发费用" as "研发费用",
+fy."财务费用" as "财务费用",
+fy."其中：利息费用" as "其中：利息费用",
+fy."利息收入" as "利息收入",
+fy."主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+fy."税金及附加-瓷砖" as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from fy
+union all
+select
+qt.stat_month,
+qt.dept_code,
+qt.sales_grp,
+qt.salesemply,--销售雇员
+qt.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+qt."对外销售额" as "对外销售额",
+qt."跨事业部收入" as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+qt."对外销售成本" as "对外销售成本",
+qt."跨事业部成本" as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from qt
+union all
+select
+sz.stat_month,
+sz.dept_code,
+sz.sales_grp,
+sz.salesemply,--销售雇员
+sz.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+sz."税金及附加" as "税金及附加(不含房产税+土地使用税)",
+sz."房产税" as "房产税",
+sz."土地使用税" as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+sz."资产减值-存货跌价(能明确责任的)-新" as "资产减值-存货跌价(能明确责任的)-新",
+sz."资产减值--固定资产" as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+sz."信用减值损失-其他应收款" as "信用减值损失-其他应收款",
+sz."公允价值变动收益" * -1 as "加: 公允价值变动收益(损失以“-”号填列)",
+sz."其他收益"  * -1 as "其他收益",
+sz."其他收益（非Z000）" * -1  as "其他收益（非Z000）",
+sz."投资收益" * -1  as "投资收益(损失负)",
+sz."资产处置损益" * -1   as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+-sz."营业外收入" as "加：营业外收入",
+sz."营业外支出" as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+sz."资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from sz
+union all
+select
+zj.stat_month,
+zj.dept_code,
+zj.sales_grp,
+zj.salesemply,--销售雇员
+zj.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+zj."库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from zj
+union all
+select
+tr.stat_month,
+tr.dept_code,
+tr.sales_grp,
+tr.salesemply,--销售雇员
+tr.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+tr."资金成本-固定资产",
+tr."资金成本-在建工程",
+tr."资金成本-无形资产",
+tr."资金成本-长期待摊费用" as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from tr
+union all
+select
+tr1.stat_month,
+tr1.dept_code,
+tr1.sales_grp,
+tr1.salesemply,--销售雇员
+tr1.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+tr1."资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from tr1
+union all
+select
+tr2.stat_month,
+tr2.dept_code,
+tr2.sales_grp,
+tr2.salesemply,--销售雇员
+tr2.data_source,--数据来源
+'1'	as  "分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+tr2."供应商付现利息" as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from tr2
+union all
+select
+ch2.stat_month,
+ch2.dept_code,
+ch2.sales_grp,
+ch2.salesemply,--销售雇员
+ch2.data_source,--数据来源
+ch2."分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+ch2."资产减值-存货跌价(能明确责任的)" as "其中：资产减值-存货跌价(能明确责任的)",
+ch2."资产减值-存货跌价(不能明确责任的)" as "其中：资产减值-存货跌价(不能明确责任的)",
+ch2."资产减值-存货跌价(外协寄售)" as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as "1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+"库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from ch2
+union all
+select
+ar2.stat_month,
+ar2.dept_code,
+ar2.sales_grp,
+ar2.salesemply,--销售雇员
+ar2.data_source,--数据来源
+ar2."分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+ar2."信用减值损失-应收票据未逾期" as "信用减值损失-应收票据未逾期",
+ar2."信用减值损失-应收票据逾期" as "信用减值损失-应收票据逾期",
+ar2."信用减值损失-应收账款未逾期" as "信用减值损失-应收账款未逾期",
+ar2."信用减值损失-应收账款逾期" as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as "1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as"库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from ar2
+union all
+select
+af.stat_month,
+af.dept_code,
+af.sales_grp,
+af.salesemply,--销售雇员
+af.data_source,--数据来源
+"分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+af."应收账款利息(阿米巴)" as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+0 as "税金及附加(不含房产税+土地使用税)-卫浴"
+from af
+union all 
+select
+xsyj.stat_month,
+xsyj.dept_code,
+xsyj.sales_grp,
+xsyj.salesemply,--销售雇员
+xsyj.data_source,--数据来源
+"分类标识"	,
+0 as "对外不含税销售额",
+0 as "1+N收入(对外卖出方)：",
+0 as "其中：卫浴产品收入",
+0 as "DPI产品收入",
+0 as "ART产品收入",
+0 as "辅材产品收入",
+0 as "整装产品收入",
+0 as "木地板收入",
+0 as "绿家产品收入",
+0 as "新材产品收入",
+0 as "跨事业部收入(对外卖出方)",
+0 as "跨事业部收入(供货方)",
+0 as "事业部内部收入(对外卖出方)",
+0 as "事业部内部收入(供货方)",
+0 as "收入(其他)",
+0 as "收入调整值",
+0 as "减：服务费(FD)",
+0 as "加：使用积分",
+0 as "减：预提积分-手工",
+0 as "减：预提积分-系统",
+0 as "其中：清仓收入",
+0 as "销售成本",
+0 as "物流成本",
+0 as "其他成本",
+0 as "1+N成本",
+0 as "其中：卫浴产品成本",
+0 as "DPI产品成本",
+0 as "ART产品成本",
+0 as "辅材产品成本",
+0 as "整装产品成本",
+0 as "木地板成本",
+0 as "绿家产品成本",
+0 as "新材产品成本",
+0 as "跨事业部成本(对外卖出方)",
+0 as "跨事业部成本(供货方)",
+0 as "事业部内部成本(对外卖出方)",
+0 as "事业部内部成本(供货方)",
+0 as "清仓成本",
+0 as "成本调整值",
+0 as "阿米巴成本调整值(瓷砖)",
+0 as "共享仓标A调整值",
+0 as "1+N使用积分",   --**
+0 as "1+N预提积分-手工",  --**
+0 as "1+N预提积分-系统", --**
+0 as "跨事业部使用积分", --**
+0 as "跨事业部预提积分-手工", --**
+0 as "跨事业部预提积分-系统", --**
+0 as "事业部内部使用积分", --**
+0 as "事业部内部预提积分-手工", --**
+0 as "跨事业部内部预提积分-系统", --**
+0 as "税金及附加(不含房产税+土地使用税)",
+0 as "房产税",
+0 as "土地使用税",
+0 as "减：销售费用",
+0 as "物流费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其中：利息费用",
+0 as "利息收入",
+0 as "主营业务成本-运费(费用类)",
+0 as "费用-分摊费用(事业部内部)",
+0 as "其中：资产减值-存货跌价(能明确责任的)",
+0 as "其中：资产减值-存货跌价(不能明确责任的)",
+0 as "其中：资产减值-存货跌价(外协寄售)",
+0 as "资产减值-存货跌价(能明确责任的)-新",
+0 as "资产减值--固定资产",
+0 as "信用减值损失-应收票据未逾期",
+0 as "信用减值损失-应收票据逾期",
+0 as "信用减值损失-应收账款未逾期",
+0 as "信用减值损失-应收账款逾期",
+0 as "信用减值损失-其他应收款",
+0 as "加: 公允价值变动收益(损失以“-”号填列)",
+0 as "其他收益",
+0 as "其他收益（非Z000）",
+0 as "投资收益(损失负)",
+0 as "资产处置损益",
+0 as "对外销售额",
+0 as "跨事业部收入：",
+0 as "卫浴事业部收取鹏嘉品牌使用费",
+0 as "对外销售成本",
+0 as "跨事业部成本",
+0 as "鹏嘉支付卫浴事业部品牌使用费",
+0 as"1+N利润",
+0 as "跨事业部利润",
+0 as "事业部内部利润",
+0 as "加：营业外收入",
+0 as "减：营业外支出",
+0 as "应收账款利息(阿米巴)",
+0 as "库存利息",
+0 as "资金成本-预付长期资产款",
+0 as "资金成本-固定资产",
+0 as "资金成本-在建工程",
+0 as "资金成本-无形资产",
+0 as "资金成本-长期待摊费用(展厅装修)",
+0 as "供应商付现利息(参照前面单列)",
+0 as "预计奖金包",
+0 as "对外参股股权投资款(事业部基于业务需要)",
+0 as "整体毛利",
+0 as "收入汇总",
+0 as "阿米巴销售成本",
+0 as "阿米巴清仓成本",
+0 as "阿米巴整体毛利",
+0 as "阿米巴收入汇总",
+0 as "1+N收入/汇总",
+0 as "阿米巴成本",
+0 as "税金及附加-瓷砖",
+0 as "资产减值-存货跌价(能明确责任的)-瓷砖",
+0 as "标A成本",
+0 as "标A整体毛利",
+0 as "标A收入汇总",
+0 as "卫浴非全资调整值",
+0 as "1+N毛利",
+0 as "跨事业部毛利",
+0 as "1+N对外分成毛利额",
+0 as "跨事业部对外分成毛利额",
+0 as "事业部内部对外分成毛利额",
+0 as "卫浴-销售成本",
+"税金及附加(不含房产税+土地使用税)-卫浴"
+from xsyj
+)
+,tmp1 as (
+select
+stat_month             ,
+dept_code        ,
+sales_grp      ,
+salesemply,--销售雇员
+data_source,--数据来源
+"分类标识"	,
+sum("对外不含税销售额") as "对外不含税销售额"   ,
+sum("1+N收入(对外卖出方)：") as "1+N收入(对外卖出方)："   ,
+sum("其中：卫浴产品收入") as "其中：卫浴产品收入"     ,
+sum("DPI产品收入") as "DPI产品收入"               ,
+sum("ART产品收入") as "ART产品收入"              ,
+sum("辅材产品收入") as "辅材产品收入"            ,
+sum("整装产品收入") as "整装产品收入"        ,
+sum("木地板收入") as "木地板收入"              ,
+sum("绿家产品收入") as "绿家产品收入"        ,
+sum("新材产品收入") as "新材产品收入"        ,
+sum("跨事业部收入(对外卖出方)") as "跨事业部收入(对外卖出方)",
+sum("跨事业部收入(供货方)") as "跨事业部收入(供货方)"  ,
+sum("事业部内部收入(对外卖出方)") as "事业部内部收入(对外卖出方)"  ,
+sum("事业部内部收入(供货方)")  as "事业部内部收入(供货方)"    ,
+sum("收入(其他)") as "收入(其他)",
+sum("收入调整值") as "收入调整值",
+sum("减：服务费(FD)") as "减：服务费(FD)"  ,
+sum("加：使用积分") as "加：使用积分"     ,
+sum("减：预提积分-手工") as "减：预提积分-手工"   ,
+sum("减：预提积分-系统") as "减：预提积分-系统"  ,
+sum("其中：清仓收入") as "其中：清仓收入"   ,
+sum("销售成本") as "销售成本" ,
+sum(coalesce("物流成本",0) + coalesce("主营业务成本-运费(费用类)",0)) as "物流成本"  ,
+sum("其他成本") as "其他成本"  ,
+sum("1+N成本")  as "1+N成本"    ,
+sum("其中：卫浴产品成本") as "其中：卫浴产品成本",
+sum("DPI产品成本") as "DPI产品成本" ,
+sum("ART产品成本") as "ART产品成本"  ,
+sum("辅材产品成本") as "辅材产品成本"   ,
+sum("整装产品成本") as "整装产品成本",
+sum("木地板成本") as "木地板成本"  ,
+sum("绿家产品成本") as "绿家产品成本"  ,
+sum("新材产品成本") as "新材产品成本" ,
+sum("跨事业部成本(对外卖出方)") as "跨事业部成本(对外卖出方)"  ,
+sum("跨事业部成本(供货方)") as "跨事业部成本(供货方)",
+sum("事业部内部成本(对外卖出方)") as "事业部内部成本(对外卖出方)" ,
+sum("事业部内部成本(供货方)") as "事业部内部成本(供货方)",
+sum("清仓成本") as "清仓成本"  ,
+sum("成本调整值") as "成本调整值",
+sum("阿米巴成本调整值(瓷砖)") as "阿米巴成本调整值(瓷砖)",
+sum("共享仓标A调整值") as "共享仓标A调整值",
+sum("1+N使用积分")  as  "1+N使用积分",
+sum("1+N预提积分-手工") as "1+N预提积分-手工" ,
+sum("1+N预提积分-系统") as "1+N预提积分-系统"   ,
+sum("跨事业部使用积分") as "跨事业部使用积分" ,
+sum("跨事业部预提积分-手工") as "跨事业部预提积分-手工",
+sum("跨事业部预提积分-系统") as "跨事业部预提积分-系统",
+sum("事业部内部使用积分") as "事业部内部使用积分",
+sum("事业部内部预提积分-手工") as "事业部内部预提积分-手工" ,
+sum("跨事业部内部预提积分-系统") as "跨事业部内部预提积分-系统",
+sum("税金及附加(不含房产税+土地使用税)") as "税金及附加(不含房产税+土地使用税)",
+sum("房产税") as "房产税",
+sum("土地使用税") as "土地使用税",
+sum("减：销售费用") as "减：销售费用",
+sum("物流费用") as "物流费用"  ,
+sum("管理费用") as "管理费用"  ,
+sum("研发费用") as "研发费用"   ,
+sum("财务费用") as "财务费用"  ,
+sum("其中：利息费用") as "其中：利息费用"  ,
+sum("利息收入") as "利息收入"    ,
+sum("费用-分摊费用(事业部内部)") as "费用-分摊费用(事业部内部)"  ,
+sum("其中：资产减值-存货跌价(能明确责任的)") as "其中：资产减值-存货跌价(能明确责任的)"   ,
+sum("其中：资产减值-存货跌价(不能明确责任的)") as "其中：资产减值-存货跌价(不能明确责任的)" ,
+sum("其中：资产减值-存货跌价(外协寄售)") as "其中：资产减值-存货跌价(外协寄售)" ,
+sum("信用减值损失-应收票据未逾期") as "信用减值损失-应收票据未逾期" ,
+sum("信用减值损失-应收票据逾期") as "信用减值损失-应收票据逾期" ,
+sum("信用减值损失-应收账款未逾期") as "信用减值损失-应收账款未逾期",
+sum("信用减值损失-应收账款逾期") as "信用减值损失-应收账款逾期",
+sum("信用减值损失-其他应收款") as "信用减值损失-其他应收款"  ,
+sum("加: 公允价值变动收益(损失以“-”号填列)") as "加: 公允价值变动收益(损失以“-”号填列)"  ,
+sum("其他收益") as "其他收益"  ,
+sum("其他收益（非Z000）")  as "其他收益（非Z000）",
+sum("投资收益(损失负)") as "投资收益(损失负)" ,
+sum("资产处置损益") as "资产处置损益"  ,
+sum("对外销售额") as "对外销售额"  ,
+sum("跨事业部收入：") as "跨事业部收入："   ,
+sum("卫浴事业部收取鹏嘉品牌使用费") as "卫浴事业部收取鹏嘉品牌使用费" ,
+sum("对外销售成本") as "对外销售成本" ,
+sum("跨事业部成本") as "跨事业部成本" ,
+sum("鹏嘉支付卫浴事业部品牌使用费")  as "鹏嘉支付卫浴事业部品牌使用费",
+sum("1+N利润") as "1+N利润" ,
+sum("跨事业部利润") as "跨事业部利润"  ,
+sum("事业部内部利润") as "事业部内部利润"   ,
+sum("加：营业外收入") as "加：营业外收入" ,
+sum("减：营业外支出") as "减：营业外支出"   ,
+sum("应收账款利息(阿米巴)") as "应收账款利息(阿米巴)"   ,
+sum("库存利息") as "库存利息" ,
+sum("资金成本-预付长期资产款") as "资金成本-预付长期资产款",
+sum("资金成本-固定资产") as "资金成本-固定资产"   ,
+sum("资金成本-在建工程") as "资金成本-在建工程" ,
+sum("资金成本-无形资产") as "资金成本-无形资产"  ,
+sum("资金成本-长期待摊费用(展厅装修)") as "资金成本-长期待摊费用(展厅装修)" ,
+sum("供应商付现利息(参照前面单列)") as "供应商付现利息(参照前面单列)" ,
+sum("预计奖金包") as "预计奖金包" ,
+sum("对外参股股权投资款(事业部基于业务需要)") as "对外参股股权投资款(事业部基于业务需要)",
+sum("整体毛利") as "整体毛利",
+sum("收入汇总") as "收入汇总",
+sum("阿米巴销售成本") as "阿米巴销售成本",
+sum("阿米巴清仓成本") as "阿米巴清仓成本" ,
+sum(coalesce("阿米巴整体毛利",0) - coalesce("主营业务成本-运费(费用类)",0)) as "阿米巴整体毛利",
+sum("阿米巴收入汇总") as "阿米巴收入汇总",
+sum("1+N收入/汇总") as "1+N收入/汇总",
+sum("阿米巴成本") as "阿米巴成本",
+sum("税金及附加-瓷砖") as "税金及附加-瓷砖",
+sum("资产减值-存货跌价(能明确责任的)-瓷砖") as "资产减值-存货跌价(能明确责任的)-瓷砖",
+sum("标A成本") as "标A成本",
+sum(coalesce("标A整体毛利",0) - coalesce("主营业务成本-运费(费用类)",0)) as "标A整体毛利",
+sum("标A收入汇总") as "标A收入汇总",
+sum("卫浴非全资调整值") as "卫浴非全资调整值",
+sum("1+N毛利") as "1+N毛利",
+sum("跨事业部毛利") as "跨事业部毛利",
+sum("1+N对外分成毛利额") as "1+N对外分成毛利额",
+sum("跨事业部对外分成毛利额") as "跨事业部对外分成毛利额",
+sum("事业部内部对外分成毛利额") as "事业部内部对外分成毛利额",
+sum("卫浴-销售成本") as "卫浴-销售成本",
+sum("资产减值--固定资产") as "资产减值--固定资产",
+sum("资产减值-存货跌价(能明确责任的)-新") as "资产减值-存货跌价(能明确责任的)-新",
+sum("税金及附加(不含房产税+土地使用税)-卫浴") as "税金及附加(不含房产税+土地使用税)-卫浴"
+from tmp
+group by
+stat_month,
+dept_code,
+"分类标识"	,
+sales_grp,
+salesemply,
+data_source
+)
+select
+stat_month             ,
+dept_code        ,
+"分类标识"		,
+"对外不含税销售额"   ,
+"1+N收入(对外卖出方)："   ,
+"其中：卫浴产品收入"     ,
+"DPI产品收入"               ,
+"ART产品收入"              ,
+"辅材产品收入"             ,
+"整装产品收入"         ,
+"木地板收入"              ,
+"绿家产品收入"         ,
+"新材产品收入"          ,
+"跨事业部收入(对外卖出方)"  ,
+"跨事业部收入(供货方)"   ,
+"事业部内部收入(对外卖出方)"   ,
+"事业部内部收入(供货方)"     ,
+"收入(其他)",
+"收入调整值",
+"减：服务费(FD)"    ,
+"加：使用积分"      ,
+"减：预提积分-手工"   ,
+"减：预提积分-系统"   ,
+"其中：清仓收入"    ,
+"销售成本"  ,
+"物流成本"   ,
+"其他成本"   ,
+"1+N成本"     ,
+"其中：卫浴产品成本" ,
+"DPI产品成本"  ,
+"ART产品成本"   ,
+"辅材产品成本"    ,
+"整装产品成本"  ,
+"木地板成本"   ,
+"绿家产品成本"    ,
+"新材产品成本"  ,
+"跨事业部成本(对外卖出方)"   ,
+"跨事业部成本(供货方)" ,
+"事业部内部成本(对外卖出方)"  ,
+"事业部内部成本(供货方)",
+"清仓成本"   ,
+"成本调整值",
+"1+N使用积分"    ,
+"1+N预提积分-手工"  ,
+"1+N预提积分-系统"    ,
+"跨事业部使用积分"  ,
+"跨事业部预提积分-手工"  ,
+"跨事业部预提积分-系统" ,
+"事业部内部使用积分" ,
+"事业部内部预提积分-手工"  ,
+"跨事业部内部预提积分-系统"  ,
+"税金及附加(不含房产税+土地使用税)"  ,
+"房产税"   ,
+"土地使用税" ,
+"减：销售费用"  ,
+"物流费用"   ,
+"管理费用"   ,
+"研发费用"    ,
+"财务费用"    ,
+"其中：利息费用"   ,
+"利息收入"    ,
+"费用-分摊费用(事业部内部)"   ,
+"其中：资产减值-存货跌价(能明确责任的)"   ,
+"其中：资产减值-存货跌价(不能明确责任的)"  ,
+"其中：资产减值-存货跌价(外协寄售)"   ,
+"信用减值损失-应收票据未逾期"  ,
+"信用减值损失-应收票据逾期"   ,
+"信用减值损失-应收账款未逾期" ,
+"信用减值损失-应收账款逾期" ,
+"信用减值损失-其他应收款"   ,
+"加: 公允价值变动收益(损失以“-”号填列)"   ,
+"其他收益"   ,
+"投资收益(损失负)"  ,
+"资产处置损益"   ,
+"对外销售额"   ,
+"跨事业部收入："   ,
+"卫浴事业部收取鹏嘉品牌使用费"  ,
+"对外销售成本"  ,
+"跨事业部成本"  ,
+"鹏嘉支付卫浴事业部品牌使用费" ,
+"1+N利润"  ,
+"跨事业部利润"   ,
+"事业部内部利润"    ,
+"加：营业外收入"   ,
+"减：营业外支出"    ,
+"应收账款利息(阿米巴)"  ,
+"库存利息"   ,
+"资金成本-预付长期资产款" ,
+"资金成本-固定资产"    ,
+"资金成本-在建工程"  ,
+"资金成本-无形资产"   ,
+"资金成本-长期待摊费用(展厅装修)"  ,
+"供应商付现利息(参照前面单列)"  ,
+"预计奖金包"   ,
+"对外参股股权投资款(事业部基于业务需要)",
+current_timestamp ,
+sales_grp,
+"整体毛利",
+"收入汇总",
+"阿米巴销售成本",
+"阿米巴清仓成本",
+"阿米巴整体毛利",
+"阿米巴收入汇总",
+"1+N收入/汇总",
+"阿米巴成本",
+"税金及附加-瓷砖",
+"资产减值-存货跌价(能明确责任的)-瓷砖",
+"阿米巴成本调整值(瓷砖)",
+"标A成本",
+"标A整体毛利",
+"标A收入汇总",
+"卫浴非全资调整值",
+"1+N毛利",
+"跨事业部毛利",
+"1+N对外分成毛利额",
+"跨事业部对外分成毛利额",
+"事业部内部对外分成毛利额",
+"卫浴-销售成本",
+"共享仓标A调整值",
+"资产减值--固定资产",
+"其他收益（非Z000）",
+"资产减值-存货跌价(能明确责任的)-新",
+salesemply,--销售雇员
+data_source,
+"税金及附加(不含房产税+土地使用税)-卫浴"
+from tmp1
+where 1=1
+and stat_month = '${PERIOD_ID_M}'

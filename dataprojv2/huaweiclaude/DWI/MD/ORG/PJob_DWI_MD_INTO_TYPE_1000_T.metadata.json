@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_INTO_TYPE_1000_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/ORG",
+    "description": "HRP1000：存储所有 OM 对象类型，例如，O - 组织单位、S-职位、C- 工作、K- 成本中心等",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

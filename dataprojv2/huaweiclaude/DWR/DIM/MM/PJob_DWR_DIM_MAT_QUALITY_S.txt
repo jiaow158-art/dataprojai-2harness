@@ -1,0 +1,1005 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/02/25 09:46:22 GMT+08:00
+-- description:物料主数据质量监控汇总表(按物料统计)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+with QUALITY_DETAIL_T_04 as (
+select distinct 
+ material_num
+,flag
+,subj_sum_count
+,0 as subj_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_04
+union all 
+select distinct 
+ material_num
+,flag
+,0 as subj_sum_count
+,subj_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_04
+)
+
+,QUALITY_DETAIL_T_03 as (
+select distinct 
+ material_num
+,flag
+,acc_sum_count
+,0 as acc_error_count
+,0 as pri_sum_count
+,0 as pri_error_count
+,0 as acct_sum_count
+,0 as acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+union all 
+select distinct 
+ material_num
+,flag
+,0 as acc_sum_count
+,acc_error_count
+,0 as pri_sum_count
+,0 as pri_error_count
+,0 as acct_sum_count
+,0 as acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+union all 
+select distinct 
+ material_num
+,flag
+,0 as acc_sum_count
+,0 as acc_error_count
+,pri_sum_count
+,0 as pri_error_count
+,0 as acct_sum_count
+,0 as acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+union all 
+select distinct 
+ material_num
+,flag
+,0 as acc_sum_count
+,0 as acc_error_count
+,0 as pri_sum_count
+,pri_error_count
+,0 as acct_sum_count
+,0 as acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+union all 
+select distinct 
+ material_num
+,flag
+,0 as acc_sum_count
+,0 as acc_error_count
+,0 as pri_sum_count
+,0 as pri_error_count
+,acct_sum_count
+,0 as acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+union all 
+select distinct 
+ material_num
+,flag
+,0 as acc_sum_count
+,0 as acc_error_count
+,0 as pri_sum_count
+,0 as pri_error_count
+,0 as acct_sum_count
+,acct_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_03
+)
+,QUALITY_DETAIL_T_02 as (
+select distinct 
+ material_num
+,flag
+,prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,mat3_error_count
+,0 as mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,mat4_sum_count
+,0 as mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+union all 
+select distinct 
+ material_num
+,flag
+,0 as prodh_sum_count
+,0 as prodh_error_count
+,0 as item_sum_count
+,0 as item_error_count
+,0 as set_sum_count
+,0 as set_error_count
+,0 as konda_sum_count
+,0 as konda_error_count
+,0 as mat1_sum_count
+,0 as mat1_error_count
+,0 as wv_sum_count
+,0 as wv_error_count
+,0 as ts_sum_count
+,0 as ts_error_count
+,0 as pj_sum_count
+,0 as pj_error_count
+,0 as mat3_sum_count
+,0 as mat3_error_count
+,0 as mat4_sum_count
+,mat4_error_count
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_02
+)
+, tmp as (
+select 
+ flag
+,sum(pld_sum_count) as pld_sum_count --产品上线时间总行数
+,sum(pld_err_count) as pld_err_count --产品上线时间错误数
+,sum(weight_sum_count) as weight_sum_count  --重量总行数
+,sum(weight_error_count) as weight_error_count  --重量错误总行数
+,sum(pp_sum_count) as pp_sum_count  --产品所有权总行数
+,sum(pp_error_count) as pp_error_count --产品所有权总行数
+,sum(group_sum_count) as group_sum_count --产品组与物料组的关系校验总行数
+,sum(group_error_count) as group_error_count --产品组与物料组的关系校验错误行数
+,sum(status_sum_count) as status_sum_count --状态检查总行数
+,sum(status_error_count) as status_error_count --状态检查错误行数
+,sum(batch_sum_count) as batch_sum_count --批次管理总行数
+,sum(batch_error_count) as batch_error_count -- 批次管理错误行数
+,sum(category_sum_count) as category_sum_count -- 品类不能为空校验总行数
+,sum(category_error_count) as category_error_count --品类不能为空校验错误行数
+,sum(chanel_sum_count) as chanel_sum_count --产品渠道不能为空校验总行数
+,sum(chanel_error_count) as chanel_error_count  --产品渠道不能为空校验错误行数
+,sum(tech_sum_count) as tech_sum_count -- 产品工艺不能为空校验总行数
+,sum(tech_error_count) as tech_error_count -- 产品工艺不能为空校验错误行数
+,sum(pos_sum_count)  as pos_sum_count    --高值说明异常校验总行数 
+,sum(pos_error_count) as pos_error_count --高值说明异常校验错误行数
+,sum(dim_sum_count) as dim_sum_count  --大小量纲校验总行数
+,sum(dim_error_count) as dim_error_count  --大小量纲校验错误行数
+,sum(cate_sum_count) as cate_sum_count   --品类异常校验总行数
+,sum(cate_error_count) as cate_error_count  --品类异常校验错误行数
+,sum(size_sum_count) as size_sum_count  --大小量纲等于长宽校验总行数
+,sum(size_error_count) as size_error_count --大小量纲等于长宽校验错误行数
+,sum(new_sum_count) as new_sum_count --新品说明与产品上市时间的关系校验总行数
+,sum(new_error_count) as new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,sum(clear_sum_count) as clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,sum(clear_error_count) as clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,0 as prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,0 as prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,0 as item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,0 as item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,0 as set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,0 as set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,0 as konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,0 as konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,0 as mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,0 as mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,0 as wv_sum_count --卫浴重量体积校验总行数
+,0 as wv_error_count  --卫浴重量体积校验错误行数
+,0 as ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,0 as ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,0 as pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,0 as pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,0 as mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,0 as mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,0 as mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,0 as mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,0 as acc_sum_count  --评估类与产品层次匹配总行数
+,0 as acc_error_count --评估类与产品层次匹配错误行数
+,0 as pri_sum_count  --价格控制中心总行数
+,0 as pri_error_count  --价格控制中心相关错误行数
+,0 as acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,0 as acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,0 as subj_sum_count --科目设置组总行数
+,0 as subj_error_count --科目设置组错误行数
+from DWRDIM.DWR_DIM_MAT_QUALITY_DETAIL_T_01
+group by flag
+union all 
+select 
+ flag
+,0 as pld_sum_count --产品上线时间总行数
+,0 as pld_err_count --产品上线时间错误数
+,0 as weight_sum_count  --重量总行数
+,0 as weight_error_count  --重量错误总行数
+,0 as pp_sum_count  --产品所有权总行数
+,0 as pp_error_count --产品所有权总行数
+,0 as group_sum_count --产品组与物料组的关系校验总行数
+,0 as group_error_count --产品组与物料组的关系校验错误行数
+,0 as status_sum_count --状态检查总行数
+,0 as status_error_count --状态检查错误行数
+,0 as batch_sum_count --批次管理总行数
+,0 as batch_error_count -- 批次管理错误行数
+,0 as category_sum_count -- 品类不能为空校验总行数
+,0 as category_error_count --品类不能为空校验错误行数
+,0 as chanel_sum_count --产品渠道不能为空校验总行数
+,0 as chanel_error_count  --产品渠道不能为空校验错误行数
+,0 as tech_sum_count -- 产品工艺不能为空校验总行数
+,0 as tech_error_count -- 产品工艺不能为空校验错误行数
+,0 as pos_sum_count    --高值说明异常校验总行数 
+,0 as pos_error_count --高值说明异常校验错误行数
+,0 as dim_sum_count  --大小量纲校验总行数
+,0 as dim_error_count  --大小量纲校验错误行数
+,0 as cate_sum_count   --品类异常校验总行数
+,0 as cate_error_count  --品类异常校验错误行数
+,0 as size_sum_count  --大小量纲等于长宽校验总行数
+,0 as size_error_count --大小量纲等于长宽校验错误行数
+,0 as new_sum_count --新品说明与产品上市时间的关系校验总行数
+,0 as new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,0 as clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,0 as clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,sum(prodh_sum_count) as prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,sum(prodh_error_count) as prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,sum(item_sum_count) as item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,sum(item_error_count) as item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,sum(set_sum_count) as set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,sum(set_error_count) as set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,sum(konda_sum_count) as konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,sum(konda_error_count) as konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,sum(mat1_sum_count) as mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,sum(mat1_error_count) as mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,sum(wv_sum_count) as wv_sum_count --卫浴重量体积校验总行数
+,sum(wv_error_count) as wv_error_count  --卫浴重量体积校验错误行数
+,sum(ts_sum_count) as ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,sum(ts_error_count) as ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,sum(pj_sum_count) as pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,sum(pj_error_count) as pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,sum(mat3_sum_count) as mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,sum(mat3_error_count) as mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,sum(mat4_sum_count) as mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,sum(mat4_error_count) as mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,0 as acc_sum_count  --评估类与产品层次匹配总行数
+,0 as acc_error_count --评估类与产品层次匹配错误行数
+,0 as pri_sum_count  --价格控制中心总行数
+,0 as pri_error_count  --价格控制中心相关错误行数
+,0 as acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,0 as acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,0 as subj_sum_count --科目设置组总行数
+,0 as subj_error_count --科目设置组错误行数
+from QUALITY_DETAIL_T_02
+group by 
+flag
+union all 
+select 
+ flag
+,0 as pld_sum_count --产品上线时间总行数
+,0 as pld_err_count --产品上线时间错误数
+,0 as weight_sum_count  --重量总行数
+,0 as weight_error_count  --重量错误总行数
+,0 as pp_sum_count  --产品所有权总行数
+,0 as pp_error_count --产品所有权总行数
+,0 as group_sum_count --产品组与物料组的关系校验总行数
+,0 as group_error_count --产品组与物料组的关系校验错误行数
+,0 as status_sum_count --状态检查总行数
+,0 as status_error_count --状态检查错误行数
+,0 as batch_sum_count --批次管理总行数
+,0 as batch_error_count -- 批次管理错误行数
+,0 as category_sum_count -- 品类不能为空校验总行数
+,0 as category_error_count --品类不能为空校验错误行数
+,0 as chanel_sum_count --产品渠道不能为空校验总行数
+,0 as chanel_error_count  --产品渠道不能为空校验错误行数
+,0 as tech_sum_count -- 产品工艺不能为空校验总行数
+,0 as tech_error_count -- 产品工艺不能为空校验错误行数
+,0 as pos_sum_count    --高值说明异常校验总行数 
+,0 as pos_error_count --高值说明异常校验错误行数
+,0 as dim_sum_count  --大小量纲校验总行数
+,0 as dim_error_count  --大小量纲校验错误行数
+,0 as cate_sum_count   --品类异常校验总行数
+,0 as cate_error_count  --品类异常校验错误行数
+,0 as size_sum_count  --大小量纲等于长宽校验总行数
+,0 as size_error_count --大小量纲等于长宽校验错误行数
+,0 as new_sum_count --新品说明与产品上市时间的关系校验总行数
+,0 as new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,0 as clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,0 as clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,0 as prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,0 as prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,0 as item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,0 as item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,0 as set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,0 as set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,0 as konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,0 as konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,0 as mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,0 as mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,0 as wv_sum_count --卫浴重量体积校验总行数
+,0 as wv_error_count  --卫浴重量体积校验错误行数
+,0 as ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,0 as ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,0 as pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,0 as pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,0 as mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,0 as mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,0 as mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,0 as mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,sum(acc_sum_count) as acc_sum_count  --评估类与产品层次匹配总行数
+,sum(acc_error_count) as acc_error_count --评估类与产品层次匹配错误行数
+,sum(pri_sum_count) as pri_sum_count  --价格控制中心总行数
+,sum(pri_error_count) as pri_error_count  --价格控制中心相关错误行数
+,sum(acct_sum_count) as acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,sum(acct_error_count) as acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,0 as subj_sum_count --科目设置组总行数
+,0 as subj_error_count --科目设置组错误行数
+from QUALITY_DETAIL_T_03
+group by 
+flag
+union all 
+select 
+ flag
+,0 as pld_sum_count --产品上线时间总行数
+,0 as pld_err_count --产品上线时间错误数
+,0 as weight_sum_count  --重量总行数
+,0 as weight_error_count  --重量错误总行数
+,0 as pp_sum_count  --产品所有权总行数
+,0 as pp_error_count --产品所有权总行数
+,0 as group_sum_count --产品组与物料组的关系校验总行数
+,0 as group_error_count --产品组与物料组的关系校验错误行数
+,0 as status_sum_count --状态检查总行数
+,0 as status_error_count --状态检查错误行数
+,0 as batch_sum_count --批次管理总行数
+,0 as batch_error_count -- 批次管理错误行数
+,0 as category_sum_count -- 品类不能为空校验总行数
+,0 as category_error_count --品类不能为空校验错误行数
+,0 as chanel_sum_count --产品渠道不能为空校验总行数
+,0 as chanel_error_count  --产品渠道不能为空校验错误行数
+,0 as tech_sum_count -- 产品工艺不能为空校验总行数
+,0 as tech_error_count -- 产品工艺不能为空校验错误行数
+,0 as pos_sum_count    --高值说明异常校验总行数 
+,0 as pos_error_count --高值说明异常校验错误行数
+,0 as dim_sum_count  --大小量纲校验总行数
+,0 as dim_error_count  --大小量纲校验错误行数
+,0 as cate_sum_count   --品类异常校验总行数
+,0 as cate_error_count  --品类异常校验错误行数
+,0 as size_sum_count  --大小量纲等于长宽校验总行数
+,0 as size_error_count --大小量纲等于长宽校验错误行数
+,0 as new_sum_count --新品说明与产品上市时间的关系校验总行数
+,0 as new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,0 as clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,0 as clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,0 as prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,0 as prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,0 as item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,0 as item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,0 as set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,0 as set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,0 as konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,0 as konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,0 as mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,0 as mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,0 as wv_sum_count --卫浴重量体积校验总行数
+,0 as wv_error_count  --卫浴重量体积校验错误行数
+,0 as ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,0 as ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,0 as pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,0 as pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,0 as mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,0 as mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,0 as mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,0 as mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,0 as acc_sum_count  --评估类与产品层次匹配总行数
+,0 as acc_error_count --评估类与产品层次匹配错误行数
+,0 as pri_sum_count  --价格控制中心总行数
+,0 as pri_error_count  --价格控制中心相关错误行数
+,0 as acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,0 as acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,sum(subj_sum_count) as subj_sum_count --科目设置组总行数
+,sum(subj_error_count) as subj_error_count --科目设置组错误行数
+from QUALITY_DETAIL_T_04
+group by 
+flag
+)
+,tmp1 as (
+select 
+ flag
+,sum(pld_sum_count) as pld_sum_count --产品上线时间总行数
+,sum(pld_err_count) as pld_err_count --产品上线时间错误数
+,sum(weight_sum_count) as weight_sum_count  --重量总行数
+,sum(weight_error_count) as weight_error_count  --重量错误总行数
+,sum(pp_sum_count) as pp_sum_count  --产品所有权总行数
+,sum(pp_error_count) as pp_error_count --产品所有权总行数
+,sum(group_sum_count) as group_sum_count --产品组与物料组的关系校验总行数
+,sum(group_error_count) as group_error_count --产品组与物料组的关系校验错误行数
+,sum(status_sum_count) as status_sum_count --状态检查总行数
+,sum(status_error_count) as status_error_count --状态检查错误行数
+,sum(batch_sum_count) as batch_sum_count --批次管理总行数
+,sum(batch_error_count) as batch_error_count -- 批次管理错误行数
+,sum(category_sum_count) as category_sum_count -- 品类不能为空校验总行数
+,sum(category_error_count) as category_error_count --品类不能为空校验错误行数
+,sum(chanel_sum_count) as chanel_sum_count --产品渠道不能为空校验总行数
+,sum(chanel_error_count) as chanel_error_count  --产品渠道不能为空校验错误行数
+,sum(tech_sum_count) as tech_sum_count -- 产品工艺不能为空校验总行数
+,sum(tech_error_count) as tech_error_count -- 产品工艺不能为空校验错误行数
+,sum(pos_sum_count)  as pos_sum_count    --高值说明异常校验总行数 
+,sum(pos_error_count) as pos_error_count --高值说明异常校验错误行数
+,sum(dim_sum_count) as dim_sum_count  --大小量纲校验总行数
+,sum(dim_error_count) as dim_error_count  --大小量纲校验错误行数
+,sum(cate_sum_count) as cate_sum_count   --品类异常校验总行数
+,sum(cate_error_count) as cate_error_count  --品类异常校验错误行数
+,sum(size_sum_count) as size_sum_count  --大小量纲等于长宽校验总行数
+,sum(size_error_count) as size_error_count --大小量纲等于长宽校验错误行数
+,sum(new_sum_count) as new_sum_count --新品说明与产品上市时间的关系校验总行数
+,sum(new_error_count) as new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,sum(clear_sum_count) as clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,sum(clear_error_count) as clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,sum(prodh_sum_count) as prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,sum(prodh_error_count) as prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,sum(item_sum_count) as item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,sum(item_error_count) as item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,sum(set_sum_count) as set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,sum(set_error_count) as set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,sum(konda_sum_count) as konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,sum(konda_error_count) as konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,sum(mat1_sum_count) as mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,sum(mat1_error_count) as mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,sum(wv_sum_count) as wv_sum_count --卫浴重量体积校验总行数
+,sum(wv_error_count) as wv_error_count  --卫浴重量体积校验错误行数
+,sum(ts_sum_count) as ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,sum(ts_error_count) as ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,sum(pj_sum_count) as pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,sum(pj_error_count) as pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,sum(mat3_sum_count) as mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,sum(mat3_error_count) as mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,sum(mat4_sum_count) as mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,sum(mat4_error_count) as mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,sum(acc_sum_count) as acc_sum_count  --评估类与产品层次匹配总行数
+,sum(acc_error_count) as acc_error_count --评估类与产品层次匹配错误行数
+,sum(pri_sum_count) as pri_sum_count  --价格控制中心总行数
+,sum(pri_error_count) as pri_error_count  --价格控制中心相关错误行数
+,sum(acct_sum_count) as acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,sum(acct_error_count) as acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,sum(subj_sum_count) as subj_sum_count --科目设置组总行数
+,sum(subj_error_count) as subj_error_count --科目设置组错误行数
+from tmp 
+group by flag
+)
+
+insert overwrite table DWRDIM.DWR_DIM_MAT_QUALITY_S partition(PERIOD_ID_M = '${PERIOD_ID_M}')
+select
+ flag
+,pld_sum_count --产品上线时间总行数
+,pld_err_count --产品上线时间错误数 
+,case when pld_sum_count = 0 then 1 else (pld_sum_count - pld_err_count) / pld_sum_count end as pld_rate  --产品上线时间准确率
+,weight_sum_count  --重量总行数
+,weight_error_count  --重量错误总行数
+,case when weight_sum_count = 0 then 1 else (weight_sum_count - weight_error_count) / weight_sum_count end as weight_rate  --重量准确率
+,pp_sum_count  --产品所有权总行数
+,pp_error_count --产品所有权总行数
+,case when pp_sum_count = 0 then 1 else (pp_sum_count - pp_error_count) / pp_sum_count end as pp_rate  --产品所有权准确率
+,group_sum_count --产品组与物料组的关系校验总行数
+,group_error_count --产品组与物料组的关系校验错误行数
+,case when group_sum_count = 0 then 1 else (group_sum_count - group_error_count) / group_sum_count end as group_rate  --产品组与物料组的关系校验准确率
+,status_sum_count --状态检查总行数
+,status_error_count --状态检查错误行数
+,case when status_sum_count = 0 then 1 else (status_sum_count - status_error_count) / status_sum_count end as status_rate  ---状态检查准确率
+,batch_sum_count --批次管理总行数
+,batch_error_count -- 批次管理错误行数
+,case when batch_sum_count = 0 then 1 else (batch_sum_count - batch_error_count) / batch_sum_count end as batch_rate  ---批次管理准确率
+,category_sum_count -- 品类不能为空校验总行数
+,category_error_count --品类不能为空校验错误行数
+,case when category_sum_count = 0 then 1 else (category_sum_count - category_error_count) / category_sum_count end as category_rate  ---品类不能为空校验准确率
+,chanel_sum_count --产品渠道不能为空校验总行数
+,chanel_error_count  --产品渠道不能为空校验错误行数
+,case when chanel_sum_count = 0 then 1 else (chanel_sum_count - chanel_error_count) / chanel_sum_count end as chanel_rate  ---产品渠道不能为空校验准确率
+,tech_sum_count -- 产品工艺不能为空校验总行数
+,tech_error_count -- 产品工艺不能为空校验错误行数
+,case when tech_sum_count = 0 then 1 else (tech_sum_count - tech_error_count) / tech_sum_count end as tech_rate  ---产品工艺不能为空校验准确率
+,pos_sum_count    --高值说明异常校验总行数 
+,pos_error_count --高值说明异常校验错误行数
+,case when pos_sum_count = 0 then 1 else (pos_sum_count - pos_error_count) / pos_sum_count end as pos_rate  ---高值说明异常校验准确率
+,dim_sum_count  --大小量纲校验总行数
+,dim_error_count  --大小量纲校验错误行数
+,case when dim_sum_count = 0 then 1 else (dim_sum_count - dim_error_count) / dim_sum_count end as dim_rate  ---大小量纲校验准确率
+,cate_sum_count   --品类异常校验总行数
+,cate_error_count  --品类异常校验错误行数
+,case when cate_sum_count = 0 then 1 else (cate_sum_count - cate_error_count) / cate_sum_count end as cate_rate  ---品类异常校验准确率
+,size_sum_count  --大小量纲等于长宽校验总行数
+,size_error_count --大小量纲等于长宽校验错误行数
+,case when size_sum_count = 0 then 1 else (size_sum_count - size_error_count) / size_sum_count end as size_rate  ---大小量纲等于长宽校验准确率
+,new_sum_count --新品说明与产品上市时间的关系校验总行数
+,new_error_count  --新品说明与产品上市时间的关系校验错误行数
+,case when new_sum_count = 0 then 1 else (new_sum_count - new_error_count) / new_sum_count end as new_rate  ---新品说明与产品上市时间的关系校验准确率
+,clear_sum_count  --清库存标识与库存消耗类型的关系校验总行数
+,clear_error_count --清库存标识与库存消耗类型的关系校验错误行数
+,case when clear_sum_count = 0 then 1 else (clear_sum_count - clear_error_count) / clear_sum_count end as clear_rate  ---清库存标识与库存消耗类型的关系准确率
+,prodh_sum_count --基础视图与销售视图的产品层次一致性校验总行数
+,prodh_error_count --基础视图与销售视图的产品层次一致性校验错误行数
+,case when prodh_sum_count = 0 then 1 else (prodh_sum_count - prodh_error_count) / prodh_sum_count end as prodh_rate  ---基础视图与销售视图的产品层次一致性校验准确率
+,item_sum_count --基础视图与销售视图的项目类别组一致性校验总行数
+,item_error_count  --基础视图与销售视图的项目类别组一致性校验错误行数
+,case when item_sum_count = 0 then 1 else (item_sum_count - item_error_count) / item_sum_count end as item_rate  ---基础视图与销售视图的项目类别组一致性校验准确率
+,set_sum_count  --科目设置组在各个销售视图的一致性校验总行数
+,set_error_count  --科目设置组在各个销售视图的一致性校验错误行数
+,case when set_sum_count = 0 then 1 else (set_sum_count - set_error_count) / set_sum_count end as set_rate  ---科目设置组在各个销售视图的一致性校验准确率
+,konda_sum_count  --物料价格组在各个销售视图的一致性校验总行数
+,konda_error_count --物料价格组在各个销售视图的一致性校验错误行数
+,case when konda_sum_count = 0 then 1 else (konda_sum_count - konda_error_count) / konda_sum_count end as konda_rate  ---物料价格组在各个销售视图的一致性校验准确率
+,mat1_sum_count --产品主次（物料组1）在各个销售视图的一致性校验总行数
+,mat1_error_count --产品主次（物料组1）在各个销售视图的一致性校验错误行数
+,case when mat1_sum_count = 0 then 1 else (mat1_sum_count - mat1_error_count) / mat1_sum_count end as mat1_rate  ---产品主次（物料组1）在各个销售视图的一致性校验准确率
+,wv_sum_count --卫浴重量体积校验总行数
+,wv_error_count  --卫浴重量体积校验错误行数
+,case when wv_sum_count = 0 then 1 else (wv_sum_count - wv_error_count) / wv_sum_count end as wv_rate  ---卫浴重量体积校验准确率
+,ts_sum_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验总行数
+,ts_error_count  --在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验错误行数
+,case when ts_sum_count = 0 then 1 else (ts_sum_count - ts_error_count) / ts_sum_count end as ts_rate  ---在市退市状态（物料组2）与排产计划分类（物料组4）的关系校验准确率
+,pj_sum_count  --配件标识（物料组3）与市退市状态（物料组2）的关系校验总行数
+,pj_error_count --配件标识（物料组3）与市退市状态（物料组2）的关系校验错误行数
+,case when pj_sum_count = 0 then 1 else (pj_sum_count - pj_error_count) / pj_sum_count end as pj_rate  ---配件标识（物料组3）与市退市状态（物料组2）的关系校验准确率
+,mat3_sum_count  --配件标识（物料组3）在各个销售视图的一致性校验总行数
+,mat3_error_count --配件标识（物料组3）在各个销售视图的一致性校验错误行数
+,case when mat3_sum_count = 0 then 1 else (mat3_sum_count - mat3_error_count) / mat3_sum_count end as mat3_rate  ---配件标识（物料组3）在各个销售视图的一致性校验准确率
+,mat4_sum_count  --排产计划分类（物料组4）在各个销售视图的一致性校验总行数
+,mat4_error_count  --排产计划分类（物料组4）在各个销售视图的一致性校验错误行数
+,case when mat4_sum_count = 0 then 1 else (mat4_sum_count - mat4_error_count) / mat4_sum_count end as mat4_rate  ---排产计划分类（物料组4）在各个销售视图的一致性校验准确率
+,acc_sum_count  --评估类与产品层次匹配总行数
+,acc_error_count --评估类与产品层次匹配错误行数
+,case when acc_sum_count = 0 then 1 else (acc_sum_count - acc_error_count) / acc_sum_count end as acc_rate  ---评估类与产品层次匹配准确率
+,pri_sum_count  --价格控制中心总行数
+,pri_error_count  --价格控制中心相关错误行数
+,case when pri_sum_count = 0 then 1 else (pri_sum_count - pri_error_count) / pri_sum_count end as pri_rate  ---价格控制中心准确率
+,acct_sum_count  --评估类在各个工厂视图的一致性校验总行数
+,acct_error_count  --评估类在各个工厂视图的一致性校验错误行数
+,case when acct_sum_count = 0 then 1 else (acct_sum_count - acct_error_count) / acct_sum_count end as acct_rate  ---评估类在各个工厂视图的一致性校验准确率
+,subj_sum_count --科目设置组总行数
+,subj_error_count --科目设置组错误行数
+,case when subj_sum_count = 0 then 1 else (subj_sum_count - subj_error_count) / subj_sum_count end as subj_rate  ---科目设置组准确率
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE	 -- 数据同步时间
+from tmp1

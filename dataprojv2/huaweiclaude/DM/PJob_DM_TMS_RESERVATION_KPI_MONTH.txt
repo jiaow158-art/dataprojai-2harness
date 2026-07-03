@@ -1,0 +1,168 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- description:数字化运营监测指标
+-- create time: 2023/08/28 14:47:06 GMT+08:00
+-- ******************************************************************** --
+--预约率（按单）（月度）
+--提货单中有预约记录的总吨位
+with tmp AS (
+SELECT
+	'' AS Base,
+	date_format(r.creation_date, 'yyyy-MM') AS Stat_month,
+	0 AS Loading_Cnt,
+	count(DISTINCT r.delivery_order_number) AS LADING_RECORD_QUANTITY, --提货单中有预约记录的总数量
+	0 AS LADING_QUANTITY,
+	sum(r.weight) AS LADING_RECORD_TONNAGE,--提货单中有预约记录的总吨位
+	0 AS LADING_TONNAGE,
+	0 AS Punctuality_Sign_ReservationOrder,
+	0 AS CurrentMonth_ReservationOrder,
+	0 AS Loading_Timespan
+FROM
+	SDI.SDI_RESERVATION_RECORD_1041 r
+WHERE
+	date_format(r.creation_date, 'yyyy-MM') = '${PERIOD_ID_M}'
+GROUP BY
+	date_format(r.creation_date, 'yyyy-MM')
+union all
+--(SAP)预约率（按单）（月度）
+SELECT
+	'' AS Base,
+	CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2)) AS Stat_month,
+	0 AS Loading_Cnt,
+	0 AS LADING_RECORD_QUANTITY,
+	COUNT(DISTINCT mseg.vbeln_im) AS LADING_QUANTITY, --提货单总数量
+	0 AS LADING_RECORD_TONNAGE,
+	0 AS LADING_TONNAGE,
+	0 AS Punctuality_Sign_ReservationOrder,
+	0 AS CurrentMonth_ReservationOrder,
+	0 AS Loading_Timespan
+FROM
+	sdi.sdi_matdoc_1001 mseg
+WHERE
+	(
+		mseg.BWART = '601'
+		OR mseg.BWART = '641'
+	)
+	AND mseg.XAUTO = ''
+	AND mseg.mandt = '800'
+	AND CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2)) = '${PERIOD_ID_M}'
+GROUP BY
+	CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2))
+union all
+--提货单的货物总吨位 
+SELECT
+	'' AS Base,
+	CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2)) AS Stat_month,
+	0 AS Loading_Cnt,
+	0 AS LADING_RECORD_QUANTITY,
+	0 AS LADING_QUANTITY,
+	0 AS LADING_RECORD_TONNAGE,
+	SUM(LIPS.BRGEW / LIPS.LFIMG * MSEG.MENGE) AS LADING_TONNAGE,--提货单的货物总吨位（SAP表SQL）
+	0 AS Punctuality_Sign_ReservationOrder,
+	0 AS CurrentMonth_ReservationOrder,
+	0 AS Loading_Timespan
+FROM
+	sdi.sdi_matdoc_1001 mseg
+	INNER JOIN sdi.sdi_lips_1001 lips ON mseg.vbeln_im = lips.vbeln
+	AND mseg.vbelp_im = lips.posnr
+WHERE
+	(
+		mseg.BWART = '601'
+		OR mseg.BWART = '641'
+	)
+	AND mseg.XAUTO = ''
+	AND mseg.mandt = '800'
+	AND lips.LFIMG > 0
+	AND CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2)) = '${PERIOD_ID_M}'
+GROUP BY
+	CONCAT(SUBSTR(mseg.CPUDT, 1, 4), '-', SUBSTR(mseg.CPUDT, 5, 2))
+union all
+--准到率（按单）（月度）
+SELECT
+	'' AS Base,
+	date_format(r.reservation_date, 'yyyy-MM') AS Stat_month,
+	0 AS Loading_Cnt,
+	0 AS LADING_RECORD_QUANTITY,
+	0 AS LADING_QUANTITY,
+	0 AS LADING_RECORD_TONNAGE,
+	0 AS LADING_TONNAGE,
+	count(r.reservation_code) AS Punctuality_Sign_ReservationOrder, --已到场签到目到场时间准时的预约单量
+	0 AS CurrentMonth_ReservationOrder,
+	0 AS Loading_Timespan
+FROM
+	SDI.SDI_RESERVATION_RECORD_1041 r
+WHERE
+	date_format(r.reservation_date, 'yyyy-MM') = '${PERIOD_ID_M}'
+	AND r.driver_timeout = 0
+	AND r.sign_in_time IS NOT NULL
+GROUP BY
+	date_format(r.reservation_date, 'yyyy-MM')
+union all
+SELECT
+	'' AS Base,
+	date_format(r.reservation_date, 'yyyy-MM') AS Stat_month,
+	0 AS Loading_Cnt,
+	0 AS LADING_RECORD_QUANTITY,
+	0 AS LADING_QUANTITY,
+	0 AS LADING_RECORD_TONNAGE,
+	0 AS LADING_TONNAGE,
+	0 AS Punctuality_Sign_ReservationOrder,
+	count(r.reservation_code) AS CurrentMonth_ReservationOrder, --预约时间为当月的预约单量
+	0 AS Loading_Timespan
+FROM
+	SDI.SDI_RESERVATION_RECORD_1041 r
+WHERE
+	date_format(r.reservation_date, 'yyyy-MM') =  '${PERIOD_ID_M}'
+GROUP BY
+	date_format(r.reservation_date, 'yyyy-MM')
+union all
+--司机等待时间（月度）
+SELECT
+	'' AS Base,
+	date_format(r.reservation_date, 'yyyy-MM') AS Stat_month,
+	COUNT(1) AS Loading_Cnt,
+	0 AS LADING_RECORD_QUANTITY,
+	0 AS LADING_QUANTITY,
+	0 AS LADING_RECORD_TONNAGE,
+	0 AS LADING_TONNAGE,
+	0 AS Punctuality_Sign_ReservationOrder,
+	0 AS CurrentMonth_ReservationOrder,
+	AVG(
+		(
+			UNIX_TIMESTAMP(v1.operation_end_time) - UNIX_TIMESTAMP(v2.operation_end_time)
+		) / 3600
+	) AS Loading_Timespan --预约单的装车完成时间-预约单的进场签到时间
+FROM
+	SDI.SDI_RESERVATION_RECORD_1041 r
+	LEFT JOIN SDI.SDI_RESERVATION_VENUE_LOG_1041 v1 ON v1.reservation_group_code = r.reservation_group_code AND  v1.venue_status ='LOAD_END'
+	LEFT JOIN SDI.SDI_RESERVATION_VENUE_LOG_1041 v2 ON v2.reservation_group_code = r.reservation_group_code AND v2.venue_status = 'TO_BE'
+WHERE
+	date_format(r.reservation_date, 'yyyy-MM') =  '${PERIOD_ID_M}'
+	AND r.reservation_group_code IS NOT NULL
+	AND r.sign_in_time IS NOT NULL
+GROUP BY
+	date_format(r.reservation_date, 'yyyy-MM')
+	)
+INSERT OVERWRITE TABLE DM.dm_tms_reservation_kpi_month
+select 
+SUM(t.Base) as Base,
+t.Stat_month,
+SUM(t.Loading_Cnt) as Loading_Cnt,
+SUM(t.LADING_RECORD_QUANTITY) as LADING_RECORD_QUANTITY,--提货单中有预约记录的总数量
+SUM(t.LADING_QUANTITY) as LADING_QUANTITY,--提货单总数量
+SUM(t.LADING_RECORD_TONNAGE) as LADING_RECORD_TONNAGE,--提货单中有预约记录的总吨位
+SUM(t.LADING_TONNAGE) as LADING_TONNAGE,--提货单的货物总吨位（SAP表SQL）
+SUM(t.Punctuality_Sign_ReservationOrder) as Punctuality_Sign_ReservationOrder,--已到场签到目到场时间准时的预约单量
+SUM(t.CurrentMonth_ReservationOrder) as CurrentMonth_ReservationOrder, --预约时间为当月的预约单量
+SUM(t.Loading_Timespan) as Loading_Timespan--预约单的装车完成时间-预约单的进场签到时间（min）
+from tmp t
+group by t.Stat_month
+
+
+
+
+ 
+
+
+

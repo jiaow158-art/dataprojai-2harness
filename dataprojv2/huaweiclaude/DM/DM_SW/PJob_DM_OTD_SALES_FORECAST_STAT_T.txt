@@ -1,0 +1,370 @@
+-- ******************************************************************** --
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/12/07 16:02:20 GMT+08:00
+-- update from chenzhiyong 20230227 新增产品分类、产品状态、开票金额字段
+-- update from chenzhiyong 20230302 收敛维度
+-- update from chenzhiyong 20230320 处理浴室柜的齐套逻辑
+-- update from chenzhiyong 20230320 处理子公司逻辑:苏沪是WX、贵州是GYCK、津冀是TJ
+-- update from chenzhiyong 20230323 排除发票的数据，销售组织 不等于 3830 是津冀、3831 是贵州、3832 是苏沪
+-- update from chenzhiyong 20230324 预测数关联应改成left join
+-- update from chenzhiyong 20230330 修改销售预测子公司的取数逻辑
+-- update from chenzhiyong 20230403 限制型谱
+-- update from yangjunhua  20230406 修改填报月份即预测月份
+-- update from chenzhiyong 20230406 放开字段:售达方(CUST_SAL)
+-- update from chenzhiyong 20230419 新增物料的来源类型(APS取数)
+-- update from chenzhiyong 20230506 将填报数据的齐套拆分为子件后计算准确率
+-- update from chenzhiyong 20230508 修改型谱逻辑，2301~2304数据初始化进去
+-- update from chenzhiyong 20230511 新增预测报表的审批数
+-- update from chenzhiyong 20230512 当渠道为01时，才限制型谱数据，其它渠道，取审批数大于0的物料清单数据
+-- update from chenzhiyong 20230516 处理预测子公司逻辑
+-- update from yangjunhua  20231030  1、艺耐调账去除库存地点"NT" 2、子公司sto特殊逻辑去除  3、预测数据切换成从RTM-WYDP取
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with 
+DM_GL_OUT_INVOICE_T_DATA as(
+select  T1.bill_voucher_num , 
+		T1.acc_voucher_line_item_num , 
+		T1.bill_date , 
+		T1.bill_type, 
+		T1.voucher_currency_code , 
+		T1.payer_id , 
+		T1.sale_org_code , 
+		T1.distribution_channel_code, 
+		T1.cust_sal, 
+		T1.material_num , 
+		T1.actual_billed_qty, 
+		T1.factory_code, 
+		T1.inv_location, 
+		T1.batch_num, 
+		T1.sale_unit, 
+		T1.vc_net_worth_amt, 
+		T1.sale_office_code, 
+		T1.sale_group , 
+		T1.doc_currency_tax , 
+		T1.create_date , 
+		T1.fin_acc_post_rate , 
+		T1.vch_term_num , 
+		T1.so_item_text , 
+		T1.sale_voucher_num , 
+		T1.prod_level , 
+		T1.sale_voucher_item_num , 
+		T1.cust_acct_assign_group , 
+		T1.term_setting_group , 
+		T1.cancel_bill_voucher_num , 
+		T1.reference_voucher_num , 
+		T1.account_check_status , 
+		T1.project_gross_weight , 
+		T1.proj_vol , 
+		T1.weight_unit , 
+		T1.vol_unit , 
+		T1.material_group1, 
+		T1.material_group2, 
+		T1.material_group3, 
+		T1.material_group4, 
+		T1.material_group5, 
+		T1.price_date , 
+		T1.ps_wbs_element , 
+		T1.last_update_date , 
+		T1.dw_last_update_date , 
+		T1.subtotal_price_process1 , 
+		T1.subtotal_price_process2 , 
+		T1.subtotal_price_process3 , 
+		T1.subtotal_price_process4 , 
+		T1.subtotal_price_process5 , 
+		T1.subtotal_price_process6 , 
+		T1.id_bom , 
+		T1.complete_code ,
+		T1.period_id_m
+FROM DM.DM_GL_OUT_INVOICE_T T1 
+where bill_date >=concat('${PERIOD_ID_M}','-01') 
+),
+fact as(
+-- 实际发货数 = 开票数+子公司转储单
+select
+	substr(a.bill_date,1,7) as stat_month,
+	a.sale_org_code,
+	a.distribution_channel_code , 
+	a.cust_sal,
+	case when a.sale_org_code = '3830' then '津冀子公司'
+	     when a.sale_org_code = '3831' then '贵州子公司'
+		 when a.sale_org_code = '3832' then '苏沪子公司'
+	  else d.operation_center_code end operation_center_code,
+	a.material_num,
+	sum(a.actual_billed_qty) as actual_billed_qty,   -- 开票数量
+	b.def_channel,
+    sum(a.subtotal_price_process1) as actual_billed_amt -- 开票金额
+from DM_GL_OUT_INVOICE_T_DATA a  -- DM.DM_GL_OUT_INVOICE_T
+left join DM_SW.DM_SW_PREDICT_DEF_CHANNEL_D b On a.cust_sal  = b.cust_num 
+and a.sale_org_code = b.sales_org_code 
+and a.distribution_channel_code = b.distribution_chnl_code
+left join DM_SW.DM_SW_PREDICT_CUST_ORG  d ON a.cust_sal = d.cust_num
+where a.sale_org_code between '3210' and '3920'  -- 卫浴供应链
+--and a.inv_location not in ('WX','GYCK','TJ') -- 排除 WX 苏沪  GYCK 贵州  TJ  津冀
+and a.payer_id not in ('0000003200','0000003300','0000003500','0000003600','0000003700','0000003800')  -- 去除内部发票
+and a.distribution_channel_code <> '07' -- 20230519 排除渠道为07(鹏嘉卖出)的数据
+and A.inv_location not in ('NT') -- 艺耐调账去除
+group by substr(a.bill_date,1,7) ,
+a.sale_org_code,
+a.distribution_channel_code , 
+a.cust_sal,
+a.material_num,
+b.def_channel,
+case when a.sale_org_code = '3830' then '津冀子公司'
+	     when a.sale_org_code = '3831' then '贵州子公司'
+		 when a.sale_org_code = '3832' then '苏沪子公司'
+	  else d.operation_center_code end
+),
+BOM_DETAIL_DATA AS(   -- BOM数据
+	select t1.MATNR as material_num,  -- 物料编码
+		   t2.IDNRK as small_material_num, -- 子项物料编码
+	   	   t2.MENGE as small_material_qty  -- 子项物料数量
+	from(
+		select MATNR,
+			   STLNR,
+			   row_number() over(partition by MATNR order by ANDAT desc ) as RN
+		from SDI.SDI_MAST_1001 
+		WHERE STLAN = '5'
+	) t1
+	join sdi.sdi_STPO_1001 t2 on t1.STLNR = t2.STLNR
+    --join DWIMD.dwi_md_data_material_general_t t3
+   --on t2.IDNRK = t3.material_num  -- 主柜
+	where t1.RN = 1
+	--and t3.product_level3_code = '4002001' 放开主柜限制
+),
+SDI_SW_CHANNAL_SALES_FORECAST_1037_DATA as(
+	select t1.stat_month,
+		   t1.operation_center_code, 
+		   t1.channel_name as def_channel, 
+		   nvl(t2.small_material_num,t1.material_num) as material_num,
+		   sum(nvl(t1.sales_forecast_num1,0) * nvl(t2.small_material_qty,1)) as sales_forecast_num1 -- 预测数
+	from (
+	    SELECT substr(add_months(concat(stat_month,'-01'),1),1,7) as stat_month,  -- 8月份填写的是9月份数据
+	           b.busi_region as operation_center_code,
+	           c.product_num as material_num,
+	           a.nadd1_m_take_qty as sales_forecast_num1,
+	           a.nadd1_m_distribution_qty ,
+	           b.channel_name
+	    from sdi.SDI_SALES_FORECAST_ORDER_ITEM_1029  a 
+        join sdi.SDI_SALES_FORECAST_ORDER_1029 b On a.order_id = b.id    
+        join sdi.SDI_CENTER_RESULT_1029 c ON a.middle_result_id  = c.id
+        where b.middle_result_type ='CENTER'
+        and a.del_flag='0'
+        and b.status='CHANNEL_APPROVED'
+        and  substr(add_months(concat(stat_month,'-01'),1),1,7) >= '${PERIOD_ID_M}'  
+	     ) t1 
+	left join BOM_DETAIL_DATA t2
+	on t1.material_num = t2.material_num
+	group by t1.stat_month,
+			 t1.operation_center_code, 
+			 t1.channel_name, 
+			 nvl(t2.small_material_num,t1.material_num)
+),
+mid as(
+SELECT
+	stat_month,
+    def_channel,
+    operation_center_code ,
+    material_num,
+    sum(actual_billed_qty) as actual_billed_qty,
+    sum(sales_forecast_qty) as sales_forecast_qty ,
+    sum(actual_billed_amt) as actual_billed_amt
+FROM(
+	select stat_month,
+		   def_channel,
+		   operation_center_code ,
+		   material_num,
+		   sum(actual_billed_qty) as actual_billed_qty,
+		   0 as sales_forecast_qty ,
+		   sum(actual_billed_amt) as actual_billed_amt
+	from fact
+	where stat_month >= '${PERIOD_ID_M}'  -- 昨天所在的月份
+	group by stat_month,
+			 def_channel,
+			 material_num,
+			 operation_center_code 
+	having sum(actual_billed_qty)<>0
+	union all  
+	select  a.stat_month,   -- 填报的月份即预测月份
+			a.def_channel,
+		    a.operation_center_code,
+			a.material_num ,
+			0 as actual_billed_qty,
+			sum(a.sales_forecast_num1) as sales_forecast_qty,
+			0 as actual_billed_amt
+	from SDI_SW_CHANNAL_SALES_FORECAST_1037_DATA a
+	where 1=1
+	group by  a.stat_month,
+			  a.operation_center_code ,
+			  a.material_num ,   --  
+			  a.def_channel
+	)t
+	group by stat_month,
+			 def_channel,
+			 material_num,
+			 operation_center_code 
+),
+SDI_SW_CHANNAL_SALES_APPROVE_T_1037 as (
+-- 渠道审批数
+select t.stat_month,
+			   t.def_channel, 
+			   COALESCE(t2.SMALL_MATERIAL_NUM, T.material_num) AS material_num,
+			   sum(nvl(t.APPROVE_qty,0) * nvl(t2.small_material_qty,1)) as approve_qty
+		from (
+		select  substr(add_months(concat(a.stat_month,'-01'),1),1,7) as stat_month,  -- 8月份填写的是9月份数据
+	           a.product_num as material_num,
+	           a.nadd1_m_take_qty_modify as APPROVE_qty,
+	           a.channel_describe as def_channel
+	        from SDI.SDI_SUM_ORDER_ITEM_1029  a 
+        join sdi.SDI_SALES_FORECAST_ORDER_1029 b On a.order_id = b.id    
+        where  a.del_flag='0'
+		
+		) t  -- 审批数
+		left join BOM_DETAIL_DATA t2 on t.material_num = t2.material_num
+		where T.stat_month >= '${PERIOD_ID_M}'  -- 昨天所在的月份
+		GROUP BY t.stat_month,t.def_channel, COALESCE(t2.SMALL_MATERIAL_NUM, T.material_num)
+),
+channel_mat_detail_data as(  -- 渠道预测准确率
+ SELECT t.stat_month,
+	   t.def_channel,
+	   '预测-渠道数据' as operation_center_code,
+	   '预测-渠道数据' as operation_center_name,
+	   t.material_num,
+	   sum(t.actual_billed_qty) as actual_billed_qty,
+	   sum(t.sales_forecast_qty) as sales_forecast_qty,
+	   sum(t.actual_billed_amt) as actual_billed_amt,
+	   sum(t.approve_qty) as approve_qty
+	FROM(
+		select stat_month,
+			   def_channel,
+			   material_num,
+			   sum(actual_billed_qty) as actual_billed_qty,
+			   sum(sales_forecast_qty) as sales_forecast_qty,
+			   sum(actual_billed_amt) as actual_billed_amt,
+			   0 as approve_qty
+		from mid t
+		group by stat_month,
+				 def_channel,
+				 material_num
+		UNION ALL
+		select t.stat_month,
+			   t.def_channel,
+			   t.material_num,
+			   0 AS actual_billed_qty,
+			   0 AS sales_forecast_qty,
+			   0 AS actual_billed_amt,
+			   t.approve_qty
+		from SDI_SW_CHANNAL_SALES_APPROVE_T_1037 t  -- 审批数
+		where T.stat_month >= '${PERIOD_ID_M}'  -- 昨天所在的月份
+	)t
+	group by t.stat_month,
+			 t.def_channel,
+			 t.material_num
+),
+ITEMPLAN_EX_DATA as(   -- 物料自制or外协
+	SELECT T2.code as material_num, -- 物料编码
+		   T2.name as material_name,   -- 物料名称
+		   case when t1.item_source_type = '0' then '外购'
+		        when t1.item_source_type = '1' then '自制'
+		        when t1.item_source_type = '2' then '外协'
+		        when t1.item_source_type = '3' then '自制和外购'
+		        else '' end as source_type_name  -- 来源类型名称
+	FROM SDI.SDI_WY_ITEMPLAN_EX_1007 T1
+	LEFT JOIN sdi.sdi_item_1007 T2
+	on T1.item_id = T2.ID
+	where t1.inv_org_id = '2'
+	and t1.is_default = '1'
+	and t1.is_phantom = '0'
+),
+DWI_PLAN_PRODUCT_SPECTRUM_T as (  -- 零售型谱限制，需要拆分bom
+SELECT T1.STAT_MONTH,COALESCE(T2.SMALL_MATERIAL_NUM,T1.MATERIAL_NUM) AS MATERIAL_NUM
+FROM 
+DWIOTD.DWI_PLAN_PRODUCT_SPECTRUM_T T1
+LEFT JOIN BOM_DETAIL_DATA T2 ON T1.MATERIAL_NUM = T2.MATERIAL_NUM
+GROUP BY T1.STAT_MONTH,COALESCE(T2.SMALL_MATERIAL_NUM,T1.MATERIAL_NUM)
+)
+insert overwrite table dm_sw.dm_otd_sales_forecast_stat_t partition(stat_month)
+  select  t1.def_channel,
+		t1.operation_center_code,
+		t1.operation_center_name,
+		'' area_code,
+		'' area_name,
+		t1.material_num,
+		T2.product_level2_code as PROD_CATEGORY_CODE,  -- 产品类别编码
+	T2.product_level2_name as PROD_CATEGORY_NAME,  -- 产品类别名称
+	CASE WHEN T3.matl_group4_code = 'TS' THEN 'TS'
+	  ELSE 'ZS' END AS PROD_STATUS_CODE,    -- 产品状态编码
+	CASE WHEN T3.matl_group4_code = 'TS' THEN '退市'
+	  ELSE '在市' END AS PROD_STATUS_NAME,    -- 产品状态名称
+	t1.actual_billed_amt, -- 开票金额
+	t1.actual_billed_qty, -- 开票数量
+	t1.sales_forecast_qty, -- 预测数量
+	current_timestamp as dw_last_update_date,
+	t1.operation_center_code as cust_sal, -- 售达方
+	T5.source_type_name,  -- 来源类型名称
+	nvl(t1.APPROVE_qty,0) as APPROVE_qty,  -- 审批数
+    t1.stat_month
+from channel_mat_detail_data t1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2  -- 物料主数据
+ON t1.material_num = T2.material_num
+LEFT JOIN (
+   select material_num,
+		   max(matl_group4_code) as matl_group4_code ,
+		   max(matl_group4_name) as matl_group4_name
+	from dwimd.dwi_md_data_material_sales_t   -- 物料销售
+	group by material_num 
+)T3
+ON t1.material_num = T3.material_num
+LEFT JOIN DWI_PLAN_PRODUCT_SPECTRUM_T T4 -- 型谱
+ON t1.stat_month = T4.stat_month
+AND T1.material_num = T4.material_num
+LEFT JOIN ITEMPLAN_EX_DATA T5
+ON t1.material_num = T5.material_num
+where (t1.def_channel= '经销' AND T4.material_num IS NOT NULL)
+OR ( t1.def_channel <> '经销' and nvl(t1.APPROVE_qty,0) > 0)
+union all
+  select  t1.def_channel,
+		t1.operation_center_code,
+		t6.operation_center_name,
+		t6.area_code,
+		t6.area_name,
+		t1.material_num,
+		T2.product_level2_code as PROD_CATEGORY_CODE,  -- 产品类别编码
+	T2.product_level2_name as PROD_CATEGORY_NAME,  -- 产品类别名称
+	CASE WHEN T3.matl_group4_code = 'TS' THEN 'TS'
+	  ELSE 'ZS' END AS PROD_STATUS_CODE,    -- 产品状态编码
+	CASE WHEN T3.matl_group4_code = 'TS' THEN '退市'
+	  ELSE '在市' END AS PROD_STATUS_NAME,    -- 产品状态名称
+	t1.actual_billed_amt, -- 开票金额
+	t1.actual_billed_qty, -- 开票数量
+	t1.sales_forecast_qty, -- 预测数量
+	current_timestamp as dw_last_update_date,
+	t1.operation_center_code as cust_sal, -- 售达方
+	T5.source_type_name,  -- 来源类型名称
+	0 as APPROVE_qty,  -- 审批数
+    t1.stat_month
+from mid t1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2  -- 物料主数据
+ON t1.material_num = T2.material_num
+LEFT JOIN (
+   select material_num,
+		   max(matl_group4_code) as matl_group4_code ,
+		   max(matl_group4_name) as matl_group4_name
+	from dwimd.dwi_md_data_material_sales_t   -- 物料销售
+	group by material_num 
+)T3
+ON t1.material_num = T3.material_num
+JOIN DWI_PLAN_PRODUCT_SPECTRUM_T T4 -- 型谱
+ON t1.stat_month = T4.stat_month
+AND T1.material_num = T4.material_num
+LEFT JOIN ITEMPLAN_EX_DATA T5
+ON t1.material_num = T5.material_num
+left join (select distinct operation_center_code,operation_center_name,area_code,area_name from DM_SW.DM_SW_PREDICT_CUST_ORG ) t6 On t1.operation_center_code = t6.operation_center_code;

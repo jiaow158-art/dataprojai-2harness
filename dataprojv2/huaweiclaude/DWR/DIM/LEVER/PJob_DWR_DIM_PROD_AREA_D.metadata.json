@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_PROD_AREA_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/LEVER",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrdim"
+}

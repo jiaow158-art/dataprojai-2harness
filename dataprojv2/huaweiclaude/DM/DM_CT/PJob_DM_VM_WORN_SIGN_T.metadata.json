@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_VM_WORN_SIGN_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "报损及签收报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

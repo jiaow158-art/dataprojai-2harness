@@ -1,0 +1,9 @@
+insert overwrite table sdi.sdi_hf_aggregated_counter_1007
+select 
+id,
+key,
+value,
+expire_at,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_hf_aggregated_counter_1007;

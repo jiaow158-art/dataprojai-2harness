@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SW_1_ADD_N_ACHIEVEMENT_DAILY_D",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

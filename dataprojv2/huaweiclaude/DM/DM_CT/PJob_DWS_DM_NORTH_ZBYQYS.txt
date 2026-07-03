@@ -1,0 +1,245 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/06/01 14:46:27 GMT+08:00
+-- description:北极星指标-逾期应收指标数据指标编码'ZB04','ZB08','ZB09'
+-- history list:PJob_DWS_DM_NORTH_ZBYQYS
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--来源表：DWRFIN.DWR_AR_CREDIT_DEVALUE_F
+--来源表：DWRFIN.DWR_AR_CREDIT_DEVALUE_F
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}'  
+and zb_code in ('ZB04','ZB08','ZB09','ZB51','ZB30');
+with CREDIT_DEVALUE as (
+select 
+SUBSTRING(T1.query_date,1,7) as CALMONTH 
+,
+SUM(
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#')<> 'Z0'
+and T2.node_desc2 = '瓷砖事业部'
+then T1.OVERDUE_RECEIVABLES 
+else 0 END)
+-
+SUM(
+distinct
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#')<> 'Z0'
+and T2.node_desc2 = '瓷砖事业部'
+then T3.offsetting_overdue_receivables * 10000
+else 0 END)
+as "逾期应收总额（瓷砖事业部）"
+
+,SUM(
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#') <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.NODE_NAME4 = 'H04230685'
+then T1.OVERDUE_RECEIVABLES
+else 0 END)
+-
+SUM(
+distinct
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#') <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.NODE_NAME4 = 'H04230685'
+then T3.offsetting_overdue_receivables * 10000
+else 0 END)
+as "逾期应收总额（工程市场中心）"
+
+,SUM(
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_name5 = 'H05230609'
+then T1.OVERDUE_RECEIVABLES
+else 0 END)
+-
+SUM(
+distinct
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_name5 = 'H05230609'
+then T3.offsetting_overdue_receivables * 10000
+else 0 END)
+as "逾期应收总额（战略工程）"
+
+
+,SUM(
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_name4 = 'H04230655'
+then T1.OVERDUE_RECEIVABLES
+else 0 END)
+-
+SUM(
+distinct
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_name4 = 'H04230655'
+then T3.offsetting_overdue_receivables * 10000
+else 0 END)
+as "逾期应收金额（国内直营中心）"
+
+
+,SUM(
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_desc2 = '瓷砖事业部'
+then T1.OVERDUE_RECEIVABLES +N_OVERDUE_RECEIVABLES
+else 0 END)
+-
+SUM(
+distinct
+case when
+T1.general_ledger_account in ('0011310100','0011310600','0011110100','0011310700','0011310300','0011310800')
+and T1.is_overdue_cust = 'N'
+and coalesce (T1.comp_code,'#')  <> '8000'
+and coalesce (T1.cust_group_code,'#') <> 'Z0'
+and T2.node_desc2 = '瓷砖事业部'
+then T3.offsetting_accounts_receivable * 10000
+else 0 END)
+as "应收总额（瓷砖事业部）"
+
+
+
+
+from 
+DWRFIN.DWR_AR_CREDIT_DEVALUE_F T1
+left join  
+dm.dm_rpt_sales_group_t  t2 
+on t1.sales_group_master_file = t2.node_name9
+left join 
+(select * from upload.upload_housing_offset_t
+where stat_month = '${PERIOD_ID_M}') t3 
+on
+(
+t2.node_name9 = t3.org_code
+or t2.node_name8 = t3.org_code
+or t2.node_name7 = t3.org_code
+or t2.node_name6 = t3.org_code
+or t2.node_name5 = t3.org_code
+or t2.node_name4 = t3.org_code
+or t2.node_name3 = t3.org_code
+)
+where  
+T1.query_date = case when SUBSTRING('${PERIOD_ID_M}' ,1,7) = substring(current_date,1,7)  
+then substring(current_date- INTERVAL '1 day',1,10) 
+else SUBSTR(concat(CONCAT (SUBSTRING ('${PERIOD_ID_M}' ,1,7)) ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)  end 
+group by SUBSTRING(T1.query_date,1,7)
+)
+,AMT as (
+select 
+CALMONTH ,
+'ZB04' as  zb_code,
+"逾期应收总额（瓷砖事业部）"/10000 as CM_STAT_AMT,
+"逾期应收总额（瓷砖事业部）"/10000 as ACC_STAT_AMT,
+"逾期应收总额（瓷砖事业部）"/10000 as QTR_TGT_AMT
+ from 
+CREDIT_DEVALUE
+union all 
+select 
+CALMONTH ,
+'ZB08' as  zb_code,
+"逾期应收总额（工程市场中心）"/10000 as CM_STAT_AMT,
+"逾期应收总额（工程市场中心）"/10000 as ACC_STAT_AMT,
+"逾期应收总额（工程市场中心）"/10000 as QTR_TGT_AMT
+ from 
+CREDIT_DEVALUE
+union all 
+select 
+CALMONTH ,
+'ZB09' as  zb_code,
+"逾期应收总额（战略工程）"/10000 as CM_STAT_AMT,
+"逾期应收总额（战略工程）"/10000 as ACC_STAT_AMT,
+"逾期应收总额（战略工程）"/10000 as QTR_TGT_AMT
+from 
+CREDIT_DEVALUE
+union all 
+select 
+CALMONTH ,
+'ZB51' as  zb_code,
+"逾期应收金额（国内直营中心）"/10000 as CM_STAT_AMT,
+"逾期应收金额（国内直营中心）"/10000 as ACC_STAT_AMT,
+"逾期应收金额（国内直营中心）"/10000 as QTR_TGT_AMT
+from 
+CREDIT_DEVALUE
+union all 
+select 
+CALMONTH ,
+'ZB30' as  zb_code,
+"应收总额（瓷砖事业部）"/10000 as CM_STAT_AMT,
+"应收总额（瓷砖事业部）"/10000 as ACC_STAT_AMT,
+"应收总额（瓷砖事业部）"/10000 as QTR_TGT_AMT
+from 
+CREDIT_DEVALUE
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

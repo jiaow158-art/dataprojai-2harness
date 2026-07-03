@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PAM_STANDARD_MANAGE_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

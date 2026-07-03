@@ -1,0 +1,1074 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2024/10/07 14:25:43 GMT+08:00
+-- description:订单日报留备货统计表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with get_parent_cust_num as (
+select distinct 
+-- SALES_GROUP_CODE as sale_grp,--线组
+case 
+	when COALESCE(PARENT_ACCNT_NUMBER,'NAL') not in ('','NAL') then lpad(PARENT_ACCNT_NUMBER,10,'0')
+	else lpad(ACCOUNT_NUMBER,10,'0')
+end as parent_CUST_NUM, --母
+lpad(ACCOUNT_NUMBER,10,'0') as CUST_NUM,--子
+case 
+	when SALES_CHANNEL_CODE = '06' then 'GD03'
+	when SALES_CHANNEL_CODE = '08' then 'GD02'
+	else 'GD01'
+end as zh_channel_code4,--整合渠道
+SALES_CHANNEL_CODE as distribution_channel_code,--渠道
+SALES_ORGANIZATION_CODE as SALES_ORG_CODE --组织
+From SDI.sdi_zmaster_cus_1001
+where PARVW = 'AG'
+)
+,get_curyear_nopick as (
+select
+    t1.sales_grp,
+	t1.KUNNR_OLD as cust_num,
+	case 
+	    when t1.VTWEG_OLD in ('06') then 'GD03'
+	    when t1.VTWEG_OLD in ('08') then 'GD02'
+	    else 'GD01'
+	end as integrate_channel,
+	t3.parent_CUST_NUM,
+    sum(XS_NETWR) as nopick_amount_curyear
+from dwrotd.dwr_accumulate_overdue_nopick_f t1
+left join dm.dm_rpt_sales_group_t t2 on t1.sales_grp = t2.node_name9
+left join get_parent_cust_num t3 on t1.VKORG_OLD = t3.SALES_ORG_CODE and t1.VTWEG_OLD = t3.SALES_ORG_CODE and t1.kunnr_old = t3.CUST_NUM
+where t1.CREATEDATE <= replace('${PERIOD_ID_D}','-','')
+and t1.CREATEDATE >= concat(substring('${PERIOD_ID_D}',1,4),'0101')
+and t1.sale_region_name like '%运营中心'
+group by
+t1.sales_grp,
+t1.KUNNR_OLD,
+case 
+    when t1.VTWEG_OLD in ('06') then 'GD03'
+    when t1.VTWEG_OLD in ('08') then 'GD02'
+    else 'GD01'
+end,
+t3.parent_CUST_NUM
+)
+
+,DM_RPT_SALES_DELIVER_2023_T as (--留备货明细
+select 
+t1.*,
+t2.parent_cust_num,
+CASE
+	WHEN MONTH('${PERIOD_ID_D}') IN (1, 2) 
+        	THEN replace(LAST_DAY(concat(substring('${PERIOD_ID_D}',1,4),'-02-01')),'-','')
+    ELSE replace(LAST_DAY('${PERIOD_ID_D}'),'-','')
+END as cur_month_last_day
+from DM.DM_RPT_SALES_DELIVER_2023_T t1
+left join get_parent_cust_num t2 on t1.SALES_ORG_CODE = t2.SALES_ORG_CODE and t1.distribution_channel_code = t2.distribution_channel_code and t1.CUST_NUM = t2.CUST_NUM
+where 1=1
+and t1.stat_month = SUBSTRING(date_format('${PERIOD_ID_D}', 'yyyyMMdd'),1,6)
+)
+,DM_RPT_SALES_DELIVER_T as (--未交付订单明细
+select 	
+t1.lev2_name,
+t1.dept_lv3_name,
+t1.dept_lv4_name,
+t1.dept_lv5_name,
+t1.lev6_name,t1.lev7_name,t1.vkgrp,t1.salesman_num_list,t1.salesman_name_list,
+t1.cust_num,
+t1.zh_channel_code4,
+substring(t1.expect_date_aps,1,10) as expect_date_aps,
+t1.nodeliver_area_aps,
+t1.avg_price,
+t2.parent_CUST_NUM,
+CASE
+	WHEN MONTH('${PERIOD_ID_D}') IN (1, 2) 
+        	THEN LAST_DAY(concat(substring('${PERIOD_ID_D}',1,4),'-02-01'))
+    ELSE LAST_DAY('${PERIOD_ID_D}') 
+END AS cur_month_last_day
+from DM.DM_RPT_SALES_DELIVER_T t1
+left join get_parent_cust_num t2 on t1.vkorg = t2.SALES_ORG_CODE and t1.distribution_chnl_code = t2.distribution_channel_code and t1.CUST_NUM = t2.CUST_NUM
+where t1.stat_month = SUBSTRING(date_format('${PERIOD_ID_D}', 'yyyyMMdd'),1,6)
+and t1.nodeliver_area_aps>0
+)
+,dwr_wm_wbs_stock_f as (
+select 
+t1.*,
+t2.parent_CUST_NUM,
+CASE
+	WHEN MONTH('${PERIOD_ID_D}') IN (1, 2) 
+        	THEN LAST_DAY(concat(substring('${PERIOD_ID_D}',1,4),'-02-01'))
+    ELSE LAST_DAY('${PERIOD_ID_D}') 
+END AS cur_month_last_day,
+from_unixtime(unix_timestamp(t1.promise_stock_date, 'yyyyMMdd'), 'yyyy-MM-dd') as promise_stock_date_new,
+t1.available_stock_qty*t3.length_1*t3.width/1000000 as residue_project_area
+from dwrotd.dwr_wm_wbs_stock_f t1
+left join get_parent_cust_num t2 on t1.sales_org = t2.SALES_ORG_CODE and t1.distribution_channel_code = t2.distribution_channel_code and t1.CUST_NUM = t2.CUST_NUM
+left join dwimd.dwi_md_data_material_general_t t3 on t1.material_num = t3.material_num 
+where start_month= SUBSTRING(date_format('${PERIOD_ID_D}', 'yyyyMMdd'),1,6)
+and t1.available_stock_qty > 0
+)
+,A as (
+-- 销售订单留货
+select
+	lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(case when distribution_channel_code not in ('06') then sal_pre_res_area  end) as retail_res_area,
+	sum(case when distribution_channel_code in ('06') then sal_pre_res_area end) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4 as integrate_channel,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '销售订单留货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+
+union all
+
+--销售订单备货
+select 
+    lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(sal_pre_res_area) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4 as integrate_channel,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '销售订单备货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+
+union all
+
+-- 转储单留货
+select
+	lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(sal_pre_res_area) as trans_stock_res_area,
+	sum(0) as  trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4 as integrate_channel,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '转储单留货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+
+union ALL 
+
+--转储单备货
+select 
+	lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(sal_pre_res_area) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4 as integrate_channel,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '转储单备货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+
+union all
+
+--专属客编留货
+select
+	lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(sal_pre_res_area) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '专属客编留货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	CUST_NUM,
+	zh_channel_code4,
+	parent_CUST_NUM
+	
+union all
+
+--战略专属 工程市场中心
+select 
+	'国内营销系统' as lev2_name,
+	'国内营销系统' as lev3_name,
+	'工程市场中心' as lev4_name,
+	'工程市场中心' as lev5_name,
+	'' as lev6_name,
+	'' as lev7_name,
+	'H04230685' as sale_grp,
+	'' as salesman_num_list,
+	'' as salesman_name_list, 
+ 	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(available_inventory_area) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	null as integrate_channel,
+	null as parent_CUST_NUM
+from dm.DM_WM_ALL_TYPE_STOCK_T_HIS t1
+left join dm.dm_rpt_prod_level_t  t2 On t1.product_level_code3  = t2.prod_code3 
+left join dwimd.dwi_md_data_material_general_t t3 on t1.material_num = t3.material_num
+where 1=1 
+and replace(STAT_MONTH,'-','') = SUBSTRING(date_format('${PERIOD_ID_D}', 'yyyyMMdd'),1,6)
+and t3.matl_group_code in ('1000010')
+and t3.prod_property in ('A0001','A0002','E0001','C0002')
+and inv_location in ('GCDZ','GCCA','GCPA','GCTA','GCSA','GCQA', 'GCSD','BJ','BJ01' )
+group by CUST_NUM
+
+
+union all 
+
+--剩余项目库存
+select 	
+	t1.lev2_name,t1.lev3_name,t1.lev4_name,t1.lev5_name,
+	'' as lev6_name,
+	'' as lev7_name,
+	--内部交易组归于战略工程
+	case when t1.sale_grp in ('Z55') then 'H05230609' else t1.sale_grp end as sale_grp,
+	'' as salesman_num_list,
+	'' as salesman_name_list, 
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(residue_project_area) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	cust_num,
+	zh_channel_code4 as integrate_channel,
+	null as parent_CUST_NUM
+from dwr_wm_wbs_stock_f t1
+left join dm.dm_otd_wbs_plan_order_det_t t2 on t1.wbs_num = t2.zjhdid 
+left join dwimd.dwi_md_data_material_general_t t3
+on t1.material_num = t3.material_num
+where 1=1
+and t2.ddzt <> '工程项目备货计划单'
+group by t1.lev2_name,t1.lev3_name,t1.lev4_name,t1.lev5_name,t1.sale_grp,
+	cust_num,
+	zh_channel_code4
+
+union all
+
+--无订单占用库存
+select 
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end lev2_name,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end lev3_name,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end as lev4_name,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end as lev5_name,
+	'' as lev6_name,
+	'' as lev7_name,
+	case when t1.factory_werks_code like '%10' then 'H11240102' when  t1.material_num like 'Z%' then 'H03230628' end as sale_grp,
+	'' as salesman_num_list,
+	'' as salesman_name_list, 
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(case when t1.factory_werks_code like '%10' then (t1.all_stock_quantity - t1.reserve_Inventory_QUANTITY - t1.prepar_Inventory_QUANTITY)*t3.length_1*t3.width/1000000
+		when t1.material_num like 'Z%' then t1.available_inventory_area end) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	null as integrate_channel,
+	null as parent_CUST_NUM
+from dm.DM_WM_ALL_TYPE_STOCK_T_HIS t1
+left join dwimd.dwi_md_data_material_general_t t3
+on t1.material_num = t3.material_num
+where 1=1 
+and replace(STAT_MONTH,'-','') = SUBSTRING(date_format('${PERIOD_ID_D}', 'yyyyMMdd'),1,6)
+and t3.matl_group_code in ('1000010')
+and t3.prod_property in ('A0001','A0002','E0001','C0002')
+group by 
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end,
+	case when t1.factory_werks_code like '%10' then 'H11240102' when  t1.material_num like 'Z%' then 'H03230628' end,
+	CUST_NUM
+union ALL 
+select --剩余项目库存的工程项目备货计划单 归属为 无订单占用库存明细
+    '' as lev2_name,
+	'' as lev3_name,
+	'' as lev4_name,
+	'' as lev5_name,
+	'' as lev6_name,
+	'' as lev7_name,
+	case when t1.sale_grp in ('Z55') then 'H05230609' else t1.sale_grp end as sale_grp,
+	'' as salesman_num_list,
+	'' as salesman_name_list, 
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(t1.residue_project_area) as no_order_stock_area,
+	sum(0) as lbh_before_gc_area,
+	sum(0) as lbh_before_ls_area,
+	sum(0) as lbh_mid_gc_area,
+	sum(0) as lbh_mid_ls_area,
+	sum(0) as lbh_after_gc_area,
+	sum(0) as lbh_after_ls_area,
+	CUST_NUM,
+	zh_channel_code4 as integrate_channel,
+	null as parent_CUST_NUM
+from  dwr_wm_wbs_stock_f t1
+left join dm.dm_otd_wbs_plan_order_det_t t2 on t1.wbs_num = t2.zjhdid 
+left join dwimd.dwi_md_data_material_general_t t3
+on t1.material_num = t3.material_num
+where  1=1 
+and t3.matl_group_code in ('1000010')
+and t3.prod_property in ('A0001','A0002','E0001','C0002')
+and t2.ddzt = '工程项目备货计划单'
+GROUP BY 
+t1.sale_grp,
+CUST_NUM,
+zh_channel_code4
+
+union all
+
+--新增销售订单留备货A：逾期、未逾期 + 新增销售订单留备货B：逾期、未逾期
+select  
+	lev2_name,
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(0) as retail_res_area,
+	sum(0) as project_res_area,
+	sum(0) as retail_pre_area,
+	sum(0) as trans_stock_res_area,
+	sum(0) as trans_stock_pre_area,
+	sum(0) as special_custom_res_area,
+	sum(0) as strategy_stock_area,
+	sum(0) as residue_project_area,
+	sum(0) as no_order_stock_area,
+	-->当前时间
+	sum(case when  distribution_channel_code in ('06') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) then sal_pre_res_area else 0 end ) as lbh_before_gc_area,
+	sum(case when  distribution_channel_code not in ('06') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) then sal_pre_res_area else 0 end ) as lbh_before_ls_area,
+	
+	-->当前时间 and <lastday
+	sum(case when  distribution_channel_code in ('06') 
+		and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+		and acc_time_date <= cur_month_last_day
+	then sal_pre_res_area else 0 end ) as lbh_mid_gc_area,
+	sum(case when  distribution_channel_code not in ('06') 
+		and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+		and acc_time_date <= cur_month_last_day
+	then sal_pre_res_area else 0 end ) as lbh_mid_ls_area,
+	
+	-->=当月最后一天
+	sum(case when  distribution_channel_code in ('06') 
+		and acc_time_date > cur_month_last_day
+	then sal_pre_res_area else 0 end ) as lbh_after_gc_area,
+	sum(case when  distribution_channel_code not in ('06') 
+		and acc_time_date > cur_month_last_day
+	then sal_pre_res_area else 0 end ) as lbh_after_ls_area,
+	cust_num,
+	zh_channel_code4 as integrate_channel,
+	parent_CUST_NUM
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type in ('销售订单留货','销售订单备货')
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	cust_num,
+	zh_channel_code4,parent_CUST_NUM
+)
+
+/*
+ * 金额维度
+*/
+,B as (
+select 
+	lev2_name,
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	-->当前时间
+	sum(case when  distribution_channel_code in ('06') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) then sal_pre_res_area*avg_price else 0 end ) as lbh_before_gc_amt,
+	sum(case when  distribution_channel_code not in ('06') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) then sal_pre_res_area*avg_price else 0 end ) as lbh_before_ls_amt,
+	
+	-->当前时间 and <lastday
+	sum(case when  distribution_channel_code in ('06') 
+		and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+		and acc_time_date <= cur_month_last_day
+	then sal_pre_res_area*avg_price else 0 end ) as lbh_mid_gc_amt,
+	sum(case when  distribution_channel_code not in ('06') 
+		and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+		and acc_time_date <= cur_month_last_day
+	then sal_pre_res_area*avg_price else 0 end ) as lbh_mid_ls_amt,
+	
+	-->=当月最后一天
+	sum(case when  distribution_channel_code in ('06') 
+		and acc_time_date > cur_month_last_day
+	then sal_pre_res_area*avg_price else 0 end ) as lbh_after_gc_amt,
+	sum(case when  distribution_channel_code not in ('06') 
+		and acc_time_date > cur_month_last_day
+	then sal_pre_res_area*avg_price else 0 end ) as lbh_after_ls_amt,
+	0 as special_custom_res_amt,
+	
+	    --20250310新增指标：拆分零售渠道和整装渠道
+	-->当前时间
+	sum(case when  distribution_channel_code not in ('06','08') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+	    then sal_pre_res_area else 0 end ) as lbh_before_lsqd_area,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+	    then sal_pre_res_area else 0 end ) as lbh_before_zzqd_area,
+	sum(case when  distribution_channel_code not in ('06','08') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_before_lsqd_amt,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date <= SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) 
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_before_zzqd_amt,
+	
+	-->当前时间 and <lastday
+	sum(case when  distribution_channel_code not in ('06','08') and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8)	and acc_time_date <= cur_month_last_day
+	    then sal_pre_res_area else 0 end ) as lbh_mid_lsqd_area,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) and acc_time_date <= cur_month_last_day
+	    then sal_pre_res_area else 0 end ) as lbh_mid_zzqd_area,
+	sum(case when  distribution_channel_code not in ('06','08') and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) and acc_time_date <= cur_month_last_day
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_mid_lsqd_amt,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date > SUBSTR(date_format(date_sub('${PERIOD_ID_D}',0),'yyyyMMdd'),1,8) and acc_time_date <= cur_month_last_day
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_mid_zzqd_amt,
+	
+	-->=当月最后一天
+	sum(case when  distribution_channel_code not in  ('06','08') and acc_time_date > cur_month_last_day
+	    then sal_pre_res_area else 0 end ) as lbh_after_lsqd_area,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date > cur_month_last_day
+	    then sal_pre_res_area else 0 end ) as lbh_after_zzqd_area,
+	sum(case when  distribution_channel_code not in  ('06','08') and acc_time_date > cur_month_last_day
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_after_lsqd_amt,
+	sum(case when  distribution_channel_code in ('08') and acc_time_date > cur_month_last_day
+	    then sal_pre_res_area*avg_price else 0 end ) as lbh_after_zzqd_amt,
+	cust_num,
+	zh_channel_code4 as integrate_channel,
+	sum(nopick_amount) as nopick_amount,
+	sum(nopick_area) as nopick_area,
+	parent_CUST_NUM,
+	0 as nopick_amount_curyear
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type in ('销售订单留货','销售订单备货')
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	cust_num,
+	zh_channel_code4,parent_CUST_NUM
+
+union all 
+
+select
+	lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	0,0,0,0,0,0,
+	sum(sal_pre_res_area*avg_price) as special_custom_res_amt,
+	0,0,0,0,0,0,0,0,0,0,0,0,
+	cust_num,
+	zh_channel_code4 as integrate_channel,
+	0 as nopick_amount,
+	0 as nopick_area,
+	parent_CUST_NUM,
+	0 as nopick_amount_curyear
+from DM_RPT_SALES_DELIVER_2023_T
+where 1=1
+and lb_type = '专属客编留货'
+group by lev2_name,lev3_name,lev4_name,lev5_name,lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	cust_num,
+	zh_channel_code4,parent_CUST_NUM
+
+--年累计扣罚金额
+union all 
+select
+    t2.node_desc2 as lev2_name,
+    t2.node_desc3 as lev3_name,
+    t2.node_desc4 as lev4_name,
+    t2.node_desc5 as lev5_name,
+    t2.node_desc6 as lev6_name,
+    t2.node_desc7 as lev7_name,
+    t1.sales_grp as sale_grp,null as salesman_num_list,null as salesman_name_list,
+	0,0,0,0,0,0,
+	0 as special_custom_res_amt,
+	0,0,0,0,0,0,0,0,0,0,0,0,
+	t1.cust_num,
+	t1.integrate_channel,
+	0 as nopick_amount,
+	0 as nopick_area,
+	t1.parent_CUST_NUM,
+    t1.nopick_amount_curyear
+from get_curyear_nopick t1
+left join dm.dm_rpt_sales_group_t t2 on t1.sales_grp = t2.node_name9
+)
+,C as (--未交付订单和剩余项目库存的分时间段
+select  
+	lev2_name,
+	dept_lv3_name as lev3_name,
+	dept_lv4_name as lev4_name,
+	dept_lv5_name as lev5_name,
+	lev6_name,lev7_name,vkgrp as sale_grp,salesman_num_list,salesman_name_list,
+	cust_num,
+  	zh_channel_code4 as integrate_channel,
+/*大包设计师 全部归为零售 : 零售渠道拆成零售和整装头部*/
+	-->当前时间
+    sum(case when zh_channel_code4 = 'GD01' and expect_date_aps<=  least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_beforedue_lsqd ,
+    sum(case when zh_channel_code4 = 'GD02' and expect_date_aps<=  least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_beforedue_zzqd ,
+    sum(case when zh_channel_code4 = 'GD03' and expect_date_aps<=least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_beforedue_gc ,
+    
+    sum(case when zh_channel_code4 = 'GD01'  and expect_date_aps<=least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_beforedue_lsqd ,
+    sum(case when zh_channel_code4 = 'GD02' and expect_date_aps<=least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_beforedue_zzqd ,
+    sum(case when zh_channel_code4 = 'GD03' and expect_date_aps<=least(cur_month_last_day,'${PERIOD_ID_D}') then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_beforedue_gc ,
+    
+    -->当前时间 and <lastday
+  	sum(case when zh_channel_code4 = 'GD01'  and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_middue_lsqd ,--未到期
+  	sum(case when zh_channel_code4 = 'GD02'  and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_middue_zzqd ,--未到期
+    sum(case when zh_channel_code4 = 'GD03' and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_middue_gc ,
+
+   		
+  	sum(case when zh_channel_code4 = 'GD01'  and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_middue_lsqd ,--未到期
+  	sum(case when zh_channel_code4 = 'GD02'  and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_middue_zzqd ,--未到期
+    sum(case when zh_channel_code4 = 'GD03' and expect_date_aps>least(cur_month_last_day,'${PERIOD_ID_D}') and expect_date_aps <= cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_middue_gc ,
+   		
+  	-->=当月最后一天
+  	sum(case when zh_channel_code4 = 'GD01'   and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_afterdue_lsqd ,
+  	sum(case when zh_channel_code4 = 'GD02'   and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_afterdue_zzqd ,
+    sum(case when zh_channel_code4 = 'GD03' and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps else 0 end)/10000 as nodeliver_area_afterdue_gc ,
+   	
+  	sum(case when zh_channel_code4 = 'GD01'   and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_afterdue_lsqd ,
+  	sum(case when zh_channel_code4 = 'GD02' and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_afterdue_zzqd ,
+    sum(case when zh_channel_code4 = 'GD03' and  expect_date_aps > cur_month_last_day
+  		then nodeliver_area_aps*avg_price else 0 end)/10000 as nodeliver_amt_afterdue_gc,
+  	0 as residue_project_area_beforedue,
+  	0 as residue_project_area_middue,
+  	0 as residue_project_area_afterdue,
+  	parent_CUST_NUM
+from  DM_RPT_SALES_DELIVER_T
+group by 
+	lev2_name,
+	dept_lv3_name,
+	dept_lv4_name,
+	dept_lv5_name,
+	lev6_name,lev7_name,vkgrp,salesman_num_list,salesman_name_list,
+	cust_num,
+  	zh_channel_code4,parent_CUST_NUM
+union all
+select
+    t3.node_desc2 lev2_name,
+	t3.node_desc3 as lev3_name,
+	t3.node_desc4 as lev4_name,
+	t3.node_desc5 as lev5_name,
+	t3.node_desc6 as lev6_name,
+	t3.node_desc7 as lev7_name,
+	case when t1.sale_grp in ('Z55') then 'H05230609' else t1.sale_grp end as sale_grp,
+	t1.salesman_id as salesman_num_list,t1.salesman_name as salesman_name_list,
+   	cust_num,
+   	zh_channel_code4 as integrate_channel,
+   	0,0,0,0,0,0,0,0,0,
+   	0,0,0,0,0,0,0,0,0,
+	-->当前时间
+    sum(case when t1.promise_stock_date_new<='${PERIOD_ID_D}' then t1.residue_project_area else 0 end)/10000 as residue_project_area_beforedue ,
+    -->当前时间 and <lastday
+    sum(case when t1.promise_stock_date_new>'${PERIOD_ID_D}' and t1.promise_stock_date_new <= t1.cur_month_last_day
+   		then t1.residue_project_area else 0 end)/10000 as residue_project_area_middue ,--未到期
+   	-->=当月最后一天
+    sum(case when t1.promise_stock_date_new > t1.cur_month_last_day
+   		then t1.residue_project_area else 0 end)/10000 as residue_project_area_afterdue,
+   	parent_CUST_NUM
+from dwr_wm_wbs_stock_f t1
+left join dm.dm_otd_wbs_plan_order_det_t t2 on t1.wbs_num = t2.zjhdid 
+left join dm.dm_rpt_sales_group_t t3 on t1.sale_grp = t3.node_name9
+left join dwimd.dwi_md_data_material_general_t t4 on t1.material_num = t4.material_num
+where 1=1
+and t4.matl_group_code in ('1000010')
+and t4.prod_property in ('A0001','A0002','E0001','C0002')
+and t2.ddzt <> '工程项目备货计划单'
+group by 
+t3.node_desc2 ,
+t3.node_desc3,
+t3.node_desc4,
+t3.node_desc5 ,
+t3.node_desc6,
+t3.node_desc7,
+case when t1.sale_grp in ('Z55') then 'H05230609' else t1.sale_grp end ,
+t1.salesman_id ,t1.salesman_name,
+cust_num,
+zh_channel_code4,
+parent_CUST_NUM
+)
+
+,tem as(
+select  
+	lev2_name,
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	retail_res_area,
+	project_res_area,
+	retail_pre_area,
+	trans_stock_res_area,
+	trans_stock_pre_area,
+	special_custom_res_area,
+	strategy_stock_area,
+	residue_project_area,
+	no_order_stock_area,
+	lbh_before_gc_area,
+	lbh_before_ls_area,
+	lbh_mid_gc_area,
+	lbh_mid_ls_area,
+	lbh_after_gc_area,
+	lbh_after_ls_area,
+	0 as lbh_before_gc_amt,
+	0 as lbh_before_ls_amt,
+	0 as lbh_mid_gc_amt,
+	0 as lbh_mid_ls_amt,
+	0 as lbh_after_gc_amt,
+	0 as lbh_after_ls_amt,
+	0 as special_custom_res_amt,
+	0 as lbh_before_lsqd_area,
+    0 as lbh_before_zzqd_area,
+    0 as lbh_before_lsqd_amt,
+    0 as lbh_before_zzqd_amt,
+    
+    0 as lbh_mid_lsqd_area,
+    0 as lbh_mid_zzqd_area,
+    0 as lbh_mid_lsqd_amt,
+    0 as lbh_mid_zzqd_amt,
+    
+    0 as lbh_after_lsqd_area,
+    0 as lbh_after_zzqd_area,
+    0 as lbh_after_lsqd_amt,
+    0 as lbh_after_zzqd_amt,
+    cust_num,
+	integrate_channel,
+	0 as nodeliver_area_beforedue_lsqd ,
+    0 as nodeliver_area_beforedue_zzqd ,
+    0 as nodeliver_area_beforedue_gc ,
+    0 as nodeliver_amt_beforedue_lsqd ,
+    0 as nodeliver_amt_beforedue_zzqd ,
+    0 as nodeliver_amt_beforedue_gc ,
+    -->当前时间 and <lastday
+    0 as nodeliver_area_middue_lsqd ,--未到期
+    0 as nodeliver_area_middue_zzqd ,--未到期
+    0 as nodeliver_area_middue_gc ,
+    0 as nodeliver_amt_middue_lsqd ,--未到期
+    0 as nodeliver_amt_middue_zzqd ,--未到期
+    0 as nodeliver_amt_middue_gc ,
+    -->=当月最后一天
+    0 as nodeliver_area_afterdue_lsqd ,
+    0 as nodeliver_area_afterdue_zzqd ,
+    0 as nodeliver_area_afterdue_gc ,
+    0 as nodeliver_amt_afterdue_lsqd ,
+    0 as nodeliver_amt_afterdue_zzqd ,
+    0 as nodeliver_amt_afterdue_gc,
+    0 as residue_project_area_beforedue,
+    0 as residue_project_area_middue,
+    0 as residue_project_area_afterdue,
+    0 as nopick_amount,
+    0 as nopick_area,
+    parent_CUST_NUM,
+    0 as nopick_amount_curyear
+from A 
+union all
+select 
+	lev2_name,
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	0,0,0,0,0,
+	0,0,0,0,0,
+	0,0,0,0,0,
+	lbh_before_gc_amt,
+	lbh_before_ls_amt,
+	lbh_mid_gc_amt,
+	lbh_mid_ls_amt,
+	lbh_after_gc_amt,
+	lbh_after_ls_amt,
+	special_custom_res_amt,
+	lbh_before_lsqd_area,
+    lbh_before_zzqd_area,
+    lbh_before_lsqd_amt,
+    lbh_before_zzqd_amt,
+    
+    lbh_mid_lsqd_area,
+    lbh_mid_zzqd_area,
+    lbh_mid_lsqd_amt,
+    lbh_mid_zzqd_amt,
+    
+    lbh_after_lsqd_area,
+    lbh_after_zzqd_area,
+    lbh_after_lsqd_amt,
+    lbh_after_zzqd_amt,
+    cust_num,
+	integrate_channel,
+    0 as nodeliver_area_beforedue_lsqd ,
+    0 as nodeliver_area_beforedue_zzqd ,
+    0 as nodeliver_area_beforedue_gc ,
+    0 as nodeliver_amt_beforedue_lsqd ,
+    0 as nodeliver_amt_beforedue_zzqd ,
+    0 as nodeliver_amt_beforedue_gc ,
+    -->当前时间 and <lastday
+    0 as nodeliver_area_middue_lsqd ,--未到期
+    0 as nodeliver_area_middue_zzqd ,--未到期
+    0 as nodeliver_area_middue_gc ,
+    0 as nodeliver_amt_middue_lsqd ,--未到期
+    0 as nodeliver_amt_middue_zzqd ,--未到期
+    0 as nodeliver_amt_middue_gc ,
+    -->=当月最后一天
+    0 as nodeliver_area_afterdue_lsqd ,
+    0 as nodeliver_area_afterdue_zzqd ,
+    0 as nodeliver_area_afterdue_gc ,
+    0 as nodeliver_amt_afterdue_lsqd ,
+    0 as nodeliver_amt_afterdue_zzqd ,
+    0 as nodeliver_amt_afterdue_gc,
+    0 as residue_project_area_beforedue,
+    0 as residue_project_area_middue,
+    0 as residue_project_area_afterdue,
+    nopick_amount,
+    nopick_area,
+    parent_CUST_NUM,
+    nopick_amount_curyear
+from B
+union all
+select 
+	lev2_name,
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	0,0,0,0,0,
+	0,0,0,0,0,
+	0,0,0,0,0,
+	0,0,0,0,0,0,0,0,0,0,0,
+	0,0,0,0,
+	0,0,0,0,
+	cust_num,
+	integrate_channel,
+	nodeliver_area_beforedue_lsqd ,
+    nodeliver_area_beforedue_zzqd ,
+    nodeliver_area_beforedue_gc ,
+    nodeliver_amt_beforedue_lsqd ,
+    nodeliver_amt_beforedue_zzqd ,
+    nodeliver_amt_beforedue_gc ,
+    -->当前时间 and <lastday
+    nodeliver_area_middue_lsqd ,
+    nodeliver_area_middue_zzqd ,
+    nodeliver_area_middue_gc ,
+    nodeliver_amt_middue_lsqd ,
+    nodeliver_amt_middue_zzqd ,
+    nodeliver_amt_middue_gc ,
+    -->=当月最后一天
+    nodeliver_area_afterdue_lsqd ,
+    nodeliver_area_afterdue_zzqd ,
+    nodeliver_area_afterdue_gc ,
+    nodeliver_amt_afterdue_lsqd ,
+    nodeliver_amt_afterdue_zzqd ,
+    nodeliver_amt_afterdue_gc,
+    residue_project_area_beforedue,
+    residue_project_area_middue,
+    residue_project_area_afterdue,
+    0 as nopick_amount,
+    0 as nopick_area,
+    parent_CUST_NUM,
+    0 as nopick_amount_curyear
+from C
+)
+
+,tem1 as(
+select  
+	case when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销' else lev3_name end as lev3_name,
+	case 
+		when lev4_name in ('直营经营管理板块') then '直营子公司'
+		when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销'
+		when lev3_name in ('梦之家事业部') then '梦之家'
+		else lev4_name
+	end as lev4_name,
+	case 
+		when lev5_name in ('商机资源开发部') then '资源开发运营部'
+		when lev5_name in ('战略工程中心') then '战略工程'
+		when lev5_name in ('幕墙工程中心') then '幕墙'
+		when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销'
+		when lev3_name in ('梦之家事业部') then '梦之家'
+		else lev5_name
+	end as lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	sum(retail_res_area) as retail_res_area,
+	sum(project_res_area) as project_res_area,
+	sum(retail_pre_area) as retail_pre_area,
+	sum(trans_stock_res_area) as trans_stock_res_area,
+	sum(trans_stock_pre_area) as trans_stock_pre_area,
+	sum(special_custom_res_area) as special_custom_res_area,
+	sum(strategy_stock_area) as strategy_stock_area,
+	sum(residue_project_area) as residue_project_area,
+	sum(no_order_stock_area) as no_order_stock_area,
+	sum(lbh_before_gc_area) as lbh_before_gc_area,
+	sum(lbh_before_ls_area) as lbh_before_ls_area,
+	sum(lbh_mid_gc_area) as lbh_mid_gc_area,
+	sum(lbh_mid_ls_area) as lbh_mid_ls_area,
+	sum(lbh_after_gc_area) as lbh_after_gc_area,
+	sum(lbh_after_ls_area) as lbh_after_ls_area,
+	
+	sum(lbh_before_gc_amt) as lbh_before_gc_amt,
+	sum(lbh_before_ls_amt) as lbh_before_ls_amt,
+	sum(lbh_mid_gc_amt) as lbh_mid_gc_amt,
+	sum(lbh_mid_ls_amt) as lbh_mid_ls_amt,
+	sum(lbh_after_gc_amt) as lbh_after_gc_amt,
+	sum(lbh_after_ls_amt) as lbh_after_ls_amt,
+	sum(special_custom_res_amt) as special_custom_res_amt,
+	
+	sum(lbh_before_lsqd_area) as lbh_before_lsqd_area,
+    sum(lbh_before_zzqd_area) as lbh_before_zzqd_area,
+    sum(lbh_before_lsqd_amt) as lbh_before_lsqd_amt,
+    sum(lbh_before_zzqd_amt) as lbh_before_zzqd_amt,
+    
+    sum(lbh_mid_lsqd_area) as lbh_mid_lsqd_area,
+    sum(lbh_mid_zzqd_area) as lbh_mid_zzqd_area,
+    sum(lbh_mid_lsqd_amt) as lbh_mid_lsqd_amt,
+    sum(lbh_mid_zzqd_amt) as lbh_mid_zzqd_amt,
+    
+    sum(lbh_after_lsqd_area) as lbh_after_lsqd_area,
+    sum(lbh_after_zzqd_area) as lbh_after_zzqd_area,
+    sum(lbh_after_lsqd_amt) as lbh_after_lsqd_amt,
+    sum(lbh_after_zzqd_amt) as lbh_after_zzqd_amt,
+    cust_num,
+	integrate_channel,
+	sum(nodeliver_area_beforedue_lsqd) as nodeliver_area_beforedue_lsqd ,
+    sum(nodeliver_area_beforedue_zzqd) as nodeliver_area_beforedue_zzqd ,
+    sum(nodeliver_area_beforedue_gc) as nodeliver_area_beforedue_gc,
+    sum(nodeliver_amt_beforedue_lsqd) as nodeliver_amt_beforedue_lsqd ,
+    sum(nodeliver_amt_beforedue_zzqd) as nodeliver_amt_beforedue_zzqd ,
+    sum(nodeliver_amt_beforedue_gc) as nodeliver_amt_beforedue_gc ,
+    sum(nodeliver_area_middue_lsqd) as nodeliver_area_middue_lsqd ,
+    sum(nodeliver_area_middue_zzqd) as nodeliver_area_middue_zzqd,
+    sum(nodeliver_area_middue_gc) as nodeliver_area_middue_gc,
+    sum(nodeliver_amt_middue_lsqd) as  nodeliver_amt_middue_lsqd,
+    sum(nodeliver_amt_middue_zzqd) as nodeliver_amt_middue_zzqd ,
+    sum(nodeliver_amt_middue_gc)  as nodeliver_amt_middue_gc,
+    sum(nodeliver_area_afterdue_lsqd) as nodeliver_area_afterdue_lsqd ,
+    sum(nodeliver_area_afterdue_zzqd) as nodeliver_area_afterdue_zzqd ,
+    sum(nodeliver_area_afterdue_gc) as nodeliver_area_afterdue_gc ,
+    sum(nodeliver_amt_afterdue_lsqd) as nodeliver_amt_afterdue_lsqd ,
+    sum(nodeliver_amt_afterdue_zzqd) as nodeliver_amt_afterdue_zzqd ,
+    sum(nodeliver_amt_afterdue_gc) as nodeliver_amt_afterdue_gc,
+    sum(residue_project_area_beforedue) as residue_project_area_beforedue,
+    sum(residue_project_area_middue) as residue_project_area_middue,
+    sum(residue_project_area_afterdue) as residue_project_area_afterdue,
+    sum(nopick_amount) as nopick_amount,
+    sum(nopick_area) as nopick_area,
+    parent_CUST_NUM,
+    sum(nopick_amount_curyear) as nopick_amount_curyear
+from tem t1
+where 1=1
+-- and lev4_name in ('区域运营中心','工程市场中心','直营经营管理板块','梦之家事业部','国内直营中心') or lev3_name = '国际营销系统' or lev2_name in ('国际营销中心')
+group by 
+	case when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销' else lev3_name end,
+	case 
+		when lev4_name in ('直营经营管理板块') then '直营子公司'
+		when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销'
+		when lev3_name in ('梦之家事业部') then '梦之家'
+		else lev4_name
+	end,
+	case 
+		when lev5_name in ('商机资源开发部') then '资源开发运营部'
+		when lev5_name in ('战略工程中心') then '战略工程'
+		when lev5_name in ('幕墙工程中心') then '幕墙'
+		when lev2_name in ('国际营销中心') or lev3_name in ('国际营销系统') then '国际营销'
+		when lev3_name in ('梦之家事业部') then '梦之家'
+		else lev5_name
+	end,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,cust_num,integrate_channel,parent_CUST_NUM
+)
+
+INSERT OVERWRITE table dm.dm_wm_stock_res_pre_salesgrp_t partition(partition_month)
+select 
+	lev3_name,
+	lev4_name,
+	lev5_name,
+	lev6_name,lev7_name,sale_grp,salesman_num_list,salesman_name_list,
+	retail_res_area/10000 as retail_res_area,--销售订单 零售留货
+	project_res_area/10000 as project_res_area,--销售订单 工程留货
+	retail_pre_area/10000 as retail_pre_area,--销售订单 零售备货
+	trans_stock_res_area/10000 as trans_stock_res_area,--转储单 留货
+	trans_stock_pre_area/10000 as trans_stock_pre_area,--转储单 备货
+	special_custom_res_area/10000 as special_custom_res_area,--专属客编 留货
+	strategy_stock_area/10000 as strategy_stock_area,--战略专属 工程市场中心
+	residue_project_area/10000 as residue_project_area,--剩余项目库存
+	no_order_stock_area/10000 as no_order_stock_area,--无订单占用库存 国际营销 梦之家
+	(retail_res_area + project_res_area + retail_pre_area)/10000	as res_pre_total_area,--销售订单留备货
+	
+	lbh_before_gc_area/10000 as lbh_before_gc_area,--今天前留备货工程面积
+	lbh_before_ls_area/10000 as lbh_before_ls_area,--今天前留备零售程面积
+	lbh_mid_gc_area/10000 as lbh_mid_gc_area,--今天到月底留备货工程面积
+	lbh_mid_ls_area/10000 as lbh_mid_ls_area,--今天到月底留备货零售面积
+	lbh_after_gc_area/10000 as lbh_after_gc_area,--月底后留备货工程面积
+	lbh_after_ls_area/10000 as lbh_after_ls_area,--月底后留备货零售面积
+	current_timestamp() as dw_last_update_date,
+	
+	lbh_before_gc_amt/10000 as lbh_before_gc_amt,--今天前留备货工程金额
+	lbh_before_ls_amt/10000 as lbh_before_ls_amt,--今天前留备零售程金额
+	lbh_mid_gc_amt/10000 as lbh_mid_gc_amt,--今天到月底留备货工程金额
+	lbh_mid_ls_amt/10000 as lbh_mid_ls_amt,--今天到月底留备货零售金额
+	lbh_after_gc_amt/10000 as lbh_after_gc_amt,--月底后留备货工程金额
+	lbh_after_ls_amt/10000 as lbh_after_ls_amt,--月底后留备货零售金额
+	special_custom_res_amt/10000 as special_custom_res_amt,--专属客编 留货金额
+	
+	lbh_before_lsqd_area/10000  as lbh_before_lsqd_area,--今天前留备货 零售渠道 面积
+    lbh_before_zzqd_area/10000 as lbh_before_zzqd_area,--今天前留备货 整装渠道 面积
+    lbh_before_lsqd_amt/10000 as lbh_before_lsqd_amt,--今天前留备货 零售渠道 金额
+    lbh_before_zzqd_amt/10000 as lbh_before_zzqd_amt,--今天前留备货 整装渠道 金额
+    
+    lbh_mid_lsqd_area/10000 as lbh_mid_lsqd_area,--今天到月底留备货 零售渠道 面积
+    lbh_mid_zzqd_area/10000 as lbh_mid_zzqd_area,--今天到月底留备货 整装渠道 面积
+    lbh_mid_lsqd_amt/10000 as lbh_mid_lsqd_amt,--今天到月底留备货 零售渠道 金额
+    lbh_mid_zzqd_amt/10000 as lbh_mid_zzqd_amt,--今天到月底留备货 整装渠道 金额
+    
+    lbh_after_lsqd_area/10000 as lbh_after_lsqd_area,--月底留备货 零售渠道 面积
+    lbh_after_zzqd_area/10000 as lbh_after_zzqd_area,--月底留备货 整装渠道 面积
+    lbh_after_lsqd_amt/10000 as lbh_after_lsqd_amt,--月底后留备货 零售渠道 金额
+    lbh_after_zzqd_amt/10000 as lbh_after_zzqd_amt,--月底后留备货 整装渠道 金额
+    cust_num,--客编
+    integrate_channel,--整合渠道
+    nodeliver_area_beforedue_lsqd ,--今天前未交付 零售渠道 面积
+    nodeliver_area_beforedue_zzqd ,--今天前未交付 整装渠道 面积
+    nodeliver_area_beforedue_gc ,--今天前未交付 工程渠道 面积
+    nodeliver_amt_beforedue_lsqd ,--今天前未交付 零售渠道 金额
+    nodeliver_amt_beforedue_zzqd ,--今天前未交付 整装渠道 金额
+    nodeliver_amt_beforedue_gc ,--今天前未交付 工程渠道 金额
+    
+    nodeliver_area_middue_lsqd ,--今天到月底未交付 零售渠道 面积
+    nodeliver_area_middue_zzqd ,--今天到月底未交付 整装渠道 面积
+    nodeliver_area_middue_gc ,--今天到月底未交付 工程渠道 面积
+    nodeliver_amt_middue_lsqd ,--今天到月底未交付 零售渠道 金额
+    nodeliver_amt_middue_zzqd ,--今天到月底未交付 整装渠道 金额
+    nodeliver_amt_middue_gc ,--今天到月底未交付 工程渠道 金额
+    
+    nodeliver_area_afterdue_lsqd ,--月底后未交付 零售渠道 面积
+    nodeliver_area_afterdue_zzqd ,--月底后未交付 整装渠道 面积
+    nodeliver_area_afterdue_gc ,--月底后未交付 工程渠道 面积
+    nodeliver_amt_afterdue_lsqd ,--月底后未交付 零售渠道 金额
+    nodeliver_amt_afterdue_zzqd ,--月底后未交付 整装渠道 金额
+    nodeliver_amt_afterdue_gc,--月底后未交付 工程渠道 金额
+    
+    residue_project_area_beforedue,--今天前剩余项目库存  面积
+    residue_project_area_middue,--今天到月底剩余项目库存  面积
+    residue_project_area_afterdue,--月底后剩余项目库存  面积
+    
+    nopick_amount/10000,--未提仓储扣费金额
+    nopick_area/10000,
+    parent_CUST_NUM,
+    nopick_amount_curyear/10000,--本年年累计仓储扣费金额
+	SUBSTR(date_format('${PERIOD_ID_D}','yyyyMMdd'),1,6)  as partition_month
+from tem1
+where 1=1
+-- and sale_grp not in ('ZX1')

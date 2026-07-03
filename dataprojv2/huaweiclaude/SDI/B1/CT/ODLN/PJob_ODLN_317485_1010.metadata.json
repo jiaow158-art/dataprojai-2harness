@@ -1,0 +1,8 @@
+{
+    "name": "PJob_ODLN_317485_1010",
+    "type": "HiveSQL",
+    "directory": "/SDI/B1/CT/ODLN",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

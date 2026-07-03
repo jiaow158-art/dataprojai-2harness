@@ -1,0 +1,150 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 15:31:57 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+---物流费用ZB13
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB13';
+with tt as (
+select 
+CALMONTH,
+sum(
+case when  t2.node_name5 in ('H05230609')
+and t1.data_source  in ('S','T') 
+then coalesce(t1.notax_sales_net_amt,0)end ) as "不含税销售净额（管理）",
+0 as 物流成本,
+SUM(
+case when T2.NODE_name5 in( 'H05230609','R05230606') then coalesce(t1.zyywcb_yf,0)+t1.zyywcb_zxf
+end)
+as 运输搬运费
+from DM.dm_ambv2_profit_t t1
+left join  dm.dm_rpt_sales_group_t t2 on t1.sales_grp =t2.node_name9 
+group by CALMONTH
+union all 
+select
+month,
+0 as "不含税销售净额（管理）",
+sum(local_currency_amt) as 物流成本,
+0 as 运输搬运费
+from DWRFIN.DWR_FIN_COST_D_COMPRE_SUBJ_T t1
+left join dm.dm_rpt_sales_group_t t2 
+on t1.sales_group_code = t2.node_name9
+where general_ledger_account in ('0060701010','0060701020','0060702010','0060702020','0060704000')
+and T2.NODE_name5 in( 'H05230609','R05230606')
+group by month 
+)
+,TT1 as (
+select 
+CALMONTH,
+sum("不含税销售净额（管理）") as "不含税销售净额（管理）",
+SUM(物流成本) as 物流成本,
+SUM(运输搬运费) as 运输搬运费
+from tt 
+group by CALMONTH
+
+)
+,tt2 as (
+select 
+calmonth,
+'ZB13' as  ZB_CODE,
+case when "不含税销售净额（管理）" = 0 then 0 else  (物流成本+运输搬运费)/"不含税销售净额（管理）" end as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+tt1 
+where CALMONTH = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB13' as ZB_CODE,
+0 as 当月实绩,
+case when sum("不含税销售净额（管理）") = 0 then 0 else  sum((物流成本+运输搬运费))/sum("不含税销售净额（管理）") end as 累计实绩,
+0 as 季度累计实绩
+from TT1
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB13' as ZB_CODE,
+0 as 当月实绩,
+0 as 累计实绩,
+case when sum("不含税销售净额（管理）") = 0 then 0 else  sum((物流成本+运输搬运费))/sum("不含税销售净额（管理）") end  as 季度累计实绩
+from TT1
+ where    
+ to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩)*100 as CM_STAT_AMT,
+sum(累计实绩)*100 as ACC_STAT_AMT,
+sum(季度累计实绩)*100 as QTR_TGT_AMT
+from 
+tt2
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

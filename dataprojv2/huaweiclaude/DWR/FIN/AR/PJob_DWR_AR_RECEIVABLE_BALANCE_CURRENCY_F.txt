@@ -1,0 +1,237 @@
+-- 取 ACDOCA.KOART = 'D' 的数据
+WITH 
+ACDOCA AS(
+SELECT
+ T.GJAHR							-- 年度
+,T.FISCYEARPER	    				-- 日历月
+,T.RBUKRS		    				-- 公司代码
+,T.KUNNR		    				-- 客户编码
+,T.UMSKZ		    				-- 特别总账
+,T.BELNR		    				-- 凭证号码
+,T.RACCT		    				-- 总账科目
+,T.HSL								-- 金额	
+,T.RWCUR		    				-- 货币
+,T.BUZEI            				-- 项目
+FROM SDI.SDI_ACDOCA_1001 T
+WHERE T.KOART = 'D' 
+)
+,
+-- 取 WBS 
+ACDOCA1 AS(
+SELECT
+ T.GJAHR							-- 年度
+,T.FISCYEARPER	    				-- 日历月
+,T.RBUKRS		    				-- 公司代码
+,T.KUNNR		    				-- 客户编码
+,T.UMSKZ		    				-- 特别总账
+,T.BELNR		    				-- 凭证号码
+,T.RACCT		    				-- 总账科目
+,T.HSL								-- 金额	
+,T.RWCUR		    				-- 货币
+,T.BUZEI            				-- 项目 
+,NVL(T1.XREF3,'') AS XREF3			-- WBS
+FROM ACDOCA T
+LEFT JOIN SDI.SDI_BSEG_1001 T1 
+ON  T.RBUKRS = T1.BUKRS				-- 公司代码
+AND T.GJAHR  = T1.GJAHR 			-- 年度
+AND T.BELNR  = T1.BELNR				-- 凭证号码
+AND T.BUZEI  = T1.BUZEI				-- 项目
+)
+,
+-- 取项目号
+ACDOCA2 AS(
+SELECT
+ T.GJAHR							-- 年度
+,T.FISCYEARPER	    				-- 日历月
+,T.RBUKRS		    				-- 公司代码
+,T.KUNNR		    				-- 客户编码
+,T.UMSKZ		    				-- 特别总账
+,T.BELNR		    				-- 凭证号码
+,T.RACCT		    				-- 总账科目
+,T.HSL								-- 金额	
+,T.RWCUR		    				-- 货币
+,T.BUZEI            				-- 项目 
+,T.XREF3							-- WBS
+,T2.PSPHI							-- 项目号
+FROM ACDOCA1 T
+LEFT JOIN SDI.SDI_PRPS_1001 T2 
+ON  T.XREF3 = T2.POSID				-- WBS
+)
+,
+-- 取 WBS-销售组
+ACDOCA3 AS(
+SELECT
+ T.GJAHR							-- 年度
+,T.FISCYEARPER	    				-- 日历月
+,T.RBUKRS		    				-- 公司代码
+,T.KUNNR		    				-- 客户编码
+,T4.NAME1							-- 客户全称
+,T.UMSKZ		    				-- 特别总账
+,T.BELNR		    				-- 凭证号码
+,T.RACCT		    				-- 总账科目
+,T.HSL								-- 金额	
+,T.RWCUR		    				-- 货币
+,T.BUZEI            				-- 项目 
+,T.XREF3							-- WBS
+,T.PSPHI							-- 项目号
+,T3.ZVKGRP							-- WBS-销售组
+,'' AS SALES_GROUP_MASTER_FILE		-- 销售组-主档
+FROM ACDOCA2 T
+LEFT JOIN SDI.SDI_PROJ_1001 T3 
+ON  T.PSPHI = T3.PSPNR		-- 项目号
+LEFT JOIN SDI.SDI_KNA1_1001 T4 
+ON T.KUNNR = T4.KUNNR		-- 客户编码
+)
+,
+
+
+-- 按维度补齐月份数据
+ACDOCA4 AS(
+SELECT 
+ GG.YEAR 							-- 年度					
+,GG.MONTH							-- 日历月
+,DD.COMP_CODE						-- 公司代码
+,DD.CUST_CODE						-- 客户编码
+,DD.CUST_NAME						-- 客户全称
+,DD.SALES_GROUP_MASTER_FILE	        -- 销售组-主档
+,DD.SPECIAL_GENERAL_LEDGER	        -- 特别总账
+,DD.GENERAL_LEDGER_ACCOUNT	        -- 总账科目
+,DD.WBS								-- WBS
+,DD.WBS_SALES_GROUP                 -- WBS-销售组
+FROM 
+(SELECT 
+ YEAR_ID AS YEAR 							
+,substr(MONTH_ID,1,4)||substr(MONTH_ID,5,2) AS MONTH							
+,'' AS COMP_CODE						
+,'' AS CUST_CODE						
+,'' AS CUST_NAME						
+,'' AS SALES_GROUP_MASTER_FILE			
+,'' AS SPECIAL_GENERAL_LEDGER								
+,'' AS GENERAL_LEDGER_ACCOUNT								
+,'' AS WBS													
+,'' AS WBS_SALES_GROUP
+FROM DM.DM_DIM_DATE_D 
+WHERE substr(MONTH_ID,1,4)||substr(MONTH_ID,5,2) <= (substr(CURRENT_DATE,1,4)||substr(CURRENT_DATE,6,2))
+AND substr(MONTH_ID,1,4)||substr(MONTH_ID,5,2) >= '2018012'
+GROUP BY YEAR_ID,substr(MONTH_ID,1,4)||substr(MONTH_ID,5,2)
+) GG
+LEFT JOIN 
+(
+SELECT 
+ T.GJAHR							AS	YEAR							-- 年度
+,substr(T.FISCYEARPER,1,4)||substr(T.FISCYEARPER,6,2)
+									AS	MONTH							-- 日历月
+,T.RBUKRS							AS	COMP_CODE						-- 公司代码
+,T.KUNNR							AS	CUST_CODE						-- 客户编码
+,T.NAME1							AS	CUST_NAME						-- 客户全称
+,T.SALES_GROUP_MASTER_FILE 			AS 	SALES_GROUP_MASTER_FILE			-- 销售组-主档
+,T.UMSKZ							AS	SPECIAL_GENERAL_LEDGER			-- 特别总账
+,T.RACCT							AS	GENERAL_LEDGER_ACCOUNT			-- 总账科目
+,T.XREF3							AS	WBS								-- WBS
+,T.ZVKGRP							AS	WBS_SALES_GROUP					-- WBS-销售组
+FROM ACDOCA3 T
+
+) DD
+ON 1 = 1 
+GROUP BY 
+ GG.YEAR 							
+,GG.MONTH							
+,DD.COMP_CODE						
+,DD.CUST_CODE						
+,DD.CUST_NAME						
+,DD.SALES_GROUP_MASTER_FILE	
+,DD.SPECIAL_GENERAL_LEDGER	
+,DD.GENERAL_LEDGER_ACCOUNT	
+,DD.WBS								
+,DD.WBS_SALES_GROUP
+)
+,
+ACDOCA5 AS(
+SELECT 
+ T.YEAR 								-- 年度					
+,T.MONTH								-- 日历月
+,T.COMP_CODE							-- 公司代码
+,T.CUST_CODE							-- 客户编码
+,T.CUST_NAME							-- 客户全称
+,T.SALES_GROUP_MASTER_FILE	        	-- 销售组-主档
+,T.SPECIAL_GENERAL_LEDGER	        	-- 特别总账
+,T.GENERAL_LEDGER_ACCOUNT	        	-- 总账科目
+,T.WBS									-- WBS
+,T.WBS_SALES_GROUP                  	-- WBS-销售组
+,'RMB'  AS CURRENCY						-- 货币
+,''     AS CURRENT_AMT					-- 本币金额
+
+FROM ACDOCA4 T
+UNION ALL
+
+SELECT 
+ T.GJAHR							AS YEAR								-- 年度
+,substr(T.FISCYEARPER,1,4)||substr(T.FISCYEARPER,6,2)
+									AS	MONTH							-- 日历月
+,T.RBUKRS		    				AS COMP_CODE						-- 公司代码
+,T.KUNNR		    				AS CUST_CODE						-- 客户编码
+,T.NAME1							AS CUST_NAME						-- 客户全称
+,T.SALES_GROUP_MASTER_FILE			AS SALES_GROUP_MASTER_FILE			-- 销售组-主档
+,T.UMSKZ		    				AS SPECIAL_GENERAL_LEDGER			-- 特别总账
+,T.RACCT		    				AS GENERAL_LEDGER_ACCOUNT			-- 总账科目
+,T.XREF3							AS WBS								-- WBS
+,T.ZVKGRP							AS WBS_SALES_GROUP					-- WBS-销售组
+,NVL(T.RWCUR,'RMB')		    		AS CURRENCY							-- 货币
+,T.HSL								AS CURRENT_AMT						-- 本币金额
+FROM ACDOCA3 T
+)
+,
+
+-- 本期本币余额：按日历月、公司代码、客户编码、销售组-主档、WBS、特别总账、总账科目维度汇总
+ACDOCA6 AS(
+SELECT 
+ T.YEAR 								-- 年度					
+,T.MONTH								-- 日历月
+,T.COMP_CODE							-- 公司代码
+,T.CUST_CODE							-- 客户编码
+,T.CUST_NAME							-- 客户全称
+,T.SALES_GROUP_MASTER_FILE	        	-- 销售组-主档
+,T.SPECIAL_GENERAL_LEDGER	        	-- 特别总账
+,T.GENERAL_LEDGER_ACCOUNT	        	-- 总账科目
+,T.WBS									-- WBS
+,T.WBS_SALES_GROUP                  	-- WBS-销售组
+,T.CURRENCY								-- 货币
+,SUM(NVL(T.CURRENT_AMT,0))
+AS CURRENT_LOCAL_CURRENCY_BALANCE	-- 本期本币余额
+FROM ACDOCA5 T
+GROUP BY 
+ T.YEAR 								-- 年度					
+,T.MONTH								-- 日历月
+,T.COMP_CODE							-- 公司代码
+,T.CUST_CODE							-- 客户编码
+,T.CUST_NAME							-- 客户全称
+,T.SALES_GROUP_MASTER_FILE	        	-- 销售组-主档
+,T.SPECIAL_GENERAL_LEDGER	        	-- 特别总账
+,T.GENERAL_LEDGER_ACCOUNT	        	-- 总账科目
+,T.WBS									-- WBS
+,T.WBS_SALES_GROUP                  	-- WBS-销售组
+,T.CURRENCY								-- 货币
+)
+-- 本币累计余额：按公司代码、客户编码、销售组-主档、WBS、特别总账、总账科目维度，小于等于日历月汇总
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_RECEIVABLE_BALANCE_CURRENCY_F
+SELECT
+ T.YEAR 								-- 年度					
+,T.MONTH								-- 日历月
+,T.COMP_CODE							-- 公司代码
+,T.CUST_CODE							-- 客户编码
+,T.CUST_NAME							-- 客户全称
+,T.SALES_GROUP_MASTER_FILE	        	-- 销售组-主档
+,T.WBS									-- WBS
+,T.WBS_SALES_GROUP                  	-- WBS-销售组
+,T.SPECIAL_GENERAL_LEDGER	        	-- 特别总账
+,T.GENERAL_LEDGER_ACCOUNT	        	-- 总账科目
+,T.CURRENT_LOCAL_CURRENCY_BALANCE		-- 本期本币余额
+,T.CURRENCY								-- 货币
+,SUM(T.CURRENT_LOCAL_CURRENCY_BALANCE)OVER(PARTITION BY T.COMP_CODE,T.CUST_CODE,T.SALES_GROUP_MASTER_FILE,T.WBS,T.SPECIAL_GENERAL_LEDGER,T.GENERAL_LEDGER_ACCOUNT,T.CURRENCY ORDER BY T.MONTH ROWS between UNBOUNDED PRECEDING AND CURRENT ROW)		
+AS LOCAL_CURRENCY_BALANCE_SUM		-- 本期本币累计余额
+,T5.`/BIC/ZA_SYAMB`							AS 	BUSINESS_DEPARTMENT				-- 事业部
+,CURRENT_TIMESTAMP()						AS	DW_LAST_UPDATE_DATE				--	数据同步时间
+FROM ACDOCA6 T
+LEFT JOIN SDI.SDI_BIC_AZMAM_O0062_1009 T5 
+ ON T.COMP_CODE = T5.COMP_CODE													-- 公司代码
+ORDER BY T.MONTH

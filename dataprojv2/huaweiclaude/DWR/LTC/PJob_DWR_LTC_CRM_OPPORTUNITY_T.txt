@@ -1,0 +1,567 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/07/10 14:49:46 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** 
+
+WITH exploded_codes1 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value139 AS text_col,
+      regexp_extract(value139, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_NEW_OPPORTUNITY_1046 
+    WHERE value139 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes2 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value214 AS text_col,
+      regexp_extract(value214, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_NEW_OPPORTUNITY_1046 
+    WHERE value214 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes3 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value284 AS text_col,
+      regexp_extract(value284, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_NEW_OPPORTUNITY_1046 
+    WHERE value284 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes4 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value214 AS text_col,
+      regexp_extract(value214, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_biz_account_1046 
+    WHERE value214 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes5 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value267 AS text_col,
+      regexp_extract(value267, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_biz_account_1046 
+    WHERE value267 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes6 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value13 AS text_col,
+      regexp_extract(value13, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_active_record_1046 
+    WHERE value13 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes7 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value14 AS text_col,
+      regexp_extract(value14, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_active_record_1046 
+    WHERE value14 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,exploded_codes8 AS (
+  SELECT 
+    t.id,
+    t.text_col,
+    t.extracted_codes,
+    e.code
+  FROM (
+    SELECT 
+      id,
+      value15 AS text_col,
+      regexp_extract(value15, '\\{(.*)\\}', 1) AS extracted_codes
+    FROM SDI.SDI_active_record_1046 
+    WHERE value15 <> '' 
+  ) t
+  LATERAL VIEW explode(split(t.extracted_codes, ',')) e AS code
+)
+,tmp1 AS  ( --产品品类
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes1 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'new_opportunity' AND d.field_name = 'product_category1__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp2 AS  ( --报备费缴纳方式
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes2 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'new_opportunity' AND d.field_name = 'field_o2dKf__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp3 AS  ( --采购方式
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes3 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'new_opportunity' AND d.field_name = 'purchase_method_multiple_c__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp4 AS  ( --所属角色
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes4 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'biz_account' AND d.field_name = 'customer_role__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp5 AS  ( --二级角色
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes5 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'biz_account' AND d.field_name = 'second_role__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp6 AS  ( --核心事项完成打钩
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes6 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'active_record' AND d.field_name = 'project__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp7 AS  ( --项目具体进度
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes7 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'active_record' AND d.field_name = 'project_progress__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+,tmp8 AS  ( --所需支持事项打钩
+   select
+    ec.id,
+    ec.text_col,
+    ec.extracted_codes,
+    CONCAT_WS(', ', COLLECT_SET(d.label)) AS mapped_text
+FROM exploded_codes8 ec
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 d 
+ON ec.code = d.value and d.table_name = 'active_record' AND d.field_name = 'selected_support_items__c'
+GROUP BY ec.id, ec.text_col, ec.extracted_codes
+)
+INSERT OVERWRITE TABLE DWRLTC.DWR_LTC_CRM_OPPORTUNITY_T    
+select
+ T.value54 AS BUSI_CODE --商机号
+,T.name AS BUSI_NAME --商机名称
+-- ,CASE WHEN T1.label LIKE '%经销商%' THEN T.value267 ELSE '' END AS CUST_NUM --经销商客编
+,CASE WHEN T1.VALUE in ('2','3','4','2b9BHo1T4') THEN T.value267 
+        WHEN T1.VALUE IN ('1','option1','2B2EJ861e') THEN LPAD(T.value2,10,'0') ELSE null END AS CUST_NUM --经销商/自营客编
+,T35.name AS CUST_NAME --经销商名称
+,T.VALUE267 AS CUST_COMP_CODE --经销商/子公司客编名称
+,T60.name AS CUST_COMP_NAME --经销商/子公司客编名称
+,T.value250 AS ERP_TYPE_CODE -- 企业类型
+,T51.label AS ERP_TYPE_NAME -- 企业类型名称
+,T2.employee_number AS EMP_NUM  --业务员工号
+,T2.NAME AS EMP_NAME  --业务员名称
+,T3.employee_number AS BUSI_OWNER_CODE --	商机负责人工号
+,T3.NAME AS BUSI_OWNER_NAME --	商机负责人名称
+,T.value89 AS BUSI_FOLLOWER	--商机跟进人
+,T.value6	AS BUSI_BELONG_CODE -- 商机归属方代码
+,T1.label AS BUSI_BELONG_NAME -- 商机归属方名称
+,T.value157 AS SALES_AREA_CODE --	销售区域（编码）
+,T.value93 AS SALES_AREA_NAME --	销售区域
+,T.value158 AS SALES_DEPT_CODE --	销售部门（编码）
+,T.value94 AS SALES_DEPT_NAME --	销售部门
+,T.value156 AS SALES_GRP_CODE --	销售组编码
+,T.value91 AS SALES_GRP_NAME --	销售组名称
+,T4.value13 AS SALES_ORG --销售组织
+,T4.value53 AS CHANNEL_CODE  --销售渠道
+,T.value31 AS WBS_CODE --	WBS号
+,T.value111 AS DEPT_CODE	--事业部编码
+,T5.label AS DEPT_NAME -- 事业部名称
+,T.value102 AS DEVEL_ORG_CODE --	建设单位
+,T.value14 AS DEVEL_ORG_NAME	--建设单位全称
+,T.value251 AS CONST_ORG_CODE --	施工单位
+,T.value28 AS CONST_ORG_NAME --	施工单位全称
+,T.value103 AS DESIGN_ORG_CODE --	设计单位
+,T.value69 AS DESIGN_ORG_NAME --	设计单位全称
+,T.value11 AS ADDRESS --	详细地址
+,T.value43 AS PROVINCE_CODE --	省编码
+,T20.label AS PROVINCE_NAME --	省名称
+,T.value48 AS CITY_CODE --	市编码
+,T21.label AS CITY_NAME  --市名称
+,T.value57 AS REGION_CODE --	区编码
+,T22.label AS REGION_NAME -- 区名称
+,T.record_type AS BUSI_TYPE_CODE --	业务类型编码  
+,T6.label AS BUSI_TYPE_NAME --	业务类型名称
+,T.sales_stage AS BUSI_STAGE_CODE --	商机阶段
+,SUBSTR(T7.label,1,2) AS BUSI_STAGE_NAME --	商机阶段名称
+,T.value112	AS PROJ_MAJOR_CATE_CODE --工程大类
+,T8.NAME AS PROJ_MAJOR_CATE_NAME --工程大类名称
+,T.value113	AS PROJ_SUB_CATE_CODE --工程小类
+,T9.NAME AS PROJ_SUB_CATE_NAME --工程小类名称   
+,T.value60 AS BUSI_SOURCE_CODE --	商机来源
+,T10.label AS BUSI_SOURCE_NAME --	商机来源名称
+,T.value169 AS SOURCE_ORG_CODE  --	来源单位
+,T11.VALUE2 AS SOURCE_ORG_NAME  --	来源单位名称
+,CASE WHEN T.value65 = 0 THEN '否' 
+      WHEN T.value65 = 1 THEN '是'  ELSE '' END AS IS_SPEC_PROJ --	是否特殊工程
+,CASE WHEN T.value55 = 0 THEN '否' 
+      WHEN T.value55 = 1 THEN '是'  ELSE '' END AS IS_BRO_BUSI  -- 	是否兄弟商机
+,T12.value25 AS QUTO_BUSI --	引用商机
+,CASE WHEN T.value79 = 0 THEN '否' 
+      WHEN T.value79 = 1 THEN '是'  ELSE '' END AS IS_LONG_PROJ -- 	是否长周期项目
+,CASE WHEN T.value50 = 0 THEN '否' 
+      WHEN T.value50 = 1 THEN '是'  ELSE '' END AS IS_XA -- 	是否雄安
+,CASE WHEN T.value51 = 0 THEN '否' 
+      WHEN T.value51 = 1 THEN '是'  ELSE '' END AS IS_FREE_BUSI --	是否免费商机
+,CASE WHEN T.value46 = 0 THEN '否' 
+      WHEN T.value46 = 1 THEN '是'  ELSE '' END AS IS_REPET_BUSI --	是否重复商机
+,T.value121	AS RELAT_REPET_BUSI -- 关联重复商机
+,date(from_unixtime(cast(T.close_date / 1000 AS bigint))) AS STATE_VALUE_END_DATE --	阶段有效结束日期
+,date(from_unixtime(cast(T.value41 / 1000 AS bigint))) AS STATE_VALUE_START_DATE	--阶段有效开始日期
+,T.sales_status	AS STATE_STAUS_CODE -- 阶段状态（系统预设）
+,T13.label AS STATE_STAUS_NAME -- 阶段状态名称（系统预设）
+,T.value76 AS STATE_VALUE_DAYS	--阶段有效天数
+,from_unixtime(cast(T.create_time / 1000 AS bigint)) AS CREATE_DATE --	创建时间
+,T14.NAME AS CREATER --	创建人
+,NVL(T.value25,0) AS BUILD_AREA --	建筑面积/改造面积（平方米）
+,T.value20 AS PROJ_NATURE_CODE  --	项目性质
+,T15.label AS PROJ_NATURE_NAME  --	项目性质名称
+,T16.extracted_codes AS PROD_CATE_CODE --产品品类
+,T16.mapped_text AS PROD_CATE_NAME --产品品类名称
+,T.leads_id AS SOURCE_CLUE_CODE  --源线索编码
+,T53.display_name AS SOURCE_CLUE_NAME  --源线索名称
+,T.value35 AS BUSI_REP_STATUS_CODE --	商机报备状态
+,T17.label AS BUSI_REP_STATUS_NAME --	商机报备状态名称
+,date(from_unixtime(cast(T.value122 / 1000 AS bigint))) AS BUSI_SUCC_DATE --	报备成功日期
+,NVL(T.value45,0) AS BUSI_SUM_AMT -- 	报备费总金额
+,NVL(T.value216,0) AS BUSI_ADD_FEE_AMT --	报备费附加费用
+,T18.extracted_codes AS BUSI_PAY_STYLE_CODE -- 	报备费缴纳方式
+,T18.mapped_text AS BUSI_PAY_STYLE_NAME -- 	报备费缴纳方式名称
+,T.value9	 AS BUSI_FEE_STATUS_CODE   --报备费状态
+,T19.label AS BUSI_FEE_STATUS_NAME   --报备费状态名称
+,from_unixtime(cast(T.value124 / 1000 AS bigint)) AS BUSI_PAY_END_DATE --报备费缴费截止时间
+,NVL(T.value211,0) AS COST_BUSI_AMT--报备费（成本中心）
+,NVL(T.value213,0) AS CREDIT_BUSI_AMT--报备费（客户可用信贷）
+,NVL(T.value212,0) AS BANK_BUSI_AMT--报备费（银行流水）
+,T23.extracted_codes AS PUR_WAY_CODE --采购方式
+,T23.mapped_text AS PUR_WAY_NAME --采购方式名称
+,T.value68 AS PUR_SCALE_CODE --采购规模
+,T24.label AS PUR_SCALE_NAME --采购规模名称
+,NVL(T.value83,0) AS PREDICT_PUR_AMT--预计采购金额(万元)
+,T.value16 AS BID_MODE_CODE--竞价方式
+,T25.label AS BID_MODE_NAME--竞价方式名称
+,CASE WHEN T.value84 = 0 THEN '否' 
+      WHEN T.value84 = 1 THEN '是'  ELSE '' END AS IS_TAKE_BID_GRT  --是否已交投标保证金
+,CASE WHEN T.value220 = 0 THEN '否' 
+      WHEN T.value220 = 1 THEN '是'  ELSE '' END AS IS_NEED_PRI_REVIEW --是否需要价审     
+,LPAD(T.value2,10,'0') AS PROJ_PAYER_CODE	--项目付款方
+,T.value1 AS PROJ_PAYER_NAME	--项目付款方全称
+,T.value204 AS BTR_RESULT_CODE 	--报价或投标或入库结果反馈 
+,T26.label AS BTR_RESULT_NAME 	--报价或投标或入库结果反馈名称 
+,T.value206 AS SIGN_ORG_NAME--签约单位全称
+,T.value209 AS IS_SIGN_ORG_SAME--签约单位是否与付款单位一致
+,T.value205 AS SIGN_WAY_CODE--签约/入库方式
+,T27.label AS SIGN_WAY_NAME--签约/入库方式名称
+,date(from_unixtime(cast(T.value85 / 1000 AS bigint))) AS SIGN_VALUE_START_DATE--签约有效开始日期
+,date(from_unixtime(cast(T.value86 / 1000 AS bigint))) AS SIGN_VALUE_END_DATE--签约有效结束日期
+,T.value172 AS APPLY_WAY_CODE --供货方式
+,T28.label AS APPLY_WAY_NAME --供货方式名称 
+,T.value166 AS APPLY_STAUS_CODE --供货状态  
+,T29.label AS APPLY_STAUS_NAME --供货状态名称  
+,CASE WHEN T.value173 = 0 THEN '否' 
+      WHEN T.value173 = 1 THEN '是'  ELSE '' END AS IS_DELAY_APPLY --是否延迟供货   
+,date(from_unixtime(cast(T.value174 / 1000 AS bigint))) AS PREDICT_APPLY_FIN_DAT--预计供货完成日期
+,T.value163 AS RENEW_STAUS_CODE --续签状态
+,T30.label AS RENEW_STAUS_NAME --续签状态名称
+,T.lost_reason AS LOST_REASON_CODE --输单原因
+,T31.label AS LOST_REASON_NAME --输单原因名称
+,T.value280 AS LOST_STATE--输单说明
+,T.value302 AS WIN_COMPE_BRAND_CODE  --赢单竞品品牌
+,T32.NAME AS WIN_COMPE_BRAND_NAME  --赢单竞品品牌
+,T.value32 AS WIN_PROD_CATE_CODE--赢单产品类别
+,T33.label AS WIN_PROD_CATE_NAME--赢单产品类别
+,T.value47 AS WIN_PROD_SIZE--赢单产品规格
+,NVL(T.value133,0) AS WIN_PROD_PRICE --赢单产品价格(元/片)  
+,T.value33 AS INVALUE_REASON --无效原因（原输单/无效原因）
+,from_unixtime(cast(T.value127 / 1000 AS bigint)) AS S01_TRAN_TIME--S0-S1转化时间
+,from_unixtime(cast(T.value128 / 1000 AS bigint)) AS S12_TRAN_TIME--S1-S2转化时间
+,from_unixtime(cast(T.value129 / 1000 AS bigint)) AS S23_TRAN_TIME --S2-S3转化时间
+,from_unixtime(cast(T.value130 / 1000 AS bigint)) AS S34_TRAN_TIME--S3-S4转化时间
+,from_unixtime(cast(T.value132 / 1000 AS bigint)) AS S45_TRAN_TIME--S4-S5转化时间
+,from_unixtime(cast(T.value131 / 1000 AS bigint)) AS SX_TRAN_TIME--SX转化时间
+,CASE WHEN T.parent_id IS NULL THEN T.VALUE54 ELSE T34.VALUE54 END AS PAR_BUSI_CODE-- 母商机编码
+,CASE WHEN T.parent_id IS NULL THEN T.NAME ELSE T34.NAME END AS PAR_BUSI_NAME	--母商机名称
+,CASE WHEN T.value23 = 0 THEN '否' 
+      WHEN T.value23 = 1 THEN '是'  ELSE '' END AS IS_SHARE_TACTIC	--是否共享战略
+,T.value274 AS BELONG_TACTIC_CUST_ID--所属战略客户ID
+,T.value275	AS BELONG_TACTIC_CUST_CODE--所属战略客户客编编码
+,T54.NAME AS BELONG_TACTIC_CUST_NAME--所属战略客户客编编码名称
+,CASE WHEN T.value29 = 0 THEN '否' 
+      WHEN T.value29 = 1 THEN '是'  ELSE '' END	AS IS_CHAIN--是否连锁
+,T.value63 AS CHAIN_TYPE_CODE  --连锁类型
+,T36.label AS CHAIN_TYPE_NAME  --连锁类型名称 
+,T.value67 AS TACTIC_STYLE_CODE	--战略类型
+,T37.label AS TACTIC_STYLE_NAME --战略类型名称
+,T35.value218 AS CUST_TYPE_CODE	--客户类型
+,T38.label AS CUST_TYPE_NAME --客户类型名称
+,T39.extracted_codes AS BELONG_ROLE_CODE	--所属角色
+,T39.mapped_text AS BELONG_ROLE_NAME --所属角色名称
+,T40.extracted_codes AS SECOND_ROLE_CODE	--二级角色
+,T40.mapped_text AS SECOND_ROLE_NAME --二级角色名称
+,T35.value291 AS CUS_LEV_CODE --客户级别
+,T41.label AS CUS_LEV_NAME -- 客户级别名称
+,T54.value291 AS TACTIC_CUS_LEV_CODE --战略客户级别
+,T61.label AS TACTIC_CUS_LEV_NAME -- 战略客户级别名称
+,T35.value45 AS CUS_STAR_LEV_CODE	--客户星级
+,T42.label AS CUS_STAR_LEV_NAME -- 客户星级名称
+,T35.value216 AS EXPAND_STAUS_CODE	--开拓状态
+,T43.label AS EXPAND_STAUS_NAME -- 开拓状态名称
+,T35.value217 AS OPE_STAUS_CODE --	运营状态
+,T44.label AS OPE_STAUS_NAME -- 运营状态名称
+,T35.parent_account_id AS UP_ORG_ID --	上级单位ID
+,T45.VALUE39 AS UP_ORG_CODE --上级单位编码
+,T45.NAME AS UP_ORG_NAME--上级单位名称
+,NVL(T35.value318,0) AS CUS_Y_SIGN_AMT	--经销商年度签约业绩（万元）
+,T35.value276	AS CUST_RISK_LEV_CODE--客户风险等级
+,T46.label AS CUST_RISK_LEV_NAME --客户风险等级名称
+,T.value74 AS USER_GROUP_CODE 	--用户群体
+,T47.label AS USER_GROUP_NAME 	--用户群体名称
+,T.value192	AS BUSI_PUB_SEA_CODE --商机所属公海
+,T48.label AS BUSI_PUB_SEA_NAME --商机所属公海名称
+,from_unixtime(cast(T.value194 / 1000 AS bigint)) AS ENTER_AREA_SEA_TIME --进入区域公海时间
+,from_unixtime(cast(T.value195 / 1000 AS bigint)) AS ENTER_COU_SEA_TIME	--进入全国公海时间
+,CASE WHEN T.value197 = 0 THEN '否' 
+      WHEN T.value197 = 1 THEN '是'  ELSE '' END IS_PUB_SEA_ALLOT	--是否公海领取/分配
+,T49.name AS last_enter_pub_sea_owner	--最近一次进入公海前的商机负责人
+,from_unixtime(cast(T.value200 / 1000 AS bigint)) AS BUSI_RETURN_TIME	--商机退回时间
+,T.value201	AS SUP_RETURN_TYPE--支持退回方式
+,CASE WHEN T.value299 = 0 THEN '否' 
+      WHEN T.value299 = 1 THEN '是'  ELSE '' END AS IS_NOT_BI_EXC	--是否不纳入BI统计
+,T.life_status AS LIFE_STATUS_CODE	--生命状态
+,T50.label AS LIFE_STATUS_NAME	--生命状态名称
+,current_date() AS DW_LAST_UPDATE_DATE  --最后更新日期
+,CASE WHEN T1.VALUE in ('2','3','4','2b9BHo1T4') THEN '经销商'
+      WHEN T1.VALUE IN ('1','option1','2B2EJ861e') THEN '自营 'ELSE null END AS BUSI_BELONG_FLAG --商机归属方类型
+,T.value256 AS BUSI_EXP_USE --商机预估用量
+,CASE WHEN T.value337 = 0 THEN '否' 
+      WHEN T.value337 = 1 THEN '是'  ELSE '' END AS IS_BX	--是否包销
+,T57.extracted_codes AS CHECKED_MATTER_CODE	--核心事项完成打钩
+,T57.mapped_text AS CHECKED_MATTER_NAME --核心事项完成打钩名称
+,T58.extracted_codes AS PROJ_PROGRESS_CODE	--项目具体进度
+,T58.mapped_text AS PROJ_PROGRESS_NAME --项目具体进度名称
+,T59.extracted_codes AS SUPP_ITEM_CODE	--所需支持事项打钩
+,T59.mapped_text AS SUPP_ITEM_NAME --所需支持事项打钩名称
+,T56.value16 AS SUPP_DETAIL --所需支持详细说明
+,from_unixtime(cast(T56.value17 / 1000 AS bigint)) AS TM_SIGN_TIME --预计签约时间
+,from_unixtime(cast(T56.value18 / 1000 AS bigint)) AS TM_DELV_TIME --预计供货时间
+,from_unixtime(cast(T56.create_time / 1000 AS bigint)) AS TAIL_CREATE_TIME --跟踪创建时间
+,T56.record_type AS TAIL_RECORD_TYPE_CODE ----跟进数据类型编码
+,T55.label AS TAIL_RECORD_TYPE_NAME ----跟进数据类型名称
+from SDI.SDI_NEW_OPPORTUNITY_1046 T   
+-- LEFT JOIN (SELECT value39,name FROM SDI.SDI_BIZ_ACCOUNT_1046 WHERE is_deleted = 0 AND value39 <> '') T0 
+-- ON T.value70 = T0.value39 
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T1
+ON T.VALUE6 = T1.VALUE AND T1.table_name = 'new_opportunity' AND T1.field_name = 'opportunity_owner__c'
+LEFT JOIN SDI.SDI_ORG_EMPLOYEE_USER_1046 T2 
+ON T2.ID = T.value88 
+LEFT JOIN SDI.SDI_ORG_EMPLOYEE_USER_1046 T3 
+ON T3.ID = T.owner 
+LEFT JOIN SDI.SDI_OBJECT_LV2UA__C_1046 T4 
+ON T4.ID = T.value231
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T5
+ON T.value111 = T5.VALUE AND T5.table_name = 'new_opportunity' AND T5.field_name = 'business_unit__c'--事业部
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T6
+ON T.record_type = T6.VALUE AND T6.table_name = 'new_opportunity' AND T6.field_name = 'record_type'--业务类型
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T7
+ON T.sales_stage = T7.VALUE AND T7.table_name = 'new_opportunity' AND T7.field_name = 'sales_stage'--商机阶段
+LEFT JOIN sdi.sdi_industry_table__c_1046 T8 
+ON T8.is_deleted = 0 AND T8.ID = T.value112
+LEFT JOIN sdi.sdi_industry_table__c_1046 T9 
+ON T9.is_deleted = 0 AND T9.ID = T.value113
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T10
+ON T.value60 = T10.VALUE AND T10.table_name = 'new_opportunity' AND T10.field_name = 'field_chance_source__c'--商机来源
+LEFT JOIN SDI.sdi_opportunity_source_list__c_1046 T11 
+ON T11.is_deleted = 0 AND T.value169 = T11.ID 
+LEFT JOIN SDI.sdi_brother_opportunity__c_1046 T12 
+ON T12.is_deleted = 0 AND T12.ID = T.value305
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T13
+ON T.sales_status = T13.VALUE AND T13.table_name = 'new_opportunity' AND T13.field_name = 'sales_status'--阶段状态
+LEFT JOIN SDI.SDI_ORG_EMPLOYEE_USER_1046 T14 
+ON T14.ID = T.created_by 
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T15
+ON T.value20 = T15.VALUE AND T15.table_name = 'new_opportunity' AND T15.field_name = 'field_project_nature__c'--项目性质
+LEFT JOIN TMP1 T16 
+ON T.ID = T16.ID 
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T17
+ON T.value35 = T17.VALUE AND T17.table_name = 'new_opportunity' AND T17.field_name = 'field_approval_status__c'--商机报备状态
+LEFT JOIN TMP2 T18
+ON T.ID = T18.ID 
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T19
+ON T.value9 = T19.VALUE AND T19.table_name = 'new_opportunity' AND T19.field_name = 'field_lK6vc__c'--报备费状态
+LEFT JOIN SDI.SDI_CRM_AREA_OPTIONS_T_1046 T20 
+ON T20.level_code = 'province' AND T.VALUE43 = T20.value  
+LEFT JOIN SDI.SDI_CRM_AREA_OPTIONS_T_1046 T21 
+ON T21.level_code = 'city' AND T.VALUE48 = T21.value  
+LEFT JOIN SDI.SDI_CRM_AREA_OPTIONS_T_1046 T22 
+ON T22.level_code = 'district' AND T.VALUE57 = T22.value  
+LEFT JOIN TMP3 T23
+ON T.ID = T23.ID  --采购方式
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T24
+ON T.value68 = T24.VALUE AND T24.table_name = 'new_opportunity' AND T24.field_name = 'field_purchase_scale__c'--采购规模
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T25
+ON T.value16 = T25.VALUE AND T25.table_name = 'new_opportunity' AND T25.field_name = 'field_bidding_method__c'--竞价方式
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T26
+ON T.value204 = T26.VALUE AND T26.table_name = 'new_opportunity' AND T26.field_name = 'bidding_storage_result__c'--报价或投标或入库结果反馈
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T27
+ON T.value205 = T27.VALUE AND T27.table_name = 'new_opportunity' AND T27.field_name = 'signing_storage_method__c'--签约/入库方式
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T28
+ON T.value172 = T28.VALUE AND T28.table_name = 'new_opportunity' AND T28.field_name = 'supply_method__c'--供货方式
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T29
+ON T.value166 = T29.VALUE AND T29.table_name = 'new_opportunity' AND T29.field_name = 'supply_status__c'--供货状态
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T30
+ON T.value163 = T30.VALUE AND T30.table_name = 'new_opportunity' AND T30.field_name = 'renewal_status__c'--续签状态
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T31
+ON T.lost_reason = T31.VALUE AND T31.table_name = 'new_opportunity' AND T31.field_name = 'lost_reason'--输单原因
+LEFT JOIN SDI.SDI_competitor_managem__c_1046 T32 
+ON T.VALUE302 = T32.ID AND T32.is_deleted = 0
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T33
+ON T.value32 = T33.VALUE AND T33.table_name = 'new_opportunity' AND T33.field_name = 'field_b1b3C__c'--赢单产品类别
+LEFT JOIN (SELECT ID,VALUE54,NAME,PARENT_ID FROM SDI.SDI_NEW_OPPORTUNITY_1046 WHERE is_deleted = 0) T34 
+ON T.PARENT_ID = T34.ID 
+LEFT JOIN (SELECT ID,NAME,VALUE218,VALUE214,VALUE267,VALUE291,VALUE45,VALUE216,VALUE217,PARENT_ACCOUNT_ID,VALUE318,VALUE276,VALUE283,VALUE39
+FROM SDI.SDI_biz_account_1046 WHERE is_deleted = 0 AND VALUE39 <> '') T35
+ON CASE WHEN T1.VALUE in ('2','3','4','2b9BHo1T4') THEN T.value267 
+        WHEN T1.VALUE IN ('1','option1','2B2EJ861e') THEN LPAD(T.value2,10,'0') ELSE null END = T35.VALUE39 --自营读付款方，其他读经销商
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T36
+ON T.value63 = T36.VALUE AND T36.table_name = 'new_opportunity' AND T36.field_name = 'field_single_option__c' --连锁类型
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T37
+ON T.value67 = T37.VALUE AND T37.table_name = 'new_opportunity' AND T37.field_name = 'field_strategic_type__c' --连锁类型
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T38
+ON T35.value218 = T38.VALUE AND T38.table_name = 'biz_account' AND T38.field_name = 'customer_type__c' --客户类型
+LEFT JOIN TMP4 T39 
+ON T39.ID = T35.ID
+LEFT JOIN TMP5 T40 
+ON T40.ID = T35.ID
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T41
+ON T35.value291 = T41.VALUE AND T41.table_name = 'biz_account' AND T41.field_name = 'customer_level__c' --客户级别
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T42
+ON T35.value45 = T42.VALUE AND T42.table_name = 'biz_account' AND T42.field_name = 'field_628k4__c' --客户星级
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T43
+ON T35.value216 = T43.VALUE AND T43.table_name = 'biz_account' AND T43.field_name = 'exploration_status__c' --开拓状态
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T44
+ON T35.value217 = T44.VALUE AND T44.table_name = 'biz_account' AND T44.field_name = 'operating_status__c' --运营状态
+LEFT JOIN (SELECT ID,NAME,VALUE39 FROM SDI.SDI_biz_account_1046 WHERE is_deleted = 0) T45
+ON T35.parent_account_id = T45.ID
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T46
+ON T35.value276 = T46.VALUE AND T46.table_name = 'biz_account' AND T46.field_name = 'customer_risk_level__c' --客户风险等级
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T47
+ON T.value74 = T47.VALUE AND T47.table_name = 'new_opportunity' AND T47.field_name = 'user_group_type__c' --用户群体类型
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T48
+ON T.value192 = T48.VALUE AND T48.table_name = 'new_opportunity' AND T48.field_name = 'opportunity_public_sea__c' --商机所属公海
+LEFT JOIN SDI.SDI_ORG_EMPLOYEE_USER_1046 T49 
+ON T49.ID = T.value202 
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T50
+ON T.life_status = T50.VALUE AND T50.table_name = 'new_opportunity' AND T50.field_name = 'life_status' --生命状态
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T51
+ON T.value250 = T51.VALUE AND T51.table_name = 'biz_account' AND T51.field_name = 'company_type__c' --企业类型
+LEFT JOIN SDI.sdi_object_lv2ua__c_1046 T52
+ON T.value267 = T52.value18 AND T.VALUE13 = T52.VALUE13 AND T52.VALUE53 = '06'
+LEFT JOIN SDI.SDI_BIZ_LEADS_1046 T53  
+ON T53.ID = T.leads_id AND T53.is_deleted = 0
+LEFT JOIN SDI.SDI_BIZ_ACCOUNT_1046 T54 
+ON T.value274 = T54.ID
+LEFT JOIN (SELECT A.TARGET_DATA_ID,B.value13,B.value14,B.value15,B.value16,B.value17,B.value18,B.create_time,B.record_type,B.ID,ROW_NUMBER() OVER(PARTITION BY TARGET_DATA_ID ORDER BY B.create_time DESC) RN
+            FROM SDI.SDI_FEED_RELATION_1046 A
+            LEFT JOIN SDI.SDI_ACTIVE_RECORD_1046 B
+            ON A.SOURCE_DATA_ID = B.ID 
+            WHERE A.TARGET_API_NAME = 'NewOpportunityObj' AND A.is_deleted = 0 and B.is_deleted = 0 ) T56 --即300万以上商机进度反馈
+ON T.ID = T56.TARGET_DATA_ID AND T56.RN = 1
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T55
+ON T55.VALUE = T56.record_type AND T55.table_name = 'active_record' AND T55.field_name = 'record_type' 
+LEFT JOIN TMP6 T57 
+ON T56.ID = T57.ID
+LEFT JOIN TMP7 T58 
+ON T56.ID = T58.ID
+LEFT JOIN TMP8 T59 
+ON T56.ID = T59.ID
+LEFT JOIN SDI.SDI_BIZ_ACCOUNT_1046 T60 
+ON T.value70 = T60.ID
+LEFT JOIN SDI.SDI_CRM_API_OPTIONS_T_1046 T61
+ON T54.value291 = T61.VALUE AND T61.table_name = 'biz_account' AND T61.field_name = 'customer_level__c' --客户级别
+where T.is_deleted = 0

@@ -1,0 +1,31 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/01 14:29:47 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWICS.DWI_DEA_SHOP_INFO_DMT_T
+  SELECT ID,
+         EP_ID,
+         NAME,
+         DEPT_ID,
+         PARENT_ID,
+         ORDER_NUM,
+         STORE_ID,
+         SYNC_STATUS,
+         DELETED,
+         CREATE_TIME,
+         UPDATE_TIME,
+         DEALER_ID,
+         EXT_JSON,
+         TYPE,
+         DIRECT_STORE_NUM,
+         DEALER_NO,
+         APP_ID,
+         OUT_DEPT_NO,
+         WXWORK_DEPT_ID,
+         BAK_DEALER_ID,
+         SYNC_MOS_FLAG,
+         MOS_DEPT_ID,
+         'N' AS DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+    FROM SDI.SDI_BUZ_DEPT_INFO_1030;

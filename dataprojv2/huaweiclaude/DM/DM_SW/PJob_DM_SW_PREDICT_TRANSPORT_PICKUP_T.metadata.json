@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SW_PREDICT_TRANSPORT_PICKUP_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

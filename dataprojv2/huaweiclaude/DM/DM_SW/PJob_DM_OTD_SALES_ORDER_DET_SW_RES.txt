@@ -1,0 +1,114 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/09/19 14:48:44 GMT+08:00
+-- ******************************************************************** --
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+insert overwrite table dm_sw.dm_otd_sales_order_det_sw_res partition(partition_ym)
+select  
+		t.order_num,   -- 订单头
+		t.order_item_num, --订单行
+		t.order_type_code, --订单类型code
+		t.order_date, --订单日期
+		t.sales_org_code, --销售组织代码
+		t.channel_code, --渠道
+		t.cust_num , --客户编码  
+		t.material_num , -- 物料编码
+		t.material_name, --物料名称
+		t.order_net_amt, --订单项目的凭证货币净值
+		t.order_tax_amt, --以凭证货币计的税额
+		t.total_amt, --总金额
+		t.batch_num, --批次
+		t.order_qty,  --订单数量
+		t.item_unit, --以销售单位表示的累计订购数量
+		t.item_desc,  --订单行描述
+		t.inv_location, --库存地点
+		t.ZQCYY,   --清仓原因
+		t.wbs_id,  --wbs元素
+		t.cancal_code, --报价和销售订单的拒绝原因
+		t.factory_code, --工厂代码
+		t.pricing_num,  --定价条件凭证号
+		t.creator_id, --创建者ID
+		t.oss_order_item_id, --OSS行Id
+		t.res_stock_date, --留货日期
+		t.res_stock_qty, --留货数量
+		t.prepare_stock_date, --备货日期
+		t.prepare_stock_qty, --备货数量
+		t.stockout_qty, --已出库数量
+		t.stockout_date, --出库日期
+		t.seller_code, --人员编号
+		t.sales_group_code, --人员组织编号
+		t.org_lev2_code, --销售组织L2代码
+		t.org_lev2_name, --销售组织L2名称
+		t.org_lev3_code, --销售组织L3代码
+		t.org_lev3_name, --销售组织L3名称
+		t.org_lev4_code, --销售组织L4代码
+		t.org_lev4_name, --销售组织L4名称
+		t.org_lev5_code, --销售组织L5代码
+		t.org_lev5_name, --销售组织L5名称
+		t.bath_category_name, --产品类型
+		t.product_level1_code, --产品层次1代码
+		t.product_level1_name, --产品层次1名称
+		t.product_level2_code, --产品层次2代码
+		t.product_level2_name, --产品层次2名称 
+		t.product_level3_code, --产品层次3代码
+		t.product_level3_name, --产品层次3名称
+		t.product_level4_code, --产品层次4代码
+		t.product_level4_name, --产品层次4名称
+		t.is_dingzhi, --是否定制
+		t.restock_ctrl_days, --留货考核天数
+		t.promise_date, --承诺交期
+		t.stockout_ctrl_days, --提货考核天数
+		t.zy_flag, --自营标识
+		t.j9_flag, --产品层次2j9判断标识
+		t.j2_flag, --产品层次2j2判断标识
+		t.j10_flag, --产品层次2j10判断标识
+        t.promise_deliver_date, --承诺交期
+        t.promise_stockout_date, --承诺出货日期
+	    t.dw_last_update_date --更新时间
+	    ,t.BSARK --客户采购订单类型
+	    ,t.max_res_stock_date --最后留货日期
+	    ,t.first_res_stock_date  --第一次留货日期
+	    ,t.require_date --需求日期
+	    ,t.reason --清仓原因
+	    ,t.mod_promise_deliver_date --节假日顺延后的准提日期
+	    ,t.og_order_org --初始下单部门
+	    ,t.dz_flag --定制表示
+	    ,t.salesman_num --销售雇员编号
+		,t.salesman_name --销售雇员名字
+		,t.VOLUME --体积
+		,t.report_price_num --报价单号
+		,t.cust_name --客户名称
+		,t.order_item_type_code --行项目类别
+		,t.def_price_date --定价日期
+		,t.creator_name
+		,t.cancel_reason --取消原因
+		,T.res_day_type
+		,T.order_workflow_name 
+	    ,SUBSTR(date_format(t.mod_promise_deliver_date,'yyyy-MM-dd'),1,7) partition_ym
+from dm_sw.dm_otd_sales_order_det_sw t
+left join dwimd.dwi_md_data_material_general_t mat on t.material_num  = mat.material_num 
+left join (
+select t1.material_num,t1.start_date,t1.end_date, 
+	sum(case when  t1.matl_group4_code in('DZ','TD') then 1 else 0 end) as dztd_flag--定制标识
+from dwimd.dwi_md_data_material_sales_t_his  t1
+group by t1.material_num,t1.start_date,t1.end_date 
+) matext ON t.material_num = matext.material_num and t.order_date >= matext.start_date and t.order_date < matext.end_date 
+left join sdi.sdi_vbkd_1001 vbkd on t.order_num = vbkd.vbeln and t.order_item_num = vbkd.posnr
+where 1=1
+--20260122新增过滤逻辑
+and (substring(mat.product_level_code,1,2) in ('30','40') or substring(mat.product_level_code,1,4) in ('4109'))
+and coalesce(t.cancal_code,'NAL') in ('','NAL')
+and coalesce(matext.dztd_flag,0) <= 0
+and coalesce(substring(t.batch_num,1,2),'NAL') not in ('J5')
+and coalesce(substring(t.batch_num,1,3),'NAL') not in ('DZD')
+and coalesce(t.inv_location,'NAL') not in ('GYCK')
+and coalesce(t.order_type_code,'NAL') not in ('ZA05','ZR01')
+and coalesce(vbkd.ihrez,'NAL') not in ('定制标品订单')
+--20260122新增过滤逻辑
+and SUBSTR(date_format(t.mod_promise_deliver_date,'yyyy-MM-dd'),1,7) >= 
+	case when SUBSTR(date_sub(CURRENT_DATE(),1),9,2) <='03'
+	THEN SUBSTR(add_months(CURRENT_DATE(),-1),1,7)
+	ELSE SUBSTR(date_sub(CURRENT_DATE(),1),1,7)
+END

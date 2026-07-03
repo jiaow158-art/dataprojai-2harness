@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWI_MD_CUST_CREDIT_MNGMT_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/CUST",
+    "description": "SAP 信用管理: 合作伙伴信贷主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

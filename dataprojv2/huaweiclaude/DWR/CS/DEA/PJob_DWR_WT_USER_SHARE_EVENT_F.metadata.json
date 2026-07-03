@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_WT_USER_SHARE_EVENT_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS/DEA",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

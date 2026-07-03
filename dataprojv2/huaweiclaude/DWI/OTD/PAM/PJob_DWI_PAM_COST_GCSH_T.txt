@@ -1,0 +1,193 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/06/26 18:54:54 GMT+08:00
+-- description:卫浴制造成本过程损耗数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from chenzhiyong 20230718 放开明细字段，为了报表做累计用
+-- ******************************************************************** --
+--DROP TABLE IF EXISTS DWIOTD.DWI_PAM_COST_GCSH_T;
+--CREATE TABLE DWIOTD.DWI_PAM_COST_GCSH_T AS
+with jm_qp_hg_data as(   -- 江门 青坯合格数
+	select t.STAT_DATE as prod_date,
+	       t.jm_factory_code as factory_code ,
+	      -- t.jm_np_code as np_code,
+	       --t1.jm_code as material_num,
+	       t2.material_num,
+	       sum(t.jm_hg_qty) as jm_qp_hg_qty
+	from(
+		-- 普通半检
+		select substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE, -- 评级日期
+		       a.jm_factory_code,
+			   a.jm_np_code,  -- JM_NP_CODE
+			   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty -- 是否合格('1:合格 2:返修') JM_GX_HG
+		from SDI.SDI_jm_t_gx_online_1038 a -- 改洗上线检验
+		where a.jm_is_del=0   
+		and a.jm_is_judge=1  
+		and a.JM_IS_COMPLEMENT =0 
+		and substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+				 a.jm_factory_code,
+				 a.jm_np_code
+		union all
+		-- 高压半检
+		select  substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE,
+		        a.jm_factory_code,
+				a.jm_np_code,
+				sum(case when a.jm_is_standard=1 then 1 else 0 end ) jm_hg_num
+		from SDI.SDI_JM_T_GY_PJ_1038 a 
+		left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 b
+		on a.jm_uuid=b.jm_gx_id
+		where a.jm_is_del=0
+		and substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) ,
+		         a.jm_factory_code,
+			     a.jm_np_code
+		union all
+		-- 半检报废数
+		select  substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) stat_date  ,
+		 		a.jm_factory_code ,
+				a.jm_np_code   ,
+				-sum(case when a.jm_is_standard=1 and a.JM_IS_CQ=0  then 1 else 0 end ) as jm_hg_qty
+		 from sdi.sdi_jm_t_gx_online_dumping_1038 a
+		 left join SDI.SDI_JM_T_GX_ONLINE_1038 b 
+		 on a.jm_barcode =b.jm_barcode
+		 and b.jm_is_del=0
+		where a.jm_is_del=0 
+		and a.jm_is_flow=2
+		 and b.JM_IS_COMPLEMENT =0  
+		 group by substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7)  ,
+		          a.jm_factory_code ,
+				  a.jm_np_code
+		union all
+		 -- 干补检验
+		select substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS STAT_DATE,  -- 干补日期
+		   a.jm_factory_code ,
+		   a.jm_np_code, -- 泥坯编码
+		   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty  -- 是否合格(1:合格 2:废品) JM_GX_HG
+		from SDI.SDI_jm_t_gx_dryfilling_1038 a  -- 干补检验
+		LEFT JOIN SDI.sdi_jm_t_gx_online_1038 b
+		on a.jm_uuid = b.jm_gb_id 
+		where a.jm_is_del=0  
+		and b.jm_is_complement = 0
+		and substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		group by substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+		         a.jm_factory_code,
+				 a.jm_np_code		  
+		union all
+		-- 改洗下线
+		select substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) stat_date,
+			   a.jm_factory_code ,
+			   a.jm_np_code,
+			   -sum(case when  a.jm_is_standard_gb = 1 then 1 else 0 end ) jm_hg_qty
+		 from SDI.SDI_jm_t_gx_online_dumping_1038 a
+		 left join SDI.SDI_jm_t_gx_online_1038 b 
+		 on a.JM_BARCODE=b.JM_BARCODE
+		 left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 c 
+		 on c.jm_gx_id=b.jm_uuid
+		 where a.jm_is_del=0 
+		 and a.JM_IS_CQ=0
+		 and substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10)  between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+		 group by substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) ,
+		 		  a.jm_factory_code,
+				  a.jm_np_code
+		) t
+		left join SDI.sdi_jm_t_wy_base_gc_1038 t1
+		on t.jm_np_code = t1.jm_np_code
+		left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t2 -- 生产BOM关系数据
+        on t.jm_factory_code = t2.factory_code
+        and t1.jm_code = t2.small_material_num
+		where t1.jm_is_del = 0
+		group by t.STAT_DATE,
+			     t.jm_factory_code ,
+			     --t.jm_np_code
+			     --t1.jm_code
+			     t2.material_num
+),
+jm_ysfj_data as(   -- 江门 一烧分级
+select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS prod_date,  -- 分级时间
+       a.jm_factory_code as factory_code, -- 工厂编码
+	   --a.jm_gc_code as material_num,  -- 光瓷型号编码
+       t1.material_num,
+	   --a.jm_np_code,  -- 泥坯编码
+	   sum(case when a.jm_uuid is not null then 1 else 0 end ) as jm_ysfj_qty -- 分级数  -- JM_FJ_NUM
+   from SDI.SDI_jm_t_fj_first_1038 a  -- 一烧分级
+   left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t1 -- 生产BOM关系数据
+   on a.jm_factory_code = t1.factory_code
+   and a.jm_gc_code = t1.small_material_num
+   where a.jm_is_del=0 
+   and a.JM_IS_BL_COMPLEMENT=0 
+   and a.JM_IS_BM=0   
+   and substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+   group by substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+   			a.jm_factory_code,
+            --a.jm_gc_code
+   			t1.material_num
+),
+jm_gcsh_data as(  -- 江门过程损耗数据
+	select t1.prod_date, -- 生产日期
+		   t1.factory_code, -- 工厂编码
+		   t1.material_num, -- 物料编码
+		   t1.jm_qp_hg_qty , -- 青坯合格数
+		   t2.jm_ysfj_qty ,  -- 一烧分级数
+		   nvl((t1.jm_qp_hg_qty - t2.jm_ysfj_qty) / t1.jm_qp_hg_qty,0) as jm_gcsh_qty  -- 江门过程损耗百分比
+	from jm_qp_hg_data t1
+	left join jm_ysfj_data t2
+	on t1.prod_date = t2.prod_date
+	and t1.factory_code = t2.factory_code
+	and t1.material_num = t2.material_num
+),
+jx_gcsh_data as(  -- 江西过程损耗数据
+-- 1- （分级数-（期初坯仓盘点+期初喷釉盘点+期初烧成盘点）+（期末坯仓盘点+期末喷釉盘点+期末烧成盘点）/收坯数
+/*SELECT T1.prod_date, 
+       T1.factory_code, 
+       T1.material_num,
+       nvl(1-((T1.ysfj_qty 
+       - ((T1.pc_qc_qty + T1.sy_qc_qty + T1.sy_np_qc_qty + T1.sc_qc_qty) 
+         + (T1.pc_pd_qty + T1.sy_pd_qty + T1.sy_np_pd_qty + T1.sc_pd_qty))
+        ) / T1.actual_receipt_qty),0) AS jx_gcsh_qty  -- 江门过程损耗百分比
+FROM(*/
+	SELECT NVL(T1.grade_date,t2.prod_date) as prod_date,  -- 时间
+	       NVL(T1.factory_code,t2.factory_code) as factory_code,  -- 工厂
+	       NVL(T1.material_num ,t2.material_num) as material_num, -- 物料
+	       nvl(T1.ysfj_qty,0) as ysfj_qty,   -- 一烧分级
+	       nvl(T1.actual_receipt_qty,0) as actual_receipt_qty,  -- 实收
+	       nvl(T2.pc_qc_qty,0) as pc_qc_qty,  -- 坯仓 期初
+		   nvl(T2.sy_qc_qty,0) as sy_qc_qty,  -- 喷釉 期初
+		   nvl(T2.sy_np_qc_qty,0) as sy_np_qc_qty,  -- 泥坯 期初
+		   nvl(T2.sc_qc_qty,0) as sc_qc_qty,   -- 烧成  期初
+		   nvl(T2.pc_pd_qty,0) as pc_pd_qty,   -- 坯仓 盘点
+		   nvl(T2.sy_pd_qty,0) as sy_pd_qty,  -- 喷釉 盘点
+		   nvl(T2.sy_np_pd_qty,0) as sy_np_pd_qty,  -- 泥坯 盘点
+		   nvl(T2.sc_pd_qty,0) as sc_pd_qty   -- 烧成盘点
+	FROM DWIOTD.DWI_PAM_BASE_YSFJYD_JX_T T1  -- 江西一烧分级收坯数
+	FULL OUTER JOIN DWIOTD.DWI_PAM_COST_JX_INV_PD_T T2  -- 江西盘点数
+	ON NVL(T1.grade_date,'NULL') = NVL(T2.prod_date,'NULL')
+	AND NVL(T1.factory_code,'NULL') = NVL(T2.factory_code,'NULL')
+	AND NVL(T1.material_num ,'NULL') = NVL(T2.material_num,'NULL')
+  --)T1
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_PAM_COST_GCSH_T
+SELECT NVL(T1.prod_date,t2.prod_date) as prod_date,  -- 时间
+       NVL(T1.factory_code,t2.factory_code) as factory_code,  -- 工厂
+       NVL(T1.material_num ,t2.material_num) as material_num, -- 物料
+       --nvl(t1.jx_gcsh_qty,t2.jm_gcsh_qty) as gcsh_qty, -- 损耗数
+       nvl(T1.ysfj_qty,0) as jx_ysfj_qty,   -- 一烧分级
+       nvl(T1.actual_receipt_qty,0) as jx_actual_receipt_qty,  -- 实收
+       nvl(T1.pc_qc_qty,0) as jx_pc_qc_qty,  -- 坯仓 期初
+	   nvl(T1.sy_qc_qty,0) as jx_sy_qc_qty,  -- 喷釉 期初
+	   nvl(T1.sy_np_qc_qty,0) as jx_sy_np_qc_qty,  -- 泥坯 期初
+	   nvl(T1.sc_qc_qty,0) as jx_sc_qc_qty,   -- 烧成  期初
+	   nvl(T1.pc_pd_qty,0) as jx_pc_pd_qty,   -- 坯仓 盘点
+	   nvl(T1.sy_pd_qty,0) as jx_sy_pd_qty,  -- 喷釉 盘点
+	   nvl(T1.sy_np_pd_qty,0) as jx_sy_np_pd_qty,  -- 泥坯 盘点
+	   nvl(T1.sc_pd_qty,0) as jx_sc_pd_qty,   -- 烧成盘点
+	   nvl(t2.jm_qp_hg_qty,0) as jm_qp_hg_qty, -- 青坯合格数
+	   nvl(t2.jm_ysfj_qty,0) as jm_ysfj_qty,  -- 一烧分级数
+       current_timestamp() as dw_last_update_date -- 数据同步时间
+FROM jx_gcsh_data T1  -- 江西过程损耗
+FULL OUTER JOIN jm_gcsh_data T2 -- 江门过程损耗
+ON NVL(T1.prod_date,'NULL') = NVL(T2.prod_date,'NULL')
+AND NVL(T1.factory_code,'NULL') = NVL(T2.factory_code,'NULL')
+AND NVL(T1.material_num ,'NULL') = NVL(T2.material_num,'NULL');

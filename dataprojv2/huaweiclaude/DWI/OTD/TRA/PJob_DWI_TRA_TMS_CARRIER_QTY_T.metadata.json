@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_TRA_TMS_CARRIER_QTY_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/TRA",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

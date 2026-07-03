@@ -1,0 +1,61 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/19 11:27:45 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_OITT_T
+SELECT 
+'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+custcode AS customer_code, -- 客户编码
+Code, -- 上级物料
+TreeType, -- 物料清单类型
+PriceList, -- 价格清单
+Qauntity, -- 单位数量
+UseFthrWhs, -- 从上级仓库发货
+CreateDate, -- 创建日期
+UpdateDate, -- 更新日期
+Transfered, -- 延期到下一年
+DispCurr, -- 显示货币
+ToWH, -- 成品仓库
+Object, -- 对象类型
+LogInstac, -- 日志实例 - 历史记录
+UserSign2, -- 更新用户
+OcrCode, -- 分配规则
+HideComp, -- 隐藏打印中的组件
+OcrCode2, -- 分配规则 2
+OcrCode3, -- 分配规则 3
+OcrCode4, -- 分配规则 4
+OcrCode5, -- 分配规则 5
+UpdateTime, -- Time of Update
+Project, -- 项目代码
+PlAvgSize, -- 计划平均生产规模
+CURRENT_TIMESTAMP() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_OITT_1010
+UNION ALL
+SELECT 
+'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+custcode AS customer_code, -- 客户编码
+Code, -- 上级物料
+TreeType, -- 物料清单类型
+PriceList, -- 价格清单
+Qauntity, -- 单位数量
+UseFthrWhs, -- 从上级仓库发货
+CreateDate, -- 创建日期
+UpdateDate, -- 更新日期
+Transfered, -- 延期到下一年
+DispCurr, -- 显示货币
+ToWH, -- 成品仓库
+Object, -- 对象类型
+LogInstac, -- 日志实例 - 历史记录
+UserSign2, -- 更新用户
+OcrCode, -- 分配规则
+HideComp, -- 隐藏打印中的组件
+OcrCode2, -- 分配规则 2
+OcrCode3, -- 分配规则 3
+OcrCode4, -- 分配规则 4
+OcrCode5, -- 分配规则 5
+UpdateTime, -- Time of Update
+Project, -- 项目代码
+PlAvgSize, -- 计划平均生产规模
+CURRENT_TIMESTAMP() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_SW_OITT_1010;

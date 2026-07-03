@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_RQST_PAYOT_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "LTC请款单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

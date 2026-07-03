@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWI_MD_COMPANY_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/COM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

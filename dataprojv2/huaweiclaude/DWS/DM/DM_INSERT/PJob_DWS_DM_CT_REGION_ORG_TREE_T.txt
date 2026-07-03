@@ -1,0 +1,22 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/09/25 09:37:36 GMT+08:00
+-- ******************************************************************** --
+truncate dm.dm_ct_region_org_tree_t;
+insert into dm.dm_ct_region_org_tree_t
+select distinct level2_code,
+                level2,
+                level3,
+                level3_code,
+                level4,
+                level4_code,
+                level5,
+                level5_code,
+                level6,
+                level6_code,
+                level7,
+                level7_code,
+                integrate_channel_code
+from dm.ct_sales_performance_daily_t a
+where calday = to_char(current_date - 1, 'yyyyMMdd')

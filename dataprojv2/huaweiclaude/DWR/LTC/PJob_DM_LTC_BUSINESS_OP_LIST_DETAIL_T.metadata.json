@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_BUSINESS_OP_LIST_DETAIL_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "LTC商机清单明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

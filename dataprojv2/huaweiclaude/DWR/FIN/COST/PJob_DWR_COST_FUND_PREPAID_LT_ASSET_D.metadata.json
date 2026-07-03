@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_COST_FUND_PREPAID_LT_ASSET_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "资金成本-预付长期资产款",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

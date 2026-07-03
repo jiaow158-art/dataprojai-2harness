@@ -1,0 +1,498 @@
+ -- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/23 19:26:31 GMT+08:00
+-- update from chenzhiyong 20221216 新增RTM库存数据,经销商编码:('1000008551','1000008859','318109','321104')
+-- update from chenzhiyong 20230202 DM_B1_CUSTOMER_DATA_T 去重
+-- update    linw  2023-02-27 09:17  将 DM_B1_CUSTOMER_DATA_T 替换成 upload_b1_customer_data_t
+-- upadte    linw  2023-03-01 21:50  增加RTM上线时间控制
+-- update from chenzhiyong 20230309 安徽1000005469 --> 1000006985 苏沪 321540 -- > 1000004847
+-- update from chenzhiyong 20230413 此脚本作废，逻辑全迁移到HIVE层，脚本是：PJob_DWR_DEA_B1_INVENTORY_SW_T
+-- update from huangwenbin 20230527 修改客户别名：福建-->福建万艺祥
+-- update from huangwenbin 2024-04-05 修改B1数据逻辑，当库存统计日期在切换RTM上线日期之前的，数据要保留，RTM库存也只更新35天的数据
+-- ******************************************************************** --
+-- 删除数据
+DELETE FROM DM.DM_WM_B1_INVENTORY_T_D
+where "日期" IN
+(
+  select day_dt from dm.dm_dim_date_d where  day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) and day_dt >= substr(to_date('${PERIOD_ID_D}') + interval '-34 day',1,10)
+) and "日期" >'2022-05-01' and "客户别名"<>'福建万艺祥';
+---- 插入数据
+INSERT INTO DM.DM_WM_B1_INVENTORY_T_D
+with dm_b1_customer_data AS
+(
+  select cust_code customer_code ,abbreviation customer_short_name ,rtm_cust_code from  upload.upload_b1_customer_data_t where  is_main ='是'
+)
+
+,oivl as (
+	select 
+		 "docdate"
+		,"transseq"
+		,"loccode"
+		,"transtype"
+		,"itemcode"
+		,"messageid"
+		,customer_short_name 
+		,sum("inqty") "inqty"
+		,sum("outqty") "outqty" 
+		,sum("inqty")-sum("outqty")
+		,t1."customer_code"
+		,createdate 
+	from dwiotd.dwi_wm_b1_oivl_t t1 
+	join dm_b1_customer_data t3 
+	on case when t1.customer_code = '1000005469' then '1000006985' -- 安徽
+		 	when t1.customer_code = '321540' then '1000004847'  -- 苏沪
+		 else t1.customer_code end =t3.customer_code 
+	and customer_type ='SW'
+	where 1=1 
+	group by "docdate",
+			 "transseq",
+			 "loccode",
+			 "transtype",
+			 "itemcode",
+			 "messageid",
+			 customer_short_name ,
+			 t1."customer_code",
+			 createdate
+),
+ivl1 as (
+	select transseq,
+		  customer_short_name ,
+		  sum(transvalue) transvalue  
+	from dwiotd.dwi_wm_b1_ivl1_t  t1 
+	join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	group by transseq,
+			customer_short_name 
+),
+oitm as (
+	select itemcode,
+		   itemname,
+		   codebars,
+		   frgnname,
+		   suppcatnum,
+		   invntryuom,
+		   cardcode,
+		   itmsgrpcod,
+		   firmcode,
+		   slength1,
+		   swidth1,
+		   customer_short_name
+	  from dwiotd.dwi_wm_b1_oitm_t t1 
+	  join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	  
+-- 	  and ( (t1.customer_code='319678' and t1.itmsgrpcod in('101','103'))  -- 新疆
+-- 	  or (t1.customer_code='353852' AND t1.itmsgrpcod in ('104','108'))
+-- 	  or (t1.customer_code='315762' AND t1.itmsgrpcod in ('101','102'))
+-- 	  or (t1.customer_code='310603' AND t1.itmsgrpcod in ('101','103')))
+	  group by itemcode,
+			   itemname,
+			   codebars,
+			   frgnname,
+			   suppcatnum,
+			   invntryuom,
+			   cardcode,
+			   itmsgrpcod,
+			   firmcode,
+			   slength1,
+			   swidth1,
+			   customer_short_name
+
+-- 去掉过滤条件2022-07-18
+-- 	union all 
+-- 	select itemcode,
+-- 		   itemname,
+-- 		   codebars,
+-- 		   frgnname,
+-- 		   suppcatnum,
+-- 		   invntryuom,
+-- 		   cardcode,
+-- 		   itmsgrpcod,
+-- 		   firmcode,
+-- 		   slength1,
+-- 		   swidth1,
+-- 		   customer_short_name
+-- 	  from dwiotd.dwi_wm_b1_oitm_t t1 
+-- 	  join dm.dm_b1_customer_data_t t2 
+-- 	  on t1.customer_code =t2.customer_code 
+-- 	  and t2.customer_type ='SW' 
+-- 	  and t2.customer_flag ='N'
+-- 	  and t1.customer_code not in ('319678','353852','315762','310603') 
+-- 	  and t1.customer_type=t2.customer_type
+-- 	  group by itemcode,
+-- 			  itemname,
+-- 			  codebars,
+-- 			  frgnname,
+-- 			  suppcatnum,
+-- 			  invntryuom,
+-- 			  cardcode,
+-- 			  itmsgrpcod,
+-- 			  firmcode,
+-- 			  slength1,
+-- 			  swidth1,
+-- 			  customer_short_name
+), 
+oitb as (
+	select itmsgrpcod,
+		  itmsgrpnam,
+		  customer_short_name  
+	from dwiotd.dwi_wm_b1_oitb_t t1 
+	join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	group by itmsgrpcod,
+			 itmsgrpnam,
+			 customer_short_name
+),
+omrc as (
+	select firmcode,
+		   firmname,
+		   customer_short_name  
+	from dwiotd.dwi_wm_b1_omrc_t  t1 
+	join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	group by  firmcode,
+			  firmname,
+			  customer_short_name 
+), 
+oilm as (
+	select messageid,
+		   effectqty,
+		   bpcardcode,
+		   customer_short_name  
+	from dwiotd.dwi_wm_b1_oilm_t t1 
+	join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	 group by messageid,
+			  effectqty,
+			  bpcardcode,
+			  customer_short_name 
+) ,
+ocrd as (
+	select cardcode,
+		   cardname,
+		   customer_short_name  
+	from dwiotd.dwi_wm_b1_ocrd_t t1 
+	join dm_b1_customer_data t2 
+	on case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code 
+	and customer_type ='SW'
+	 group by cardcode,
+			  cardname,
+			  customer_short_name 
+)
+, dt as (
+select day_dt from dm.dm_dim_date_d where  day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) and day_dt >= substr(to_date('${PERIOD_ID_D}') + interval '-34 day',1,10)
+) 
+,pdn1 AS (
+	 select   
+		 t2.customer_short_name
+		,t3.itemcode
+		,t3.dscription
+		,substr(dt.day_dt,1,10) day_dt
+		,t1.docdate
+		,row_number() over(partition by  t2.customer_short_name,t3.itemcode,dt.day_dt order by substr(t1.docdate,1,10)  desc ) rk 
+	 from DWIOTD.DWI_WM_b1_OPDN_T t1  
+	 join dm_b1_customer_data t2 on  case when t1.customer_code = '1000005469' then '1000006985'
+		 	when t1.customer_code = '321540' then '1000004847'
+		 else t1.customer_code end =t2.customer_code and customer_type ='SW'
+	 join DWIOTD.DWI_WM_b1_PDN1_T t3 on t1.customer_code =t3.customer_code and t1.docentry =t3.docentry
+	 join  dt on 1=1 
+	 where 1=1  
+	 and t1.docdate<=dt.day_dt
+--	 and t1.docdate <=SUBSTR('${dateformat(yyyy-MM-dd,-1,DAY)}',1,10)  -- 数据从6月1日起. 往前的通过手工表初始化
+)
+,tmp1 as (
+		  select 
+		       dt.day_dt,
+			   case when t0.docdate< dt.day_dt then 'qc' 
+					when t0.docdate  >=  dt.day_dt and  t0.docdate< substr(to_date(dt.day_dt ) + interval '+1 day',1,10)then 'qj' 
+					else 'qm'  end as dttype,       
+				t0.itemcode,
+				-- t2.itemname,
+				t2.codebars,
+				t2.frgnname,
+				t2.suppcatnum,
+				t2.invntryuom,
+				t3.itmsgrpnam,
+				t4.firmname,
+				t7.cardcode,
+				t7.cardname,
+				t0.inqty,
+				t0.outqty,       
+				case when nvl(t1.transvalue,0.0)>0.0 then t1.transvalue 
+					 else 0.0 
+				end as inlinebalance,       
+				case when nvl(t1.transvalue,0.0)<0.0 then -t1.transvalue 
+					 else 0.0 
+				end as outlinebalance,	       
+				case when (t0.transtype=18 or t0.transtype=20) then t0.inqty 
+					 else 0.0 
+				end as puch_inqty,        
+				case when (t0.transtype=14 or t0.transtype=16) then t0.inqty 
+					else 0.0
+				end as sale_inqty,       
+				case when nvl(t1.transvalue,0.0)>=0.0 and t0.transtype<>18 and t0.transtype<>20 and t0.transtype<>14 and t0.transtype<>16 then t0.inqty 
+					else 0.0 
+				end as other_inqty,        
+				case when (t0.transtype=19 or t0.transtype=21) then t0.outqty 
+					else 0.0 
+				end as puch_outqty,        
+				case when (t0.transtype=13 or t0.transtype=15) then t0.outqty 
+					else 0.0 
+				end as sale_outqty,       
+				case when nvl(t1.transvalue,0.0)<=0.0 and t0.transtype<>19 and t0.transtype<>21 and t0.transtype<>13 and t0.transtype<>15 then t0.outqty 
+					else 0.0 
+				end as other_outqty,     
+				t1.transvalue as linebalance,
+				t0.loccode as loccode ,
+				t0.customer_short_name      
+		from oivl t0  
+		inner join ivl1 t1 on t0.transseq = t1.transseq  and t0.customer_short_name = t1.customer_short_name         
+		inner join oitm t2  on t0.itemcode = t2.itemcode  and t0.customer_short_name = t2.customer_short_name      
+		inner join oitb t3  on t2.itmsgrpcod=t3.itmsgrpcod  and t2.customer_short_name = t3.customer_short_name
+		inner join omrc t4  on t2.firmcode=t4.firmcode    and t2.customer_short_name = t4.customer_short_name
+		left join oilm t5 on nvl(t0.messageid,'') = nvl(t5.messageid,'') and nvl(t5.effectqty,0.0)<>0.0      and t0.customer_short_name = t5.customer_short_name
+		left join ocrd t6 on nvl(t5.bpcardcode,'') = nvl(t6.cardcode,'')    and t5.customer_short_name = t6.customer_short_name   
+		left join ocrd t7 on nvl(t2.cardcode,'')=nvl(t7.cardcode,'')        and t2.customer_short_name = t7.customer_short_name 
+	    join dt on 1=1 
+)
+,tmp as (
+    select 
+     t.day_dt
+    ,t.dttype
+    ,t.itemcode
+    -- ,t.itemname
+    ,t.codebars
+    ,t.frgnname
+    ,t.suppcatnum
+    ,t.invntryuom
+    ,t.itmsgrpnam
+    ,t.firmname
+    ,t.loccode
+    ,t.cardcode
+    ,t.cardname
+    , t.customer_short_name
+    ,sum(case when t.dttype='qc' then nvl(t.inqty,0.0) else 0.0 end) as qcinqty
+    ,sum(case when t.dttype='qj' then nvl(t.inqty,0.0) else 0.0 end) as qjinqty
+    ,sum(case when t.dttype='qm' then nvl(t.inqty,0.0) else 0.0 end) as qminqty
+    ,sum(case when t.dttype='qc' then nvl(t.outqty,0.0) else 0.0 end) as qcoutqty
+    ,sum(case when t.dttype='qj' then nvl(t.outqty,0.0) else 0.0 end) as qjoutqty
+    ,sum(case when t.dttype='qm' then nvl(t.outqty,0.0) else 0.0 end) as qmoutqty
+    ,sum(case when t.dttype='qj' then nvl(t.inlinebalance,0.0) else 0.0 end )as qjinlinebalance
+    ,sum(case when t.dttype='qj' then nvl(t.outlinebalance,0.0) else 0.0 end) as qjoutlinebalance
+    ,sum(case when t.dttype='qc' then nvl(t.linebalance,0.0) else 0.0 end) as qclinebalance
+    ,sum(case when t.dttype='qj' then nvl(t.linebalance,0.0) else 0.0 end) as qjlinebalance
+    ,sum(case when t.dttype='qm' then nvl(t.linebalance,0.0) else 0.0 end) as qmlinebalance
+    ,sum(case when t.dttype='qj' then nvl(t.puch_inqty,0.0) else 0.0 end) as qjpuch_inqty
+    ,sum(case when t.dttype='qj' then nvl(t.sale_inqty,0.0) else 0.0 end) as qjsale_inqty
+    ,sum(case when t.dttype='qj' then nvl(t.other_inqty,0.0) else 0.0 end) as qjother_inqty
+    ,sum(case when t.dttype='qj' then nvl(t.puch_outqty,0.0) else 0.0 end)as qjpuch_outqty
+    ,sum(case when t.dttype='qj' then nvl(t.sale_outqty,0.0) else 0.0 end) as qjsale_outqty
+    ,sum(case when t.dttype='qj' then nvl(t.other_outqty,0.0) else 0.0 end) as qjother_outqty
+      from tmp1 t  
+	   group by t.itemcode,
+				-- t.itemname,
+				t.codebars,
+				t.frgnname,
+				t.suppcatnum,
+				t.invntryuom,
+				t.itmsgrpnam,
+				t.firmname,
+				t.loccode,
+				t.cardcode,
+				t.cardname,
+				t.customer_short_name,
+				t.dttype,
+				t.day_dt
+),
+DM_WM_B1_INVENTORY_T_D_DATA AS(
+select  
+	 tt.day_dt as  "日期"
+	,tt.customer_short_name 
+	,tt.itemcode     "物料编码"
+	,t4.itemname     "物料描述"
+	,t5.material_type 分类
+	,t5.product_class 品类
+	,t5.analyze_product_class 分析品类
+	,sum(nvl(tt.qcinqty,0.0))-sum(nvl(tt.qcoutqty,0.0)) as "期初数量"
+	,sum(nvl(tt.qjinqty,0.0)) as "本期入库"
+	,sum(nvl(tt.qjpuch_inqty,0.0)) as "期间采购收货数量"
+	,sum(nvl(tt.qjsale_inqty,0.0)) as "期间销售退货数量"
+	,sum(nvl(tt.qjother_inqty,0.0)) as "期间其他入库数量"
+	,sum(nvl(tt.qjpuch_outqty,0.0)) as "期间采购退货数量"
+	,sum(nvl(tt.qjoutqty,0.0)) as "本期出库"
+	,sum(nvl(tt.qjsale_outqty,0.0)) as "期间销售出库数量"
+	,sum(nvl(tt.qjother_outqty,0.0)) as "期间其他出库数量"
+	,(sum(nvl(tt.qcinqty,0.0))-sum(nvl(tt.qcoutqty,0.0)))+(sum(nvl(tt.qjinqty,0.0))-sum(nvl(tt.qjoutqty,0.0))) as "期末数量"
+	,sum(nvl(tt.qjinqty,0.0))-sum(nvl(tt.qjoutqty,0.0)) as "期间发生"
+	,sum(nvl(tt.qclinebalance,0)) as "期初金额"
+	,sum(nvl(tt.qjinlinebalance,0.0)) as "本期入库金额"
+	,sum(nvl(tt.qjoutlinebalance,0.0)) as "本期出库金额"
+	,sum(nvl(tt.qclinebalance,0.0))+sum(nvl(tt.qjlinebalance,0.0)) as "期末金额"
+	,sum(nvl(tt.qjlinebalance,0.0)) as "本期发生金额"
+	,t8.docdate "最末入库日期"
+	,t9.material_id "物料ID"
+    ,t9.material_name "SAP物料名称"
+    ,t9.matl_type_code "SAP物料类型"
+    ,t9.matl_type_name "SAP物料类型名称"
+    ,t9.product_group_code "SAP产品组"
+    ,t9.product_group_name "SAP产品组名称"
+    ,t9.product_classify_code    "SAP产品分级"
+    ,t9.product_classify_name    "SAP产品分级名称"
+    ,t9.product_level_code       "SAP层次代码"
+    ,t9.product_level_name       "SAP层次名称"
+    ,t9.product_level1_code      "SAP层次1"
+    ,t9.product_level1_name      "SAP层次1名称"
+    ,t9.product_level2_code      "SAP层次2"
+    ,t9.product_level2_name      "SAP层次2名称"
+    ,t9.product_level3_code      "SAP层次3"
+    ,t9.product_level3_name      "SAP层次3名称"
+    ,t9.product_level4_code      "SAP层次4"
+    ,t9.product_level4_name      "SAP层次4名称"
+	,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	,'' as "体积"
+	,tt.loccode as "库存地点"
+from  tmp  tt 
+    join oitm t4  on tt.itemcode=t4.itemcode AND tt.customer_short_name  =t4.customer_short_name 
+    left join  upload.upload_vm_b1_inv_cate_match_t  t5 on tt.itemcode = t5.material_num
+    left join  dm.dm_rpt_bi0_pmaterial_t t6 on tt.itemcode = t6."MATERIAL" 
+    left join  DM.DM_RPT_PROD_CATEGORY_T t7 on tt.itemcode = t7."prod_level3_code" 
+    left join pdn1 t8 on t4.itemcode=t8.itemcode AND t4.customer_short_name  =t8.customer_short_name and tt.day_dt = t8.day_dt and rk = 1 
+    left join dwimd.dwi_md_data_material_general_t t9 on tt.itemcode = t9.material_num 
+group by  tt.customer_short_name ,
+		  tt.itemcode,
+		  t4.itemname,
+		  t5.material_type,
+		  t5.product_class ,
+		  t5.analyze_product_class ,
+		  t8.docdate,
+		  t9.material_id ,
+          t9.material_name ,
+          t9.matl_type_code ,
+          t9.matl_type_name ,
+          t9.product_group_code ,
+          t9.product_group_name ,
+          t9.product_classify_code  ,
+          t9.product_classify_name ,
+          t9.product_level_code ,
+          t9.product_level_name ,
+          t9.product_level1_code ,
+          t9.product_level1_name ,
+          t9.product_level2_code ,
+          t9.product_level2_name ,
+          t9.product_level3_code ,
+          t9.product_level3_name ,
+          t9.product_level4_code ,
+          t9.product_level4_name ,
+          tt.day_dt ,
+          tt.loccode
+)
+select 日期,customer_short_name,物料编码,物料描述,分类,品类,分析品类,
+       期初数量,本期入库,期间采购收货数量,期间销售退货数量,期间其他入库数量,期间采购退货数量,
+       本期出库,期间销售出库数量,期间其他出库数量,期末数量,期间发生,期初金额,本期入库金额,本期出库金额,期末金额,
+       本期发生金额,
+       substring(cast(最末入库日期 as varchar),1,10) 最末入库日期,
+       "物料ID",
+       "SAP物料名称","SAP物料类型","SAP物料类型名称","SAP产品组","SAP产品组名称","SAP产品分级",
+       "SAP产品分级名称","SAP层次代码","SAP层次名称","SAP层次1","SAP层次1名称","SAP层次2","SAP层次2名称",
+       "SAP层次3","SAP层次3名称","SAP层次4","SAP层次4名称",CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE,"体积","库存地点"
+FROM DM_WM_B1_INVENTORY_T_D_DATA t1 
+join upload.upload_b1_customer_data_t t2 
+on t1.customer_short_name = t2.abbreviation 
+--没上RTM的经销商或者RTM上线日期大于库存日期
+and is_main = '是'  and (is_rtm = 'N' or is_rtm is null or substr(rtm_online_date,1,10) > 日期)
+UNION all
+SELECT 日期,customer_short_name as 客户别名,物料编码,物料描述,分类,品类,分析品类,
+       期初数量,本期入库,期间采购收货数量,期间销售退货数量,期间其他入库数量,期间采购退货数量,
+       本期出库,期间销售出库数量,期间其他出库数量,期末数量,期间发生,期初金额,本期入库金额,本期出库金额,期末金额,
+       本期发生金额,
+       最末入库日期,
+       物料ID,
+       SAP物料名称,SAP物料类型,SAP物料类型名称,SAP产品组,SAP产品组名称,SAP产品分级,
+       SAP产品分级名称,SAP层次代码,SAP层次名称,SAP层次1,SAP层次1名称,SAP层次2,SAP层次2名称,
+       SAP层次3,SAP层次3名称,SAP层次4,SAP层次4名称,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE,体积,warehouse_code as "库存地点"
+FROM DWROTD.DWR_WM_RTM_INVENTORY_SW_T_D
+WHERE 日期 IN
+(
+  select day_dt from dm.dm_dim_date_d where day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) and day_dt >= substr(to_date('${PERIOD_ID_D}') + interval '-34 day',1,10)
+)
+;
+   
+         
+     
+
+DELETE FROM DM.DM_WM_B1_INVENTORY_T_D where 日期 in (select max(库存月份) 日期 from upload.upload_wm_b1_inventory_sw_t where 运营中心 = '福建万艺祥') and 客户别名 = '福建万艺祥';
+
+INSERT INTO DM.DM_WM_B1_INVENTORY_T_D
+select  
+	 tt.库存月份  日期
+	,tt.运营中心 客户别名
+	,tt.物料编码
+	,tt.物料名称
+	,t5.material_type 分类
+	,t5.product_class 品类
+	,t5.analyze_product_class 分析品类
+	,期初数量
+	,本期入库
+	,期间采购收货数量
+	,期间销售退货数量
+	,期间其他入库数量
+	,期间采购退货数量
+	,本期出库
+	,期间销售出库数量
+	,期间其他出库数量
+	,期末数量
+	,期间发生
+	,期初金额
+	,本期入库金额
+	,本期出库金额
+	,期末金额
+	,本期发生金额
+	,NULL 最末入库日期
+	,t9.material_id "物料ID"
+    ,t9.material_name "SAP物料名称"
+    ,t9.matl_type_code "SAP物料类型"
+    ,t9.matl_type_name "SAP物料类型名称"
+    ,t9.product_group_code "SAP产品组"
+    ,t9.product_group_name "SAP产品组名称"
+    ,t9.product_classify_code    "SAP产品分级"
+    ,t9.product_classify_name    "SAP产品分级名称"
+    ,t9.product_level_code       "SAP层次代码"
+    ,t9.product_level_name       "SAP层次名称"
+    ,t9.product_level1_code      "SAP层次1"
+    ,t9.product_level1_name      "SAP层次1名称"
+    ,t9.product_level2_code      "SAP层次2"
+    ,t9.product_level2_name      "SAP层次2名称"
+    ,t9.product_level3_code      "SAP层次3"
+    ,t9.product_level3_name      "SAP层次3名称"
+    ,t9.product_level4_code      "SAP层次4"
+    ,t9.product_level4_name      "SAP层次4名称"
+	,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	,本期出库体积
+	,null "库存地点"
+from  upload.upload_wm_b1_inventory_sw_t   tt 
+    left join  upload.upload_vm_b1_inv_cate_match_t  t5 on tt.物料编码 = t5.material_num
+    left join  dm.dm_rpt_bi0_pmaterial_t t6 on tt.物料编码 = t6."MATERIAL" 
+    left join  DM.DM_RPT_PROD_CATEGORY_T t7 on tt.物料编码 = t7."prod_level3_code" 
+    left join dwimd.dwi_md_data_material_general_t t9 on tt.物料编码 = t9.material_num 
+   where tt.库存月份 in (select max(库存月份) 日期 from upload.upload_wm_b1_inventory_sw_t where 运营中心 = '福建万艺祥')
+    
+          
+         

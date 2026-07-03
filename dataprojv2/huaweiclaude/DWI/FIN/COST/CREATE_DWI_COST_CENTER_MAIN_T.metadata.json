@@ -1,0 +1,8 @@
+{
+    "name": "CREATE_DWI_COST_CENTER_MAIN_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/COST",
+    "description": "建表脚本",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

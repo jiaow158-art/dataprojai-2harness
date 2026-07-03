@@ -1,0 +1,39 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004363
+-- create time: 2023/03/17 14:39:37 GMT+08:00
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DM.DM_LTC_business_COST_FLOW_T
+select 
+        bcf.business_id --商机ID
+        ,bcf.business_code  --商机编码
+        ,bcf.cost_type --费用类型
+        ,bla2.meaning as  cost_type_TEXT                  --费用类型描述
+        ,bcf.payment_method --支付方式
+        ,bla1.meaning as  payment_method_TEXT                  --报备费支付方式描述
+        ,bcf.is_wx_pay --是否微信支付
+        ,bcf.payment_flow_code --支付流水号
+        ,bcf.amount --金额
+        ,bcf.pay_status --支付状态
+        ,bcf.voucher_code --凭证号
+        ,bcf.refund_voucher_code -- 退款凭证号
+        ,bcf.confiscate_voucher_code --没收凭证号
+        ,bcf.cost_center --成本中心
+        ,bcf.cost_center_code --成本中心编码
+        ,current_timestamp() as DW_LAST_UPDATE_DATE --最后更新日期
+        ,BO.division                    --事业部编码
+        ,case BO.division 
+            when 'BATHROOM_DIVISION' then '卫浴事业部'
+            when 'CERAMIC_TILE_DIVISION' then '瓷砖事业部' 
+            when 'HOUSEHOLD_DIVISION' then '家居事业部' 
+            when 'NEW_ECOLOGICAL_TIMBER_DIVISION' then '生态新材事业部' 
+            else '其他'
+        end                         as business_dept                -- 事业部
+        from STG.STG_BUSINESS_COST_FLOW_1033 bcf
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla1 on bla1.lookup_code = bcf.payment_method and bla1.lookup_type = 'PAY_TYPE' 
+                                              and bla1.enabled_flag = 'Y' and bla1.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla2 on bla2.lookup_code = bcf.cost_type and bla2.lookup_type = 'COST_TYPE' 
+                                              and bla2.enabled_flag = 'Y' and bla2.system_code = 'LTC'
+join SDI.SDI_BUSINESS_OPPORTUNITY_1033 bo on bo.business_code = bcf.business_code                                              
+        order by business_code

@@ -1,0 +1,32 @@
+
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_FP_FUND_CENTER_TMP
+(ENABLE_END_DATE                  TIMESTAMP,                     
+FUND_CENTER_CODE                  VARCHAR(500),                  
+FINANCIAL_MANAGEMENT_SCOPE        VARCHAR(500),                  
+GROUP_NUM                         VARCHAR(500),                  
+INPUT_DATE                        TIMESTAMP,                     
+LAST_UPDATE_DATE                  VARCHAR(500),                  
+CREATER_NAME                      VARCHAR(500),                  
+ENABLE_START_DATE                 TIMESTAMP,                     
+LAST_MODIFIER_ID                  VARCHAR(500),                  
+OWNER_ID                          VARCHAR(500),                  
+OBJECT_NUM                        VARCHAR(500),                  
+OWNER_NAME                        VARCHAR(500),                  
+DEL_FLAG                          VARCHAR(500),                  
+DW_LAST_UPDATE_DATE               TIMESTAMP);                    
+
+COMMENT  ON TABLE   DWRFIN.DWR_FP_FUND_CENTER_TMP	                            IS  '基金中心';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.ENABLE_END_DATE             IS  'FM：有效至';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.FUND_CENTER_CODE            IS  '基金中心';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.FINANCIAL_MANAGEMENT_SCOPE  IS  '财务管理范围';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.GROUP_NUM                   IS  '集团';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.INPUT_DATE                  IS  'FIFM: 输入日期';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.LAST_UPDATE_DATE            IS  'FM: 修改于';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.CREATER_NAME                IS  'FM: 创建于';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.ENABLE_START_DATE           IS  'FM：有效期始于';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.LAST_MODIFIER_ID            IS  'FM：进行最后一次修改的人名';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.OWNER_ID                    IS  '在组织模式中的资金中心管理者';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.OBJECT_NUM                  IS  '对象号';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.OWNER_NAME                  IS  '负责人的姓名';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.DEL_FLAG                    IS  '删除标识';
+COMMENT  ON COLUMN  DWRFIN.DWR_FP_FUND_CENTER_TMP.DW_LAST_UPDATE_DATE         IS  'DW最后更新日期';

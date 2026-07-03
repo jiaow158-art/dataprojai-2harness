@@ -1,0 +1,36 @@
+DELETE FROM
+  DWRFIN.DWR_PRC_PROD_PRICE_F;
+INSERT INTO
+  DWRFIN.DWR_PRC_PROD_PRICE_F 
+SELECT 
+  TMP.GROUP_NUM,               
+  TMP.CONDITION_RECORD_NUM,    
+  TMP.SRC_SYS_START_DATE,      
+  TMP.START_DATE,              
+  TMP.END_DATE,                
+  TMP.APPLICATION_PROGRAM_CODE,
+  TMP.CONDITION_TYPE,          
+  TMP.APPROVAL_STATUS_CODE,    
+  TMP.PRICE_TREATMENT_STATUS,  
+  TMP.SALE_OFFICE_CODE,        
+  TMP.SALE_OFFICE_NAME,        
+  TMP.SALE_ORG_CODE,           
+  TMP.SALE_ORG_NAME,           
+  TMP.DIS_CHANNEL_CODE,        
+  TMP.DIS_CHANNEL_NAME,        
+  TMP.FACTORY_ID,              
+  TMP.FACTORY_CODE,            
+  TMP.FACTORY_NAME,            
+  TMP.PAYER_ID,                
+  TMP.CUST_ID,                 
+  TMP.CUST_NUM,                
+  TMP.CUST_NAME,               
+  TMP.MATERIAL_ID,             
+  TMP.MATERIAL_NUM,            
+  TMP.MATERIAL_NAME,           
+  TMP.CUST_PRICE_GROUP,        
+  TMP.SOURCE_TYPE,             
+  TMP.SOURCE_DESC,             
+  TMP.DEL_FLAG,                
+  TMP.DW_LAST_UPDATE_DATE     
+FROM  DWRFIN.DWR_PRC_PROD_PRICE_TMP TMP;

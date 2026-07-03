@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_HR_OUTSOURCE_SETTLEMENT_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/HR",
+    "description": "外包结算单报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

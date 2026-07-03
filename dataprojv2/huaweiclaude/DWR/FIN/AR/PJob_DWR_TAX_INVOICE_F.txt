@@ -1,0 +1,41 @@
+INSERT OVERWRITE TABLE DWRFIN.DWR_TAX_INVOICE_F            --税票表
+SELECT
+S.GROUP_NUM                   AS             GROUP_NUM,
+S.COMPANY_ID                  AS             COMPANY_ID,
+S.COMPANY_CODE                AS             COMPANY_CODE,
+COM.COMPANY_NAME              AS             COMPANY_NAME,
+S.BILL_VOUCHER_NUM            AS             BILL_VOUCHER_NUM,
+S.TAX_NUM                     AS             TAX_NUM,
+S.ORDER_NUM                   AS             ORDER_NUM,
+S.OCEAN_BILL_LADING_NUM       AS             OCEAN_BILL_LADING_NUM,
+S.CUST_ID                     AS             CUST_ID,
+S.CUST_NUM                    AS             CUST_NUM,
+CUS.NAME_1                    AS             CUST_NAME,
+S.DOC_CURRENCY_TAX_AMT        AS             DOC_CURRENCY_TAX_AMT,
+S.BILL_ITEM_NUM               AS             BILL_ITEM_NUM,
+S.CUSTOMS_DECLARATION_NUM     AS             CUSTOMS_DECLARATION_NUM,
+S.PRINTING_DATE               AS             PRINTING_DATE,
+S.DEMO_DESC                   AS             DEMO_DESC,
+S.SAP_INVOICE_ISSUE_DATE2     AS             SAP_INVOICE_ISSUE_DATE2,
+S.SAP_INVOICE_ISSUE_DATE      AS             SAP_INVOICE_ISSUE_DATE,
+S.INPUT_NAME                  AS             INPUT_NAME,
+S.NET_VALUE_AMT               AS             NET_VALUE_AMT,
+S.INVOICE_STATUS              AS             INVOICE_STATUS,
+S.TAX_TYPE                    AS             TAX_TYPE,
+S.BILL_LADING_DATE            AS             BILL_LADING_DATE,
+S.TAX_INVOICE_TEXT_NUM        AS             TAX_INVOICE_TEXT_NUM,
+S.PRINTING_TIME               AS             PRINTING_TIME,
+S.TOTAL_NET_VALUE_AMT         AS             TOTAL_NET_VALUE_AMT,
+S.DEL_FLAG                    AS             DEL_FLAG,
+CURRENT_TIMESTAMP()           AS             DW_LAST_UPDATE_DATE
+FROM DWIFIN.DWI_TAX_INVOICE_T S
+INNER JOIN DWIMD.DWI_MD_COMPANY_T COM   --关联公司主数据
+ON  COM.COMPANY_ID = S.COMPANY_ID 
+AND COM.END_DATE ='4712-12-31' 
+AND COM.GROUP_NUM = S.GROUP_NUM 
+AND COM.DEL_FLAG = 'N' 
+INNER JOIN DWIMD.DWI_MD_CUST_GENERAL_T CUS   --关联客户主数据
+ON  S.CUST_ID = CUS.CUST_ID 
+AND CUS.END_DATE ='4712-12-31' 
+AND CUS.GROUP_NUM = S.GROUP_NUM 
+AND CUS.DEL_FLAG = 'N' 

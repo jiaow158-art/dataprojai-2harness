@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_TAX_INVOICE_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/TAX",
+    "description": "税票主表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

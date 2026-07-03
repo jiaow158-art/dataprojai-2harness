@@ -1,0 +1,61 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：应收账龄 DWRFIN.DWR_AR_RECEIVABLE_AGING_F
+-- 需求人：霍碧琪、林威
+-- create time: 2023/04/18 13:47:18 GMT+08:00
+-- update：2023/04/19 guzhengfeng 新增参数PERIOD_ID_D1
+-- update：2023/06/28 guzhengfeng 修改删数逻辑
+-- update：2023/09/11 guzhengfeng 统一传参格式为：yyyy-MM-dd
+-- update：2023/10/11 guzhengfeng 月结1-5号跑上月月底的数据
+-- update：2023/10/25 guzhengfeng 修改删数逻辑
+-- update：2023/10/26 guzhengfeng 新增字段订单组编码so_group_code
+-- update：2023/11/02 ZHANGPENG 修改删数逻辑
+-- update：2023/11/04 ZHANGPENG 月结1-3号跑上月月底的数据
+-- update: 20240524 zhz 新增客户组、销售人员
+-- UPDATE: 20240905 ZHZ 修改月结3号不自动跑上月数
+-- UPDATE: 20250218 wjh 新增自然账龄字段
+-- ******************************************************************** --
+DELETE FROM DWRFIN.DWR_AR_RECEIVABLE_AGING_F 
+WHERE query_date in (SELECT CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) END                        -- 当月月结2-5日传上月月底
+                        UNION ALL
+                        SELECT '${PERIOD_ID_D}'     -- 昨天
+                        UNION ALL
+                        SELECT substr(to_date('${PERIOD_ID_D}','yyyy-MM-dd') - 1,1,10)  -- 前天
+);
+INSERT INTO DWRFIN.DWR_AR_RECEIVABLE_AGING_F
+SELECT
+    query_date
+    ,comp_code
+    ,cust_code
+    ,cust_name
+    ,sales_group_master_file
+    ,wbs
+    ,wbs_sales_group
+    ,special_general_ledger
+    ,general_ledger_account
+    ,currency
+    ,local_currency_balance_sum
+    ,repay_amt
+    ,overdue_receivables
+    ,overdue_receivables_1_90
+    ,overdue_receivables_91_275
+    ,overdue_receivables_276_730
+    ,overdue_receivables_731_1460
+    ,overdue_receivables_1461
+    ,business_department
+    ,dw_last_update_date
+	,so_group_code
+	,cust_grp_code
+	,sales_emp_code
+	,NATURAL_RECEIVABLES_1_90
+	,NATURAL_RECEIVABLES_91_180
+	,NATURAL_RECEIVABLES_181_275
+	,NATURAL_RECEIVABLES_276_365
+	,NATURAL_RECEIVABLES_366_730
+	,NATURAL_RECEIVABLES_731_1095
+	,NATURAL_RECEIVABLES_1095_1460
+	,NATURAL_RECEIVABLES_1461
+FROM DWRFIN.DWR_AR_RECEIVABLE_AGING_F_01
+WHERE query_date = CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END
+;

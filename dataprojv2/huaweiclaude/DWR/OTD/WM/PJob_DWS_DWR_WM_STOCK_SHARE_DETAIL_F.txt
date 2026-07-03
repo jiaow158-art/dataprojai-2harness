@@ -1,0 +1,66 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/04/19 09:42:20 GMT+08:00
+-- update：2023/04/19 yueyuzhan 新增面积、区域字段 area_m2 、region
+-- update：2023/04/19 guzhengfeng 更新逻辑：客编长度不足10，用0补齐，增加对客编321991的区域取值判断
+-- ******************************************************************** --
+TRUNCATE TABLE dwrotd.dwr_wm_stock_share_detail_f;
+INSERT INTO dwrotd.dwr_wm_stock_share_detail_f(
+	customer_type
+	,customer_code
+	,customer_name_cn
+	,material_num
+	,material_name
+	,batch_num
+	,doc_date
+	,instock_qty
+	,outstock_qty
+	,total_instock_qty
+	,now_stock_qty
+	,now_fare_stock_qty
+	,dw_last_update_date
+	,area_m2
+	,region
+)
+SELECT
+	T.customer_type
+	,T.customer_code
+	,T.customer_name_cn
+	,T.material_num
+	,T.material_name
+	,T.batch_num
+	,T.doc_date
+	,T.instock_qty
+	,T.outstock_qty
+	,T.total_instock_qty
+	,T.now_stock_qty
+	,T.now_fare_stock_qty
+	,T.dw_last_update_date
+	,T.area_m2
+	,case when T.customer_code = '321991' then '华南运营中心' 
+	        else T1.region
+	   end region
+FROM dwrotd.dwr_wm_stock_share_detail_f_01 T
+LEFT JOIN 
+(
+select t.kunnr,
+	   t.region,
+	   t.name1,
+	   t.freeze,
+	   t.rn
+ from(
+ select distinct t.KUNNR as kunnr
+	        ,case when t.BZIRK = 'B00018' then t1.subcompany_big_area_name
+	          else t.bzirk_name end as region
+			,name1
+	        ,t.freeze
+	        ,row_number() over(partition by t.KUNNR order by nvl(t.freeze,1) asc) rn
+	from DWIPI.DWI_WF_ZSD_ZMKB_T t
+	left join dwrfin.dwr_gl_sales_group_v T1
+	on t.vkgrp = t1.sales_group
+	WHERE (t.BZIRK LIKE 'S%' OR t.BZIRK = 'B00018') 
+	) t
+	where rn = 1
+) T1
+ON lpad(T.customer_code,10,'0') = T1.kunnr

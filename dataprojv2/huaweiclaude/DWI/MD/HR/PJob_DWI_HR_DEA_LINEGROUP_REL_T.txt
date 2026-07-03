@@ -1,0 +1,85 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/02 14:45:41 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_HR_DEA_LINEGROUP_REL_T	-- 经销商所属线组及业务员关系表
+SELECT   A.KUNNR  				AS CUST_NUM					-- 客户编号
+        ,B.NAME1  				AS CUST_NAME				-- 客户名称
+        ,A.VKORG  				AS SALES_ORG_CODE			-- 销售组织编码
+        ,C.VTEXT  				AS SALES_ORG_NAME			-- 销售组织名称		   
+        ,A.VTWEG  				AS DISTRIBUTION_CHNL_CODE	-- 分销渠道编码
+        ,D.VTEXT  				AS DISTRIBUTION_CHNL_NAME	-- 分销渠道名称		   
+        ,A.SPART  				AS PRODUCT_GROUP_CODE		-- 产品组编码		   
+        ,A.BZIRK  				AS SALE_REGION_CODE			-- 销售地区编码
+        ,E.BZTXT  				AS SALE_REGION_NAME			-- 销售地区名称		   
+        ,A.VKBUR  				AS SALES_OFFICE_CODE		-- 销售办事处编码
+        ,F.BEZEI  				AS SALES_OFFICE_NAME		-- 销售办事处名称		   
+        ,A.VKGRP  				AS LINE_GROUP_CODE			-- 线组编码
+        ,G.BEZEI  				AS LINE_GROUP_NAME			-- 线组名称
+        ,H.PERNR  				AS EMP_NUM				 	-- 人员编号
+        ,I.ENAME  				AS EMP_NAME					-- 员工或申请人的格式姓名
+		,'N'					AS DEL_FLAG					-- 删除标识
+		,CURRENT_TIMESTAMP 		AS DW_LAST_UPDATE_DATE 		-- 同步数据时间
+		,B.LAND1 				AS COUNTRY_REGION_CODE		-- 国家/地区代码
+	    ,B.REGIO 				AS REGION_CODE				-- 地区编码（省/自治区/直辖市、市、县）	
+        ,T.BEZEI 				AS REGION_NAME				-- 地区名称（省/自治区/直辖市、市、县）
+  FROM SDI.SDI_KNVV_1001 A     -- 客户主记录销售数据
+  LEFT JOIN SDI.SDI_KNA1_1001 B  -- 客户主文件的一般数据
+    ON A.KUNNR = B.KUNNR
+   AND B.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_T005U_1001 T  -- 税款 ：地区关键字：文本
+    ON B.REGIO = T.BLAND 
+   AND B.LAND1 = T.LAND1 
+   AND T.SPRAS = '1'
+   AND T.MANDT = '800'
+  LEFT JOIN SDI.SDI_TVKOT_1001 C   -- 机构单位：销售机构：文本
+    ON C.VKORG = A.VKORG  
+   AND C.SPRAS = '1'  -- 语言代码
+   AND C.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_TVTWT_1001 D   -- 机构单位：分销渠道：文本
+    ON D.VTWEG = A.VTWEG
+   AND D.SPRAS = '1' 
+   AND D.DEL_FLAG = 'N'   
+  LEFT JOIN  SDI.SDI_T171T_1001 E  -- 客户: 销售地区: 文本
+    ON E.BZIRK= A.BZIRK
+   AND E.SPRAS = '1'
+   AND E.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_TVKBT_1001 F  -- 机构单位：销售办公室：文本
+    ON F.VKBUR = A.VKBUR
+   AND F.SPRAS = '1'
+   AND F.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_TVGRT_1001 G  -- 组织单位: 销售组: 文本
+    ON G.VKGRP = A.VKGRP
+   AND G.SPRAS = '1'
+   AND G.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_KNVP_1001 H    -- 客户主记录伙伴功能
+    ON H.KUNNR = A.KUNNR
+   AND H.VKORG = A.VKORG 
+   AND H.VTWEG = A.VTWEG
+   AND H.SPART = A.SPART
+   AND H.PARVW = 'VE'  -- 合作伙伴功能
+   AND H.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_PA0001_1001 I   -- 人力资源主记录:信息类型0001 (原始分配)
+    ON I.PERNR = H.PERNR
+   AND I.ENDDA > REPLACE(CAST(CURRENT_DATE AS varchar(10)),'-','')  -- 结束日期
+ WHERE A.DEL_FLAG = 'N' AND A.MANDT = '800'
+ GROUP BY
+         A.KUNNR  		
+        ,B.NAME1  		
+        ,A.VKORG  		
+        ,C.VTEXT  		
+        ,A.VTWEG  		
+        ,D.VTEXT  		
+        ,A.SPART  		
+        ,A.BZIRK  		
+        ,E.BZTXT  		
+        ,A.VKBUR  		
+        ,F.BEZEI  		
+        ,A.VKGRP  		
+        ,G.BEZEI  		
+        ,H.PERNR  		
+        ,I.ENAME  		
+		,B.LAND1 		
+	    ,B.REGIO 		
+        ,T.BEZEI

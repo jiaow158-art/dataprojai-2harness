@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GL_SUMMARY_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/GL",
+    "description": "总账汇总",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

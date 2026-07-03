@@ -1,0 +1,20 @@
+insert overwrite table sdi.sdi_job_config_1007
+select 
+id,
+create_by,
+create_date,
+cron_expression,
+employee_id,
+inv_org,
+job_class,
+key,
+last_run_time,
+name,
+parameter,
+state,
+sync_lock_time_out,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_job_config_1007;

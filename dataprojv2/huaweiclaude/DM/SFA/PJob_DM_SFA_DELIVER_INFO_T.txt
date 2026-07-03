@@ -1,0 +1,67 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/12/05 11:45:58 GMT+08:00
+-- description:sfa发运信息
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- create table dm.dm_sfa_deliver_info_t (
+--  opportunity_number string comment '商机号'
+-- ,plan_num string comment '计划订单号'
+-- ,plan_item_num string comment '计划单行号'
+-- ,do_num string comment '运单号'
+-- ,do_line_num string comment '运单行'
+-- ,sap_order_num string comment 'SAP订单号'
+-- ,sap_order_line_num string comment 'SAP订单行号'
+-- ,sign_time timestamp comment '签收时间'
+-- ,sale_emp_num string comment '销售人员工号'
+-- ,sale_emp_name string comment '创建人姓名'
+-- ,material_code string comment '物料编码'
+-- ,material_name string comment '物料名称'
+-- ,unit string comment '单位'
+-- ,actl_delv_qty decimal(38,10) comment '签收数量'
+-- ,TOT_LINE_AMT decimal(38,10) comment '行合计金额'
+-- ,is_sign_name string comment '签收状态'
+-- ,create_date date comment '创建日期'
+-- ,update_date date comment '修改日期'
+-- ,dw_last_update_date timestamp
+-- )
+
+insert overwrite table dm.dm_sfa_deliver_info_t
+select 
+ T3.engr_code as opportunity_number --商机号
+,T3.plan_num  --计划订单号
+,T3.plan_item_num --计划单行号
+,T.do_num -- 运单号
+,T.do_line_num --运单行
+,T.sap_order_num --SAP订单号
+,T.sap_order_line_num --SAP订单行号
+,T.sign_time --签收时间
+,T3.sale_emp_num --销售人员工号
+,T3.sale_emp_name --创建人姓名
+,T3.material_num as material_code --物料编码
+,T3.material_name --物料名称
+,T3.unit -- 单位
+,CASE WHEN T.is_sign_name = '已签收' THEN T.actl_delv_qty ELSE 0 END AS actl_delv_qty --签收数量
+,T.TOT_LINE_AMT  --行合计金额
+,T.is_sign_name --签收状态
+,case when SUBSTR(T.create_date,1,10) >= SUBSTR(T3.create_date,1,10) THEN SUBSTR(T.create_date,1,10) ELSE SUBSTR(T3.create_date,1,10) END AS create_date
+,case when SUBSTR(T.update_time,1,10) >= SUBSTR(T3.update_time,1,10) THEN SUBSTR(T.update_time,1,10) ELSE SUBSTR(T3.update_time,1,10) END AS update_date
+,current_timestamp as dw_last_update_date
+FROM DWROTD.DWR_TRA_TMS_SHIP_DTL_F T --运单
+LEFT JOIN DWRLTC.DWR_BO_DSPT_ORDER_F T1 --发运委托
+ON T.DSPT_NUM = T1.DSPT_NUM
+AND T.DELV_NUM = T1.DELV_NUM 
+AND T.DELV_LINE_NUM = T1.DELV_LINE_NUM
+LEFT JOIN DWROTD.DWR_BO_DELV_SHIP_BILL_F T2 --出货计划票据
+ON T1.DELV_SHIP_LINE_ID = T2.DELV_SHIP_LINE_ID
+AND T.SAP_ORDER_NUM = T2.SAP_ORDER_NUM 
+AND T.SAP_ORDER_LINE_NUM = T2.SAP_ORDER_LINE_NUM
+left join DWRLTC.DWR_BO_PLAN_ORDER_F T3 --计划单
+on T2.PLAN_ITEM_NUM = T3.PLAN_ITEM_NUM
+-- left join dm.dm_rpt_sales_group_t T4
+-- on T4.node_name9 = T3.sale_grp_code
+WHERE T3.engr_code is not NULL and T3.engr_code <> ''
+-- and T4.node_name2 = 'H11000001' --瓷砖事业部
+AND T3.div_name = '瓷砖事业部'

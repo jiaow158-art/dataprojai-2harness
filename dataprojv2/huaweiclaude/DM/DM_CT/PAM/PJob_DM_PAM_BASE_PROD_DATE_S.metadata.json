@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PAM_BASE_PROD_DATE_S",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT/PAM",
+    "description": "基地生产天数汇总",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

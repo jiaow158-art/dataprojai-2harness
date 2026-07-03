@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_CZ_GXC_CUST_REBT_DIFF_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "瓷砖共享仓返利明细表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

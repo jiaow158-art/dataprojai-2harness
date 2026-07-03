@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RES_PRE_SALESGRP_T",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "dp_mrs_hive_prod: ART+",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

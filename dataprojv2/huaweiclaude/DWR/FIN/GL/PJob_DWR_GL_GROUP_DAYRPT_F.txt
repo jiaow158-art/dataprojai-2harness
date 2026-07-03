@@ -1,0 +1,30 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:集团日报表(DWR)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRFIN.DWR_GL_GROUP_DAYRPT_F
+SELECT
+  UTILITIES_DEPT_CODE ,  -- 事业部编码   sybcode
+  UTILITIES_DEPT ,      -- 事业部  syb
+  SYSTEM_CODE ,           -- 系统编码  xtcode
+  SYSTEM_NAME ,    -- 系统  XT
+  SUBCOMPANY_BIG_AREA_CODE ,   -- 子公司大区编码  zgsdqcode
+  SUBCOMPANY_BIG_AREA_NAME ,    -- 子公司大区  zgsdq
+  CALENDAR_MONTH ,    -- 日历年月  zmonth
+  RECORD_MODE ,  -- RECORDMODE
+  ROLL_PERFORMANCE_TARGET ,   -- 滚动业绩目标 zgdyjmb
+  ROLL_COST_TARGET ,  -- 滚动费用目标  zgdfymb
+  ROLL_GROSS_PROFIT_RATE ,  -- 滚动毛利率目标 zgdmllmb
+  ROLL_ORDER_TARGET ,   -- 滚动订单目标  zgdddmb
+  ROLL_SALE_NETAMO_TARGET ,   -- 滚动销售净额目标 zgdjemb
+  ROLL_HIGHVALUEPROD_TARGET ,   -- 滚动高值品目标 zgdgzpmb
+  MONTH ,    -- 月份   ZMONTH2
+  CALENDAR_DAY ,   -- 日历日   calday
+  ROLL_GROSS_PROFIT_AMOU_TARGET ,   -- 滚动毛利额目标 zgdmlemb
+  'N' AS DEL_FLAG ,   -- 删除标志
+  current_timestamp() as DW_LAST_UPDATE_DATE   -- 同步数据时间
+FROM DWIFIN.DWI_GL_GROUP_DAYRPT_T
+WHERE DEL_FLAG = 'N';

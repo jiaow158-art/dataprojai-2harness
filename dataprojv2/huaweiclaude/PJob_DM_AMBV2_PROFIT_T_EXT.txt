@@ -1,0 +1,624 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2023/10/24 09:58:38 GMT+08:00
+-- description:成本调整值补数据程序
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert into dm.dm_ambv2_profit_t_ext
+with tmp as (
+select
+ A.bill_num 
+,A.bill_item
+,sum(notax_sales_net_amt) as "不含税销售净额"	
+,sum(amb_internal_price) as "阿米巴内部结算总价"
+from dm.dm_ambv2_profit_t A 
+where stat_day between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+group by 
+ A.bill_num 
+,A.bill_item 
+)
+,tmp1 as (
+select 
+ substr('${PERIOD_ID_D}',1,7) as calmonth
+,substr('${PERIOD_ID_D}',1,4)||substr('${PERIOD_ID_D}',6,2)||substr('${PERIOD_ID_D}',9,2)  as calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,'${REMARK}' as zasd_p001_zuonr--备注说明
+,A.bill_num
+,A.bill_item
+,bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,sales_grp
+,sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,batch
+,plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,A.size_dim
+,zsfqc
+,case when gcbb.gcbbh is not null then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴内部结算总价") / tmp."不含税销售净额",1) < '0.03'  then 'F000' end) 
+	  when substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and T.category_code is not null 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴内部结算总价")/tmp."不含税销售净额",1) < '0.03' then 'I000' end) end as bus_area
+,case when gcbb.gcbbh is not null then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴内部结算总价") / tmp."不含税销售净额",1) < '0.03'  then '特殊工程' end) 
+	  when substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and T.category_code is not null 
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴内部结算总价")/tmp."不含税销售净额",1) < '0.03' then '山西基地平衡方案' end) end as bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,0 as zhsje
+,0 as zbhsje
+,0 as zhwjz
+,0 as zyywsr_zyck
+,0 as zzyywsr_gn
+,0 as zyywsr_wm
+,0 as zyywsr_gsj
+,0 as zyywsr_jtj
+,0 as zzxcyf
+,0 as zhwjzjgtz
+,0 as zsj
+,0 as zzxcyfsj
+,0 as zhwjzjgtzsj
+,0 as zhwjzsj
+,0 as zzyywsr_qt
+,0 as zsyjf
+,0 as zytjf_sg
+,0 as zytjf_xt
+,0 as zyywcb
+,0 as zyywcb_gsj
+,0 as zyywcb_jtj
+,0 as zyywcb_dsf
+,0 as zyywcb_yf
+,0 as ztms_yf
+,0 as zsgrz_yf
+,0 as zyywcb_zxf
+,0 as ztms_zxf
+,0 as zsgrz_zxf
+,0 as zzyywcb_clcbcy
+,0 as zzyywcb_cbcbcy
+,0 as zzyywcb_cpjjss
+,0 as zzyywcb_qt
+,0 as zxsmj
+,0 as zxssl
+,dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,0 as zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,0 as zzqj
+,0 as zsrtzz
+,case when (gcbb.gcbbh is not null or (substr(A.zpcrkrq,1,4) = '2023' and substr(A.plant,1,2) = '19' and T.category_code is not null )) and coalesce(A.zxssl,0) <> 0
+	  then (case when if(tmp."不含税销售净额" <> 0,(tmp."不含税销售净额" - tmp."阿米巴内部结算总价")/tmp."不含税销售净额",1) < '0.03' then tmp."不含税销售净额" * 0.97 - tmp."阿米巴内部结算总价" else 0 end) else 0 end as zzcbtzz
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,zpl
+,zpl___t
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,0 as zxsmj_unit
+,0 as zxssl_unit
+,doc_type
+,doc_type___t
+,0 as zfdje
+,0 as z_yjsgtzz
+,val_type
+,0 as zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,0 as zxscb_amb
+,0 as zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,0 as zzyywcb_azf
+,0 as prod_cost_adjust
+,prod_property
+,sales_division_1n_code
+,sales_division_1n
+,product_division_1n_code
+,product_division_1n
+,zsales_grp
+,zsales_grp_n
+,zsales_channel
+,0 as standard_price_a
+,0 as amb_internal_tax_price
+,0 as amb_internal_price
+,classify_name
+,prod_line_name
+,A.category_name
+,category_prod_line
+,masterseries_prod
+,mastersale_prod
+,sku_short_code
+,one_level_dept_code
+,one_level_dept_name
+,two_level_dept_code
+,two_level_dept_name
+,wbs_1_level_dept_code
+,wbs_1_level_dept_name
+,wbs_2_level_dept_code
+,wbs_2_level_dept_name
+,wbs_3_level_dept_code
+,wbs_3_level_dept_name
+,0 as ext_act_sales_cost
+,0 as income_1n
+,0 as cost_1n
+,0 as cross_income
+,0 as cross_cost
+,rate_1n
+,0 as profit_1n
+,cross_rate
+,'T' as data_source
+,0 as ext_sales_income
+,prod_property_name
+,0 as cross_profit
+,dept_inner_rate
+,0 as dept_inner_profit
+,0 as dept_inner_income
+,0 as dept_inner_cost
+,integrate_channel
+,A.last_update_date
+,trading_mode
+,integrate_channel2
+,ext_sales_rate
+,0 as ext_sales_profit
+,0 as notax_sales_net_amt
+,0 as amb_internal_avg_price
+,0 as last_period_avg_price
+,0 as last_period_sum_price
+,'${PERIOD_ID_D}' as stat_day
+,0 as amb_internal_avg_fac_price
+,0 as amb_profit_amt
+,0 as act_cost_sum_amt
+,0 as act_cost_profit_amt
+,bom_flag
+,calmonth as s_calmonth
+,stat_day as s_calday
+from dm.dm_ambv2_profit_t A
+left join tmp 
+on A.bill_num = tmp.bill_num and A.bill_item = tmp.bill_item
+left join upload.upload_spec_gcbb_t gcbb
+on A.z_gcbbh = gcbb.gcbbh
+left join upload.upload_category_limit_t T
+on A.zpl = T.category_code and A.size_dim = T.size_dim
+where data_source = 'S' and prod_property = 'A0001'
+and stat_day between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and coalesce(zcbtzz,0) = 0 and sales_division_1n_code in ('11000001','11000009')
+and ((zpl = 'PL006' and A.size_dim = '800X800') or (zpl = 'PL006' and A.size_dim = '1200X600') or gcbb.gcbbh is not null)
+)
+select 
+ calmonth
+,calday
+,doc_number
+,doc_number___t
+,s_ord_item
+,ac_doc_nr
+,ac_doc_ln
+,zasd_p001_zuonr
+,bill_num
+,bill_item
+,bill_type
+,bill_type___t
+,salesemply
+,salesemply___t
+,customer
+,customer___t
+,sales_grp
+,sales_grp___t
+,distr_chan
+,distr_chan___t
+,zasd_p001_0sales_grp_0
+,zasd_p001_0sales_grp_0___t
+,wbs_elemt
+,wbs_elemt___t
+,country
+,country___t
+,sales_dist
+,sales_dist___t
+,salesorg
+,salesorg___t
+,sales_off
+,sales_off___t
+,material
+,material___t
+,prod_hier
+,prod_hier___t
+,matl_group
+,matl_group___t
+,matl_grp_1
+,matl_grp_1___t
+,matl_grp_2
+,matl_grp_2___t
+,matl_grp_3
+,matl_grp_3___t
+,matl_grp_4
+,matl_grp_4___t
+,matl_grp_5
+,matl_grp_5___t
+,comp_code
+,comp_code___t
+,extmatlgrp
+,extmatlgrp___t
+,batch
+,plant
+,plant___t
+,stor_loc
+,stor_loc___t
+,doc_currcy
+,doc_currcy___t
+,loc_currc2
+,loc_currc2___t
+,z_gcbbh
+,zsjbm
+,zsjyxq
+,zsjms
+,zossbjdh
+,zgcbbh
+,ztmswldh
+,zddms
+,division
+,division___t
+,zqdzh
+,zqdzh___t
+,size_dim
+,zsfqc
+,bus_area
+,bus_area___t
+,cust_grp1
+,cust_grp1___t
+,cust_grp2
+,cust_grp2___t
+,cust_grp3
+,cust_grp3___t
+,zfsjbm
+,infoprov
+,inco1
+,inco1_t
+,bstnk_vf
+,bstnk_vf_t
+,ktgrd
+,ktgrd_t
+,konda
+,konda_t
+,kalsm
+,kalsm_t
+,taxk1
+,taxk1_t
+,"/BIC/ZSCDH"
+,zhsje
+,zbhsje
+,zhwjz
+,zyywsr_zyck
+,zzyywsr_gn
+,zyywsr_wm
+,zyywsr_gsj
+,zyywsr_jtj
+,zzxcyf
+,zhwjzjgtz
+,zsj
+,zzxcyfsj
+,zhwjzjgtzsj
+,zhwjzsj
+,zzyywsr_qt
+,zsyjf
+,zytjf_sg
+,zytjf_xt
+,zyywcb
+,zyywcb_gsj
+,zyywcb_jtj
+,zyywcb_dsf
+,zyywcb_yf
+,ztms_yf
+,zsgrz_yf
+,zyywcb_zxf
+,ztms_zxf
+,zsgrz_zxf
+,zzyywcb_clcbcy
+,zzyywcb_cbcbcy
+,zzyywcb_cpjjss
+,zzyywcb_qt
+,zxsmj
+,zxssl
+,dw_last_update_date
+,zcbkm
+,zsrkm
+,zsrkm___t
+,zasd_p001_zsrpz
+,zasd_p001_zcbpz
+,zasd_p001_zgsjfp
+,zasd_p001_zgsjfph
+,zkpzt
+,zkpzt___t
+,zzyywcb_zz
+,cust_group
+,cust_group___t
+,zsalesgrp
+,zsalesgrp___t
+,z_zcck
+,zzqj
+,zsrtzz
+,zzcbtzz as zcbtzz
+,zprodh1
+,zprodh1___t
+,zprodh2
+,zprodh2___t
+,zprodh3
+,zprodh3___t
+,zprodh4
+,zprodh4___t
+,zprodh5
+,zprodh5___t
+,zgg01
+,zgg01___t
+,zyl01
+,zyl01___t
+,zyl05
+,zyl05___t
+,zpl
+,zpl___t
+,calquarter
+,zdw01
+,zdw01___t
+,zyl08
+,zyl08___t
+,zyl03
+,zyl03___t
+,zmx01
+,zmx01___t
+,zwl01
+,zwl01___t
+,zwlmc
+,zwlmc___t
+,zsx01
+,zsx01___t
+,zwl02
+,zwl02___t
+,zzkunnr
+,zzkunnr___t
+,zzvkorg
+,zzvkorg___t
+,zferth
+,zferth___t
+,zpcrkrq
+,zchanqbd
+,zchanq
+,zxsmj_unit
+,zxssl_unit
+,doc_type
+,doc_type___t
+,zfdje
+,z_yjsgtzz
+,val_type
+,zyywsr_zyck_pzhb
+,zjymsflag
+,zjymsflag___t
+,zxssyb
+,zxssyb___t
+,zcpsyb
+,zcpsyb___t
+,zscsyb
+,zscsyb___t
+,zfhsyb
+,zfhsyb___t
+,zbsyb
+,zxscb_amb
+,zhsxse
+,refer_doc
+,refer_itm
+,matl_type
+,ihrez
+,zbismt
+,vsort
+,ctlpc
+,lzone
+,zcmc
+,aeskd
+,zzyywcb_azf
+,prod_cost_adjust
+,prod_property
+,sales_division_1n_code
+,sales_division_1n
+,product_division_1n_code
+,product_division_1n
+,zsales_grp
+,zsales_grp_n
+,zsales_channel
+,standard_price_a
+,amb_internal_tax_price
+,amb_internal_price
+,classify_name
+,prod_line_name
+,category_name
+,category_prod_line
+,masterseries_prod
+,mastersale_prod
+,sku_short_code
+,one_level_dept_code
+,one_level_dept_name
+,two_level_dept_code
+,two_level_dept_name
+,wbs_1_level_dept_code
+,wbs_1_level_dept_name
+,wbs_2_level_dept_code
+,wbs_2_level_dept_name
+,wbs_3_level_dept_code
+,wbs_3_level_dept_name
+,ext_act_sales_cost
+,income_1n
+,cost_1n
+,cross_income
+,cross_cost
+,rate_1n
+,profit_1n
+,cross_rate
+,data_source
+,ext_sales_income
+,prod_property_name
+,cross_profit
+,dept_inner_rate
+,dept_inner_profit
+,dept_inner_income
+,dept_inner_cost
+,integrate_channel
+,last_update_date
+,trading_mode
+,integrate_channel2
+,ext_sales_rate
+,ext_sales_profit
+,notax_sales_net_amt
+,amb_internal_avg_price
+,last_period_avg_price
+,last_period_sum_price
+,stat_day
+,amb_internal_avg_fac_price
+,case when trading_mode = 'A' or trading_mode is null then notax_sales_net_amt - amb_internal_price - zzcbtzz 
+	  when trading_mode in ('B','C') then (notax_sales_net_amt - cost_1n - cross_cost - zzcbtzz) * (rate_1n + cross_rate) else 0 end as amb_profit_amt
+,act_cost_sum_amt
+,act_cost_profit_amt
+,bom_flag
+,s_calmonth
+,s_calday
+from tmp1
+where coalesce(zzcbtzz,0) <> 0 

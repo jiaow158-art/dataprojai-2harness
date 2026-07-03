@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PROJ_PROFIT_SEARCH_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "工程渠道毛利率查询接口",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

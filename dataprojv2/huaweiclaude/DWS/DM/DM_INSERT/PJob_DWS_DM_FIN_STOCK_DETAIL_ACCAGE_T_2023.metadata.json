@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_FIN_STOCK_DETAIL_ACCAGE_T_2023",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "2023库存明细账龄表(废弃)",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

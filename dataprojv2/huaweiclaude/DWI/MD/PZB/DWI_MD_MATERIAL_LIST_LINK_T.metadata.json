@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_MATERIAL_LIST_LINK_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrbs"
+}

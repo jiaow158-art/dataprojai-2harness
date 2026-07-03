@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_WM_STOCK_SHARE_DETAIL_F",
+    "type": "DWSSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "update：2023/04/19 yueyuzhan 新增面积、区域字段 area_m2 、region",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

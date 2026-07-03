@@ -1,0 +1,330 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/25 11:47:26 GMT+08:00
+-- ******************************************************************** --
+delete from dm.DM_PERFORMANCE_CHART_S;
+with tmp as (
+select 
+ a.calendar_year_month as "年月"
+,a.class_dept_one as "中心"
+,'' as "销售部门"
+,a.sales_group as "销售组代码"
+,'' as "销售组描述"
+,a.distribution_channel "分销渠道代码"
+,a.distribution_channel_desc  as "分销渠道"
+,0 as "本月预测"
+,sum(a.sales_achievement) as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.DM_RPT_BATHROOM_PRODSALES_S as a 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where  a.calendar_year_month = to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm') 
+and a.class_dept_one <> '鹏嘉家居'
+group by 
+ a.calendar_year_month
+,a.class_dept_one 
+,a.sales_group 
+,a.distribution_channel 
+,a.distribution_channel_desc 
+union all
+select 
+ z."CALMONTH" as "年月"
+,tt."TXTSH" as "中心"
+,'' as "销售部门"
+,'' as "销售组代码"
+,'' as "销售组描述"
+,'' as "分销渠道代码"
+,'' as "分销渠道"
+,0 as "本月预测"
+,z."ZA_YJTZ" as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.dm_rpt_bic_azeam_o0132_t as z
+left join dm.dm_rpt_bi0_psales_grp_t as a on z."SALES_GRP" = a."SALES_GRP" 
+left join DM.DM_RPT_BIC_TZDPZGSDQ_T as tt on a."/BIC/ZDPZGSDQ" = tt."/BIC/ZDPZGSDQ" 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where z."CALMONTH" = to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm')
+union all
+select 
+ t."month_id"  as "年月"
+,a.class_dept_one as "中心"
+,'' as "销售部门"
+,a.sales_group as "销售组代码"
+,'' as "销售组描述"
+,a.distribution_channel as "分销渠道代码"
+,a.distribution_channel_desc  as "分销渠道"
+,0 as "本月预测"
+,0 as "本月实际业绩"
+,sum(a.sales_achievement) as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.DM_RPT_BATHROOM_PRODSALES_S as a 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and a.calendar_year_month = to_char(add_months(to_date(t."month_id",'yyyy-mm-dd'),-12),'yyyymm')
+and a.class_dept_one <> '鹏嘉家居'
+group by 
+ t."month_id"
+,a.class_dept_one 
+,a.sales_group 
+,a.distribution_channel 
+,a.distribution_channel_desc 
+union all
+select 
+ t."month_id" as "年月"
+,tt."TXTSH" as "中心"
+,'' as "销售部门"
+,'' as "销售组代码"
+,'' as "销售组描述"
+,'' as "分销渠道代码"
+,'' as "分销渠道"
+,0 as "本月实际业绩"
+,0 as "本月预测"
+,z."ZA_YJTZ"  as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.dm_rpt_bic_azeam_o0132_t as z
+left join dm.dm_rpt_bi0_psales_grp_t as a on z."SALES_GRP" = a."SALES_GRP" 
+left join DM.DM_RPT_BIC_TZDPZGSDQ_T as tt on a."/BIC/ZDPZGSDQ" = tt."/BIC/ZDPZGSDQ" 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and z."CALMONTH" = to_char(add_months(to_date(t."month_id",'yyyy-mm-dd'),-12),'yyyymm')
+union all
+select 
+ t."month_id"  as "年月"
+,a.class_dept_one as "中心"
+,'' as "销售部门"
+,a.sales_group as "销售组代码"
+,'' as "销售组描述"
+,a.distribution_channel as "分销渠道代码" 
+,a.distribution_channel_desc  as "分销渠道"
+,0 as "本月预测"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,sum(a.sales_achievement) as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.DM_RPT_BATHROOM_PRODSALES_S as a 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and a.calendar_year_month between to_char(Date_trunc ('YEARS',to_date(t."month_id",'yyyy-mm-dd') ) ,'yyyymm')--202201
+	  and to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm') and a.class_dept_one <> '鹏嘉家居'
+group by 
+ t."month_id"
+,a.class_dept_one 
+,a.sales_group 
+,a.distribution_channel 
+,a.distribution_channel_desc 
+union all
+select 
+ t."month_id"  as "年月"
+,g."TXTSH" as "中心"
+,'' as "销售部门"
+,f."SALES_GRP" as "销售组代码"
+,'' as "销售组描述"
+,f."DISTR_CHAN" as "分销渠道代码" 
+,'' as "分销渠道"
+,0 as "本月预测"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,sum(f."ZYJ") as "本年预算"
+,sum(case when  f."CALMONTH"=to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm') then f."ZYJ" end) as "本月预算"
+from dm.dm_rpt_bic_azssd_o0282_t as f
+left join DM.DM_RPT_BIC_TZDPZGSDQ_T as g on f."/BIC/ZDPZGSDQ" = g."/BIC/ZDPZGSDQ" 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and f."CALMONTH" between to_char(Date_trunc ('YEARS',to_date(t."month_id",'yyyy-mm-dd') ) ,'yyyymm')--202201
+	  and to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm') and f."/BIC/ZDPSYB" = '11000002' --and a.sales_group = 'R1B'
+group by 
+ t."month_id"
+,g."TXTSH"
+,f."SALES_GRP"
+,f."DISTR_CHAN"
+union all
+select 
+ t."month_id"  as "年月"
+,tt."TXTSH" as "中心"
+,'' as "销售部门"
+,'' as "销售组代码"
+,'' as "销售组描述"
+,'' as "分销渠道代码" 
+,'' as "分销渠道"
+,0 as "本月预测"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,sum(z."ZA_YJTZ") as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.dm_rpt_bic_azeam_o0132_t as z
+left join dm.dm_rpt_bi0_psales_grp_t as a on z."SALES_GRP" = a."SALES_GRP" 
+left join DM.DM_RPT_BIC_TZDPZGSDQ_T as tt on a."/BIC/ZDPZGSDQ" = tt."/BIC/ZDPZGSDQ" 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and z."CALMONTH" between to_char(Date_trunc ('YEARS',to_date(t."month_id",'yyyy-mm-dd') ) ,'yyyymm')--202201
+	  and to_char((to_date(t."month_id",'yyyy-mm-dd')),'yyyymm')--202204
+group by 
+ t."month_id" 
+,tt."TXTSH"
+union all
+select 
+ t."month_id"  as "年月"
+,a.class_dept_one as "中心"
+,'' as "销售部门"
+,a.sales_group as "销售组代码"
+,'' as "销售组描述"
+,a.distribution_channel as  "分销渠道代码" 
+,a.distribution_channel_desc  as "分销渠道"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,0 as "本月预测"
+,sum(a.sales_achievement) as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.DM_RPT_BATHROOM_PRODSALES_S as a 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and a.calendar_year_month between to_char(add_months(Date_trunc ('YEARS',to_date(t."month_id",'yyyy-mm-dd') ),-12) ,'yyyymm')--202101
+	  and to_char(add_months(to_date(t."month_id",'yyyy-mm-dd'),-12),'yyyymm') and a.class_dept_one <> '鹏嘉家居'
+group by 
+ t."month_id"
+,a.class_dept_one 
+,a.sales_group 
+,a.distribution_channel 
+,a.distribution_channel_desc 
+union all
+select 
+ t."month_id"  as "年月"
+,tt."TXTSH" as "中心"
+,'' as "销售部门"
+,'' as "销售组代码"
+,'' as "销售组描述"
+,'' as "分销渠道代码" 
+,'' as "分销渠道"
+,0 as "本月预测"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,sum(z."ZA_YJTZ") as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from dm.dm_rpt_bic_azeam_o0132_t as z
+left join dm.dm_rpt_bi0_psales_grp_t as a on z."SALES_GRP" = a."SALES_GRP" 
+left join DM.DM_RPT_BIC_TZDPZGSDQ_T as tt on a."/BIC/ZDPZGSDQ" = tt."/BIC/ZDPZGSDQ" 
+join (select "month_id" from dm.dm_dim_date_d group by "month_id" ) as t on 1=1 
+where 1=1 and z."CALMONTH" between to_char(add_months(Date_trunc ('YEARS',to_date(t."month_id",'yyyy-mm-dd') ),-12) ,'yyyymm')--202101
+	  and to_char(add_months(to_date(t."month_id",'yyyy-mm-dd'),-12),'yyyymm')--202103
+group by 
+ t."month_id"  
+,tt."TXTSH"
+)
+,tmp1 as (
+ select 
+ "年月"
+,"中心"
+,"销售部门"
+,"销售组代码"
+,"销售组描述"
+,"分销渠道代码" 
+,"分销渠道"
+,0 as "本月预测" 
+,sum("本月实际业绩") as "本月实际业绩"
+,sum("去年同期") as "去年同期"
+,sum("本年累计") as "本年累计"
+,sum("去年累计") as "去年累计"
+,sum("本年预算") as "本年预算"
+,sum("本月预算") as "本月预算"
+from tmp 
+group by 
+ "年月"
+,"中心"
+,"销售部门"
+,"销售组代码"
+,"销售组描述"
+,"分销渠道代码" 
+,"分销渠道"
+union all 
+select 
+ e.year_month as "年月"
+,e.center as "中心"
+,e.sales_dept_name_cn  as "销售部门"
+,''  as "销售组代码"
+,e.sales_group_name_cn as "销售组描述"
+,e.channel_code as "分销渠道代码"
+,g."TXTSH" as "分销渠道"
+,e.forecast_amt  as "本月预测"
+,0 as "本月实际业绩"
+,0 as "去年同期"
+,0 as "本年累计"
+,0 as "去年累计"
+,0 as "本年预算"
+,0 as "本月预算"
+from DM.DM_RPT_FORECAST_DATA_T as e  
+left join dm.dm_rpt_bi0_tdistr_chan_t as g on e.channel_code = g."DISTR_CHAN" and g."LANGU" = '1'
+
+
+ )
+
+,tmp2 as (
+select 
+ a."年月"
+,a."中心"
+,b."SALES_OFF" as "销售部门编码"
+,(case when a."销售部门" is null then d."TXTSH" else a."销售部门" end ) as "销售部门" 
+,a."销售组代码"
+,c.txtsh as "销售组描述"
+,a."分销渠道代码"
+,(case when a."分销渠道" is null then e."TXTSH" else a."分销渠道" end ) as "分销渠道"
+,a."本月实际业绩"
+,a."本月预测"
+,'' as "预测完成率"
+,a."去年同期" 
+,0 as "同比"
+,a."本年累计"
+,a."本年预算"
+,a."本月预算"
+,0 as "完成率"
+,a."去年累计"
+,0 as "年累计同比"
+,current_date as last_update_date
+from tmp1 as a 
+left join dm.dm_rpt_bi0_psales_grp_t as b on a."销售组代码" = b."SALES_GRP" 
+left join dm.dm_rpt_bi0_tsales_grp_t as c on a."销售组代码" = c.sales_grp and c.langu = '1'
+left join dm.dm_rpt_bi0_tsales_off_t as d on b."SALES_OFF" = d."SALES_OFF" and d."LANGU"= '1'
+left join dm.dm_rpt_BI0_TDISTR_CHAN_t as e on e."DISTR_CHAN" = a."分销渠道代码" and e."LANGU"= '1'
+)
+ insert into dm.DM_PERFORMANCE_CHART_S
+select 
+"年月"
+,"中心"
+,"销售部门编码"
+,"销售部门" 
+,"销售组代码"
+,"销售组描述"
+,"分销渠道代码"
+,"分销渠道"
+,"本月实际业绩"
+,"本月预测"
+,"预测完成率"
+,"去年同期" 
+,"同比"
+,"本年累计"
+,"本年预算"
+, "完成率"
+,"去年累计"
+,"年累计同比"
+,last_update_date
+,"本月预算"
+from tmp2 
+where 
+--"年月" = t."month_id" and 
+( "本月实际业绩" + "去年同期" + "本年累计" + "去年累计" + "本月预测" + "本年预算" ) <> 0 --AND "中心" <> '鹏嘉家居';

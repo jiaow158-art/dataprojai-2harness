@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZBYQYS",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标-逾期应收指标数据指标编码'ZB04','ZB08','ZB09'",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

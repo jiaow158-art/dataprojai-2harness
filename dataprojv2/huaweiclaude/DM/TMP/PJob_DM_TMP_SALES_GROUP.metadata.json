@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_TMP_SALES_GROUP",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

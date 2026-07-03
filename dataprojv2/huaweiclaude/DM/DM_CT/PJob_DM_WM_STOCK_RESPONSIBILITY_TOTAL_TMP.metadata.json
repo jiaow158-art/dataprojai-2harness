@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_TOTAL_TMP",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "总库存&项目库存",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

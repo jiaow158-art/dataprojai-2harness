@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_CT_SALES_PERFORMANCE_MATERIAL_DAILY_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,437 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/29 09:57:31 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_COST_SALES_GROSS_PROFIT_D WHERE substring(cast(date(days) as varchar),1,7) = '${PERIOD_ID_M}';
+INSERT INTO DM.DM_COST_SALES_GROSS_PROFIT_D
+with dim_date as (
+ select
+-- date_part('day', date(last_day('2022-07-06')) -  date_trunc('month',date('2022-07-06')) ) + 1   diff 
+day_dt 
+,day_id
+,month_days 
+,day_id_yago
+from dm.dm_dim_date_d where substr(day_dt,1,7) = '${PERIOD_ID_M}'
+group by 
+day_dt 
+,day_id
+,month_days 
+,day_id_yago
+)
+select  
+ substring(cast(date(days) as varchar),1,10) days   -- 天
+,months            -- 月份
+,node_desc2        -- 二级部门
+,node_desc3        -- 三级部门
+,node_desc4 sales_region   -- 销售区域
+,node_desc5 operation_center  -- 运营中心
+,sales_grp       		--销售组
+,sales_grp_desc   		-- 销售组描述
+,prod_hierarchys    	-- 产品层次3
+,size_dim				-- 大小/量纲
+,zqdzh     integration_channel   -- 整合渠道
+--,zqdzh___t interaction_channel_desc  -- 整合渠道描述
+,factory     -- 工厂
+--,factory_t   -- 工厂描述
+,sum(budget_amt)                         budget_amt    			-- 预算金额
+,sum(budget_use_point)                   budget_use_point  		-- 预算使用积分
+,sum(budget_accrual_point)               budget_accrual_point   -- 预算预提积分
+,sum(budget_notax_sales_net_amt)         budget_notax_sales_net_amt --预算不含税净额(管理)
+,sum(budget_cost_a)                      budget_cost_a         -- 预算成本A
+,sum(budget_gross_profit)                budget_gross_profit   -- 预算毛利额
+,sum(budget_sales_area)                  budget_sales_area     -- 预算销售面积
+,sum(budget_sales_qty)                   budget_sales_qty      -- 预算销售数量
+,sum(budget_gross_margin)                budget_gross_margin   --  预算毛利率
+,sum(sales_amt)                          sales_amt			   -- 销售金额
+,sum(use_point)                          use_point             -- 使用积分
+,sum(accrual_point_system)               accrual_point_system  -- 预提积分(系统)
+,sum(accrual_point_manual)               accrual_point_manual  --  预提积分(手工)
+,sum(price_adjustment)                   price_adjustment      -- (价格调整+ 中心仓运费)
+,sum(notax_sales_net_amt)                notax_sales_net_amt   -- 不含税净额(管理)
+,sum(actual_cost)                        actual_cost           -- 实际成本
+,sum(gross_profit)                       gross_profit          -- 毛利额
+,sum(gross_margin)                       gross_margin 		   -- 毛利率
+,sum(sales_qty)                          sales_qty              -- 销售数量
+,sum(sales_area)                         sales_area 		    -- 销售面积
+,sum(last_year_sales_amt)                last_year_sales_amt    -- 去年同期销售金额
+,sum(last_year_use_point)                last_year_use_point    -- 去年同期使用积分
+,sum(last_year_accrual_point_system)     last_year_accrual_point_system  -- 去年同期预提积分(系统)
+,sum(last_year_accrual_point_manual)     last_year_accrual_point_manual  -- 去年同期预提积分(系统)
+,sum(last_year_price_adjustment)         last_year_price_adjustment      -- 去年同期(价格调整+ 中心仓运费)
+,sum(last_year_notax_sales_net_amt)      last_year_notax_sales_net_amt  -- 去年同期不含税净额(管理)
+,sum(last_year_actual_cost)              last_year_actual_cost        -- 去年同期实际成本
+,sum(last_year_gross_profit)             last_year_gross_profit 		-- 去年同期毛利额
+,sum(last_year_gross_margin)             last_year_gross_margin         -- 去年同期毛利率
+,sum(last_year_sales_qty) 				 last_year_sales_qty            -- 去年同期销售数量
+,sum(last_year_sales_area)  			 last_year_sales_area			-- 去年同期销售面积
+,CURRENT_TIMESTAMP()					 DW_LAST_UPDATE_DATE            -- 数据同步时间
+from  (
+SELECT 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth   months              -- 月份
+,day_dt     days                -- 日  
+,t1.sales_grp  sales_grp        -- 销售组
+,sales_grp___t sales_grp_desc   -- 销售组描述
+,lve2_code prod_hierarchys      -- 产品层次
+,size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant     factory              -- 工厂
+,plant___t  factory_t           -- 工厂描述
+,0  budget_amt					-- 当期预算业绩
+,0  budget_use_point            -- 预算使用积分	
+,0  budget_accrual_point        -- 预算预提积分	
+,0  budget_notax_sales_net_amt  -- 预算不含税销售净额	
+,0  budget_cost_A               -- 预算成本A	
+,0  budget_gross_profit         -- 预算毛利	
+,0  budget_sales_area 			-- 预算销售面积	
+,0  budget_sales_qty 			-- 预算销售数量	
+,0  budget_gross_margin    		-- 预算毛利率
+--, sum(nvl(zhsje,0) )     sales_amt                -- 销售业绩（含税）	
+, 0  sales_amt
+, sum(nvl(zsyjf,0))      use_point                -- 使用积分	
+, sum(nvl(zytjf_xt,0))   accrual_point_system    -- 预提积分（系统）	
+, sum(nvl(zytjf_sg,0))   accrual_point_manual    -- 预提积分（手工）	
+, sum(nvl(zzxcyf,0) + nvl(zhwjzjgtz,0))   price_adjustment                           -- 中心仓运费+价格调整	
+--, sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) notax_sales_net_amt    -- 不含税销售净额（管理）
+, 0 notax_sales_net_amt
+, sum(nvl(zyywcb,0))  actual_cost       -- 实际成本	
+, sum(nvl(zbhsje,0)+nvl(zytjf_xt,0) + nvl(zytjf_sg,0) - nvl(zyywcb,0))   gross_profit  -- 毛利额(不含税)	
+, case when sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) <> 0 then sum(nvl(zbhsje,0)+nvl(zytjf_xt,0) + nvl(zytjf_sg,0) - nvl(zyywcb,0)) / sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) else 0 end gross_margin   -- 当期毛利率	
+,sum(nvl(zxsmj,0))  sales_qty  -- 销售数量	
+,sum(nvl(zxssl,0) ) sales_area   -- 销售面积
+,0 last_year_sales_amt
+,0 last_year_use_point
+,0 last_year_accrual_point_system
+,0 last_year_accrual_point_manual
+,0 last_year_price_adjustment
+,0 last_year_notax_sales_net_amt
+,0 last_year_actual_cost
+,0 last_year_gross_profit
+,0 last_year_gross_margin
+,0 last_year_sales_qty
+,0 last_year_sales_area
+FROM DM.DM_ZZT_XSSR_T t1 
+join DM.DM_RPT_SALES_GROUP_T     t2 on t1.sales_grp = t2.node_name9 
+left join DM.DM_RPT_PROD_LEVEL_T t3 on substr(prod_hier,1,7) = t3.prod_code3
+join dim_date t5 on t1.calday = t5.day_id 
+where 1=1
+and t2.node_desc2  = '瓷砖事业部'
+and  bill_type in ('ZF2','ZF21','ZRE1','ZRE2','ZS1','ZS11','ZS2','ZS21','ZG2','ZGS2','ZL2','ZLS1','ZTS1','ZT1','ZT2','ZT3','ZTS2','ZTS3','ZP1')
+and CUST_GROUP <>'Z0' 
+group by 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth                   -- 月份
+,day_dt                     -- 日  
+,t1.sales_grp               -- 销售组
+,sales_grp___t              -- 销售组描述
+,lve2_code   				-- 产品层次
+,size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant                   -- 工厂
+,plant___t             -- 工厂描述
+
+union all 
+
+SELECT 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth   months              -- 月份
+,day_dt     days                -- 日  
+,t1.sales_grp  sales_grp        -- 销售组
+,sales_grp___t sales_grp_desc   -- 销售组描述
+,lve2_code prod_hierarchys       -- 产品层次
+,size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant     factory              -- 工厂
+,plant___t  factory_t           -- 工厂描述
+,0  budget_amt					-- 当期预算业绩
+,0  budget_use_point            -- 预算使用积分	
+,0  budget_accrual_point        -- 预算预提积分	
+,0  budget_notax_sales_net_amt  -- 预算不含税销售净额	
+,0  budget_cost_A               -- 预算成本A	
+,0  budget_gross_profit         -- 预算毛利	
+,0  budget_sales_area 			-- 预算销售面积	
+,0  budget_sales_qty 			-- 预算销售数量	
+,0  budget_gross_margin    		-- 预算毛利率
+,0 sales_amt                -- 销售业绩（含税）	
+,0 use_point                -- 使用积分	
+,0 accrual_point_system    -- 预提积分（系统）	
+,0 accrual_point_manual    -- 预提积分（手工）	
+,0 price_adjustment                           -- 中心仓运费+价格调整	
+,0 notax_sales_net_amt    -- 不含税销售净额（管理）
+,0 actual_cost       -- 实际成本	
+,0 gross_profit  -- 毛利额(不含税)	
+,0 gross_margin   -- 当期毛利率	
+,0 sales_qty    -- 销售数量	
+,0 sales_area   -- 销售面积
+,0     last_year_sales_amt
+,sum(nvl(zsyjf,0))      last_year_use_point
+,sum(nvl(zytjf_xt,0))   last_year_accrual_point_system
+,sum(nvl(zytjf_sg,0))   last_year_accrual_point_manual
+,sum(nvl(zzxcyf,0) + nvl(zhwjzjgtz,0))    last_year_price_adjustment
+, 0 last_year_notax_sales_net_amt
+,sum(nvl(zyywcb,0))  last_year_actual_cost
+,sum(nvl(zbhsje,0)+nvl(zytjf_xt,0) + nvl(zytjf_sg,0) - nvl(zyywcb,0))   last_year_gross_profit
+,case when sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) <> 0 then sum(nvl(zbhsje,0)+nvl(zytjf_xt,0) + nvl(zytjf_sg,0) - nvl(zyywcb,0)) / sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) else 0 end last_year_gross_margin  
+,sum(nvl(zxsmj,0))  last_year_sales_qty  -- 销售数量	
+,sum(nvl(zxssl,0) ) last_year_sales_area   -- 销售面积
+FROM DM.DM_ZZT_XSSR_T t1 
+join DM.DM_RPT_SALES_GROUP_T     t2 on t1.sales_grp = t2.node_name9 
+left join DM.DM_RPT_PROD_LEVEL_T t3 on substr(prod_hier,1,7) = t3.prod_code3
+join dim_date t5 on t1.calday = t5.day_id_yago 
+where 1=1 
+and t2.node_desc2  = '瓷砖事业部'
+and  bill_type in ('ZF2','ZF21','ZRE1','ZRE2','ZS1','ZS11','ZS2','ZS21','ZG2','ZGS2','ZL2','ZLS1','ZTS1','ZT1','ZT2','ZT3','ZTS2','ZTS3','ZP1')
+group by 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth                   -- 月份
+,day_dt                     -- 日  
+,t1.sales_grp               -- 销售组
+,sales_grp___t              -- 销售组描述
+,lve2_code   -- 产品层次
+,size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant                   -- 工厂
+,plant___t             -- 工厂描述
+union all 
+select 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,"CALMONTH"     months   		-- 日历年/月
+, day_dt          days
+,"SALES_GRP"  sales_grp         -- 销售组
+,t2.node_desc9 sales_grp_desc
+,lve2_code  prod_hierarchys  -- 产品层次3
+,"ZGG"  size_dim      		-- 规格
+,"/BIC/ZQDZH"   zqdzh     		-- 整合渠道
+,"ZZHQDMS"      zqdzh___t      -- 整合渠道描述
+,"PLANT" factory          -- 工厂
+,null    factory_t
+,sum(nvl("ZYJ",0)/month_days)      budget_amt            		-- 业绩
+,sum(nvl("ZSYJF",0)/month_days)    budget_use_point       		-- 使用积分
+,sum(nvl("ZYTJF",0)/month_days)    budget_accrual_point        -- 预提积分
+,sum(nvl("ZBHSXSJE",0)/month_days) budget_notax_sales_net_amt  -- 不含税销售净额
+,sum(nvl("ZCBA" ,0)/month_days)    budget_cost_A          		-- 成本A
+,sum(nvl("ZML",0)/month_days)      budget_gross_profit         -- 毛利
+,sum(nvl("ZXSMJ" ,0)/month_days)   budget_sales_area    	    -- 销售面积	
+,sum(nvl("ZXSMJ" ,0)/month_days)   budget_sales_qty    	    -- 销售数量			
+,sum(nvl("ZXSMJ" ,0)/month_days)   budget_gross_margin    	    -- 毛利率	
+,0 sales_amt               -- 销售业绩（含税）	
+,0 use_point               -- 使用积分	
+,0 accrual_point_system    -- 预提积分（系统）	
+,0 accrual_point_manual    -- 预提积分（手工）	
+,0 price_adjustment        -- 中心仓运费+价格调整	
+,0 notax_sales_net_amt     -- 不含税销售净额（管理）
+,0 actual_cost       	   -- 实际成本	
+,0 gross_profit  		   -- 毛利额(不含税)	
+,0 gross_margin  		   -- 当期毛利率	
+,0 sales_qty    -- 销售数量	
+,0 sales_area   -- 销售面积
+,0 last_year_sales_amt
+,0 last_year_use_point
+,0 last_year_accrual_point_system
+,0 last_year_accrual_point_manual
+,0 last_year_price_adjustment
+,0 last_year_notax_sales_net_amt
+,0 last_year_actual_cost
+,0 last_year_gross_profit
+,0 last_year_gross_margin
+,0 last_year_sales_qty
+,0 last_year_sales_area
+from dm.dm_rpt_bic_azssd_o0282_t t1
+join DM.DM_RPT_SALES_GROUP_T  t2 on t1."SALES_GRP"  = t2.node_name9 
+left join DM.DM_RPT_PROD_LEVEL_T t3 on t1."/BIC/ZPRODH3" = t3.prod_code3 
+join dim_date t5 on substr(t5.day_id,1,6) = t1."CALMONTH"
+where 1=1
+and t2.node_desc2  = '瓷砖事业部' 
+group by 
+node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,"CALMONTH"        			 -- 日历年/月
+,"SALES_GRP"           		 -- 销售组
+,lve2_code      			 -- 产品层次3
+,"ZGG"        				 -- 规格
+,"/BIC/ZQDZH"        		 -- 整合渠道
+,"ZZHQDMS"         			 -- 整合渠道描述
+,"PLANT"            		 -- 工厂
+,t2.node_desc9 
+,day_dt
+union all 
+SELECT 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth   months              -- 月份
+,day_dt     days                -- 日  
+,t1.sales_grp  sales_grp        -- 销售组
+,sales_grp___t sales_grp_desc   -- 销售组描述
+,lve2_code prod_hierarchys      -- 产品层次
+,dimension size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant     factory              -- 工厂
+,plant___t  factory_t           -- 工厂描述
+,0  budget_amt					-- 当期预算业绩
+,0  budget_use_point            -- 预算使用积分	
+,0  budget_accrual_point        -- 预算预提积分	
+,0  budget_notax_sales_net_amt  -- 预算不含税销售净额	
+,0  budget_cost_A               -- 预算成本A	
+,0  budget_gross_profit         -- 预算毛利	
+,0  budget_sales_area 			-- 预算销售面积	
+,0  budget_sales_qty 			-- 预算销售数量	
+,0  budget_gross_margin    		-- 预算毛利率
+--, sum(nvl(zhsje,0) )     sales_amt                -- 销售业绩（含税）	
+,  sum(coalesce(zxsyj_kjy, 0) + zxsyj_zd)  sales_amt
+, 0 use_point                -- 使用积分	
+, 0 accrual_point_system    -- 预提积分（系统）	
+, 0 accrual_point_manual    -- 预提积分（手工）	
+, 0 price_adjustment                           -- 中心仓运费+价格调整	
+--, sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) notax_sales_net_amt    -- 不含税销售净额（管理）
+, sum(zbhssrgl) notax_sales_net_amt
+, 0 actual_cost       -- 实际成本	
+, 0 gross_profit  -- 毛利额(不含税)	
+, 0 gross_margin   -- 当期毛利率	
+, 0 sales_qty  -- 销售数量	
+, 0 sales_area   -- 销售面积
+,0 last_year_sales_amt
+,0 last_year_use_point
+,0 last_year_accrual_point_system
+,0 last_year_accrual_point_manual
+,0 last_year_price_adjustment
+,0 last_year_notax_sales_net_amt
+,0 last_year_actual_cost
+,0 last_year_gross_profit
+,0 last_year_gross_margin
+,0 last_year_sales_qty
+,0 last_year_sales_area
+FROM DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T t1 
+join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.sales_grp = t2.node_name9 
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T t4 on t1.material  = t4.material_num
+left join DM.DM_RPT_PROD_LEVEL_T t3 on coalesce(t4.product_level3_code,t4.product_level2_code,'其他杂类'  )  = coalesce(t3.prod_code3,t3.lve4_code,'其他杂类') 
+join dim_date t5 on t1.calday = t5.day_id 
+where 1=1
+and t2.node_desc2  = '瓷砖事业部'
+group by 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth                   -- 月份
+,day_dt                     -- 日  
+,t1.sales_grp               -- 销售组
+,sales_grp___t              -- 销售组描述
+,lve2_code   				-- 产品层次
+,dimension                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant                   -- 工厂
+,plant___t             -- 工厂描述
+
+union all 
+
+SELECT 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth   months              -- 月份
+,day_dt     days                -- 日  
+,t1.sales_grp  sales_grp        -- 销售组
+,sales_grp___t sales_grp_desc   -- 销售组描述
+,lve2_code prod_hierarchys      -- 产品层次
+,dimension size_dim                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant     factory              -- 工厂
+,plant___t  factory_t           -- 工厂描述
+,0  budget_amt					-- 当期预算业绩
+,0  budget_use_point            -- 预算使用积分	
+,0  budget_accrual_point        -- 预算预提积分	
+,0  budget_notax_sales_net_amt  -- 预算不含税销售净额	
+,0  budget_cost_A               -- 预算成本A	
+,0  budget_gross_profit         -- 预算毛利	
+,0  budget_sales_area 			-- 预算销售面积	
+,0  budget_sales_qty 			-- 预算销售数量	
+,0  budget_gross_margin    		-- 预算毛利率
+--, sum(nvl(zhsje,0) )     sales_amt                -- 销售业绩（含税）	
+, 0 sales_amt
+, 0 use_point                -- 使用积分	
+, 0 accrual_point_system    -- 预提积分（系统）	
+, 0 accrual_point_manual    -- 预提积分（手工）	
+, 0 price_adjustment                           -- 中心仓运费+价格调整	
+--, sum( nvl(zbhsje,0) + nvl(zytjf_xt,0) +nvl(zytjf_sg,0) ) notax_sales_net_amt    -- 不含税销售净额（管理）
+, 0 notax_sales_net_amt
+, 0 actual_cost       -- 实际成本	
+, 0 gross_profit  -- 毛利额(不含税)	
+, 0 gross_margin   -- 当期毛利率	
+, 0 sales_qty  -- 销售数量	
+, 0 sales_area   -- 销售面积
+,sum(coalesce(zxsyj_kjy, 0) + zxsyj_zd)  last_year_sales_amt
+,0 last_year_use_point
+,0 last_year_accrual_point_system
+,0 last_year_accrual_point_manual
+,0 last_year_price_adjustment
+,sum(zbhssrgl) last_year_notax_sales_net_amt
+,0 last_year_actual_cost
+,0 last_year_gross_profit
+,0 last_year_gross_margin
+,0 last_year_sales_qty
+,0 last_year_sales_area
+FROM DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T t1 
+join  DM.DM_RPT_SALES_GROUP_T     t2 on t1.sales_grp = t2.node_name9 
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T t4 on t1.material  = t4.material_num
+left join DM.DM_RPT_PROD_LEVEL_T t3 on coalesce(t4.product_level3_code,t4.product_level2_code,'其他杂类'  )  = coalesce(t3.prod_code3,t3.lve4_code,'其他杂类') 
+join dim_date t5 on t1.calday = t5.day_id_yago 
+where 1=1
+and t2.node_desc2  = '瓷砖事业部'
+group by 
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,calmonth                   -- 月份
+,day_dt                     -- 日  
+,t1.sales_grp               -- 销售组
+,sales_grp___t              -- 销售组描述
+,lve2_code   				-- 产品层次
+,dimension                       -- 大小/量纲
+,zqdzh 	            		    -- 整合渠道
+,zqdzh___t                      -- 整合渠道描述
+,plant                   -- 工厂
+,plant___t             -- 工厂描述
+
+)
+group by  
+ node_desc2
+,node_desc3
+,node_desc4
+,node_desc5
+,months
+,days
+,sales_grp
+,sales_grp_desc
+,prod_hierarchys
+,size_dim
+,zqdzh
+,factory;
