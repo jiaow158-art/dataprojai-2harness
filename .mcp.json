@@ -4,14 +4,14 @@
       "type": "stdio",
       "command": "/usr/bin/python3",
       "args": [
-        "/home/dp-user/dataprojv2/dataprojv2/dws_mcp_server.py"
+        "/home/dp-user/dataprojv2/dws_mcp_server.py"
       ],
       "env": {
-        "DWS_HOST": "121.37.200.214",
-        "DWS_PORT": "8000",
-        "DWS_DBNAME": "DP_DWS",
-        "DWS_USER": "aiuser",
-        "DWS_PASSWORD": "Dp123456"
+        "DWS_HOST": "${DWS_HOST}",
+        "DWS_PORT": "${DWS_PORT}",
+        "DWS_DBNAME": "${DWS_DBNAME}",
+        "DWS_USER": "${DWS_USER}",
+        "DWS_PASSWORD": "${DWS_PASSWORD}"
       }
     }
   }
