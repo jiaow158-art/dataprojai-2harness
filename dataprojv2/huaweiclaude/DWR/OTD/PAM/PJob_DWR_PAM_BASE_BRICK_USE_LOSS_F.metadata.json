@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_BASE_BRICK_USE_LOSS_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "技术部中试（研发）用坯记录表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

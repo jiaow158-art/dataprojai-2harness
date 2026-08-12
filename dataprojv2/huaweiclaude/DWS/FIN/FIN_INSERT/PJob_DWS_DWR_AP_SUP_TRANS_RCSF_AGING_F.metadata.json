@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWR_AP_SUP_TRANS_RCSF_AGING_F",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/FIN_INSERT",
-    "description": "供应商往来重分类后自然账龄",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

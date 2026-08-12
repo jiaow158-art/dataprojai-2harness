@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_CT_DEALER_INVENTORY_ANALYSE_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "B1经销商库存分析",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

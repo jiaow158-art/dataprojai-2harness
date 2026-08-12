@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OMS_USER_MONTHLY_D",
-    "type": "HiveSQL",
-    "directory": "/DM/SYSTEM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

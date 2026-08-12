@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PTP_PURCHASE_VCH_HEADER_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/PTP",
-    "description": "SAP采购凭证抬头表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwipur"
-}

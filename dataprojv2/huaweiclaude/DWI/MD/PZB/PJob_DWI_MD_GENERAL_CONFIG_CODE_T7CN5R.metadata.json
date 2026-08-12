@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_T7CN5R",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/PZB",
-    "description": "来源表T7CN5R",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

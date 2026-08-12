@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_FIN_GROUP_DAILY_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/FIN_INSERT",
-    "description": "瓷砖阿米巴V2集团日报2023",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

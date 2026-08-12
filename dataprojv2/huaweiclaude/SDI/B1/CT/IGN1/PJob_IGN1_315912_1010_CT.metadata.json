@@ -1,8 +1,0 @@
-{
-    "name": "PJob_IGN1_315912_1010_CT",
-    "type": "HiveSQL",
-    "directory": "/SDI/B1/CT/IGN1",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

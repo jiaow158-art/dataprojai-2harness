@@ -1,8 +1,0 @@
-{
-    "name": "DWR_DIM_CUST_SALES_AREA_D",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/CUST",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SFA_MD_INFO_T",
-    "type": "DWSSQL",
-    "directory": "/DM/SFA",
-    "description": "sfa门店信息",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

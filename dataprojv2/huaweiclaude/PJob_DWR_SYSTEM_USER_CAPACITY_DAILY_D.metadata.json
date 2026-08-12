@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_SYSTEM_USER_CAPACITY_DAILY_D",
-    "type": "HiveSQL",
-    "directory": "/",
-    "description": "各系统日用户基数统计表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

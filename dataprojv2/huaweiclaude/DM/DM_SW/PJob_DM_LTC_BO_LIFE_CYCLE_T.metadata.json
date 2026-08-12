@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_LTC_BO_LIFE_CYCLE_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

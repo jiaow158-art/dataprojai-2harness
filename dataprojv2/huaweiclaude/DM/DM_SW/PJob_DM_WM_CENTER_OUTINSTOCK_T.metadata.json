@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_CENTER_OUTINSTOCK_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

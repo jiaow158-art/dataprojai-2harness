@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_AR_RECEIVABLE_AGING_2023_INFO_2",
-    "type": "HiveSQL",
-    "directory": "/",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

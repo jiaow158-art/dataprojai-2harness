@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SUB_COMPANY_CITY_RETAIL_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": null,
-    "database": ""
-}

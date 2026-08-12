@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_LTC_CNTC_ITEM_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/LTC",
-    "description": "LTC合同行信息表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

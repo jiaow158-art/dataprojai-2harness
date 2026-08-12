@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_CT_INCOME_COST_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "瓷砖收入成本",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

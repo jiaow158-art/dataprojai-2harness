@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_PRODSTOCK_OUT_IN_T_BAK20220516",
-    "type": "HiveSQL",
-    "directory": "/DM/TMP",
-    "description": "OEM库存月拍照表备份",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

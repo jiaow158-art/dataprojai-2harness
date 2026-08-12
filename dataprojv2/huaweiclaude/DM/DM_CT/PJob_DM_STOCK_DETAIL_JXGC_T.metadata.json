@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_STOCK_DETAIL_JXGC_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

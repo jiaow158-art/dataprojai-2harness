@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_BASE_NEW_PRODUCTION_LINE_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "新产线维护信息表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_BO_DSPT_ORDER_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "一单到底自营工程提货单",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

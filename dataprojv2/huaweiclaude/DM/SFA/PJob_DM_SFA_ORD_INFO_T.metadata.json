@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SFA_ORD_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DM/SFA",
-    "description": "sfa订单数据同步接口",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

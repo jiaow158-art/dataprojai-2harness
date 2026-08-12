@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_FP_COMMITMENT_PROJ_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/AR",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

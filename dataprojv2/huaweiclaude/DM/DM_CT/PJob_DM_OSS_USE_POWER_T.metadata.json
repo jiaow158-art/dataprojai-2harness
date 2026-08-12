@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OSS_USE_POWER_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OTD_TOTAL_SALES_OUTGOODS_V",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW/VIEW",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

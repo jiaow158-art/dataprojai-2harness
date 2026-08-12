@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_STOCK_SKU_FREQUENCY_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/WM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

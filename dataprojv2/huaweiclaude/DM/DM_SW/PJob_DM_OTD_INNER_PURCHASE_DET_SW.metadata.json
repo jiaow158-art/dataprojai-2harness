@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OTD_INNER_PURCHASE_DET_SW",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

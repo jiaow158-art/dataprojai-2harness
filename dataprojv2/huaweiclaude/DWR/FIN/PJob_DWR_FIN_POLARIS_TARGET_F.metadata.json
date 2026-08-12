@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_FIN_POLARIS_TARGET_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN",
-    "description": "北极星指标目标",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_CUST_GENERAL_TMP",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/CUST",
-    "description": "1",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

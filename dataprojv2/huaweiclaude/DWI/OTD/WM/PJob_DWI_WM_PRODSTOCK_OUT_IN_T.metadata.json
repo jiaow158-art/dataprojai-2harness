@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_WM_PRODSTOCK_OUT_IN_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/WM",
-    "description": "SAP成品出入库表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

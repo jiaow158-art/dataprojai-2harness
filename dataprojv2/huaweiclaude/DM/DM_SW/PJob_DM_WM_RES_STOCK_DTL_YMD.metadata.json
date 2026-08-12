@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_RES_STOCK_DTL_YMD",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_LEVEL_STRUCTURE_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/LEVEL",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_FACTORY_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/FACT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_GL_INVOICE_ITEM_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/GL",
-    "description": "出具发票：项数据",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

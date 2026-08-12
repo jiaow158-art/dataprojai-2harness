@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_MATERIAL_SALES_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/MM",
-    "description": "物料主数据（销售数据）",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

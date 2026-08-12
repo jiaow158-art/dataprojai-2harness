@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WF_REQUESTS_CONSUMING_TIME_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "流程耗时明细表（请求ID维度）",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

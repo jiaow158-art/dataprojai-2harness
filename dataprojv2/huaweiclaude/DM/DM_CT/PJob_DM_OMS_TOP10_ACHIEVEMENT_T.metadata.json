@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OMS_TOP10_ACHIEVEMENT_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "TOP前十商品排行榜业绩",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

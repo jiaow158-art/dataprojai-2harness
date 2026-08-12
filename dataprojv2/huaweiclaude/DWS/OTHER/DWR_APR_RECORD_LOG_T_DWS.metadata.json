@@ -1,8 +1,0 @@
-{
-    "name": "DWR_APR_RECORD_LOG_T_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

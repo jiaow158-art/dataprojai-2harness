@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB71",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "共享仓辐射中小经销商收入同比增长率ZB71",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_ADMINISTRATION_RIGION_LIST_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/PI",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

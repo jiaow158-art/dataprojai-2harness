@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWR_AR_RECEIVABLE_AGING_2023_INFO_F",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/FIN_INSERT",
-    "description": "应收账龄明细-区分2023年前后格式",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

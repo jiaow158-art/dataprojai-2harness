@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_OTD_LOADING_PLAN_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PLAN",
-    "description": "装载计划模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

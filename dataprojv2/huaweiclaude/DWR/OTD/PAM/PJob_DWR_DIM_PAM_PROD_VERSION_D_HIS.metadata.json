@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_PAM_PROD_VERSION_D_HIS",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "基地生产版本快照表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

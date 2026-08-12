@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_PRODSTOCK_OUT_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "出库单",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

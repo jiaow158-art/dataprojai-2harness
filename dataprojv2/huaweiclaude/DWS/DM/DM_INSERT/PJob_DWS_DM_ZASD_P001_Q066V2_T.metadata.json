@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_ZASD_P001_Q066V2_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "销售收入表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

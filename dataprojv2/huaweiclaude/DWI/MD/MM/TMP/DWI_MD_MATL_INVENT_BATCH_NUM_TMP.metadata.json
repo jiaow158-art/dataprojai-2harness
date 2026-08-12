@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_MATL_INVENT_BATCH_NUM_TMP",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/MM/TMP",
-    "description": "物料主数据（库存批号信息）临时表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

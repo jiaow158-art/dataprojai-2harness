@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_CUST_DEFECT_STATIS",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "客诉质量问题统计报表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

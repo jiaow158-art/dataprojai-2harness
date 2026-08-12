@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_FACTORY_BAK",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/BACKUP",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrbs"
-}

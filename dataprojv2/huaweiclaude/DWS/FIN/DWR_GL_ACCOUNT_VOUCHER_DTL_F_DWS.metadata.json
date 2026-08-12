@@ -1,8 +1,0 @@
-{
-    "name": "DWR_GL_ACCOUNT_VOUCHER_DTL_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN",
-    "description": "会计凭证明细表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

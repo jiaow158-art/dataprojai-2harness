@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB62ZB63",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "逾期应收总额（工程市场中心-新增逾期与历史逾期）ZB62 ZB63",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

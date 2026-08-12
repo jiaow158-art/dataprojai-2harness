@@ -1,8 +1,0 @@
-{
-    "name": "DWR_WM_PROJECT_STOCK_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTD/WM",
-    "description": "SAP项目库存表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

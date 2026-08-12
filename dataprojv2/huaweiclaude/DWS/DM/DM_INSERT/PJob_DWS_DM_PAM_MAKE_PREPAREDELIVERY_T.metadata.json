@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_PAM_MAKE_PREPAREDELIVERY_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

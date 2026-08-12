@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_SAP_DEPT_INFO_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/ORG",
-    "description": "SAP组织架构表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_BASE_SHOP_BRICK_DAY_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "车间抛光线发砖日记录表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

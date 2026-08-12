@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_EXPENSE_TYPE_T_HIS",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/COST",
-    "description": "费用类型拉链表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

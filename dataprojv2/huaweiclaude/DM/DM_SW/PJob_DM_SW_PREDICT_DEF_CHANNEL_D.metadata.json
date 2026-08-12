@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SW_PREDICT_DEF_CHANNEL_D",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

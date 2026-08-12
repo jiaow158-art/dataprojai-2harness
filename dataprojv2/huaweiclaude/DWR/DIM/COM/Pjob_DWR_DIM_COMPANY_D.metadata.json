@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWR_DIM_COMPANY_D",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/COM",
-    "description": "1",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

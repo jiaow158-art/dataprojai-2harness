@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_RPT_TRADETICKET_QUOTA_T_LASTDAY_OF_LASTMONTH",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "取上个月最后一天",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

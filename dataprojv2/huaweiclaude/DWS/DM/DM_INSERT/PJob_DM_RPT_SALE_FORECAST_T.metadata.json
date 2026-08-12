@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_RPT_SALE_FORECAST_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "需求预测-业绩达成明细表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

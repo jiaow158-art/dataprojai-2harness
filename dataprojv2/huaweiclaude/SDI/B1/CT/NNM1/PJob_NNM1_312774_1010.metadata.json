@@ -1,8 +1,0 @@
-{
-    "name": "PJob_NNM1_312774_1010",
-    "type": "HiveSQL",
-    "directory": "/SDI/B1/CT/NNM1",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

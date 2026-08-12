@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_ORG_SALE_GRP_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/ORG",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

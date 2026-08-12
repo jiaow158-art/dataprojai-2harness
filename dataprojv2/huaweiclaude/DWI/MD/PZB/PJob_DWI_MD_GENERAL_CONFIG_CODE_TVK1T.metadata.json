@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_TVK1T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/PZB",
-    "description": "来源表TVK1T",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

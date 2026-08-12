@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SW_RPT_WM_CXC_DAY_SUM",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

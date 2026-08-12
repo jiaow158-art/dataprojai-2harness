@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SFA_CUST_CHANNEL_ALL_T",
-    "type": "DWSSQL",
-    "directory": "/DM/SFA",
-    "description": "crm客户所属渠道同步（与crm系统对比）",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

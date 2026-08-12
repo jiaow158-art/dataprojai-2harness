@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_GL_ACCOUNT_VOUCHER_DTL_F_INIT",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/TAX",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

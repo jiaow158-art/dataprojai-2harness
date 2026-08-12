@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_HR_DEA_LINEGROUP_REL_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/HR",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

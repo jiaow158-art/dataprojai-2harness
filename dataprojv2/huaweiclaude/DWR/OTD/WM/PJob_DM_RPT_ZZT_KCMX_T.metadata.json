@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_RPT_ZZT_KCMX_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/WM",
-    "description": "日常增量调度（按当月增量）",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

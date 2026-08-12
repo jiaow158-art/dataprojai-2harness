@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_SO_CHECK_ORDER_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/SO",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

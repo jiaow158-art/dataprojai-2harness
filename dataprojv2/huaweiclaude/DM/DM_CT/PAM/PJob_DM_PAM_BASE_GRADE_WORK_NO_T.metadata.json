@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_BASE_GRADE_WORK_NO_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "分级缺陷工序与缺陷对照表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

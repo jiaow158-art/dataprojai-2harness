@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_RPT_BATHROOM_COMMERCIAL_CENTER_SALES_REPORT_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "卫浴商用中心销售报表逻辑调整",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

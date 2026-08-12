@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_GL_SALES_GROUP_V",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/VIEW",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

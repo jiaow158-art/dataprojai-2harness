@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PS_SALE_ORDER_BLAN_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "产销管理报表DM层",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB58",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "准时交付率（工程-订单行）ZB58",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

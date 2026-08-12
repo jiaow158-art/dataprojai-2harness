@@ -1,8 +1,0 @@
-{
-    "name": "PJOB_DM_OWN_VS_OEM_COST_T",
-    "type": "HiveSQL",
-    "directory": "/DM/TMP",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

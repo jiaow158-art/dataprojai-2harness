@@ -1,9 +1,0 @@
--- DWS sql 
--- ******************************************************************** --
--- author: guzhengfeng
--- create time: 2022/12/29 15:56:18 GMT+08:00
--- ******************************************************************** --
--- 取上个月最后一天
-select distinct
-REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D1}') - INTERVAL '1 MONTH'),1,10),'-','') as PERIOD_ID_D	--	上个月最后一天
-from dm.dm_rpt_tradeticket_quota_t;

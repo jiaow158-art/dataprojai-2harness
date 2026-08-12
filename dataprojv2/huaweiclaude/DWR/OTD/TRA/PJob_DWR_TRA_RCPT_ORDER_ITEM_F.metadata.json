@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_TRA_RCPT_ORDER_ITEM_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/TRA",
-    "description": "TMS回单行表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

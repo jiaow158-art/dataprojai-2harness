@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_APR_NODE_BASIC_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/BS",
-    "description": "审批节点基本信息",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

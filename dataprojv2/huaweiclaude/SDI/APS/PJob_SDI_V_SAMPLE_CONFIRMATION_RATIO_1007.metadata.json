@@ -1,8 +1,0 @@
-{
-    "name": "PJob_SDI_V_SAMPLE_CONFIRMATION_RATIO_1007",
-    "type": "HiveSQL",
-    "directory": "/SDI/APS",
-    "description": "复板指标",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

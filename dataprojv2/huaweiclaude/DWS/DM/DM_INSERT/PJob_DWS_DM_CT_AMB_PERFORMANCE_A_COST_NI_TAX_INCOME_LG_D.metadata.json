@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_CT_AMB_PERFORMANCE_A_COST_NI_TAX_INCOME_LG_D",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "瓷砖阿米巴业绩和A成本不含税收入线组维度",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

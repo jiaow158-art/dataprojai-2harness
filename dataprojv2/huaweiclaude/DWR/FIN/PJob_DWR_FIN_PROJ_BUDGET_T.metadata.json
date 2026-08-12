@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_FIN_PROJ_BUDGET_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN",
-    "description": "获取项目预算模型(SAP/FSSC)",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

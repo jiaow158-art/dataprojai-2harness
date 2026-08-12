@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_AMBV2_CHDJ_GRP_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "存货跌价分摊（线组）",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

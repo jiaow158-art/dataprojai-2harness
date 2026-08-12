@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PRC_CONDITIONAL_PRICE_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/PRC",
-    "description": "定价要素表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

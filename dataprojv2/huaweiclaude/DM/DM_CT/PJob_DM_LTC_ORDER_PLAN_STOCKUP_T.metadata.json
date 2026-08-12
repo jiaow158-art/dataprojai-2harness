@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_LTC_ORDER_PLAN_STOCKUP_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

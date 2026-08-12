@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_FIN_STOCK_D_ACCAGE_LIST_C_T_2023",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "库存明细账龄上市口径",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

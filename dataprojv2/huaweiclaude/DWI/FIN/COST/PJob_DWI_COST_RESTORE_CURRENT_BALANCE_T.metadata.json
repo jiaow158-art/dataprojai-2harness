@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_COST_RESTORE_CURRENT_BALANCE_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/COST",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

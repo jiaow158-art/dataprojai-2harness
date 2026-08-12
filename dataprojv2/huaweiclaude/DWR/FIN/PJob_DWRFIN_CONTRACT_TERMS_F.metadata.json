@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWRFIN_CONTRACT_TERMS_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

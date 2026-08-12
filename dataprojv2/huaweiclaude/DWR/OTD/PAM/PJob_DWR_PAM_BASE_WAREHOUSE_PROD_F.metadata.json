@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_BASE_WAREHOUSE_PROD_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "基地过仓产量模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

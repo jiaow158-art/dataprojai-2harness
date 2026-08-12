@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WF_REQUESTS_CONSUMING_TIME_S_BAK20220418",
-    "type": "HiveSQL",
-    "directory": "/DM/TMP",
-    "description": "L1耗时汇总备份表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

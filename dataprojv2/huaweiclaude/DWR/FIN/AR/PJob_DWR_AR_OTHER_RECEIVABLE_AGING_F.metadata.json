@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_AR_OTHER_RECEIVABLE_AGING_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/AR",
-    "description": "其他应收逾期账龄",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

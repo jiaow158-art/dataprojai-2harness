@@ -1,8 +1,0 @@
-{
-    "name": "PJob_VACUUM_FULL_TABLE",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER",
-    "description": "清理DWS脏数据率高的表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

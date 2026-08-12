@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_TRA_TMS_TRANSPORT_PLAN_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/PLAN",
-    "description": "运输计划表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

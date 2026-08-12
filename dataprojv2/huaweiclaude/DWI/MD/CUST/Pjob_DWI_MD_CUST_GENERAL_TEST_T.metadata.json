@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_MD_CUST_GENERAL_TEST_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/CUST",
-    "description": "客户主数据（一般数据）调度",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

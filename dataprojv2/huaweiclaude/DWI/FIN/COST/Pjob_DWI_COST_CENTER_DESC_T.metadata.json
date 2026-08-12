@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_COST_CENTER_DESC_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/COST",
-    "description": "成本中心说明文本-逻辑脚本",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

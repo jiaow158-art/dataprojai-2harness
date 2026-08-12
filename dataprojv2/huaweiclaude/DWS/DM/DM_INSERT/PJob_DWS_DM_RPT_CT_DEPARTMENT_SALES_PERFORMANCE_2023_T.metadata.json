@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_RPT_CT_DEPARTMENT_SALES_PERFORMANCE_2023_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "瓷砖事业部销售业绩",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

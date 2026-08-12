@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_TARGET_ACHIEVEMENT_REGION",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

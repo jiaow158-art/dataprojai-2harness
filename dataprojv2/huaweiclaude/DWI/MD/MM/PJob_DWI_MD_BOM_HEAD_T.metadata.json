@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_BOM_HEAD_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/MM",
-    "description": "BOM表头调度",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

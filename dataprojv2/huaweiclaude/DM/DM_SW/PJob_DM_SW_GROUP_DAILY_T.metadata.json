@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SW_GROUP_DAILY_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "卫浴周报汇总表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

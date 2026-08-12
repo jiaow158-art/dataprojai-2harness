@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PRC_CONDITIONAL_PRICE_TMP",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/PRC",
-    "description": "定价要素临时表，用于获取增量数据",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

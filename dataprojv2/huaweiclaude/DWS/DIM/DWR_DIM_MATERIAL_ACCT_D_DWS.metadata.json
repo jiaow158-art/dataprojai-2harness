@@ -1,8 +1,0 @@
-{
-    "name": "DWR_DIM_MATERIAL_ACCT_D_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/DIM",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

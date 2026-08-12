@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_OTD_PAM_COST_REDUCTION_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

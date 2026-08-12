@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_DEMAND_ANALYSE_T",
-    "type": "DWSSQL",
-    "directory": "/DM/TMP",
-    "description": "需求分析报表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

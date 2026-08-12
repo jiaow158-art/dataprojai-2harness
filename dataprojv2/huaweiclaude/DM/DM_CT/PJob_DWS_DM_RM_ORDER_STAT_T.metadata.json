@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_RM_ORDER_STAT_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_STOCK_ANALYSIS_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "卫浴库存分析报表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

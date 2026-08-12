@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SO_OMS_POLICY_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "OMS订货会政策",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

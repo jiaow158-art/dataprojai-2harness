@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_APR_NODE_BASIC_INFO_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER/OTHER_INSERT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

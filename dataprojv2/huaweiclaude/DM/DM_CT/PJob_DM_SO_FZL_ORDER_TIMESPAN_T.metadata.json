@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SO_FZL_ORDER_TIMESPAN_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "非战略订单交付周期",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

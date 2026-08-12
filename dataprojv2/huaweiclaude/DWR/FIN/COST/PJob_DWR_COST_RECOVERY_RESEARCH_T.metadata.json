@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_COST_RECOVERY_RESEARCH_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/COST",
-    "description": "分段成本还原本期结存-研发费用",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

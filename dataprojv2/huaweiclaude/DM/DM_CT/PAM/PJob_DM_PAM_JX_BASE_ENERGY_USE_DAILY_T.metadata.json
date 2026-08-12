@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_JX_BASE_ENERGY_USE_DAILY_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "江西基地能源耗用日报表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

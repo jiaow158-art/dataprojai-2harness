@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PTP_PURCHASE_APPLY_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/PTP",
-    "description": "SAP采购申请表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwipur"
-}

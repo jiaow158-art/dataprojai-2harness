@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_WF_REQUESTS_CONSUMING_TIME_PRE_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "耗时明细前端展示层",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

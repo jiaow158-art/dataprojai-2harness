@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_OA_RPT_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/BIT/RM",
-    "description": "OA：数据中心报表列表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

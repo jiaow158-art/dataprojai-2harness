@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_SO_HEAD_MODIFY_DSS_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/SO",
-    "description": "DSS修改订单头",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

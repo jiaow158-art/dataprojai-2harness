@@ -1,8 +1,0 @@
-{
-    "name": "PJob_GET_MONTH",
-    "type": "HiveSQL",
-    "directory": "/DM/TMP",
-    "description": "获取月份",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

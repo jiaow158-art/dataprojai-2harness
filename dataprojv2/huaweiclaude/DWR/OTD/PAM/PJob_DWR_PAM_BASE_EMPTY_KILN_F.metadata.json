@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_BASE_EMPTY_KILN_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "基地空窑时间模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

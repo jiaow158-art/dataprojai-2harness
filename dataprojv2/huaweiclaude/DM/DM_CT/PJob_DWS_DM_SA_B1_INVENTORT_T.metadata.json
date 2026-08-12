@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SA_B1_INVENTORT_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "瓷砖B1库存-按日快照",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_FI_AMBV2_PROFIT_SUM_LISTED_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "集团利润表-上市口径",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

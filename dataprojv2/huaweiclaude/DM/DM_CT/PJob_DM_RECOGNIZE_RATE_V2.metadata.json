@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_RECOGNIZE_RATE_V2",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "各打包线追溯率",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrbit"
-}

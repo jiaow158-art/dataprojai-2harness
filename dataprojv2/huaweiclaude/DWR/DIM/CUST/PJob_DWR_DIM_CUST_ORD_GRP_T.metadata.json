@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_CUST_ORD_GRP_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/CUST",
-    "description": "客户订单组",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

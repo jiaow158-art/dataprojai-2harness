@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_EMPLOYEE_BASIC_INFO_D_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/DIM/DIM_INSERT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

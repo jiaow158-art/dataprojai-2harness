@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_WM_B1_INVENTORY_T_MM",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "B1库存月份汇总表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

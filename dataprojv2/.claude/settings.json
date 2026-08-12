@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "mcp__dws__run_query",
-      "mcp__dws__describe_table"
-    ]
-  }
-}

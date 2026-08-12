@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_RPT_WM_CXC_MONTH_SUM",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "基地产销存报表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

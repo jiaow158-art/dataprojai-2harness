@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_ORD_UNIT_T_BAK",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/ORG",
-    "description": "主数据：组织单位表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwimd"
-}

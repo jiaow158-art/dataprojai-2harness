@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_SUPPLIER_GENERAL_D",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/SUP",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrbs"
-}

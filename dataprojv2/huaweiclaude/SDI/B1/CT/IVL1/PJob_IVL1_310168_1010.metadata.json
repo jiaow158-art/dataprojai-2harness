@@ -1,8 +1,0 @@
-{
-    "name": "PJob_IVL1_310168_1010",
-    "type": "HiveSQL",
-    "directory": "/SDI/B1/CT/IVL1",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

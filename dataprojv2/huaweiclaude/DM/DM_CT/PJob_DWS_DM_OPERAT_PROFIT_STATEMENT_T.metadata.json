@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_OPERAT_PROFIT_STATEMENT_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "利润表平铺版底表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

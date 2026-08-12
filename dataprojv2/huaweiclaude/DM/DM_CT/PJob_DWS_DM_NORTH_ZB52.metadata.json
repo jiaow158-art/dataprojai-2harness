@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB52",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "经营费用率（(制造与技术中心）ZB52",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

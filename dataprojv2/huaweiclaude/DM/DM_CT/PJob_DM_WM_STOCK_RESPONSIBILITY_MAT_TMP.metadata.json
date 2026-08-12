@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_MAT_TMP",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "供应链瓷砖产品范围",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

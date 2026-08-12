@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PLAN_PRODUCT_SPECTRUM_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/PLAN",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

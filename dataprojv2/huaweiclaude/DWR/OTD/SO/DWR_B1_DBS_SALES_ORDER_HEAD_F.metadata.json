@@ -1,8 +1,0 @@
-{
-    "name": "DWR_B1_DBS_SALES_ORDER_HEAD_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/SO",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

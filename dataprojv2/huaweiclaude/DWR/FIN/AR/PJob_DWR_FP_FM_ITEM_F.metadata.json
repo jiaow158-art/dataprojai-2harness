@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_FP_FM_ITEM_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/AR",
-    "description": "在资金管理中的FI行项目",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

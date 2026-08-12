@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_SO_TRANS_STORE_HEAD_DSS_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/SO",
-    "description": "DSS转储单头",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

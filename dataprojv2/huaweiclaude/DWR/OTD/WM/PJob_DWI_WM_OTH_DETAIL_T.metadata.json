@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_WM_OTH_DETAIL_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/WM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

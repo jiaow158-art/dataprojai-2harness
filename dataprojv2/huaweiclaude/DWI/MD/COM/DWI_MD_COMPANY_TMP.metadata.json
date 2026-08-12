@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_COMPANY_TMP",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/COM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

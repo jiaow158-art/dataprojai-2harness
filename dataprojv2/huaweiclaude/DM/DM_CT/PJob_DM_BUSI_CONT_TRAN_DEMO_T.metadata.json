@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_BUSI_CONT_TRAN_DEMO_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "商机评审合同转化模型",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

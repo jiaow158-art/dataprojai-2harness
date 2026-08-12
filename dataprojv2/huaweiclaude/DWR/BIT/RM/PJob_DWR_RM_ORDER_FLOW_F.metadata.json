@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_RM_ORDER_FLOW_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/BIT/RM",
-    "description": "需求工单流转明细表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrbit"
-}

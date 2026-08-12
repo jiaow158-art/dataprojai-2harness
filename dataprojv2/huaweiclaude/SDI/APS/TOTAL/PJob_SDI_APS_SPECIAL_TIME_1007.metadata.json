@@ -1,8 +1,0 @@
-{
-    "name": "PJob_SDI_APS_SPECIAL_TIME_1007",
-    "type": "HiveSQL",
-    "directory": "/SDI/APS/TOTAL",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

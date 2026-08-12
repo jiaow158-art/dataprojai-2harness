@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_EMPLOYEE_BASIC_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/HR",
-    "description": "员工基础信息",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

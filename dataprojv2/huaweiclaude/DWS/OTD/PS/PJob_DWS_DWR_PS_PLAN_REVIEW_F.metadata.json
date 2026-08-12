@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWR_PS_PLAN_REVIEW_F",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTD/PS",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

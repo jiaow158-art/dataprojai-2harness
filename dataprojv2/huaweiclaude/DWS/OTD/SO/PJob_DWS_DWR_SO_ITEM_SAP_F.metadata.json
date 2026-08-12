@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWR_SO_ITEM_SAP_F",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTD/SO",
-    "description": "SAP销售订单行表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

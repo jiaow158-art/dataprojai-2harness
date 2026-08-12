@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PDM_FLEEING_INSPECTION_1040",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

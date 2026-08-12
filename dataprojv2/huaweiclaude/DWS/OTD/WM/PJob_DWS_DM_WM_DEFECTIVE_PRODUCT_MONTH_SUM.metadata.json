@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_WM_DEFECTIVE_PRODUCT_MONTH_SUM",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTD/WM",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "DWR_DIM_SUPPLIER_GENERAL_D_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/DIM",
-    "description": "供应商主数据（一般数据）",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

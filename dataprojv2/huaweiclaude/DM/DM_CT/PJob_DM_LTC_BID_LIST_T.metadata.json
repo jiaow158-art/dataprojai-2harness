@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_LTC_BID_LIST_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "LTC保证金清单",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

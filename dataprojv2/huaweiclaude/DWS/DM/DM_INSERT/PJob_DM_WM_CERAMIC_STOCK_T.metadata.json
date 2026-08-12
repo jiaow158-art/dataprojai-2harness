@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_CERAMIC_STOCK_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

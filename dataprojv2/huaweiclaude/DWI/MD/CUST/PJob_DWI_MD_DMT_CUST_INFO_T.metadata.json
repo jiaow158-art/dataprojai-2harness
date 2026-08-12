@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_DMT_CUST_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/CUST",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_CRE_INTEGRAL_CHANGE_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/CRE",
-    "description": "积分更改记录表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

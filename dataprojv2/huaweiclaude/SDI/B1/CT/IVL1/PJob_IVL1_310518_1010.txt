@@ -1,4 +1,0 @@
---经销商数据库做了迁移，将新旧数据库数据做融合
-ALTER TABLE SDI.SDI_IVL1_1010 drop partition(custcode= '310518');INSERT INTO TABLE SDI.SDI_IVL1_1010 partition(custcode= '310518')(TransSeq,LayerID,CalcPrice,Balance,TransValue,LayerInQty,LayerOutQ,RevalTotal,CUST_CODE,DEL_FLAG,DW_LAST_UPDATE_DATE) SELECT TransSeq,LayerID,CalcPrice,Balance,TransValue,LayerInQty,LayerOutQ,RevalTotal,'310518' AS CUST_CODE,'N' AS DEL_FLAG, current_timestamp() as DW_LAST_UPDATE_DATE  FROM STG.STG_IVL1_310518_1010
-union all
-SELECT TransSeq,LayerID,CalcPrice,Balance,TransValue,LayerInQty,LayerOutQ,RevalTotal,'310518' AS CUST_CODE,'N' AS DEL_FLAG, current_timestamp() as DW_LAST_UPDATE_DATE  FROM STG.STG_IVL1_310518_1010_his;

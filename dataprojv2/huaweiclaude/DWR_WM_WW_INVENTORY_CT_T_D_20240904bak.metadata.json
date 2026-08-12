@@ -1,8 +1,0 @@
-{
-    "name": "DWR_WM_WW_INVENTORY_CT_T_D_20240904bak",
-    "type": "HiveSQL",
-    "directory": "/",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

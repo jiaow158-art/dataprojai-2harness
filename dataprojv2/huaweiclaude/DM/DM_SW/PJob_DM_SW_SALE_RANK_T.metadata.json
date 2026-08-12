@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SW_SALE_RANK_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

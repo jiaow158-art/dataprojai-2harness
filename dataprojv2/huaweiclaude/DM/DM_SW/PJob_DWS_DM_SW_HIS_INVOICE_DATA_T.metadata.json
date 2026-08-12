@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SW_HIS_INVOICE_DATA_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "卫浴历史出货数据表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

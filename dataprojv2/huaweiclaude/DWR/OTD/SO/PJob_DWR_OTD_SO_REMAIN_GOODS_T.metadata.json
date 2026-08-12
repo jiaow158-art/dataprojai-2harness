@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_OTD_SO_REMAIN_GOODS_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/SO",
-    "description": "订单留货数模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

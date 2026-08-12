@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_MAT_PERIOD_PRICE_R",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/PRC",
-    "description": "物料期间周期价记录表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

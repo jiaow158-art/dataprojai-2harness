@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_TRA_TMS_SHIP_DTL_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/TRA",
-    "description": "运单模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

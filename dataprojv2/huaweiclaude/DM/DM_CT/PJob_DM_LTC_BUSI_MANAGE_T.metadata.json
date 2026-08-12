@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_LTC_BUSI_MANAGE_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "驾驶舱-商机管理模型",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

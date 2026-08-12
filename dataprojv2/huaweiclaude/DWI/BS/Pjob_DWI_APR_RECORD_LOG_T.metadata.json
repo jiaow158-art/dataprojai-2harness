@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_APR_RECORD_LOG_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/BS",
-    "description": "审批记录日志表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

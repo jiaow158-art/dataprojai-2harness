@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_SAP_ESTBL_STAT_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/ORG",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

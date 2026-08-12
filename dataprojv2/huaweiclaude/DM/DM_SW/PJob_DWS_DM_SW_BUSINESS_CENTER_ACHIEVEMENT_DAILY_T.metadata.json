@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SW_BUSINESS_CENTER_ACHIEVEMENT_DAILY_T",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

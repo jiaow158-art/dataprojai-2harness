@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_QMS_PROD_CHK_ORDER_INFO_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/QMS",
-    "description": "成品检测单",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "DWR_FP_COMMITMENT_PROJ_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN",
-    "description": "承诺项目主数据",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

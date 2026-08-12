@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PS_APS_PROTECH_ORDER_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PS",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

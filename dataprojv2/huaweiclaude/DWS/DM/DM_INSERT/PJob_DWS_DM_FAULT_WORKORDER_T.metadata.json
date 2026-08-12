@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_FAULT_WORKORDER_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "故障工单",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

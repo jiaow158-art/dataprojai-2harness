@@ -1,8 +1,0 @@
-{
-    "name": "PJob_OBTN_316158_1010_CT",
-    "type": "HiveSQL",
-    "directory": "/SDI/B1/CT/OBTN",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

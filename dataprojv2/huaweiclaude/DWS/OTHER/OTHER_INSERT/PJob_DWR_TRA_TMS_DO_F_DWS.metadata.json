@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_TRA_TMS_DO_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER/OTHER_INSERT",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

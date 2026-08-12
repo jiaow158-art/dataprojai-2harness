@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB54",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "区域化交付率ZB54",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

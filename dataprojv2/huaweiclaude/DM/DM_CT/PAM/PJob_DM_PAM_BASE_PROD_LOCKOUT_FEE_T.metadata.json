@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_BASE_PROD_LOCKOUT_FEE_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "生产线停产费用明细表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

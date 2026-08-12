@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SO_BUSI_CHANCE_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "工程报价单出货统计表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

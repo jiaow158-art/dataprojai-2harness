@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_CRE_CUST_CREDIT_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/AR",
-    "description": "客户授信",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

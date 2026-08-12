@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_STORE_DATA_DETAIL_F",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

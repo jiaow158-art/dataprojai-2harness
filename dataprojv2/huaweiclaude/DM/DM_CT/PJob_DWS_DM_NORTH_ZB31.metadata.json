@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB31",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "经营费用率（瓷砖事业部）ZB31",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

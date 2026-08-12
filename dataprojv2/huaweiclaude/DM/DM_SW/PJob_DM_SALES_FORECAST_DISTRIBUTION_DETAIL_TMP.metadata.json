@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SALES_FORECAST_DISTRIBUTION_DETAIL_TMP",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_SW",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

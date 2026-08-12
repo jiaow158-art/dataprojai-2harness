@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_SO_MOS_ORDER_INFO_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/CS/DMT",
-    "description": "意向订单",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

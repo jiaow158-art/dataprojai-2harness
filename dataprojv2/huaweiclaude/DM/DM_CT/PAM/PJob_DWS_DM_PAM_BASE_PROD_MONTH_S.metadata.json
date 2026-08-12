@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_PAM_BASE_PROD_MONTH_S",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "基地生产报表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

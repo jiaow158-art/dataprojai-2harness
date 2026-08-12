@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_GENE_BOARD_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "DAS基因版表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SO_ZL_ORDER_PRE_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/DM/DM_INSERT",
-    "description": "战略工程订单展示层表",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

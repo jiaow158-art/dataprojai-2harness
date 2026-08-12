@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_ORG_COST_EMP_D_TEST",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/ORG",
-    "description": "销售组织与成本中心关联",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

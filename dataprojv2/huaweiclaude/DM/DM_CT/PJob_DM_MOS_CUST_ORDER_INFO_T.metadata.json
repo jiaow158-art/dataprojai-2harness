@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_MOS_CUST_ORDER_INFO_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "店效倍增明细表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

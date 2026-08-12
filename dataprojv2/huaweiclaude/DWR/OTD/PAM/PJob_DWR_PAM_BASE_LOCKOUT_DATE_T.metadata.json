@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_BASE_LOCKOUT_DATE_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "基地 停工天数表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

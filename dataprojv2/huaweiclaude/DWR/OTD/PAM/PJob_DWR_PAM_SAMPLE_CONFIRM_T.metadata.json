@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PAM_SAMPLE_CONFIRM_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/PAM",
-    "description": "aps复板模型",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

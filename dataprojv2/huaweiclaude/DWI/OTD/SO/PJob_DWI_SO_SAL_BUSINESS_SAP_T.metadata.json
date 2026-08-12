@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_SO_SAL_BUSINESS_SAP_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/SO",
-    "description": "SAP销售凭证业务数据表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

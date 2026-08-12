@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB53",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "特定产品销售面积ZB53",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

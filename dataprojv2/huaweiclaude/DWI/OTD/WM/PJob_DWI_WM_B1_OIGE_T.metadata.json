@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_WM_B1_OIGE_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/WM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_CS_MOS_CONFLCT_INFO_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/CS/DMT",
-    "description": "冲突记录",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

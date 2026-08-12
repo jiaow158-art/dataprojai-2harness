@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_DATA_MATERIAL_FACTORY_T_20230422",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD",
-    "description": "产品工厂主数据",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

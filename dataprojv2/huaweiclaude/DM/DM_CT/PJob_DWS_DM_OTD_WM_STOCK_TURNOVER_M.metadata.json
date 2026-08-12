@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_OTD_WM_STOCK_TURNOVER_M",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "DM_OTD_WM_STOCK_TURNOVER_M",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

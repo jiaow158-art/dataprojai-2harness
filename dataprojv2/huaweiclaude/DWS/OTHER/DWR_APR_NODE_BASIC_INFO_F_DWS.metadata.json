@@ -1,8 +1,0 @@
-{
-    "name": "DWR_APR_NODE_BASIC_INFO_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

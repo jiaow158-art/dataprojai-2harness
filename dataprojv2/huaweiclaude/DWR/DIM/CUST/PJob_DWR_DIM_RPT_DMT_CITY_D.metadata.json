@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_RPT_DMT_CITY_D",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/CUST",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

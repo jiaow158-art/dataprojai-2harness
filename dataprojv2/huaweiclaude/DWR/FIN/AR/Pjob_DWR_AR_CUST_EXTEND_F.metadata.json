@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWR_AR_CUST_EXTEND_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/AR",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

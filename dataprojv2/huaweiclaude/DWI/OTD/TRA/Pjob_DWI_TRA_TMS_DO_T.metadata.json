@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_TRA_TMS_DO_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/TRA",
-    "description": "1",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

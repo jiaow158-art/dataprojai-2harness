@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WF_EMP_CONSUMING_TIME_S",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "人员耗时汇总表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

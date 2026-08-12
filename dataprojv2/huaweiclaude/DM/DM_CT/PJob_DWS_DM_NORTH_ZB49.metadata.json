@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_NORTH_ZB49",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT",
-    "description": "税后净利润-标A（国内直营中心）ZB49",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

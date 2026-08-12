@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_SA_CT_CHANNEL_ACHIEVEMENT_DAILY_T",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/FIN_INSERT",
-    "description": "瓷砖渠道业绩日报",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

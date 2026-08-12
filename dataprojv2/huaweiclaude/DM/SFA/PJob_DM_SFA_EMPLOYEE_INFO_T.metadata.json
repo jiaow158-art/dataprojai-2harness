@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SFA_EMPLOYEE_INFO_T",
-    "type": "DWSSQL",
-    "directory": "/DM/SFA",
-    "description": "sfa人员信息同步脚本",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

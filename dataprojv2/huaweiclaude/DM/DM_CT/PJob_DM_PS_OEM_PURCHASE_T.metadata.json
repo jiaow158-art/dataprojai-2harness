@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PS_OEM_PURCHASE_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "瓷砖OEM日报表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

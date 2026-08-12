@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PS_MATERIAL_AREA_BIO_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/PS",
-    "description": "SAP物料产区归属表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

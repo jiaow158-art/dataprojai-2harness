@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_LOCKOUT_UNIT_PRICE_MONTH",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "停工影响表-常规 ",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

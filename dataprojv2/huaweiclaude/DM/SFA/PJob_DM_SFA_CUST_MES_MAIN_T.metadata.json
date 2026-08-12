@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SFA_CUST_MES_MAIN_T",
-    "type": "DWSSQL",
-    "directory": "/DM/SFA",
-    "description": "sfa专用经销商主档信息",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

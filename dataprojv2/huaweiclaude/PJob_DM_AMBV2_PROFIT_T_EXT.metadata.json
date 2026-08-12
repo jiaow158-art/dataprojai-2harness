@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_AMBV2_PROFIT_T_EXT",
-    "type": "DWSSQL",
-    "directory": "/",
-    "description": "成本调整值补数据程序",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

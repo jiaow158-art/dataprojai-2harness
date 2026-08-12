@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_AR_RECEIVABLE_BALANCE_CURRENCY_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/AR",
-    "description": "应收余额表(货币)",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

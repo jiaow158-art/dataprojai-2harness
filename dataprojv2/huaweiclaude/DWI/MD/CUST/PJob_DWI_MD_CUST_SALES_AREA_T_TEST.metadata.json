@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_CUST_SALES_AREA_T_TEST",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/CUST",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwifin"
-}

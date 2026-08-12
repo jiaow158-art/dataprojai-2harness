@@ -1,8 +1,0 @@
-{
-    "name": "PJOB_DWI_MD_FR_FINE_RECORD_EXECUTE_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/BIT/OPR",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

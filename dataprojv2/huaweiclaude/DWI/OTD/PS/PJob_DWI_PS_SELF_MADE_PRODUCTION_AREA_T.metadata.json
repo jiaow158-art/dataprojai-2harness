@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PS_SELF_MADE_PRODUCTION_AREA_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/PS",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

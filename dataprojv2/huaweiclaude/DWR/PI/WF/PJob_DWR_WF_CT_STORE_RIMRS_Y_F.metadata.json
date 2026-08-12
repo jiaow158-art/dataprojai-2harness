@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_WF_CT_STORE_RIMRS_Y_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/PI/WF",
-    "description": "BIT049-终端门店报销流程（瓷砖专用2024）表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwipi"
-}

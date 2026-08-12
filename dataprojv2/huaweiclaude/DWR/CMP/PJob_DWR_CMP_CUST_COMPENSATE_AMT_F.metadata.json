@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_CMP_CUST_COMPENSATE_AMT_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/CMP",
-    "description": "赔偿金额信息表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

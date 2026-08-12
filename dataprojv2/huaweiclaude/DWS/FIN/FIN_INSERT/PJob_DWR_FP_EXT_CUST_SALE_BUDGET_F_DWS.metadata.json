@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_FP_EXT_CUST_SALE_BUDGET_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/FIN/FIN_INSERT",
-    "description": "外部客户月度销售预算",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

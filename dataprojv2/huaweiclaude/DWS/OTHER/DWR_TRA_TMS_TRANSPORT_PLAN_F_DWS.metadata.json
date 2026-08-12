@@ -1,8 +1,0 @@
-{
-    "name": "DWR_TRA_TMS_TRANSPORT_PLAN_F_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/OTHER",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

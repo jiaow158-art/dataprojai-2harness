@@ -1,8 +1,0 @@
-{
-    "name": "Pjob_DWI_PRC_PRICE_CONDITION_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/AR",
-    "description": "内部结算价格",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrfin"
-}

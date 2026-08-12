@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_MATERIAL_INVENTORY_LOC_TMP",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/MM/TMP",
-    "description": "物料主数据（库存地点数据）临时",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

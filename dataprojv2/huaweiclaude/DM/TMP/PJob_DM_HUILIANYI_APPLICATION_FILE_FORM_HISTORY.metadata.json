@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_HUILIANYI_APPLICATION_FILE_FORM_HISTORY",
-    "type": "DWSSQL",
-    "directory": "/DM/TMP",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

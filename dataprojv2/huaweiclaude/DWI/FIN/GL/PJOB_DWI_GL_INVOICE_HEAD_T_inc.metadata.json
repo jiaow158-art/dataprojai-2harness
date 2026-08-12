@@ -1,8 +1,0 @@
-{
-    "name": "PJOB_DWI_GL_INVOICE_HEAD_T_inc",
-    "type": "HiveSQL",
-    "directory": "/DWI/FIN/GL",
-    "description": "用于提取增量月份",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

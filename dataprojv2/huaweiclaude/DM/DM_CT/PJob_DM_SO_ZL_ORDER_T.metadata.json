@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_SO_ZL_ORDER_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "准校准提-战略订单底表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

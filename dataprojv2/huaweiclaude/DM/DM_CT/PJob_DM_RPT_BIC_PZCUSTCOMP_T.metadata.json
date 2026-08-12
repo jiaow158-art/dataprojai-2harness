@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_RPT_BIC_PZCUSTCOMP_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

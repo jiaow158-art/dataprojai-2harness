@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWI_MD_DATA_MATERIAL_GENERAL_T_01",
-    "type": "DWSSQL",
-    "directory": "/DWS/DIM/DIM_INSERT",
-    "description": "物料一般数据增加判断高值和1+N的逻辑",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

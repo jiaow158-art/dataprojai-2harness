@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_WM_PRODSTOCK_OUT_IN_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT",
-    "description": "物料凭证月拍照表（库存）",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dm"
-}

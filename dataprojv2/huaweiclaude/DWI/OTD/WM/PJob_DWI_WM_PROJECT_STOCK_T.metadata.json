@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_WM_PROJECT_STOCK_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/WM",
-    "description": "SAP项目库存表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwiotd"
-}

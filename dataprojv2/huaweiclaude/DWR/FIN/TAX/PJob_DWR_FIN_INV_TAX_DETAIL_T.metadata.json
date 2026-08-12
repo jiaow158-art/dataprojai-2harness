@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_FIN_INV_TAX_DETAIL_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/FIN/TAX",
-    "description": "发票税票明细表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

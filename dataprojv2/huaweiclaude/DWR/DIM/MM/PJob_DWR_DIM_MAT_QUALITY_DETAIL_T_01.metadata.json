@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_MAT_QUALITY_DETAIL_T_01",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/MM",
-    "description": "物料质量监控明细数据-基础数据",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DM_B1_TRANSIT_INVENTORY_t",
-    "type": "DWSSQL",
-    "directory": "/DM/DM_SW",
-    "description": "运营中心在途库存",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_WF_REQUEST_BASIC_INTO_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/PI/WF",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrpi"
-}

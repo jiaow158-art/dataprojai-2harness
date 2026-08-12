@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_PAM_COST_JX_INV_PD_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/OTD/PAM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

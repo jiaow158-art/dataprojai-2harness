@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_PROJ_BUSI_GATHER_T",
-    "type": "HiveSQL",
-    "directory": "/DWR/LTC",
-    "description": "LTC、CRM合并表",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

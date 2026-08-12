@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_SO_POLICY_ITEM_DSS_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/SO",
-    "description": "DSS折扣政策行",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

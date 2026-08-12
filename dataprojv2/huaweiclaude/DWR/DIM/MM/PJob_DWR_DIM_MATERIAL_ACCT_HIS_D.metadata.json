@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_DIM_MATERIAL_ACCT_HIS_D",
-    "type": "HiveSQL",
-    "directory": "/DWR/DIM/MM",
-    "description": "mbewh 物料评估：历史",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

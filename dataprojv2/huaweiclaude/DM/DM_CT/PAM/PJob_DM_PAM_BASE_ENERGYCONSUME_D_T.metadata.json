@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_PAM_BASE_ENERGYCONSUME_D_T",
-    "type": "HiveSQL",
-    "directory": "/DM/DM_CT/PAM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

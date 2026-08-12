@@ -1,8 +1,0 @@
-{
-    "name": "DWI_MD_BOM_ITEM_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/MM",
-    "description": "BOM表行",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "stg"
-}

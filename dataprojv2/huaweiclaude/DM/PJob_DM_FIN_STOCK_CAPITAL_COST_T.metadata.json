@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DM_FIN_STOCK_CAPITAL_COST_T",
-    "type": "HiveSQL",
-    "directory": "/DM",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_ITR_USER_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/CC",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

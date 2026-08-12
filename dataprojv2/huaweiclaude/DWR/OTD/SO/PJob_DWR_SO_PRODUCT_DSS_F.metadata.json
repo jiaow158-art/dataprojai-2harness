@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWR_SO_PRODUCT_DSS_F",
-    "type": "HiveSQL",
-    "directory": "/DWR/OTD/SO",
-    "description": "DSS产品",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwrotd"
-}

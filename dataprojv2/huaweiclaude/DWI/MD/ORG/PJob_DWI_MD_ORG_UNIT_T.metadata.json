@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_ORG_UNIT_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD/ORG",
-    "description": "",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "dwimd"
-}

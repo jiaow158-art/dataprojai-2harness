@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWI_MD_MATERIAL_BRAND_T",
-    "type": "HiveSQL",
-    "directory": "/DWI/MD",
-    "description": "物料品牌主数据",
-    "connectionName": "dp_mrs_hive_prod",
-    "database": "sdi"
-}

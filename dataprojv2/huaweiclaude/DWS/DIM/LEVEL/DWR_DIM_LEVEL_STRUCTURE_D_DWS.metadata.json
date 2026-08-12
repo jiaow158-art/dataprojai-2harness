@@ -1,8 +1,0 @@
-{
-    "name": "DWR_DIM_LEVEL_STRUCTURE_D_DWS",
-    "type": "DWSSQL",
-    "directory": "/DWS/DIM/LEVEL",
-    "description": "层次结构表(表结构)",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}

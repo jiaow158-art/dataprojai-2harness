@@ -1,8 +1,0 @@
-{
-    "name": "PJob_DWS_DWR_BO_PROJECT_DETAIL_HIS",
-    "type": "DWSSQL",
-    "directory": "/DWR/LTC",
-    "description": "",
-    "connectionName": "dp_dws_prod",
-    "database": "DP_DWS"
-}
