@@ -1,0 +1,214 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/11/18 16:35:08 GMT+08:00
+-- description:基地过仓产量模型
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- CREATE TABLE DWROTD.DWR_PAM_BASE_WAREHOUSE_PROD_F (
+--  site_code string comment '工厂代码'
+-- ,site_name string comment '工厂名称'
+-- ,work_shop_code string comment '车间代码'
+-- ,work_shop_name string comment '车间名称'
+-- ,product_line_code string comment '产线代码'
+-- ,product_line_name string comment '产线名称'
+-- ,work_no_code string comment '工序代码'
+-- ,work_no_name string comment '工序名称'
+-- ,group_code string comment '班组代码'
+-- ,group_name string comment '班组名称'
+-- ,shift_date date comment '班次日期'
+-- ,shift_code string comment '班次代码'
+-- ,shift_name string comment '班次名称'
+-- ,shift_start_time timestamp comment '开始时间'
+-- ,shift_end_time timestamp comment '结束时间'
+-- ,material_num string comment '物料编码'
+-- ,batch_num string comment '批次'
+-- ,grade string comment '等级'
+-- ,product_date date comment '生产日期'
+-- ,UNIT_AREA decimal(38,10) comment '单位面积'
+-- ,emit_num decimal(38,10) comment '发出数量'
+-- ,act_num decimal(38,10) comment '实际数量'
+-- ,total_num decimal(38,10) comment '总件数'
+-- ,create_time timestamp comment '创建时间'
+-- ,update_time timestamp comment '修改时间'
+-- ,creater string comment '创建人姓名'
+-- ,updater string comment '修改人姓名'
+-- ,DEL_FLAG string comment '删除标识'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+-- PARTITIONED BY (
+-- `PERIOD_ID_M` string)
+
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with tmp as (
+select 
+ site as site_code	--工厂代码
+,site_describe	as site_name--工厂名称
+,work_shop as work_shop_code --车间代码
+,work_shop_desc	as work_shop_name--车间名称
+,product_line as product_line_code	--产线代码
+,product_line_desc	as product_line_name--产线名称
+,work_no_code	--工序代码
+,work_no_desc as work_no_name	--工序名称
+,group_code	--班组代码
+,group_desc	as group_name--班组名称
+,shift_date	--班次日期
+,shift_code	--班次代码
+,shift_description as shift_name--班次名称
+,shift_start_time	--开始时间
+,shift_end_time	--结束时间
+,product_code as material_num	--产品编号
+,batch  as batch_num --批次
+,grade -- 等级
+,product_date	--生产日期
+,emit_number as emit_num	--发出数量
+,practical_number as act_num --实际数量
+,total_number as total_num	--总件数
+,create_time	--创建时间
+,update_time	--修改时间
+,creater	--创建人姓名
+,updater	--修改人姓名
+from SDI.SDI_DP_DATA_FENJI_WAREHOUSE_INVENTORY_DETAIL_1006
+where site in ('1300','1800') and delete_flag = '1'
+and shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all
+select 
+ site as site_code	--工厂代码
+,site_describe	as site_name--工厂名称
+,production_work_shop as work_shop_code --车间代码
+,production_work_shop_desc	as work_shop_name--车间名称
+,production_product_line as product_line_code	--产线代码
+,production_product_line_desc as product_line_name--产线名称
+,work_no_code	--工序代码
+,work_no_desc as work_no_name	--工序名称
+,group_code	--班组代码
+,group_desc	as group_name--班组名称
+,shift_date	--班次日期
+,shift_code	--班次代码
+,shift_description as shift_name--班次名称
+,shift_start_time	--开始时间
+,shift_end_time	--结束时间
+,product_code as material_num	--产品编号
+,batch  as batch_num--批次
+,grade -- 等级
+,product_date	--生产日期
+,emit_number as emit_num	--发出数量
+,practical_number as act_num --实际数量
+,total_number as total_num	--总件数
+,create_time	--创建时间
+,update_time	--修改时间
+,creater	--创建人姓名
+,updater	--修改人姓名
+from sdi.sdi_dj_grade_warehouse_inventory_detail_1006
+where site = '1500' and delete_flag = '1'
+and shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all  
+select 
+ T1.site as site_code	--工厂代码
+,T1.site_describe	as site_name--工厂名称
+,T1.work_shop as work_shop_code --车间代码
+,T1.work_shop_desc	as work_shop_name--车间名称
+,T1.product_line as product_line_code	--产线代码
+,T1.product_line_desc	as product_line_name--产线名称
+,T1.work_no_code	--工序代码
+,T1.work_no_desc as work_no_name	--工序名称
+,T1.group_code	--班组代码
+,T1.group_desc	as group_name--班组名称
+,T1.shift_date	--班次日期
+,T1.shift_code	--班次代码
+,T1.shift_description as shift_name--班次名称
+,T1.shift_start_time	-- 开始时间
+,T1.shift_end_time	-- 结束时间
+,T1.product_code as material_num -- 物料编码
+,T.batch as batch_num--批次
+,T.grade -- 等级
+,T.product_date	--生产日期
+,T.emit_number as emit_num	--发出数量
+,0 as act_num --实际数量
+,T.total as total_num	--总件数
+,T.create_time	--创建时间
+,T.update_time	--修改时间
+,T.creater	--创建人姓名
+,T.updater	--修改人姓名
+from sdi.sdi_dh_product_warehouse_list_one_1006 T
+left join sdi.sdi_dh_product_warehouse_list_1006 T1 
+on T.record_id = T1.id
+where T1.site = '1600' and T.delete_flag = '1'
+and T1.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all 
+select 
+ T1.site as site_code	--工厂代码
+,T1.site_describe	as site_name--工厂名称
+,T1.work_shop as work_shop_code --车间代码
+,T1.work_shop_desc	as work_shop_name--车间名称
+,T1.product_line as product_line_code	--产线代码
+,T1.product_line_desc	as product_line_name--产线名称
+,T1.work_no_code	--工序代码
+,T1.work_no_desc as work_no_name	--工序名称
+,T1.group_code	--班组代码
+,T1.group_desc	as group_name--班组名称
+,T1.shift_date	--班次日期
+,T1.shift_code	--班次代码
+,T1.shift_description as shift_name--班次名称
+,T1.shift_start_time	-- 开始时间
+,T1.shift_end_time	-- 结束时间
+,T1.product_code as material_num -- 物料编码
+,T.batch as batch_num--批次
+,T.grade -- 等级
+,T.product_date	--生产日期
+,T.emit_number as emit_num	--发出数量
+,0 as act_num --实际数量
+,T.total as total_num	--总件数
+,T.create_time	--创建时间
+,T.update_time	--修改时间
+,T.creater	--创建人姓名
+,T.updater	--修改人姓名
+from sdi.sdi_ds_product_warehouse_list_one_1006 T
+left join sdi.sdi_ds_product_warehouse_list_1006 T1 
+on T.record_id = T1.id
+where T1.site = '1900' and T.delete_flag = '1'
+and T1.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+)
+insert overwrite table DWROTD.DWR_PAM_BASE_WAREHOUSE_PROD_F partition(period_id_m)
+select 
+ T.site_code	--工厂代码
+,T.site_name--工厂名称
+,T.work_shop_code --车间代码
+,T.work_shop_name--车间名称
+,T.product_line_code	--产线代码
+,T.product_line_name--产线名称
+,T.work_no_code	--工序代码
+,T.work_no_name	--工序名称
+,T.group_code	--班组代码
+,T.group_name--班组名称
+,T.shift_date	--班次日期
+,T.shift_code	--班次代码
+,T.shift_name--班次名称
+,T.shift_start_time	-- 开始时间
+,T.shift_end_time	-- 结束时间
+,T.material_num -- 物料编码
+,T.batch_num--批次
+,T.grade -- 等级
+,T.product_date	--生产日期
+,NVL(T1.UNIT_AREA,0) AS UNIT_AREA--单位面积
+,NVL(T.emit_num,0) AS emit_num	--发出数量
+,NVL(T.act_num,0) AS act_num --实际数量
+,T.total_num	--总件数
+,T.create_time	--创建时间
+,T.update_time	--修改时间
+,T.creater	--创建人姓名
+,T.updater	--修改人姓名
+,'N' AS DEL_FLAG  --  '删除标识'
+,current_timestamp () AS DW_LAST_UPDATE_DATE -- '最后更新时间'
+,SUBSTR(T.shift_date,1,7) AS period_id_m
+from tmp T
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T1
+on T.material_num = T1.material_num 

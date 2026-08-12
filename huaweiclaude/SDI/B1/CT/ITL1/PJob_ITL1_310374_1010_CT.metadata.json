@@ -1,0 +1,8 @@
+{
+    "name": "PJob_ITL1_310374_1010_CT",
+    "type": "HiveSQL",
+    "directory": "/SDI/B1/CT/ITL1",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

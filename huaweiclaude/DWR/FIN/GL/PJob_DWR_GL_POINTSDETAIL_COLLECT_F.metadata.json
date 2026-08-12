@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_GL_POINTSDETAIL_COLLECT_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/GL",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

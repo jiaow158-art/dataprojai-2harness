@@ -1,0 +1,35 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/05/09 19:13:54 GMT+08:00
+-- 专属仓库存
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_WM_STOCK_RESPONSIBILITY_EXCLUSIVE_TMP
+select t1.material_num ,
+	   t1.batch_num ,
+	   t1.FACTORY_CODE,
+	   t1.inv_location,
+       case when t1.inv_location IN('GCQA','BJ01','GCSA','GCCA','GCPA','GCTA','GCSD','BJ','BY','HNDY','JXDY',    'SXDY','SDDY','QYDY','CQDY') then '工程市场'
+            when t1.inv_location IN('0020','0018','0026','0030','0018','GFZ','0028','0019','BC','HA08','EA03','LA01','EA1','VA01','0034','0015','A005','MA01','FB73','FB62','GFZ') then '直营'
+            when t1.factory_code like '%10' then '国际营销系统'
+            when t4.external_matl_group_code = '10080' then '梦之家' 
+			end as resp_system,
+       sum(left_stock_qty) as exclusive_stock,  -- 
+       sum(left_zkkc) as exclusive_stock_mid, -- 可用库存，用于辅助计算剩余可用库存
+       sum(left_djzjkc) as exclusive_stock_mid2, -- 冻结质检库存，用于辅助计算剩余冻结质检库存
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE 
+from dm.dm_wm_stock_responsibility_left_0_tmp t1
+join dm.dm_wm_stock_responsibility_mat_tmp t4 
+On t1.material_num  = t4.material_num 
+where case when t1.inv_location IN('GCQA','BJ01','GCSA','GCCA','GCPA','GCTA','GCSD','BJ','BY','HNDY','JXDY',			'SXDY','SDDY','QYDY','CQDY') then '工程市场'
+            when t1.inv_location IN('0020','0018','0026','0030','0018','GFZ','0028','0019','BC','HA08','EA03','LA01','EA1','VA01','0034','0015','A005','MA01','FB73','FB62','GFZ') then '直营'
+            when t1.factory_code like '%10' then '国际营销系统'
+            when t4.external_matl_group_code = '10080' then '梦之家' end is not null
+group by t1.material_num ,
+		 t1.batch_num ,
+		 t1.FACTORY_CODE,
+		 t1.inv_location,
+         case when t1.inv_location IN('GCQA','BJ01','GCSA','GCCA','GCPA','GCTA','GCSD','BJ','BY','HNDY','JXDY',    'SXDY','SDDY','QYDY','CQDY') then '工程市场'
+            when t1.inv_location IN('0020','0018','0026','0030','0018','GFZ','0028','0019','BC','HA08','EA03','LA01','EA1','VA01','0034','0015','A005','MA01','FB73','FB62','GFZ') then '直营'
+            when t1.factory_code like '%10' then '国际营销系统'
+            when t4.external_matl_group_code = '10080' then '梦之家' end;

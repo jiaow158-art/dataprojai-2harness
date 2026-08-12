@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB02",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星税后净利润（瓷砖事业部）ZB02",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

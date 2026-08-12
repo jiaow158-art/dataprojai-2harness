@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GL_ACCOUNT_VOUCHER_PROJ_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "会计核算凭证项目数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

@@ -1,0 +1,120 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/05/26 09:55:16 GMT+08:00
+-- desc：销售收入表 dm_zasd_p001_q066v2_t
+-- ******************************************************************** --
+DELETE FROM DM.dm_zasd_p001_q066v2_t WHERE CALMONTH BETWEEN '${PERIOD_ID_M1}' and  '${PERIOD_ID_M2}';
+INSERT INTO DM.dm_zasd_p001_q066v2_t(
+    batch
+    ,bill_item
+    ,bill_num
+    ,bus_area
+    ,bus_area___t
+    ,calmonth
+    ,comp_code
+    ,comp_code___t
+    ,customer
+    ,customer___t
+    ,distr_chan
+    ,distr_chan___t
+    ,division
+    ,division___t
+    ,doc_number
+    ,doc_number___t
+    ,material
+    ,material___t
+    ,matl_group
+    ,matl_group___t
+    ,plant
+    ,plant___t
+    ,salesemply
+    ,salesemply___t
+    ,salesorg
+    ,salesorg___t
+    ,sales_dist
+    ,sales_dist___t
+    ,sales_grp
+    ,sales_grp___t
+    ,size_dim
+    ,stor_loc
+    ,stor_loc___t
+    ,s_ord_item
+    ,wbs_elemt
+    ,wbs_elemt___t
+    ,zasd_p001_0sales_grp_0
+    ,zasd_p001_0sales_grp_0___t
+    ,zprodh2
+    ,zprodh2___t
+    ,zprodh3
+    ,zprodh3___t
+    ,zqdzh
+    ,zqdzh___t
+    ,zsfqc
+    ,z_zcck
+    ,zbhsxssr
+    ,zmle
+    ,zsjcb
+    ,zxsmj
+    ,zxssl
+    ,zxsyj
+    ,dw_last_update_date
+    ,zhsxse
+)
+SELECT
+    t.batch
+    ,t.bill_item
+    ,t.bill_num
+    ,t.bus_area
+    ,t.bus_area___t
+    ,t.calmonth
+    ,t.comp_code
+    ,t.comp_code___t
+    ,t.customer
+    ,t.customer___t
+    ,t.distr_chan
+    ,t.distr_chan___t
+    ,t.division
+    ,t.division___t
+    ,t.doc_number
+    ,t.doc_number___t
+    ,t.material
+    ,t.material___t
+    ,t.matl_group
+    ,t.matl_group___t
+    ,t.plant
+    ,t.plant___t
+    ,t.salesemply
+    ,t.salesemply___t
+    ,t.salesorg
+    ,t.salesorg___t
+    ,t.sales_dist
+    ,t.sales_dist___t
+    ,t.sales_grp
+    ,t.sales_grp___t
+    ,t.size_dim
+    ,t.stor_loc
+    ,t.stor_loc___t
+    ,t.s_ord_item
+    ,t.wbs_elemt
+    ,t.wbs_elemt___t
+    ,t.zasd_p001_0sales_grp_0
+    ,t.zasd_p001_0sales_grp_0___t
+    ,t.zprodh2
+    ,t.zprodh2___t
+    ,t.zprodh3
+    ,t.zprodh3___t
+    ,t.zqdzh
+    ,t.zqdzh___t
+    ,t.zsfqc
+    ,t.z_zcck
+    ,t.zbhsxssr
+    ,t.zmle
+    ,t.zsjcb
+    ,t.zxsmj
+    ,t.zxssl
+    ,t.zxsyj
+    ,t.dw_last_update_date
+    ,t.zhsxse
+FROM dm.dm_zasd_p001_q066v2_t_01 t
+;

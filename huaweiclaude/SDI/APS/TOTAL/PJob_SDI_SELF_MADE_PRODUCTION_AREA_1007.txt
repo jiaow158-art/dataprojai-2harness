@@ -1,0 +1,22 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/10 11:36:36 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE SDI.SDI_SELF_MADE_PRODUCTION_AREA_1007
+SELECT
+  ID , 
+  BATCH_START , 
+  CREATE_BY , 
+  CREATE_DATE , 
+  ENTERPRISE_CODE , 
+  ENTERPRISE_ID , 
+  INV_ORG_ID , 
+  IS_ENABLE , 
+  IS_PHANTOM , 
+  SYNC_ID , 
+  UPDATE_BY , 
+  UPDATE_DATE ,
+  'N' AS DEL_FLAG ,
+  CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE 
+FROM STG.STG_SELF_MADE_PRODUCTION_AREA_1007;

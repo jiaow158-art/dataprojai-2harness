@@ -1,0 +1,403 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2024/09/17 10:12:14 GMT+08:00
+-- update from huangwenbin 2024-11-12 由于SAP存在拆单后VBAP无ID_ITEM的情况，从RTM获取SAP订单号与行号
+-- update from huangwenbin 2024-11-13 由于SAP存在拆单后VBAP无ID_ITEM的情况，从OSS获取SAP订单号与行号，修改OSS订单的行合计金额的逻辑
+-- update from huangwenbin 2024-11-14 增加字段：拒绝原因描述
+-- update from huangwenbin 2024-11-15 修改OSS订单行状态描述取值逻辑，订单行状态编码源系统并没有，代码置空
+-- update from huangwenbin 2024-11-16 修改OSS订单状态描述取值逻辑，编码源系统并没有，代码置空
+-- update from zhz 2024-11-20 新增商机号字段
+-- update from zhz 2024-11-21 新增销售组、修改时间字段
+-- update from huangwenbin 2024-11-29 修复OSS订单的物料组1、物料组2、单位面积、行合计面积取值逻辑
+-- update from huangwenbin 2024-12-02 修复OSS订单的供货产区的取值，保留描述
+-- update from huangwenbin 2024-12-02 修复OMS订单的供货产区描述不随编码更新的错误，增加字段供货产区编码
+-- update from huangwenbin 2024-12-25 增加字段：订单子类型编码等4个字段
+-- update from huangwenbin 2025-05-27 增加字段：销售雇员工号（客户主档）
+-- update from zhz 2025-07-22 新增字段及数据来源
+-- update from huangwenbin 2025-08-15 表SDI_ORDER_APPLY_MATERIAL_CZJXS_1033增加关联条件：t3.id = t4.order_line_id
+-- update from huangwenbin 2025-09-11 代码优化：处理关联sdi_vbap_1001时存在的数据倾斜问题
+-- update from huangwenbin 2025-09-16 修改经销工程订单的部分取值逻辑，处理OSS部分SAP订单号存在脏数据的问题
+-- update from zhz 2025-09-19 oss增加按单号、行号获取拒绝原因作为保底
+-- update from zhz 2025-10-15 新增交货状态字段
+-- update from huangwenbin 2025-10-17 新增字段:来源平台编码、来源平台描述
+-- ******************************************************************** --
+
+with tmp as(
+select kunnr,vkorg,vtweg,pernr
+      ,row_number() over(partition by kunnr,vkorg,vtweg order by parza asc) as rn
+  from sdi.sdi_knvp_1001
+ where parvw = 'VE'
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_OTD_SO_SALE_OFR_ORDER_F
+SELECT 
+ t1.order_number   		  					order_num   				-- 订单号
+,COALESCE(t6.vbeln,t3.sap_order_number)	  					sap_order_num				            -- SAP订单
+,t3.ITEM_NO		  							order_line_num				-- 订单行
+,COALESCE(t6.posnr,replace(t3.sap_order_item_number,t3.sap_order_number,''))	sap_order_line_num				-- SAP订单行
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t8.creation_date else t1.creation_date end create_date				-- 创建日期
+,t1.order_type 			 						order_type_code				-- 订单类型
+,case when  t1.order_type ='标准订单' then '标准订单'
+					else COALESCE(s1.meaning,s2.meaning) end   	order_type_name		-- 订单类型描述
+,t2.QUOTATION_NUMBER 	 					ofr_num				-- 报价单 
+,t3.quotation_item_id						ofr_line_num				-- 报价单行 
+,t1.sale_org_code	 						sale_org_code				-- 销售组织
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then '06' else t1.sale_channel_code end sale_chnl_code				-- 分销渠道
+,t1.account_number		 					cust_code				-- 客户编码
+,t1.account_name 							cust_name				-- 客户名称
+,NULL										pay_cust_code			-- 付款编码
+,NULL		 								pay_cust_name			-- 付款名称 
+,t5.pernr		 			 				sale_emp_num 		    -- 销售雇员工号
+,NULL	 									sale_emp_name	  		-- 销售雇员描述 
+,t1.status    								order_st_code   		-- 订单状态
+,s3.meaning									order_st_name 			-- 订单状态描述
+,t3.`status` 								order_line_st_code		-- 订单行状态
+,s5.meaning									order_line_st_name 			-- 订单行状态描述
+,t1.last_update_date	  				    order_line_st_update_time 	-- 订单状态更新时间 
+,t3.POLICY_CODE  							order_plcy			-- 政策明细ID 
+,t3.policy_name 		  					order_plcy_desc				-- 销售政策
+,t2.pickup_type       						pick_type_code			-- 提货方式
+,case when t2.pickup_type = 0 then  '自提'
+			when t2.pickup_type = 1 then  '配送' end pick_type_desc  -- 提货方式描述
+,t3.STOCK_TYPE							stock_prep_type				-- 备货类型
+,s4.meaning								stock_prep_type_desc		-- 备货类型描述
+,t2.WHETHER_TO_TAKE_CARE 				is_make_code				-- 是否打托
+,t2.WHOLE_ORDER_DELIVERY				is_all_delv_code			-- 是否整单 
+,t2.PROVINCE							prov_name					-- 省份
+,t2.CITY								city_name					-- 城市
+,t2.DISTRICT_WITH_COUNTY				strt_name					-- 县/区 
+,t2.STREET_NUMBER						cmy_name					-- 街道 
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.product_code
+      else t3.MATERIAL_NUMBER
+       end as material_code				-- 物料编码 
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.product_name
+      else t3.MATERIAL_NAME
+       end as material_name				-- 物料名称
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.material_specifications else t3.MATERIAL_SPECIFICATIONS end dimension					-- 物料规格
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.material_group1 else t3.MATERIAL_GROUP1 end mat_grp_code1				-- 物料组1
+,t3.MATERIAL_GROUP2 					mat_grp_code2				-- 物料组2
+,s8.meaning 						    spld_area_name 		       -- 供货产区
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.factory_code else t3.FACTORY_CODE end factory_code				-- 工厂编码
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.stock_location_code else t3.STOCK_LOCATION_CODE end warehouse_code				-- 库存地点编码 
+,t3.BATCH			                    batch						-- 批次 
+,t3.UNIT								unit 						-- 单位 
+,t3.AGENT_PRICE							AGENT_PRICE					-- 代理基准价
+,T3.UNIT_PRICE							discount_unit_price			-- 折后单价 
+,t3.policy_discount						discount 					 -- 折扣
+,coalesce(t6.kwmeng,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.order_qty else t3.QUANTITY end) as qty		 -- 数量	
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.weight else t3.UNIT_WEIGHT end as UNIT_WEIGHT 				-- 单位重量	
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.area else t3.UNIT_AREA end as UNIT_AREA			 		-- 单位面积	
+,t3.freight  					 		freight						-- 单位运费		
+,coalesce(t6.KZWI6,t3.ITEM_AMOUNT)		total_line_amount			-- 行合计金额
+,coalesce(t6.kwmeng,t3.QUANTITY) * 	t3.UNIT_WEIGHT		total_line_weight			-- 行合计重量 
+,coalesce(t6.kwmeng,t3.QUANTITY) * 	t3.UNIT_AREA		total_line_area				-- 行合计面积 
+,t3.TOTAL_CAPACITY 						total_line_volume			-- 行合计体积								
+,t3.PROCESSING							processing_method				-- 加工方式 
+,t3.extra_amount						extra_charges				-- 额外费用 
+,t3.replenish_order_code				replenish_order_code		-- 补货原单号
+,t3.replenish_order_batch				replenish_order_batch       -- 补货原批次
+,t2.SHIPPING_METHOD						SHIPPING_METHOD				-- 运输方式 
+,t6.ABGRU 						        denial_reason				-- 拒绝原因
+,t3.`comment` 							remark_info					-- 备注
+,'OMS'								    source_system				-- 来源系统
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t8.submit_date else t1.submit_time end as submit_time                 -- 提交时间
+,concat(substr(t6.ERDAT,1,4),'-',substr(t6.ERDAT,5,2),'-',substr(t6.ERDAT,7,2))           review_pass_date              -- 评审通过时间
+,s6.bezei  denial_reason_name			-- 拒绝原因描述
+,coalesce(t2.opportunity_number,t2.project_code) as opportunity_number -- 商机号
+,s7.sales_grp --销售组
+,t1.last_update_date as update_date--修改时间
+,case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.supply_area else t3.supply_area_code end as spld_area_code --供货产区编码
+,null as order_sub_type_code --订单子类型编码
+,null as order_sub_type_name --订单子类型描述
+,t1.order_type as plan_type_code --计划订单类型编码
+,case when t1.order_type ='标准订单' then '标准订单'
+	  else COALESCE(s1.meaning,s2.meaning) end as plan_type_name --计划订单类型描述
+,t7.pernr as md_sale_emp_num --销售雇员工号（客户主档）	 
+,t4.project_line_id -- 项目评审行ID
+,t4.contract_line_id -- 合同行ID
+,t4.project_id -- 项目评审ID
+,t4.contract_id -- 合同ID
+,t8.apply_type as apply_type_code-- 申请类型 
+,case when t8.apply_type = 'ENGINEERING_CHOICE' then '工程备货'
+      when t8.apply_type = 'ENGINEERING_ORDER' then '工程开单'
+      when t8.apply_type = 'SAMPLE_APPLY' then '样品申请'
+      when t8.apply_type = 'SAMPLE_ROOM' then '样板间' else '' end as apply_type_name --申请类型文本
+,t4.prepare_order_code  --备货单号
+,t2.wbs_number as wbs_num
+,t6.LFSTA as deliver_status --交货状态
+,t1.source_platform as src_plat_code --来源平台编码
+,case when t1.source_platform = 'APP' then '手机端'
+      when t1.source_platform = 'PC' then 'PC端'
+	   end as src_plat_name --来源平台描述
+FROM sdi.sdi_s_order_all_business_1029  t1
+join sdi.sdi_s_engineering_plan_order_1029 t2  on t1.id = t2.id
+join sdi.sdi_s_engineering_plan_order_line_1029 t3 on t2.id = t3.HEAD_ID
+left join sdi.sdi_vbap_1001 t6 on t3.item_no = case when t6.ID_ITEM = '' then concat(rand(50),'#*#') else t6.ID_ITEM end and t6.mandt='800'
+and coalesce(t3.MATERIAL_NUMBER,'SNULL') = t6.matnr
+and coalesce(t3.batch,'') = coalesce(t6.charg,'')
+left join sdi.sdi_vbpa_1001 t5 on t6.vbeln = t5.vbeln  and  t5.posnr = '000000' and t5.parvw ='VE'    and t5.mandt='800'
+left join SDI.SDI_ORDER_APPLY_MATERIAL_CZJXS_1033 t4 on t4.order_id = t2.id and t3.id = t4.order_line_id
+left join SDI.SDI_ORDER_APPLY_CZJXS_1033 t8 on t4.id = t8.id 
+left join  sdi.sdi_base_lookup_values_1029 s1 on t1.order_type = s1.lookup_code and s1.lookup_type ='ORDER_TYPE' and s1.system_code = 'OSS' and s1.enabled_flag='Y'
+left join  sdi.sdi_base_lookup_values_1029 s2 on t1.order_type = s2.lookup_code and s2.lookup_type ='OMS_CERAMIC_ORDER_TYPE' and s2.system_code = 'OSS' and s2.enabled_flag='Y'
+left join  sdi.sdi_base_lookup_values_1029 s3 on t1.status = s3.lookup_code and s3.lookup_type ='ORDER_HEAD_STATUS' and s3.system_code = 'OSS' and s3.enabled_flag='Y'
+left join  sdi.sdi_base_lookup_values_1029 s4 on t3.STOCK_TYPE = s4.lookup_code and s4.lookup_type ='WY_STOCK_TYPE' and s4.system_code = 'OSS' and s4.enabled_flag='Y'
+left join  sdi.sdi_base_lookup_values_1029 s5 on t3.status = s5.lookup_code and s5.lookup_type ='ORDER_LINE_NEW_STATUS'  and s5.enabled_flag='Y'
+left join sdi.sdi_tvagt_1001 s6 on t6.ABGRU = s6.abgru and s6.mandt = '800' and s6.spras = '1' 
+left join (select emp_num,sales_grp,sales_desc,row_number() over(partition by emp_num) as rn 
+from dwrdim.dwr_dim_org_cost_emp_d) s7  
+on t5.PERNR = s7.emp_num and s7.rn = 1
+left join sdi.sdi_base_lookup_values_1029 s8
+on case when t1.external_systems_order_source = 'LTC_CZJXS' then t4.supply_area else t3.supply_area_code end = s8.lookup_code
+and s8.lookup_type = 'DP_SUPPLY_AREA'
+and s8.system_code = 'LTC'
+left join tmp t7
+on t1.account_number = t7.kunnr
+and t1.sale_org_code = t7.vkorg
+and t1.sale_channel_code = t7.vtweg
+and t7.rn = 1
+union all
+select
+ t1.ORDER_NUM   				order_num -- 订单号
+,COALESCE(t9.vbeln,t7.vbeln,coalesce(substr(t2.x_sap_item_id,1,10),t2.x_sap_num)) 	 				sap_order_num						-- SAP订单
+,t2.row_id               order_line_num   -- 订单行
+,COALESCE(t9.posnr,t7.posnr,substr(t2.x_sap_item_id,11,6)) sap_order_line_num 		-- sap 订单行'
+,t1.CREATED     			create_date 			-- 创建时间
+,t1.x_od_type 			 order_type_code 			-- 订单类型
+,s19.val			 			order_type_name 					-- 订单类型描述
+,t3.ORDER_NUM 	 			 ofr_num							-- 报价单
+,t2.QUOTE_ITEM_ID 	 ofr_line_num					-- 报价单行
+,s2.sales_org_cd		 sale_org_code				-- 销售组织
+,s3.sales_chan_cd    sale_chnl_code 		   -- 分销渠道
+,s4.OU_NUM 					 cust_code 								-- 客户编码
+,s4.NAME 		 				cust_name 							-- 客户名称
+,s5.OU_NUM				 pay_cust_code 							-- 付款编码
+,s5.NAME		 			 pay_cust_name 						-- 付款名称
+,s7.LOGIN 	                  sale_emp_num  			        -- 销售雇员工号
+,s7.LAST_NAME	            sale_emp_name	  		             -- 销售雇员描述
+,NULL   order_st_code    			-- 订单状态
+,t1.STATUS_CD                   order_st_name      			-- 订单状态描述
+--,t2.STATUS_CD     order_line_st_code			-- 订单行状态
+,null               order_line_st_code			-- 订单行状态
+,coalesce(t2.x_item_status_cd,t2.status_cd)              order_line_st_cname          -- 订单行状态描述
+,t2.LAST_UPD 	order_line_st_update_time 	        -- 订单状态更新时间
+,t4.ATTRIB_07 	order_plcy		        -- 销售政策ID
+,s8.NAME		 	order_plcy_desc			-- 销售政策
+,t3.X_PICKTYPE pick_type_code				-- 提货方式
+,null  		 pick_type_desc 						-- 提货方式描述
+,t1.X_STOCK_TYPE	stock_prep_type	  -- 备货类型
+,null  		stock_prep_desc						-- 备货方式描述
+,t1.X_ISPACKAGE 	is_make_code 			-- 是否打托
+,t1.X_ALLSUBMIT		is_all_delv_code 			-- 是否整单
+,t1.X_PROV			prov_name 				-- 省份
+,t1.X_CITY			city_name				-- 城市
+,t1.X_COUNTY		strt_name				-- 县/区
+,t1.X_STREET		cmy_name			-- 街道
+,s9.NAME				material_code 		-- 物料编码
+,s9.desc_text		material_name		-- 物料描述
+,s9.X_SIZE_DIMENSION  dimension		-- 物料规格
+,s15.MAT_GRP1 			mat_grp_code1				-- 物料组1
+,s15.MAT_GRP2  		mat_grp_code2				-- 物料组2
+,s17.val		spld_area_name   -- 供货产区
+,s10.FACTORY_CD  factory_code				 --工厂编码
+,s11.WAREHOUSE_CD		warehouse_code    -- 库存地点
+,t2.X_BATCH   	batch  		-- 批次
+,s9.X_BASIC_UNIT 	unit   -- 单位
+,t2.X_EP_PRICE		agent_price		-- 代理基准价
+,t2.UNIT_PRI			discount_unit_price -- 折后单价
+,t2.X_FINAL_DIS		discount 		 -- 折扣
+,coalesce(t9.kwmeng,t7.kwmeng,t2.X_QTY_REQ)	qty			 -- 数量
+,t2.GROSS_WGHT		unit_weight		-- 单位重量
+,COALESCE(T2.X_UNIT_AREA,s16.X_UNIT_AREA)			unit_area			-- 单位面积
+,t2.FRGHT_AMT			freight				-- 单位运费
+,NVL(coalesce(t9.kwmeng,t7.kwmeng,t2.X_QTY_REQ),0) * NVL(T2.BASE_UNIT_PRI,0)	 total_line_amount  -- 行合计金额
+,NVL(s9.X_GROSS_WEIGHT,0) * NVL(coalesce(t9.kwmeng,t7.kwmeng,t2.X_QTY_REQ),0)  total_line_weight --行合计重量
+,nvl(COALESCE(T2.X_UNIT_AREA,s16.X_UNIT_AREA),0) *  NVL(coalesce(t9.kwmeng,t7.kwmeng,t2.X_QTY_REQ), 0)	total_line_area   --行合计面积
+,NVL(T2.X_QTY_REQ,0) * NVL(s9.X_VOLUME,0)  total_line_Volume --行合计体积
+,t2.X_DELY_LOC			processing_method   		-- 加工方式
+,t2.X_EXT_PRICE			extra_charges     			-- 额外费用
+,t2.X_ORIG_NUM			replenish_order_code 		-- 补货原单号
+,t2.X_ORIG_BATCH 		replenish_order_batch		-- 	补货批次
+,NULL					SHIPPING_METHOD			-- 运输方式
+,coalesce(t7.ABGRU,t9.ABGRU)		denial_reason			-- 拒绝原因
+,t2.X_COMMEMTS				remark_info   -- 备注
+,'OSS'						source_system			-- 来源系统
+,t5.DP_BILL_SUBMIT_TIME       submit_time                 -- 提交时间
+,t1.X_ALLAPPROVALTIME         review_pass_date              -- 评审通过时间
+,s12.bezei  denial_reason_name			-- 拒绝原因描述
+,coalesce(s13.opportunity_num,s13.PROJ_REP_CODE) as opportunity_num   -- 商机号
+,s14.sales_group_code  as sales_grp --销售组
+,t1.last_upd as update_date
+,t5.DP_SUPPLY_AREA as spld_area_code --供货产区编码
+,t1.X_OD_SUBTYPE as order_sub_type_code --订单子类型编码
+,s1.val as order_sub_type_name --订单子类型描述
+,t1.x_plan_type as plan_type_code --计划订单类型编码
+,s18.val as plan_type_name --计划订单类型描述
+,t8.pernr as md_sale_emp_num --销售雇员工号（客户主档）
+,'' as project_line_id -- 项目评审行ID
+,'' as contract_line_id -- 合同行ID
+,'' as project_id -- 项目评审ID
+,'' as contract_id -- 合同ID
+,t4.X_PROD_USE as apply_type_code -- 申请类型  
+,case when t4.X_PROD_USE = '0' then '工程大货'
+      when t4.X_PROD_USE = '1' then '样板间'
+      when t4.X_PROD_USE = '2' then '补货' else '' end apply_type_name --申请类型文本
+,'' as prepare_order_code  --备货单号  
+,t1.x_wbs_number as wbs_num
+,coalesce(t9.LFSTA,t7.LFSTA) as deliver_status --交货状态
+,'' as src_plat_code --来源平台编码
+,'' as src_plat_name --来源平台描述
+from sdi.sdi_s_order_1002 t1     
+join sdi.sdi_s_order_item_1002  t2 on     T1.ROW_ID = T2.ORDER_ID
+left join sdi.sdi_s_order_1002 t3 on 	   t1.QUOTE_ID	= t3.ROW_ID
+left join sdi.sdi_s_order_x_1002 t4    ON t3.ROW_ID  = t4.ROW_ID
+left join sdi.sdi_s_order_item_x_1002  t5 on  t2.ROW_ID = t5.ROW_ID
+left join sdi.sdi_vbap_1001 t7 on t2.ROW_ID = case when t7.ID_ITEM = '' then concat(rand(50),'#*#') else t7.ID_ITEM end and t7.mandt='800'  and coalesce(substr(t2.x_sap_item_id,1,10),t2.x_sap_num) is null 
+left join sdi.sdi_vbap_1001 t9 on case when substr(t2.x_sap_item_id,1,10) is null then concat(rand(50),'#*#')  else substr(t2.x_sap_item_id,1,10) end = t9.vbeln 
+and case when substr(t2.x_sap_item_id,11,6) is null then concat(rand(50),'#*#') else substr(t2.x_sap_item_id,11,6) end = t9.posnr and t9.mandt = '800'
+LEFT JOIN (
+	SELECT name,val FROM sdi.sdi_s_lst_of_val_1002  WHERE TYPE ='DP_ORDER_SUB_TYPE' AND LANG_ID = 'CHS'
+	) s1  ON  t1.X_OD_SUBTYPE = s1.name
+left join sdi.sdi_cx_sales_org_1002  s2 on t1.X_ORG_ID = s2.ROW_ID
+left join sdi.sdi_cx_sales_chan_1002  s3 on t1.X_SALES_CHAN_ID = s3.ROW_ID
+LEFT  JOIN sdi.sdi_s_org_ext_1002  s4 ON  t1.ACCNT_ID = s4.PAR_ROW_ID
+LEFT  JOIN sdi.sdi_s_org_ext_1002  s5 ON  t1.X_PAYER_ID = s5.PAR_ROW_ID
+LEFT  JOIN sdi.sdi_s_org_ext_1002  s6 ON  t1.X_PRJ_ACCT_ID  = s6.PAR_ROW_ID
+LEFT JOIN (SELECT t1.ROW_ID,t2.LOGIN ,t1.LAST_NAME FROM sdi.sdi_s_contact_1002   t1
+JOIN sdi.sdi_s_user_1002   t2 ON t1.ROW_ID  = t2.ROW_ID ) s7 ON t4.ATTRIB_05 = s7.ROW_ID
+LEFT JOIN sdi.sdi_cx_pri_poy_1002  s8 ON t4.ATTRIB_07 = s8.ROW_ID
+left join sdi.sdi_s_prod_int_1002  s9 on t2.PROD_ID = s9.ROW_ID
+left join sdi.sdi_cx_factory_1002   s10 on t2.X_FACT_ID = s10.ROW_ID
+left join sdi.sdi_cx_warehouse_1002  s11 on t2.X_WH_ID = s11.ROW_ID
+left join sdi.sdi_tvagt_1001 s12 on t7.ABGRU = s12.abgru
+and s12.mandt = '800' and s12.spras = '1'
+left join sdi.sdi_cx_proj_rep_1002 s13  
+on s13.row_id = t1.X_PROJ_REP_ID
+left join DWRDIM.DWR_DIM_CUST_SALES_AREA_D2 s14 
+on s4.OU_NUM = s14.cust_num and s2.sales_org_cd = s14.sales_org_code 
+and s3.sales_chan_cd = s14.distribution_chnl_code
+and s14.end_date = '4712-12-31'
+left join sdi.sdi_CX_PROD_SALES_1002 s15
+on t2.PROD_ID = s15.PROD_ID
+AND t1.X_ORG_ID = s15.SALES_ORG_ID
+AND t1.X_SALES_CHAN_ID = s15.SALES_CHAN_ID
+left join sdi.sdi_S_ORDER_ITEM_1002 s16
+on t2.QUOTE_ITEM_ID = s16.ROW_ID
+left join sdi.SDI_S_LST_OF_VAL_1002 s17
+on t5.DP_SUPPLY_AREA = s17.name
+and s17.TYPE = 'DP_SUPPLY_AREA'
+LEFT JOIN (
+	SELECT name,val FROM sdi.sdi_s_lst_of_val_1002  WHERE TYPE ='ORDER_PLAN_TYPE' AND LANG_ID = 'CHS'
+	) s18  ON  t1.x_plan_type = s18.name
+LEFT JOIN (
+	SELECT name,val FROM sdi.sdi_s_lst_of_val_1002  WHERE TYPE ='DP_ORDER_TYPE' AND LANG_ID = 'CHS'
+	) s19  ON  t1.x_od_type = s19.name
+left join tmp t8
+on s4.OU_NUM = t8.kunnr
+and s2.sales_org_cd = t8.vkorg
+and s3.sales_chan_cd = t8.vtweg
+and t8.rn = 1
+WHERE t1.X_OD_TYPE ='Purchase Order'
+union all 
+select 
+ T1.VBELN AS order_num
+,T1.VBELN AS sap_order_num
+,T1.POSNN AS order_line_num
+,T1.POSNN AS sap_order_line_num
+,T2.ERDAT AS create_date
+,T2.VBTYP AS order_type_code
+,'' AS order_type_name
+,T1.VBELV AS ofr_num
+,T1.POSNV AS ofr_line_num
+,T2.VKORG AS sale_org_code
+,T2.VTWEG AS sale_chnl_code
+,T2.KUNNR AS cust_code
+,T3.NAME_1 AS cust_name
+,'' AS pay_cust_code
+,'' AS pay_cust_name
+,T4.PERNR AS sale_emp_num
+,'' AS sale_emp_name
+,'' AS order_st_code
+,'' AS order_st_name
+,'' AS order_line_st_code
+,'' AS order_line_st_name
+,'' AS order_line_st_update_time
+,'' AS order_plcy
+,'' AS order_plcy_desc
+,'' AS pick_type_code
+,'' AS pick_type_desc
+,'' AS stock_prep_type
+,'' AS stock_prep_type_desc
+,'' AS is_make_code
+,'' AS is_all_delv_code
+,'' AS prov_name
+,'' AS city_name
+,'' AS strt_name
+,'' AS cmy_name
+,T5.MATNR AS material_code
+,T6.material_name AS material_name
+,T6.dimension AS dimension
+,T5.WGRU1 AS mat_grp_code1
+,T5.WGRU2 AS mat_grp_code2
+,'' AS spld_area_name
+,T5.WERKS AS factory_code
+,T5.LGORT AS warehouse_code
+,T5.CHARG AS batch
+,T5.VRKME AS unit
+,0 AS agent_price
+,(T5.NETWR + T5.MWSBP) / T5.KWMENG AS discount_unit_price
+,(1 - T5.KZWI4 / T5.KZWI6) * 100 AS discount
+,T5.KWMENG AS qty
+,T6.gross_weight AS unit_weight
+,T6.unit_area
+,0 AS freight
+,T5.NETWR + T5.MWSBP AS total_line_amount
+,T6.gross_weight * T5.KWMENG AS total_line_weight
+,T6.unit_area * T5.KWMENG AS total_line_area
+,T6.busi_volume * T5.KWMENG AS total_line_volume
+,'' AS processing_method
+,0 AS extra_charges
+,'' AS replenish_order_code
+,'' AS replenish_order_batch
+,'' AS shipping_method
+,T5.ABGRU AS denial_reason
+,'' AS remark_info
+,'SAP' AS source_system
+,T2.ERDAT AS submit_time
+,'' AS review_pass_date
+,'' AS denial_reason_name
+,T.engr_code AS opportunity_number
+,T2.VKGRP AS sales_grp
+,T.dw_last_update_date AS update_date
+,'' AS spld_area_code,'' AS order_sub_type_code
+,'' AS order_sub_type_name
+,'' AS plan_type_code
+,'' AS plan_type_name
+,'' AS md_sale_emp_num
+,'' as project_line_id -- 项目评审行ID
+,'' as contract_line_id -- 合同行ID
+,'' as project_id -- 项目评审ID
+,'' as contract_id -- 合同ID
+,'' as apply_type_code -- 申请类型  
+,'' as apply_type_name -- 申请类型文本
+,'' as prepare_order_code  --备货单号  
+,T7.POSID AS WBS_NUM
+,t5.LFSTA as deliver_status --交货状态
+,'' as src_plat_code --来源平台编码
+,'' as src_plat_name --来源平台描述
+FROM DWRLTC.DWR_LTC_OFR_ORDER_F T
+LEFT JOIN SDI.SDI_VBFA_1001 T1 
+ON T.sap_order_num = T1.VBELV and T1.VBTYP_N = 'C' AND  T1.VBTYP_V = 'B' AND T.sap_order_item_num = T1.POSNV
+JOIN SDI.SDI_VBAK_1001 T2 
+ON T.sap_order_num = T2.VBELN 
+LEFT JOIN DWRDIM.DWR_DIM_CUST_GENERAL_D T3
+ON T2.KUNNR = T3.CUST_NUM AND T3.END_DATE = '4712-12-31'
+LEFT JOIN SDI.SDI_VBPA_1001 T4 
+ON T1.VBELN = T4.vbeln and T4.posnr = '000000' and T4.parvw ='VE' 
+LEFT JOIN SDI.SDI_VBAP_1001 T5 
+ON T1.VBELN = T5.VBELN AND T1.POSNN = T5.POSNR
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T6
+ON T5.MATNR = T6.MATERIAL_NUM 
+LEFT JOIN SDI.SDI_PRPS_1001 T7 
+ON T2.ps_psp_pnr = T7.PSPNR
+WHERE T2.VBTYP = 'B' 

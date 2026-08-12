@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_WM_RTM_OFR_ORDER_T_BAK20230829",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

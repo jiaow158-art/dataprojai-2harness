@@ -1,0 +1,66 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- TABLE DESC:工作流请求节点操作人信息表（DWI）
+-- create time: chenzhiyong 20220310
+-- ******************************************************************** --
+insert OVERWRITE table dwipi.dwi_wf_requests_node_creator_t 
+ select 
+  t2.workcode    emp_num 
+ ,t1.userid	    OA_EMPLOYEE_ID
+ ,t1.requestid	request_code
+ ,t1.groupid	    oa_groupid
+ ,t1.workflowid	wf_code
+ ,t1.workflowtype	wf_type
+ ,t1.isremark_tmp	isremark_tmp
+ ,t1.usertype	user_type_code
+ ,t1.nodeid	operation_node_code
+ ,t1.agentorbyagentid	agent_record
+ ,t1.agenttype	agent_operating_type
+ ,t1.showorder	creator_display_order
+ ,t1.receivedate	receive_date
+ ,t1.receivetime	receive_time
+ ,t1.viewtype	examine_flag
+ ,t1.iscomplete	is_end_flag
+ ,t1.islasttimes	creator_last_record
+ ,t1.id	current_node_id
+ ,t1.operatedate	operate_date
+ ,t1.operatetime	operate_time
+ ,t1.groupdetailid	group_detail_id
+ ,t1.isreminded	is_timeout_reminded
+ ,t1.isprocessed	is_timeout_processed
+ ,t1.wfreminduser	wf_remind_user
+ ,t1.wfusertypes	wf_user_type
+ ,t1.preisremark_tmp	preisremark_tmp
+ ,t1.isreject	is_return_creator
+ ,t1.needwfback	need_feedback
+ ,t1.lastisremark	used_wfsave_type
+ ,t1.isreminded_csh	is_reminded_csh
+ ,t1.wfreminduser_csh	wf_reminded_user_csh
+ ,t1.wfusertypes_csh	wf_user_type_csh
+ ,t1.handleforwardid	wf_saved_recordid
+ ,t1.takisremark	used_record_opinion_flag
+ ,t1.lastreminddatetime	last_reminded_timeout
+ ,t1.opdatetime	op_date_time
+ ,t1.isprocessing	wf_asyn_processing_state
+ ,t1.processuser	actual_creator
+ ,t1.isbereject	is_return_node
+ ,t1.isremark	operation_type
+ ,t1.preisremark	before_change_operation_type
+ ,t1.overtime	timeout_dealwith
+ ,t1.overworktime	over_work_time
+ ,t1.istakout	opinion_consult_is_out
+ ,t1.takid	opinion_consult_record_id
+ ,t1.multitaklevel	opinion_consult_level
+ ,t1.viewdate	view_date
+ ,t1.viewtime	view_time
+ ,t1.isinmultitak	is_multilevel_consult_state
+ ,t1.firstviewdate	first_view_date
+ ,t1.firstviewtime	first_view_time
+ ,t1.del_flag	del_flag
+ ,CURRENT_TIMESTAMP() AS dw_last_update_date
+ from 
+ sdi.sdi_workflow_currentoperator_1004 t1 
+ left  join sdi.sdi_hrmresource_1004 t2 
+ on t1.userid = t2.id
+ WHERE t1.del_flag = 'N';

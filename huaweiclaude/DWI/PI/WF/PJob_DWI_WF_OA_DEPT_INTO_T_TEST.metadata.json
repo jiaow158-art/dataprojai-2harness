@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WF_OA_DEPT_INTO_T_TEST",
+    "type": "HiveSQL",
+    "directory": "/DWI/PI/WF",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipi"
+}

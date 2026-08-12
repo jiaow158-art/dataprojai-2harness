@@ -1,0 +1,8 @@
+{
+    "name": "DWR_FP_FUND_CENTER_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN",
+    "description": "基金中心",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

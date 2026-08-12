@@ -1,0 +1,8 @@
+{
+    "name": "PJob_IGE1_310544_1010",
+    "type": "HiveSQL",
+    "directory": "/SDI/B1/CT/IGE1",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_REVIEW_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "ltc项目和投标评审",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

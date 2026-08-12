@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_OTD_SALES_ORDER_SAP_API",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/SO",
+    "description": "销售订单接口表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

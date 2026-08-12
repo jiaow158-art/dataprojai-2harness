@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB77",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "工程商机新增数量ZB77",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

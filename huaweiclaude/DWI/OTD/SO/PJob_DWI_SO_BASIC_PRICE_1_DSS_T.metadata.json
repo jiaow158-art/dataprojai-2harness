@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_SO_BASIC_PRICE_1_DSS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "DSS基准价1",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

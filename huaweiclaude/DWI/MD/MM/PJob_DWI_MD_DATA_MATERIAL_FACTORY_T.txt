@@ -1,0 +1,68 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/04/14 16:10:21 GMT+08:00
+-- desc：物料工厂表 DWIMD.DWI_MD_DATA_MATERIAL_FACTORY_T_0414 PJob_DWI_MD_DATA_MATERIAL_FACTORY_T_0414
+-- update：2023/04/22 guzhengfeng DWI_MD_DATA_MATERIAL_FACTORY_T_0414 重命名为 DWI_MD_DATA_MATERIAL_FACTORY_T，DWI_MD_DATA_MATERIAL_FACTORY_T_HIS_0414 重命名为 DWI_MD_DATA_MATERIAL_FACTORY_T_HIS
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_DATA_MATERIAL_FACTORY_T
+SELECT 
+    MATERIAL_ID						-- 物料ID
+    ,MATERIAL_NUM					-- 物料编号
+    ,GROUP_NUM						-- 集团
+    ,FACTORY_CODE					-- 工厂编码
+    ,INTEGRATE_MRP_NAME				-- 综合名称
+    ,LOAD_GROUP_NAME				-- 装载组名称
+    ,REPE_PARAMETER_FILE_NAME		-- 重复生产参数文件名称
+    ,RECEIVE_GOODS_DAYS				-- 以天计的收货处理时间
+    ,FORWARD_CONSUM_PERIOD			-- 消耗时期-向前
+    ,REVERSE_CONSUM_PERIOD			-- 消耗时期-逆向
+    ,CONSUM_PATTERNS_NAME			-- 消耗模式名称	  
+    ,MATL_SHIP_GROUP_NAME			-- 物料运输组名称
+    ,MATL_REQUIRE_PLAN_TYPE_NAME	-- 物料需求计划类型名称
+    ,MATL_REQ_PLAN_CTRER_CODE		-- 物料需求计划控制员
+    ,MATL_P_BATCH_PROCEDURE_CODE	-- 物料计划内批量程序名称
+    ,NO_COST_ACCT_NAME				-- 无成本核算名称
+    ,PROD_PLAN_PARAMETER_FILE		-- 生产计划参数文件
+    ,PROFIT_CENTER_CODE				-- 利润中心
+    ,USABLE_CHECK_GROUP_CODE		-- 可用性检查的检查组
+    ,PLAN_DELIVERY_DAYS				-- 计划交货时间（天）
+    ,PLAN_STRATEGY_GROUP_NAME		-- 计划策略组名称
+    ,POST_TO_INSPECT_STOCK_NAME		-- 过帐到检验库存名称
+    ,FLOAT_P_P_CODE					-- 浮动排产时间容余码
+    ,DELIVERY_LOC_CODE				-- 发货存储地点
+    ,RELATED_REQUIRE_FLAG			-- 对于独立和集中需求的相关需求标识   
+    ,FACTORY_PROD_DAYS				-- 厂内生产时间天数     
+    ,PUR_GROUP_NAME					-- 采购组名称
+    ,PUR_TYPE_NAME					-- 采购类型名称
+    ,ALLOW_REMANUFACTURE_FLAG		-- 标识：允许的重复制造
+    ,RECOIL_FLAG					-- 标识：反冲
+    ,SOURCE_LIST_REQUIRE_FLAG		-- 标识: 源清单要求
+    ,DEL_FLAG						-- 删除标识
+    ,START_DATE						-- 开始时间
+    ,END_DATE						-- 结束时间
+    ,UPDATE_DATE					-- 更新时间
+    ,WAREHOUSE_CODE					-- 仓库地点
+    ,MATL_SHIP_GROUP_CODE			-- 物料运输组
+    ,LOAD_GROUP_CODE				-- 装载组
+    ,USABLE_CHECK_GROUP_NAME		-- 可用性检查名称
+    ,PUR_GROUP_CODE					-- 采购组
+    ,PROFIT_CENTER_NAME				-- 利润中心名称
+    ,MATL_REQUIRE_PLAN_TYPE_CODE	-- 物料需求计划类型
+    ,MATL_P_BATCH_PROCEDURE_NAME	-- 批量大小名称
+    ,PUR_TYPE_CODE					-- 采购类型
+    ,SPE_PUR_TYPE_CODE				-- 特殊采购类型
+    ,SPE_PUR_TYPE_NAME				-- 特殊采购类型名称
+    ,PLAN_STRATEGY_GROUP_CODE		-- 策略组
+    ,CONSUM_PATTERNS_CODE			-- 消耗模式
+    ,INTEGRATE_MRP_FLAG				-- 综合
+    ,REPE_PARAMETER_FILE_CODE		-- 重复生产参数文件
+    ,PRODUTION_MANAGER 				-- 生产管理员
+FROM DWIMD.DWI_MD_DATA_MATERIAL_FACTORY_T_HIS  
+	WHERE END_DATE = '4712-12-31' 
+	AND DEL_FLAG = 'N'

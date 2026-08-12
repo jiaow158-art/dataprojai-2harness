@@ -1,0 +1,82 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004363
+-- create time: 2023/03/28 14:51:34 GMT+08:00
+-- 报表名：LTC保证金清单
+-- update：2023/04/03 guzhengfeng 1、字段receipt_flag取值重复，下线直取（第45行）代码；2、名称 _meaning 修改为 _name；3、数据写入表
+-- ******************************************************************** --
+--LTC保证金
+with bid_bpm as (
+select task.name_ --taskname
+       ,task.assignee_ --assignee
+       ,bpm.bill_no
+       ,MAX(BPM.start_time) AS bpm_startTime
+from sdi.sdi_act_hi_taskinst_1031 task 
+INNER JOIN sdi.SDI_act_bpm_task_leavel_1031 leavel ON leavel.task_id = task.id_
+join sdi.sdi_act_bpm_list_1031 bpm on bpm.proc_inst_id = leavel.top_proc_inst_id
+join SDI.SDI_MARGIN_APPLY_1033 ma on ma.Apply_code = bpm.bill_no
+where  ( task.delete_reason_ IS NULL OR task.delete_reason_ = 'completed' ) 
+    AND task.end_time_ IS NOT NULL 
+    and ( TASK.name_ = '上级领导' or TASK.name_ = '业务员发起')
+    GROUP BY task.name_,task.assignee_,bpm.bill_no
+)
+INSERT OVERWRITE TABLE DM.DM_LTC_BID_LIST_T
+SELECT 
+MA.Apply_code                           --单据编号
+,ma.receipts_status                     --单据状态
+,blv3.meaning AS receipts_status_name   --单据状态名称
+,MA.apply_type                          --申请类型
+,blv1.meaning AS apply_type_name        --申请类型名称
+,MA.margin_type                         --保证金类型
+,blv2.meaning AS margin_type_name       --保证金类型名称
+,MA.business_code                       --商机编码
+,MA.business_name                       --商机名称
+,MA.pay_company                         --付款公司代码
+,MA.pay_voucher                         --付款凭证
+,MA.collecting_company                  --收款公司代码
+,MA.margin_money                        --金额
+,MA.pay_date                            --付款时间
+,MA.calibrate_date                      --定标日期
+,MA.backletter_date                     --保函到期日
+,case MA.margin_type 
+    when 'LETTER_GUARANTEE' then ma.backletter_date
+    when 'MARGIN' then DATE_ADD(ma.calibrate_date, 30) 
+    end as Expiry_date              --到期日
+,MA.mat_mount                       --垫资金额
+--,MA.receipt_flag                    --是否有收据/要求提供的退款资料   /*2023/04/03 guzhengfeng 字段取值重复，下线该行代码*/
+,CASE MA.receipt_flag
+    WHEN 'Y' THEN '是'
+    else  '否'
+    end AS       receipt_flag       --是否有收据/要求提供的退款资料
+,BO.division                        --事业部编码
+,case BO.division 
+            when 'BATHROOM_DIVISION' then '卫浴事业部'
+            when 'CERAMIC_TILE_DIVISION' then '瓷砖事业部' 
+            when 'HOUSEHOLD_DIVISION' then '家居事业部' 
+            when 'NEW_ECOLOGICAL_TIMBER_DIVISION' then '生态新材事业部' 
+            else '其他'
+        end                         as business_dept                -- 事业部
+,BID_BPM2.assignee_ as Operator        --经办人
+,usr2.user_full_name as Operator_name        --经办人名称
+,bid_bpm.assignee_ as leader        --上级领导
+,usr1.user_full_name as leader_name        --上级领导名称
+,current_timestamp() as DW_LAST_UPDATE_DATE --最后更新日期
+FROM SDI.SDI_MARGIN_APPLY_1033 MA
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv1 on blv1.lookup_code = ma.apply_type
+              and blv1.system_code = 'LTC'
+          	  and blv1.enabled_flag = 'Y'
+          	  and blv1.lookup_type = 'APPLY_TYPE_CODE'
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv2 on blv2.lookup_code = ma.margin_type
+              and blv2.system_code = 'LTC'
+          	  and blv2.enabled_flag = 'Y'
+          	  and blv2.lookup_type = 'MARGINTYPE_CODE'
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv3 on blv3.lookup_code = ma.receipts_status
+              and blv3.system_code = 'LTC'
+          	  and blv3.enabled_flag = 'Y'
+          	  and blv3.lookup_type = 'SAMPLE_GENERAL_STATUS'
+JOIN STG.STG_BUSINESS_OPPORTUNITY_1033 BO ON BO.business_code = MA.business_code
+LEFT JOIN bid_bpm ON bid_bpm.bill_no = MA.Apply_code AND bid_bpm.name_ = '上级领导'
+LEFT JOIN bid_bpm BID_BPM2 ON BID_BPM2.bill_no = MA.Apply_code AND BID_BPM2.name_ = '业务员发起'
+left join SDI.SDI_BASE_USERS_1029 usr1 on usr1.user_name = bid_bpm.assignee_
+left join SDI.SDI_BASE_USERS_1029 usr2 on usr2.user_name = bid_bpm2.assignee_
+where MA.DELETE_FLAG = 0

@@ -1,0 +1,8 @@
+{
+    "name": "DWR_COST_CENTER_MAIN_D_TMP",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "成本中心主数据临时表，用于Proj_DWR_COST_CENTER_MAIN_D脚本里",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

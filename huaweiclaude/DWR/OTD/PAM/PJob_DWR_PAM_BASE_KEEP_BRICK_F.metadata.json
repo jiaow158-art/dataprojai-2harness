@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PAM_BASE_KEEP_BRICK_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PAM",
+    "description": "基地留砖交接班表(计算损耗专用)",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

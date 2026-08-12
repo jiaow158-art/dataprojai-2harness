@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PAM_CQ_BASE_PROD_DAILY_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT/PAM",
+    "description": "重庆基地日报",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

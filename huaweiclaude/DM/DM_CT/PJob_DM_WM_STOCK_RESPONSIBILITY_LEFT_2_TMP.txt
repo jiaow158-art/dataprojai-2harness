@@ -1,0 +1,39 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/05/10 09:38:02 GMT+08:00
+-- ******************************************************************** --
+-- 制造溢出分配后剩余库存
+with tmp as (
+	select material_num,
+		   batch_num,
+		   factory_code,
+		   inv_location,
+		   left_stock_qty ,
+		   left_zkkc,
+		   left_djzjkc 
+	from dm.DM_WM_STOCK_RESPONSIBILITY_LEFT_1  
+	union all 
+	select material_num,
+		   batch_num,
+		   factory_code,
+		   inv_location,
+		   0-dist_overflow_stock_qty,
+		   0-left_zkkc,
+		   0
+	from dm.dm_wm_stock_responsibility_overproduct_tmp
+)
+insert overwrite table DM.DM_WM_STOCK_RESPONSIBILITY_LEFT_2_TMP
+select material_num,
+	   batch_num,
+	   factory_code,
+	   inv_location,
+       sum(left_stock_qty) as left_stock_qty,
+       sum(left_zkkc) as left_zkkc,
+       sum(left_djzjkc) as left_djzjkc,
+	   current_timestamp() as dw_last_update_date
+from tmp 
+group by material_num,
+		 batch_num,
+		 factory_code,
+		 inv_location;

@@ -1,0 +1,37 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/12/23 09:18:55 GMT+08:00
+-- description:分级缺陷工序与缺陷对照表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- create table dm.dm_pam_base_grade_work_no_t (
+--  site_code string comment '工厂代码'
+-- ,work_no_code string comment '所属工序代码'
+-- ,work_no_name string comment '所属工序名称'
+-- ,defect_code string comment '缺陷代码'
+-- ,defect_name string comment '缺陷名称'
+-- ,data_status string comment '状态 1已启用 0已禁用'
+-- ,create_time timestamp comment '创建时间'
+-- ,update_time timestamp comment '修改时间'
+-- ,creater string comment '创建人'
+-- ,updater string comment  '修改人'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后修改时间'
+-- )
+
+insert overwrite table dm.dm_pam_base_grade_work_no_t
+select 
+ site as site_code  --工厂代码
+,work_no_code  --所属工序代码
+,work_no_desc as work_no_name
+,defect_code  --缺陷代码
+,defect_desc as defect_name
+,data_status  --状态 1已启用 0已禁用
+,create_time
+,update_time
+,creater
+,updater
+,current_timestamp () AS DW_LAST_UPDATE_DATE -- '最后更新时间'
+from SDI.SDI_DP_DATA_FENJI_GRADE_RADING_PROCESS_CONTRAST_1006
+where delete_flag = 1

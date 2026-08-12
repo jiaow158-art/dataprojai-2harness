@@ -1,0 +1,153 @@
+-- HIVE sql
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2023/05/31 16:25:36 GMT+08:00
+-- desc：资金成本-供应商 dwrfin.dwr_cost_fund_cost_supplier_d
+-- update：2023/06/25 guzhengfeng 新增字段事业部编码、事业部名称
+-- update :2023-07-24 10:12:23  新增销售组 新增时间边界   linw
+-- update :2023-08-02 10:12:23  新增删除标识   linw
+-- 2023-08-02 11:39:18          新增过滤不参与计算的供应商 linw 
+-- update 2024-05-06 16:09:05   新增只更新指定分区
+-- update 2024-06-02 15:53:10   分区格式修复YYYY-MM
+-- linw 2024-06-03 09:34:44   剔除 '0001010130','0001010130' 
+-- ******************************************************************** --
+set hive.exec.dynamic.partition=ture;
+set hive.exec.dynamic.partition.mode=nonstrict;
+-- set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+with tmp as (
+SELECT A.GJAHR, A.BELNR, A.RBUKRS, A.FISCYEARPER, A.BLART, A.RACCT, A.HSL, A.RWCUR, A.WSL, B.AWKEY, A.LIFNR,A.docln
+FROM sdi.sdi_acdoca_1001  A
+LEFT JOIN sdi.sdi_bkpf_1001  B ON A.BELNR = B.BELNR AND A.RBUKRS = B.BUKRS AND A.GJAHR = B.GJAHR
+where ( A.RACCT IN ('0021210100', '0021210110', '0021210300','0011510100')
+or SUBSTRING(A.RACCT, 1, 6) = '001002')
+-- and A.FISCYEARPER='2023004'
+-- AND A.period_id_m = '202304'
+)
+-- INSERT OVERWRITE TABLE dwrfin.dwr_cost_fund_cost_supplier_d partition (period_id_m)
+,
+TMP1 AS(
+select A.GJAHR, A.BELNR, A.RBUKRS, A.FISCYEARPER, A.BLART, A.RACCT, A.HSL, B.RWCUR, A.WSL, A.AWKEY, B.LIFNR, C.NAME_ORG1, C.BPKIND,D.text40
+      ,case when A.RBUKRS ='1900' and B.LIFNR in ('001012766','001010130') then '否'
+      when C.BPKIND  in ('02','04','05','06','07','10','11','12','17','18','19','21' ) then '是' 
+      else '否' end supplier_property_flag
+       , sum(A.HSL*-1 *0.04/12*6) AS supplier_cost_fund,current_timestamp() as dw_last_update_date,substring(A.FISCYEARPER,1,4)||substring(A.FISCYEARPER,6,2) AS period_id_m
+from tmp A
+join (
+      select t.*, ROW_NUMBER()over(partition by AWKEY order by docln) rn
+      from tmp t
+      where  t.RACCT IN ('0021210100', '0021210110', '0021210300','0011510100','0016030900')
+) B On a.AWKEY = B.AWKEY and B.rn=1
+LEFT JOIN sdi.sdi_but000_1001  C ON B.LIFNR = C.PARTNER
+left join sdi.SDI_TB004T_1001 D on c.bpkind =d.bpkind and d.spras='1' and D.client=800
+where  SUBSTRING(A.RACCT, 1, 6) = '001002'
+group by A.GJAHR, A.BELNR, A.RBUKRS, A.FISCYEARPER, A.BLART, A.RACCT, A.HSL, B.RWCUR, A.WSL, A.AWKEY, B.LIFNR, C.NAME_ORG1, C.BPKIND,D.text40
+)
+,tmp2 as (
+select
+	T.GJAHR     fiscalyear , 
+	T.BELNR     acct_voucher ,
+	T.RBUKRS    comp_code,
+	concat(substr(T.period_id_m,1,4),'-',substr(T.period_id_m,5,2)) year_month ,
+	T.BLART     voucher_type,
+	T.RACCT     general_ledger_account,
+	T.HSL       currency_amt ,
+	T.RWCUR     currency ,
+	T.WSL       voucher_amt ,
+	T.AWKEY     reference_code,
+	T.LIFNR     supplier_code,
+	T.NAME_ORG1 supplier_desc,
+	T.BPKIND  supplier_property ,
+	T.text40 supplier_property_desc,
+	T.supplier_property_flag supplier_property_flag,
+	sum(T.supplier_cost_fund) current_cost_fund,
+	sum(SUM(T.supplier_cost_fund)) over(partition by cast(T.GJAHR as string),cast(T.RBUKRS as string),cast(T.BELNR as string ),cast(T.LIFNR as string ),cast(T.AWKEY as string ),cast(T.BPKIND as string) order by cast( T.period_id_m as string )) accumulative_cost_fund ,
+	T.dw_last_update_date,
+	null business_department_code ,       -- 事业部编码
+	NULL business_department_name ,       -- 事业部名称
+	T1.sales_grp sales_grp ,
+	'N' AS DEL_FLAG,
+	T.period_id_m
+from
+	TMP1 T
+LEFT JOIN SDI.SDI_DIVISION_COMP_T_1037 T1
+ON T.RBUKRS = T1.comp_code and substr(t1.end_date,1,10) ='9999-12-31'
+group by 
+	T.GJAHR,
+	T.BELNR,
+	T.RBUKRS,
+	T.period_id_m,
+	T.BLART,
+	T.RACCT,
+	T.HSL,
+	T.RWCUR,
+	T.WSL,
+	T.AWKEY,
+	T.LIFNR,
+	T.NAME_ORG1,
+	T.BPKIND,
+	T.text40,
+	T.supplier_property_flag,
+	T.dw_last_update_date,
+	T1.sales_grp,
+	T.period_id_m
+)
+
+
+INSERT OVERWRITE TABLE dwrfin.dwr_cost_fund_cost_supplier_d partition (period_id_m)
+select 
+         fiscalyear
+        , acct_voucher
+        , comp_code
+        , year_month
+        , voucher_type
+        , general_ledger_account
+        , currency_amt
+        , currency
+        , voucher_amt
+        , reference_code
+        , supplier_code
+        , supplier_desc
+        , supplier_property
+        , supplier_property_desc
+        , case when supplier_code in ('0001010130','0001012766') then "否" else supplier_property_flag end   supplier_property_flag
+        , current_cost_fund
+        , accumulative_cost_fund
+        , dw_last_update_date
+        , business_department_code
+        , business_department_name
+        , sales_grp
+        , del_flag
+        , year_month period_id_m
+from tmp2 t where T.year_month = substr('${period_id_m}', 1, 7)
+-- CREATE TABLE `dwrfin.dwr_cost_fund_cost_supplier_d`(
+-- `fiscalyear` string COMMENT '年度',
+-- `acct_voucher` string COMMENT '会计凭证',
+-- `comp_code` string COMMENT '公司代码',
+-- `year_month` string COMMENT '年月',
+-- `voucher_type` string COMMENT '凭证类型',
+-- `general_ledger_account` string COMMENT '总账科目',
+-- `currency_amt` decimal(26,6) COMMENT '本币金额',
+-- `currency` string COMMENT '货币',
+-- `voucher_amt` decimal(26,6) COMMENT '凭证金额',
+-- `reference_code` string COMMENT '参考代码',
+-- `supplier_code` string COMMENT '供应商编码',
+-- `supplier_desc` string COMMENT '供应商描述',
+-- `supplier_property` string COMMENT '供应商属性',
+-- `supplier_property_desc` string COMMENT '供应商属性描述',
+-- `supplier_property_flag` string COMMENT '是否计算资金成本',
+-- `current_cost_fund` decimal(26,6) COMMENT '当期资金成本',
+-- `accumulative_cost_fund` decimal(26,6) COMMENT '累计资金成本',
+-- `dw_last_update_date` timestamp COMMENT '数据同步时间',
+-- `business_department_code` string COMMENT '事业部编码',
+-- `business_department_name` string COMMENT '事业部名称',
+-- `sales_grp` string COMMENT '销售组')
+-- COMMENT '资金成本-供应商'
+-- PARTITIONED BY (
+-- `period_id_m` string COMMENT '分区（月）')
+
+
+
+-- select * from dwrfin.dwr_cost_fund_cost_supplier_d 

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_FIN_CONTRACT_LEDGER_DETAIL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "合同台账模型",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

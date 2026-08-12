@@ -1,0 +1,70 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/09/03 14:35:34 GMT+08:00
+-- description:das基因版表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from huangwenbin 2024-09-07 增加字段：源物料编码
+-- update from huangwenbin 2025-10-08 代码优化
+-- ******************************************************************** --
+WITH T1 AS(
+SELECT DISTINCT A.PRODUCT_CODE
+               ,COALESCE(B.MATERIAL_NUM,C.MATERIAL_NUM) AS MATERIAL_NUM
+  FROM SDI.SDI_DP_GENE_BOARD_INFO_1006 A
+  LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T B
+    ON A.PRODUCT_CODE = SUBSTR(B.MATERIAL_NUM,1,LENGTH(B.MATERIAL_NUM)-2)
+  LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T C
+    ON A.PRODUCT_CODE = C.MATERIAL_NUM
+ WHERE A.DELETE_FLAG = '1' 
+)
+insert overwrite table DWROTD.DWR_PAM_GENE_BOARD_INFO_T
+select 
+ T.SITE AS SITE_CODE
+,T.WORK_SHOP AS WORK_SHOP_CODE
+,T.PRODUCT_CODE AS SRC_MATERIAL_NUM --源物料编码
+,T1.MATERIAL_NUM --物料编码
+,T.TYPE AS TYPE_CODE
+,CASE WHEN T.TYPE = '0' THEN '签板'
+      WHEN T.TYPE = '1' THEN '补版'
+      ELSE '' END AS TYPE_NAME --类型（签板0,补版1）
+,T.SIGNING_DATE --日期（签板,借出,报废）
+,T.BATCH AS BATCH_NUM 
+,T.GLOSS --光泽度
+,T.PRODUCT_CHARACTERISTICS AS PROD_CHATCS  --产品特性
+,T.CATEGORY --品类
+,T.CONNECTED_PATTERN AS PATTERN --连纹形式
+,T.FACE_COUNT -- 面数
+,T.NUMBER AS QTY --数量（签板,借出,报废）
+,T.STORAGE_AREA AS STOR_AREA --存放区域
+,T.PERSONNEL_NAME AS PER_NAME -- 人员名称（签板,借出,报废）
+,T.PERSONNEL_PHONE AS PER_PHONE --人员电话（签板,借出,报废）
+,T.STATE AS STATE_CODE -- 状态(签板0,借出中1,已借出2，借入中3，借入审核不通过4，已借入5，报废中6，已报废7，待确认8，部分借出9)
+,CASE WHEN T.STATE = '0' THEN '签板'
+      WHEN T.STATE = '1' THEN '借出中'
+      WHEN T.STATE = '2' THEN '已借出'
+      WHEN T.STATE = '3' THEN '借入中'
+      WHEN T.STATE = '4' THEN '借入审核不通过'
+      WHEN T.STATE = '5' THEN '已借入'
+      WHEN T.STATE = '6' THEN '报废中'
+      WHEN T.STATE = '7' THEN '已报废'
+      WHEN T.STATE = '8' THEN '待确认'
+      WHEN T.STATE = '9' THEN '部分借出'
+      ELSE '' END STATE_NAME 
+,T.BEFORE_SCRAPPING_STATE AS B_S_STATE_CODE  --报废前状态(签板0,借出中1,已借出2，借入中3，借入审核不通过4，已借入5，报废中6，已报废7)
+,CASE WHEN T.BEFORE_SCRAPPING_STATE = '0' THEN '签板'
+      WHEN T.BEFORE_SCRAPPING_STATE = '1' THEN '借出中'
+      WHEN T.BEFORE_SCRAPPING_STATE = '2' THEN '已借出'
+      WHEN T.BEFORE_SCRAPPING_STATE = '3' THEN '借入中'
+      WHEN T.BEFORE_SCRAPPING_STATE = '4' THEN '借入审核不通过'
+      WHEN T.BEFORE_SCRAPPING_STATE = '5' THEN '已借入'
+      WHEN T.BEFORE_SCRAPPING_STATE = '6' THEN '报废中'
+      WHEN T.BEFORE_SCRAPPING_STATE = '7' THEN '已报废'
+      ELSE '' END AS B_S_STATE_NAME 
+,T.CREATE_TIME 
+,T.UPDATE_TIME 
+,CURRENT_TIMESTAMP() as DW_LAST_UPDATE_DATE
+from SDI.SDI_DP_GENE_BOARD_INFO_1006 T
+LEFT JOIN T1
+ON T.PRODUCT_CODE = T1.PRODUCT_CODE
+WHERE T.DELETE_FLAG = '1'

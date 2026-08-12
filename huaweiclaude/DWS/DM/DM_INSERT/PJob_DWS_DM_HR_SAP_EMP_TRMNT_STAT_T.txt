@@ -1,0 +1,523 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/05/19 15:41:12 GMT+08:00
+-- update from huangwenbin 2024-06-17 修改是否管理干部逻辑：岗位层级=总监级、总经理级、总裁级-->职族=管理职族
+-- update from huangwenbin 2024-06-17 上一版代码写错了，修改是否管理干部逻辑：岗位层级=总监级、总经理级、总裁级-->职族=管理职族
+-- update from huangwenbin 2024-08-05 增加字段：部门结构名称
+-- update from huangwenbin 2026-03-17 在职人数增加逻辑：剔除退休人员，是否有编制=是
+-- update from huangwenbin 2026-03-17 在职人数去掉逻辑：剔除退休人员
+-- update from huangwenbin 2026-04-21 增加字段：其他离职人数、退休人数
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_HR_SAP_EMP_TRMNT_STAT_T;
+--UPLOAD_HR_MPO_EMP_2022_T已下线
+WITH T1 AS(
+SELECT
+       A.STAT_MONTH --统计月份
+	  ,SUBSTR(CAST(A.STAT_MONTH || '-01' AS DATE) + INTERVAL '1 YEAR',1,7) AS NY_STAT_MONTH --下一年月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_POST_LVL_NAME AS EMP_LVL_NAME --职级名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)') THEN 'MP'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '间接产出' THEN 'O辅'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '直接产出' THEN 'OO'
+            WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)','操作职族')
+			 AND (A.EMP_POST_ATTR_NAME = '' OR A.EMP_POST_ATTR_NAME IS NULL) THEN NULL
+			ELSE A.EMP_POST_TYPE_NAME
+             END AS EMP_POST_TYPE_NAME --职族名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族') THEN '是'
+	        ELSE '否'
+			 END AS IS_MGMT_CADRES --是否管理干部		 
+	  ,COUNT(DISTINCT CASE WHEN COALESCE(A.OPER_TYPE_NAME,'$$$') <> '退休' THEN A.EMP_NUM END) AS TRMNT_EMP_CNT --离职人数
+	  ,COUNT(DISTINCT CASE WHEN A.TRMNT_TYPE_NAME = '主动离职' OR A.OPER_TYPE_NAME IN('内退') THEN A.EMP_NUM ELSE NULL END) AS VOLRY_TRMNT_EMP_CNT --主动离职人数
+	  ,COUNT(DISTINCT CASE WHEN A.TRMNT_TYPE_NAME = '被动离职' AND COALESCE(A.OPER_REASON,'&&&') <> '死亡' THEN A.EMP_NUM ELSE NULL END) AS UNVOLRY_TRMNT_EMP_CNT --被动离职人数
+	  ,COUNT(DISTINCT CASE WHEN A.OPER_REASON = '死亡' THEN A.EMP_NUM END) AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,COUNT(DISTINCT CASE WHEN A.OPER_TYPE_NAME = '退休' THEN A.EMP_NUM END) AS RET_TRMNT_EMP_CNT --退休人数
+  FROM DWRHR.DWR_HR_EMP_TRMNT_INFO_F A
+ WHERE A.EMP_GROUP_NAME NOT IN('实习生','劳务外包人员','劳务派遣员工','离职人员','外部人员','临时工','顾问','残联员工')
+   AND A.OPER_TYPE_NAME IN('离职','（停用）终止协议用工','退休','内退')
+ AND (A.LVL5_DEPT_NAME NOT IN ('陈村和园','鹏云','星信厂管理组')  or A.LVL5_DEPT_NAME is null)
+ AND (A.LVL3_DEPT_NAME NOT IN ('资本运营部') or A.LVL3_DEPT_NAME is null)
+ GROUP BY
+       A.STAT_MONTH --统计月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_POST_LVL_NAME --职级名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)') THEN 'MP'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '间接产出' THEN 'O辅'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '直接产出' THEN 'OO'
+            WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)','操作职族')
+			 AND (A.EMP_POST_ATTR_NAME = '' OR A.EMP_POST_ATTR_NAME IS NULL) THEN NULL
+			ELSE A.EMP_POST_TYPE_NAME
+             END --职族名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族') THEN '是'
+	        ELSE '否'
+			 END --是否管理干部		 
+)
+,T2 AS(
+SELECT B.STAT_MONTH --统计月份
+      ,SUBSTR(CAST(B.STAT_MONTH || '-01' AS DATE) + INTERVAL '1 YEAR',1,7) AS NY_STAT_MONTH --下一年月份
+	  ,SUBSTR(CAST(B.STAT_MONTH || '-01' AS DATE) + INTERVAL '1 MONTH',1,7) AS NM_STAT_MONTH --下一月月份
+      ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)') THEN 'MP'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '间接产出' THEN 'O辅'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '直接产出' THEN 'OO'
+            WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)','操作职族')
+			 AND (A.EMP_POST_ATTR_NAME = '' OR A.EMP_POST_ATTR_NAME IS NULL) THEN NULL
+			ELSE A.EMP_POST_TYPE_NAME
+             END AS EMP_POST_TYPE_NAME --职族名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族') THEN '是'
+	        ELSE '否'
+			 END AS IS_MGMT_CADRES --是否管理干部		 
+	  ,COUNT(1) AS EMP_CNT --员工数 
+  FROM DWRDIM.DWR_DIM_SAP_EMP_INFO_F A
+ INNER JOIN (SELECT DISTINCT DAY_MEND_DT
+                            ,SUBSTR(DAY_MEND_DT,1,7) AS STAT_MONTH
+               FROM DM.DM_DIM_DATE_D
+			   
+			  UNION ALL
+
+			 SELECT DISTINCT DAY_MEND_DT
+                            ,SUBSTR(CAST(DAY_MEND_DT AS DATE) + INTERVAL '1 MONTH',1,7) AS STAT_MONTH
+               FROM DM.DM_DIM_DATE_D  
+			) B
+	ON A.STAT_DATE = B.DAY_MEND_DT		
+ WHERE A.EMP_GROUP_NAME NOT IN('实习生','劳务外包人员','劳务派遣员工','退休人员','离职人员','外部人员','临时工','顾问','残联员工')
+   AND (A.LVL5_DEPT_NAME NOT IN ('陈村和园','鹏云','星信厂管理组')  OR A.LVL5_DEPT_NAME IS NULL)
+   AND (A.LVL3_DEPT_NAME NOT IN ('资本运营部') OR A.LVL3_DEPT_NAME IS NULL)
+   AND A.IS_ZB = '是'
+ GROUP BY 
+       B.STAT_MONTH --统计月份
+      ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+      ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)') THEN 'MP'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '间接产出' THEN 'O辅'
+            WHEN A.EMP_POST_TYPE_NAME = '操作职族' AND A.EMP_POST_ATTR_NAME = '直接产出' THEN 'OO'
+            WHEN A.EMP_POST_TYPE_NAME IN('管理职族','专业职族','营销职族(失效)','行政职族(失效)','操作职族')
+			 AND (A.EMP_POST_ATTR_NAME = '' OR A.EMP_POST_ATTR_NAME IS NULL) THEN NULL
+			ELSE A.EMP_POST_TYPE_NAME
+             END --职族名称
+	  ,CASE WHEN A.EMP_POST_TYPE_NAME IN('管理职族') THEN '是'
+	        ELSE '否'
+			 END --是否管理干部
+)
+,T3 AS(
+SELECT B.STAT_MONTH --统计月份
+      ,COUNT(DISTINCT A.STAT_DATE) AS DATE_CNT --日期数  
+  FROM DWRDIM.DWR_DIM_SAP_EMP_INFO_F A
+ INNER JOIN (SELECT DISTINCT DAY_MEND_DT
+                            ,SUBSTR(DAY_MEND_DT,1,7) AS STAT_MONTH
+               FROM DM.DM_DIM_DATE_D
+			   
+			  UNION ALL
+
+			 SELECT DISTINCT DAY_MEND_DT
+                            ,SUBSTR(CAST(DAY_MEND_DT AS DATE) + INTERVAL '1 MONTH',1,7) AS STAT_MONTH
+               FROM DM.DM_DIM_DATE_D  
+			) B
+	ON A.STAT_DATE = B.DAY_MEND_DT		
+ WHERE A.EMP_GROUP_NAME NOT IN('实习生','劳务外包人员','劳务派遣员工','退休人员','离职人员','外部人员','临时工','顾问','残联员工')
+   AND (A.LVL5_DEPT_NAME NOT IN ('陈村和园','鹏云','星信厂管理组')  OR A.LVL5_DEPT_NAME IS NULL)
+   AND (A.LVL3_DEPT_NAME NOT IN ('资本运营部') OR A.LVL3_DEPT_NAME IS NULL)
+   AND A.IS_ZB = '是'
+ GROUP BY 
+       B.STAT_MONTH --统计月份
+),T4 AS(
+SELECT
+       STAT_MONTH --统计月份
+	  ,LVL1_DEPT_NAME --一级部门名称
+      ,LVL2_DEPT_NAME --二级部门名称
+	  ,LVL3_DEPT_NAME --三级部门名称
+	  ,LVL4_DEPT_NAME --四级部门名称
+	  ,LVL5_DEPT_NAME --五级部门名称
+      ,LVL6_DEPT_NAME --六级部门名称
+	  ,LVL7_DEPT_NAME --七级部门名称
+	  ,LVL8_DEPT_NAME --八级部门名称
+	  ,EMP_LVL_NAME --职级名称
+	  ,EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,TRMNT_EMP_CNT --本月离职人数
+	  ,VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,0 AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,0 AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,0 AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,0 AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,0 AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,0 AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,0 AS EMP_CNT --月初人数
+	  ,0 AS LM_EMP_CNT --上月月初人数
+	  ,0 AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,RET_TRMNT_EMP_CNT --退休人数
+  FROM T1
+
+ UNION ALL
+
+SELECT
+       SUBSTR(CAST(CONCAT(STAT_MONTH,'-01') AS DATE) + INTERVAL '1 MONTH',1,7) AS STAT_MONTH --统计月份
+	  ,LVL1_DEPT_NAME --一级部门名称
+      ,LVL2_DEPT_NAME --二级部门名称
+	  ,LVL3_DEPT_NAME --三级部门名称
+	  ,LVL4_DEPT_NAME --四级部门名称
+	  ,LVL5_DEPT_NAME --五级部门名称
+      ,LVL6_DEPT_NAME --六级部门名称
+	  ,LVL7_DEPT_NAME --七级部门名称
+	  ,LVL8_DEPT_NAME --八级部门名称
+	  ,EMP_LVL_NAME --职级名称
+	  ,EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,0 AS TRMNT_EMP_CNT --本月离职人数
+	  ,0 AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,0 AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,TRMNT_EMP_CNT AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,VOLRY_TRMNT_EMP_CNT AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,UNVOLRY_TRMNT_EMP_CNT AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,0 AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,0 AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,0 AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,0 AS EMP_CNT --月初人数
+	  ,0 AS LM_EMP_CNT --上月月初人数
+	  ,0 AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,0 AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,0 AS RET_TRMNT_EMP_CNT --退休人数
+  FROM T1
+
+ UNION ALL
+
+SELECT
+       NY_STAT_MONTH AS STAT_MONTH --统计月份
+	  ,LVL1_DEPT_NAME --一级部门名称
+      ,LVL2_DEPT_NAME --二级部门名称
+	  ,LVL3_DEPT_NAME --三级部门名称
+	  ,LVL4_DEPT_NAME --四级部门名称
+	  ,LVL5_DEPT_NAME --五级部门名称
+      ,LVL6_DEPT_NAME --六级部门名称
+	  ,LVL7_DEPT_NAME --七级部门名称
+	  ,LVL8_DEPT_NAME --八级部门名称
+	  ,EMP_LVL_NAME --职级名称
+	  ,EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,0 AS TRMNT_EMP_CNT --本月离职人数
+	  ,0 AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,0 AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,0 AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,0 AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,0 AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,TRMNT_EMP_CNT AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,VOLRY_TRMNT_EMP_CNT AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,UNVOLRY_TRMNT_EMP_CNT AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,0 AS EMP_CNT --月初人数
+	  ,0 AS LM_EMP_CNT --上月月初人数
+	  ,0 AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,0 AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,0 AS RET_TRMNT_EMP_CNT --退休人数
+  FROM T1
+ WHERE NY_STAT_MONTH <= SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7) 
+ 
+ UNION ALL
+
+SELECT
+       A.STAT_MONTH --统计月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,A.EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,0 AS TRMNT_EMP_CNT --本月离职人数
+	  ,0 AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,0 AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,0 AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,0 AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,0 AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,0 AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,0 AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,0 AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,CASE WHEN COALESCE(B.DATE_CNT,0) = 0 THEN 0
+            ELSE COALESCE(A.EMP_CNT,0) / B.DATE_CNT
+             END AS EMP_CNT --月初人数 AS EMP_CNT --月初人数
+	  ,0 AS LM_EMP_CNT --上月月初人数
+	  ,0 AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,0 AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,0 AS RET_TRMNT_EMP_CNT --退休人数
+  FROM T2 A
+  LEFT JOIN T3 B
+    ON A.STAT_MONTH = B.STAT_MONTH
+	
+ UNION ALL
+
+SELECT
+       SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) + INTERVAL '1 MONTH',1,7) AS STAT_MONTH --统计月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,A.EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,0 AS TRMNT_EMP_CNT --本月离职人数
+	  ,0 AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,0 AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,0 AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,0 AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,0 AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,0 AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,0 AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,0 AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,0 AS EMP_CNT --月初人数 AS EMP_CNT --月初人数
+	  ,CASE WHEN COALESCE(B.DATE_CNT,0) = 0 THEN 0
+            ELSE COALESCE(A.EMP_CNT,0) / B.DATE_CNT
+             END AS LM_EMP_CNT --上月月初人数
+	  ,0 AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,0 AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,0 AS RET_TRMNT_EMP_CNT --退休人数	  
+  FROM T2 A
+  LEFT JOIN T3 B
+    ON A.NM_STAT_MONTH = B.STAT_MONTH
+	
+ UNION ALL
+
+SELECT
+       SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) + INTERVAL '1 YEAR',1,7) AS STAT_MONTH --统计月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,A.EMP_POST_TYPE_NAME --职族名称
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,0 AS TRMNT_EMP_CNT --本月离职人数
+	  ,0 AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,0 AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,0 AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,0 AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,0 AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,0 AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,0 AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,0 AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,0 AS EMP_CNT --月初人数 AS EMP_CNT --月初人数
+	  ,0 AS LM_EMP_CNT --上月月初人数
+	  ,CASE WHEN COALESCE(B.DATE_CNT,0) = 0 THEN 0
+            ELSE COALESCE(A.EMP_CNT,0) / B.DATE_CNT
+             END AS LY_EMP_CNT --去年同期月初人数
+	  ,0 AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+	  ,0 AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,0 AS RET_TRMNT_EMP_CNT --退休人数	  
+  FROM T2 A
+  LEFT JOIN T3 B
+    ON A.NY_STAT_MONTH = B.STAT_MONTH
+ WHERE A.NY_STAT_MONTH <= SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7)
+)
+,T5 AS(
+SELECT A.STAT_MONTH --统计月份
+	  ,SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) - INTERVAL '1 MONTH',1,7) AS LAST_MONTH --上个月
+	  ,SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) - INTERVAL '12 MONTH',1,7) AS LAST_YEAR_MONTH --去年同期月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,CASE WHEN A.EMP_LVL_NAME = '员工级' THEN '员工级'
+	        WHEN A.EMP_LVL_NAME = '主管级' THEN '主管级'
+			WHEN A.EMP_LVL_NAME = '经理级' THEN '经理级'
+			WHEN A.EMP_LVL_NAME IN('总监级','中心总经理级','总经理级','总裁级','董事长级') THEN '总监及以上'
+			 END AS EMP_LVL_TYPE_NAME --职级分类名称
+	  ,CASE WHEN A.EMP_LVL_NAME = '员工级' THEN 1
+	        WHEN A.EMP_LVL_NAME = '主管级' THEN 2
+			WHEN A.EMP_LVL_NAME = '经理级' THEN 3
+			WHEN A.EMP_LVL_NAME IN('总监级','中心总经理级','总经理级','总裁级','董事长级') THEN 4
+			 END AS EMP_LVL_TYPE_RANK --职级分类排序		 
+	  ,A.IS_MGMT_CADRES --是否管理干部
+	  ,A.EMP_POST_TYPE_NAME --职族名称		 
+	  ,SUM(A.TRMNT_EMP_CNT) AS TRMNT_EMP_CNT --本月离职人数
+	  ,SUM(A.VOLRY_TRMNT_EMP_CNT) AS VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,SUM(A.UNVOLRY_TRMNT_EMP_CNT) AS UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,SUM(A.LM_TRMNT_EMP_CNT) AS LM_TRMNT_EMP_CNT --上月离职人数
+	  ,SUM(A.LM_VOLRY_TRMNT_EMP_CNT) AS LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,SUM(A.LM_UNVOLRY_TRMNT_EMP_CNT) AS LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,SUM(A.LY_TRMNT_EMP_CNT) AS LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,SUM(A.LY_VOLRY_TRMNT_EMP_CNT) AS LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,SUM(A.LY_UNVOLRY_TRMNT_EMP_CNT) AS LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,SUM(A.EMP_CNT) AS EMP_CNT --月初人数
+	  ,SUM(A.LM_EMP_CNT) AS LM_EMP_CNT --上月月初人数
+	  ,SUM(A.LY_EMP_CNT) AS LY_EMP_CNT --去年同期月初人数
+	  ,SUM(A.OTH_TRMNT_EMP_CNT) AS OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,SUM(A.RET_TRMNT_EMP_CNT) AS RET_TRMNT_EMP_CNT --退休人数	  
+  FROM T4 A
+ GROUP BY
+       A.STAT_MONTH --统计月份
+	  ,SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) - INTERVAL '1 MONTH',1,7) --上个月
+	  ,SUBSTR(CAST(CONCAT(A.STAT_MONTH,'-01') AS DATE) - INTERVAL '12 MONTH',1,7) --去年同期月份
+	  ,A.LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,CASE WHEN A.EMP_LVL_NAME = '员工级' THEN '员工级'
+	        WHEN A.EMP_LVL_NAME = '主管级' THEN '主管级'
+			WHEN A.EMP_LVL_NAME = '经理级' THEN '经理级'
+			WHEN A.EMP_LVL_NAME IN('总监级','中心总经理级','总经理级','总裁级','董事长级') THEN '总监及以上'
+			 END --职级分类名称
+	  ,CASE WHEN A.EMP_LVL_NAME = '员工级' THEN 1
+	        WHEN A.EMP_LVL_NAME = '主管级' THEN 2
+			WHEN A.EMP_LVL_NAME = '经理级' THEN 3
+			WHEN A.EMP_LVL_NAME IN('总监级','中心总经理级','总经理级','总裁级','董事长级') THEN 4
+			 END --职级分类排序		 
+	  ,A.IS_MGMT_CADRES --是否管理干部
+	  ,A.EMP_POST_TYPE_NAME --职族名称		 
+)
+INSERT INTO DM.DM_HR_SAP_EMP_TRMNT_STAT_T
+(
+       STAT_MONTH --统计月份
+	  ,LAST_MONTH --上个月
+	  ,LAST_YEAR_MONTH --去年同期月份
+	  ,LVL1_DEPT_NAME --一级部门名称
+      ,LVL2_DEPT_NAME --二级部门名称
+	  ,LVL3_DEPT_NAME --三级部门名称
+	  ,LVL4_DEPT_NAME --四级部门名称
+	  ,LVL5_DEPT_NAME --五级部门名称
+      ,LVL6_DEPT_NAME --六级部门名称
+	  ,LVL7_DEPT_NAME --七级部门名称
+	  ,LVL8_DEPT_NAME --八级部门名称
+	  ,EMP_LVL_NAME --职级名称
+	  ,EMP_LVL_TYPE_NAME --职级分类名称
+	  ,EMP_LVL_TYPE_RANK --职级分类排序		 
+	  ,IS_MGMT_CADRES --是否管理干部
+	  ,EMP_POST_TYPE_NAME --职族名称
+	  ,TRMNT_EMP_CNT --本月离职人数
+	  ,VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,LM_TRMNT_EMP_CNT --上月离职人数
+	  ,LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,EMP_CNT --月初人数
+	  ,LM_EMP_CNT --上月月初人数
+	  ,LY_EMP_CNT --去年同期月初人数
+	  ,TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+      ,DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,DEPT_JG_NAME --部门结构名称
+	  ,OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,RET_TRMNT_EMP_CNT --退休人数
+)
+SELECT A.STAT_MONTH --统计月份
+	  ,A.LAST_MONTH --上个月
+	  ,A.LAST_YEAR_MONTH --去年同期月份
+	  ,A.LVL1_DEPT_NAME1 AS LVL1_DEPT_NAME --一级部门名称
+      ,A.LVL2_DEPT_NAME --二级部门名称
+	  ,A.LVL3_DEPT_NAME --三级部门名称
+	  ,A.LVL4_DEPT_NAME --四级部门名称
+	  ,A.LVL5_DEPT_NAME --五级部门名称
+      ,A.LVL6_DEPT_NAME --六级部门名称
+	  ,A.LVL7_DEPT_NAME --七级部门名称
+	  ,A.LVL8_DEPT_NAME --八级部门名称
+	  ,A.EMP_LVL_NAME --职级名称
+	  ,A.EMP_LVL_TYPE_NAME --职级分类名称
+	  ,A.EMP_LVL_TYPE_RANK --职级分类排序		 
+	  ,A.IS_MGMT_CADRES --是否管理干部
+	  ,A.EMP_POST_TYPE_NAME --职族名称
+	  ,A.TRMNT_EMP_CNT --本月离职人数
+	  ,A.VOLRY_TRMNT_EMP_CNT --本月主动离职人数
+	  ,A.UNVOLRY_TRMNT_EMP_CNT --本月被动离职人数
+	  ,A.LM_TRMNT_EMP_CNT --上月离职人数
+	  ,A.LM_VOLRY_TRMNT_EMP_CNT --上月主动离职人数
+	  ,A.LM_UNVOLRY_TRMNT_EMP_CNT --上月被动离职人数	  
+	  ,A.LY_TRMNT_EMP_CNT --去年同期离职人数
+	  ,A.LY_VOLRY_TRMNT_EMP_CNT --去年同期主动离职人数
+	  ,A.LY_UNVOLRY_TRMNT_EMP_CNT --去年同期被动离职人数
+	  ,A.EMP_CNT --月初人数
+	  ,A.LM_EMP_CNT --上月月初人数
+	  ,A.LY_EMP_CNT --去年同期月初人数
+      ,SUM(A.TRMNT_EMP_CNT)	OVER(PARTITION BY SUBSTR(A.STAT_MONTH,1,4),A.LVL1_DEPT_NAME,A.LVL2_DEPT_NAME
+                                             ,A.LVL3_DEPT_NAME,A.LVL4_DEPT_NAME,A.LVL5_DEPT_NAME
+                                             ,A.LVL6_DEPT_NAME,A.LVL7_DEPT_NAME,A.LVL8_DEPT_NAME
+											 ,A.EMP_LVL_NAME,A.EMP_POST_TYPE_NAME ORDER BY A.STAT_MONTH ASC
+											 ) AS TOTAL_TRMNT_EMP_CNT --本年累计离职人数
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,CASE WHEN COALESCE(A.LVL8_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1||A.LVL4_DEPT_NAME1||A.LVL5_DEPT_NAME1||A.LVL6_DEPT_NAME1||A.LVL7_DEPT_NAME1||A.LVL8_DEPT_NAME1
+	        WHEN COALESCE(A.LVL7_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1||A.LVL4_DEPT_NAME1||A.LVL5_DEPT_NAME1||A.LVL6_DEPT_NAME1||A.LVL7_DEPT_NAME1
+	        WHEN COALESCE(A.LVL6_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1||A.LVL4_DEPT_NAME1||A.LVL5_DEPT_NAME1||A.LVL6_DEPT_NAME1
+			WHEN COALESCE(A.LVL5_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1||A.LVL4_DEPT_NAME1||A.LVL5_DEPT_NAME1
+			WHEN COALESCE(A.LVL4_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1||A.LVL4_DEPT_NAME1
+			WHEN COALESCE(A.LVL3_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1||A.LVL3_DEPT_NAME1
+			WHEN COALESCE(A.LVL2_DEPT_NAME,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1||A.LVL2_DEPT_NAME1
+			WHEN COALESCE(A.LVL1_DEPT_NAME1,'SNULL') <> 'SNULL'
+            THEN A.LVL1_DEPT_NAME1
+	         END AS DEPT_JG_NAME --部门结构名称
+	  ,OTH_TRMNT_EMP_CNT --其他离职人数
+	  ,RET_TRMNT_EMP_CNT --退休人数	  		 
+  FROM(SELECT A.*
+             ,CASE WHEN COALESCE(A.LVL8_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL8_DEPT_NAME ELSE '' END AS LVL8_DEPT_NAME1
+			 ,CASE WHEN COALESCE(A.LVL7_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL7_DEPT_NAME ELSE '' END AS LVL7_DEPT_NAME1
+			 ,CASE WHEN COALESCE(A.LVL6_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL6_DEPT_NAME ELSE '' END AS LVL6_DEPT_NAME1
+			 ,CASE WHEN COALESCE(A.LVL5_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL5_DEPT_NAME ELSE '' END AS LVL5_DEPT_NAME1
+			 ,CASE WHEN COALESCE(A.LVL4_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL4_DEPT_NAME ELSE '' END AS LVL4_DEPT_NAME1
+             ,CASE WHEN COALESCE(A.LVL3_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL3_DEPT_NAME ELSE '' END AS LVL3_DEPT_NAME1
+			 ,CASE WHEN COALESCE(A.LVL2_DEPT_NAME,'SNULL') <> 'SNULL' THEN '-'||A.LVL2_DEPT_NAME ELSE '' END AS LVL2_DEPT_NAME1
+			 ,COALESCE(A.LVL1_DEPT_NAME,'东鹏控股') AS LVL1_DEPT_NAME1
+         FROM T5 A) A
+ WHERE STAT_MONTH <= SUBSTR(CURRENT_DATE,1,7) 
+;

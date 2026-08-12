@@ -1,0 +1,63 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/06/29 18:38:01 GMT+08:00
+-- description:物料BOM数据，做卫浴运中接口用
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--create table DM_SW.DM_OTD_MAT_OUTGOODS_RATIO_T as 
+with BOM_DETAIL_DATA AS(   -- BOM数据
+	select t1.MATNR as material_num,  -- 物料编码
+		   t2.IDNRK as small_material_num--, -- 子项物料编码
+	   	   --t2.MENGE as small_material_qty  -- 子项物料数量
+	from(
+		select MATNR,
+			   STLNR,
+			   row_number() over(partition by MATNR order by ANDAT desc ) as RN
+		from SDI.SDI_MAST_1001 
+		WHERE STLAN = '5'
+	) t1
+	join sdi.sdi_STPO_1001 t2 on t1.STLNR = t2.STLNR
+    join DWIMD.dwi_md_data_material_general_t t3
+    on t2.IDNRK = t3.material_num  
+	where t1.RN = 1
+	and t3.product_level3_code = '4002001'  -- 主柜
+),
+tmp_data as(
+SELECT t.operation_center_code,
+       t.operation_center_name,
+       t.material_num,
+       t1.small_material_num,
+	   SUM(actual_billed_qty) AS material_qty
+FROM DM_SW.DM_OTD_SALES_FORECAST_FACT_T T
+join BOM_DETAIL_DATA t1
+on t.material_num = t1.material_num
+WHERE def_channnel = '经销'
+and stat_date_d > add_monthS(CAST('${PERIOD_ID_D}' AS STRING),-3)  
+and stat_date_d <= '${PERIOD_ID_D}'  -- 最近3个月
+GROUP BY  t.operation_center_code,
+	     t.operation_center_name,
+	     t.material_num,
+	     t1.small_material_num
+),
+tmp_data01 as(
+	select t.operation_center_code,t.operation_center_name,t.material_num,t.small_material_num,t.material_qty,
+		   sum(material_qty) over(PARTITION by t.operation_center_code,t.small_material_num) as tot_material_qty
+	from tmp_data t
+),
+tmp_data02 as(
+	select t.operation_center_code,t.operation_center_name,t.material_num,t.small_material_num,
+	       max(material_qty) as material_qty,
+	       max(tot_material_qty) as tot_material_qty,
+	       max(material_qty) / max(tot_material_qty) as material_ratio
+	from tmp_data01 t
+	group by t.operation_center_code,t.operation_center_name,t.material_num,t.small_material_num
+)
+insert overwrite table DM_SW.DM_OTD_MAT_OUTGOODS_RATIO_T
+select t1.*,
+       current_timestamp() as dw_last_update_date
+from tmp_data02 t1;
+
+
+---drop table  DM_SW.DM_OTD_MAT_OUTGOODS_RATIO_T

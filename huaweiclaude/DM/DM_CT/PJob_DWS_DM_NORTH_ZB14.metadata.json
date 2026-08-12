@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB14",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标-毛利率-标A毛利率（零售渠道）ZB14",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

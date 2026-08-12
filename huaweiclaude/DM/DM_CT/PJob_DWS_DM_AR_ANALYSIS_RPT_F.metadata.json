@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_AR_ANALYSIS_RPT_F",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_ITEM_MODIFY_DSS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "DSS修改订单行",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

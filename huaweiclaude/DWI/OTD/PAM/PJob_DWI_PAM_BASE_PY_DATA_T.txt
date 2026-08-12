@@ -1,0 +1,51 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/06/21 17:39:33 GMT+08:00
+-- description:卫浴基地制造成本(来源BCS系统，喷釉数据)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--DROP TABLE IF EXISTS DWIOTD.DWI_PAM_BASE_PY_DATA_T;
+--create table dwiotd.dwi_pam_base_py_data_t as
+INSERT OVERWRITE TABLE DWIOTD.DWI_PAM_BASE_PY_DATA_T
+SELECT T.prod_date, -- 日期
+	   T.factory_code,   -- 工厂
+	   --T.material_num, -- 物料编码
+	   t1.material_num,
+	   SUM(T.py_qty) AS py_qty ,-- 施釉数量
+	   current_timestamp() as dw_last_update_date -- 数据同步时间
+FROM(
+	SELECT substring(t.glazedate,1,7) as prod_date, -- 日期
+		   t.factory as factory_code,   -- 工厂
+		   t.productgc as material_num, -- 物料编码
+		   sum(t.pnum) py_qty   -- 施釉数量
+	FROM SDI.SDI_QIS_GLAZEINFO_1011 t  -- 江西 喷釉上线数量
+	where t.glazedate between '2022-06-01' and '${PERIOD_ID_D}'  -- 当天
+	and t.productgc is not null
+	GROUP BY substring(t.glazedate,1,7),
+			 t.factory ,
+			 t.productgc
+	union all
+	select substring(from_unixtime(unix_timestamp(a.jm_glaze_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) AS prod_date, -- 日期
+		   a.JM_FACTORY_CODE as factory_code, -- 工厂编码
+		   a.jm_gc_code as material_num,  --物料编码
+		   sum(case when a.jm_uuid is not null then 1 else 0 end) py_qty   -- 施釉数量
+	FROM SDI.SDI_JM_T_GLAZE_1038 A --STG.STG_JM_T_GLAZE_1038 A      -- 江门 喷釉上线数量
+	JOIN SDI.SDI_JM_T_WY_BASE_GC_1038 B
+	on a.jm_gc_id=b.jm_uuid
+	where a.jm_is_del=0 
+	and a.jm_gc_code is not null
+	and substring(from_unixtime(unix_timestamp(a.jm_glaze_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) between '2022-06-01' and '${PERIOD_ID_D}'  -- 传昨天
+	group by substring(from_unixtime(unix_timestamp(a.jm_glaze_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7),
+			 a.JM_FACTORY_CODE,
+			 a.jm_gc_code
+)T
+left join DWIOTD.DWI_PAM_BOM_DETAIL_DATA_T t1 -- 生产BOM关系数据
+on t.factory_code = t1.factory_code
+and t.material_num = t1.small_material_num
+GROUP BY T.prod_date, -- 日期
+	     T.factory_code,   -- 工厂
+	     --T.material_num -- 物料编码
+	     t1.material_num
+;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_DJZJKC_TMP",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": null,
+    "database": ""
+}

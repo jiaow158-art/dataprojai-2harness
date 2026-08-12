@@ -1,0 +1,28 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/09 18:57:48 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_OSS_USE_POWER_T
+SELECT  T1.LOGIN AS USE_LOGIN, -- 用户账号
+		T2.PERSON_ID AS USE_ID, -- 用户ID
+		T2.PARTY_ID AS POSITION_ID, -- 职位ID
+		T3.NAME AS POSITION_NAME, -- 职位编码
+		T3.OU_ID AS CUST_ID, -- 客户ID
+		T4.OU_NUM AS CUST_NUM,-- 客户编码
+	    T5.OU_NUM AS PARENT_CUST_NUM, -- 母客户编码
+	    CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE  -- 同步数据时间
+FROM SDI.SDI_S_USER_1002 T1     -- 用户表
+LEFT JOIN SDI.SDI_S_PARTY_PER_1002 T2  -- 用户职位关联表
+ON T1.ROW_ID = T2.PERSON_ID
+AND T1.DEL_FLAG = 'N'
+AND T2.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_S_POSTN_1002 T3 --职位表
+ON T2.PARTY_ID = T3.ROW_ID
+AND T3.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_S_ORG_EXT_1002 T4  --客户组织表
+ON T3.OU_ID = T4.ROW_ID
+AND T4.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_S_ORG_EXT_1002 T5  --客户组织表
+ON T4.PAR_OU_ID = T5.ROW_ID
+AND T5.DEL_FLAG = 'N';

@@ -1,0 +1,29 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/07/22 22:26:20 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_FIN_AR_NODEEXCPT_LTC_CONTRACT_T
+SELECT DISTINCT
+                C.WBS
+               ,C.CONTRACT_ID
+               ,C.RECEIPTS_STATUS
+               ,C.CONTRACT_CODE --合同编码
+			   ,B1.MEANING AS RECEIPTS_STATUS_NAME --合同单据状态描述
+			   ,DDH1.EARLT_CREATION_DATE --最早要货单成功提交时间
+			   ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+			   ,C.IS_CREDIT --是否授信项目
+  FROM SDI.SDI_CONTRACT_1033 C
+  LEFT JOIN SDI.SDI_BASE_LOOKUP_VALUES_1029 B1
+    ON C.RECEIPTS_STATUS = B1.LOOKUP_CODE
+   AND B1.LOOKUP_TYPE = 'RECIPS_CODE'
+   AND B1.ENABLED_FLAG = 'Y'
+  LEFT JOIN (SELECT CONTRACT_ID
+	               ,MIN(CREATION_DATE) AS EARLT_CREATION_DATE --最早要货单成功提交时间
+	           FROM SDI.SDI_DELIVER_DEMAND_HEADER_1033
+              WHERE demand_status IN('APPROVAL','SUBMIT','TO_SUBMIT')
+                AND DELETE_FLAG = 0
+		      GROUP BY CONTRACT_ID) DDH1 --要货单
+	ON C.CONTRACT_ID = DDH1.CONTRACT_ID
+ WHERE C.DELETE_FLAG = 0	
+;

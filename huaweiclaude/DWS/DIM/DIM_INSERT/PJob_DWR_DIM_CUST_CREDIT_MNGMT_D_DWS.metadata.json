@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_CUST_CREDIT_MNGMT_D_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/DIM/DIM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

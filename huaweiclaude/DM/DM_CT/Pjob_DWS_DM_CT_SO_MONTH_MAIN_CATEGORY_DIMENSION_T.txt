@@ -1,0 +1,61 @@
+/*CREATE TABLE dm.dm_ct_so_month_main_category_dimension_t
+(
+    stat_month          varchar(50),
+    channel_text        varchar(50),
+    category_name       varchar(300),
+    dimension           varchar(300),
+    amount              numeric(38, 10),
+    area                numeric(38, 10),
+    dw_last_update_date timestamp(6)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(stat_month);
+comment on table dm.dm_ct_so_month_main_category_dimension_t is '瓷砖订单按月统计主要品类/规格金额面积表';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.stat_month is '月份';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.channel_text is '整合渠道';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.category_name is '品类';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.dimension is '规格';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.amount is '金额';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.area is '面积';
+comment on column dm.dm_ct_so_month_main_category_dimension_t.dw_last_update_date is '最后更新时间';
+*/
+-- update：2024/03/29 修改逻辑：出库面积使用业绩表，补充订单表过滤条件
+delete
+from dm.dm_ct_so_month_main_category_dimension_t
+where stat_month = '${PERIOD_ID_M}';
+insert into dm.dm_ct_so_month_main_category_dimension_t
+select to_char(to_date(A.audat), 'yyyy-MM')                                 stat_month,
+       case
+           when zh_channel_code1 = 'GD03' then '工程'
+           when zh_channel_code1 = 'GD01' then '零售'
+           when zh_channel_code1 = 'GD02'
+               then '整装' end                                                channel_text,
+       case when z.category_code is null then '其他' else c.category_name end category_name,
+       c.dimension,
+       sum(A.MWSBP + A.netwr)                                               amount,
+       sum((vmeng + wqrsl) * a.width * a.length_1)                          area,
+       current_timestamp
+from DM.DM_OTD_SALES_ORDER_DET_T A
+         LEFT JOIN dm.dm_rpt_sale_grp_t B
+                   ON A.vkgrp = B.sale_grp
+         left join dwimd.dwi_md_data_material_general_t c on a.matnr = c.material_num
+         left join (select distinct category_code
+                    from upload.upload_group_main_category_specification_t
+                    where division_code = 'H11000001') z on c.category = z.category_code
+where case
+          when A.audat in ('', '00000000') then ''
+          when A.audat is null then ''
+          else to_char(to_date(A.audat), 'yyyy-MM')
+          end = '${PERIOD_ID_M}'
+  and B.lev2_name = '瓷砖事业部'
+  and coalesce(abgru, '11') in ('11', '56')
+  and c.matl_group_code = '1000010'
+  and c.external_matl_group_code = '10010'
+  and substr(werks, 1, 2) in ('12', '13', '15', '16', '17', '18', '19', '7D', '72', '75', '77', '79', '8A')
+  and substr(lgort, 1, 2) != '00'
+  and lgort not in ('BC', 'GFZ', '7F21')
+group by stat_month, channel_text, case when z.category_code is null then '其他' else c.category_name end, c.dimension

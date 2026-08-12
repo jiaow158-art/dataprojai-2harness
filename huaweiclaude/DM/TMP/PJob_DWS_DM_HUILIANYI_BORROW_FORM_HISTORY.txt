@@ -1,0 +1,55 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/01/12 09:37:15 GMT+08:00
+-- description:汇联易历史记录：借款单
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_huilianyi_borrow_form_history;
+insert into  dm.dm_huilianyi_borrow_form_history
+with tem as 
+(
+select 
+	businesscode -- 借款单号
+	,printattachmentoid as jkd_pdf_id -- 借款单附件ID
+	,pdffileurl as jkd_pdf_url -- 借款单附件URL
+	
+	,replace(replace(createddate,'T',' '),'Z','') as  createddate-- 记账日期
+	,formname -- 单据类型
+	,SPLIT_PART(SPLIT_PART(customformvalues,'showValue',2),E'\'',3) as department -- 部门
+	,substring(replace(SPLIT_PART(SPLIT_PART(customformvalues,'预计还款日期',2),E'\'',9),'T',' '),1,19) as predict_py_date -- 预计还款日期 ;
+	,companyname -- 公司名称
+	,companycode -- 公司代码
+	,currencyamount -- 付款金额
+	,substring(SPLIT_PART(approvalhistorys,'付款日期:',2),1,10) as submit_date-- 提交单据时间
+	,substring(SPLIT_PART(approvalhistorys,'付款日期:',2),1,10) as py_date -- 付款日期
+	,substring(SPLIT_PART(approvalhistorys,'付款日期:',2),12,6) as py_item_num -- 借款单行号
+	,substring(replace(SPLIT_PART(SPLIT_PART(SPLIT_PART(approvalhistorys,'付款日期:',2),'支付流水号',1),'支付',2),',','')
+		FROM 1 FOR length(replace(SPLIT_PART(SPLIT_PART(SPLIT_PART(approvalhistorys,'付款日期:',2),'支付流水号',1),'支付',2),',','')) - 1)
+			as py_amount -- 支付金额
+	,substring(replace(substring(SPLIT_PART(approvalhistorys,'支付流水号',2),1,22),' ',''),1,20)  as py_ls_id -- 支付流水号
+	,SPLIT_PART(SPLIT_PART(simpleloanlinedtos,'creditExpenseCode',2),E'\'',3) as pxdh_relation -- 关联报销单号
+FROM upload.upload_huilianyi_borrow_form_history
+)
+
+SELECT 
+    distinct
+    businesscode
+	,jkd_pdf_id
+	,jkd_pdf_url
+	,createddate
+	,formname
+	,department
+	,predict_py_date
+	,companyname
+	,companycode
+	,currencyamount
+	,submit_date
+	,py_date
+	,py_item_num
+	,py_amount
+	,py_ls_id
+	,pxdh_relation
+	,current_timestamp() as dw_last_update_date
+from tem 

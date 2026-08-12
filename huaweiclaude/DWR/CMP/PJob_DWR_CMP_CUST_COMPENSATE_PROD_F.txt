@@ -1,0 +1,185 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/09/10 14:27:33 GMT+08:00
+-- description:申诉产品信息表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+----申诉产品信息表
+--DWRCMP.DWR_CMP_CUST_COMPENSATE_PROD_F
+INSERT OVERWRITE TABLE DWRCMP.DWR_CMP_CUST_COMPENSATE_PROD_F
+SELECT 
+SUBSTR(T2.APPROVAL_DATE,1,7) AS  APPROVAL_MONTH--批复月份 
+,T2.APPROVAL_DATE   --批复日期
+, coalesce (T2.CUST_COMP_QTY,0) --客诉宗数
+,T2.cc_class  --客诉分类
+,T2.appeal_num --客诉流水号
+,T2.CUST_CODE   --客户编码
+,T2.CUST_NAME   --客户名称
+,T2.CUST_COMP_channel_name   --客诉渠道
+,T2.requestid   --请求id
+,T2.Appeal_type_name   --申诉类型
+,T2.SUB_Appeal_time   --提出申诉时间
+,T2.contacts   --联系人
+,T2.Telephone   --联系电话
+,T2.is_SAP_ORDER   --是否有SAP订单号
+,T2.consumer_NAME   --顾客名称
+,T2.consumer_tel   --顾客电话
+,T2.consumer_add   --顾客地址
+,T2.DTD_SRVC_NAME   --上门服务人员
+,T2.service_tel   --服务人员电话
+,T2.consumer_purch_date   --顾客购买日期
+,T2.PROD_INSTALL_DATE   --产品安装日期
+,T2.is_quality_issue_name   --是否属于质量问题范围
+,T2.is_returned_name   --是否退回
+,T2.compensation_type_name   --补偿类型
+,T2.compensation_method   --赔偿方式
+,T2.quality_lel_name   --质量级别
+,T2.CUST_COMP_expectant   --客户期望值
+,T2.SALES_ORG_FINANCIAL_NODES   --销售组织财务节点
+,T2.RESP_NAME   --责任方名称主表
+,T2.RESP_CODE   --责任方编码主表
+,T2.IS_QC_CHECK   --是否需要品管核查判定
+,T2.DEPARTMENT   --所属部门
+,T2.Payment_meth_name   --入账方式
+,T2.doc_date   --凭证日期
+,T2.Point_voucher     --积分凭证
+,T2.CURR_NODENAME   --当前节点名称
+,T2.INDTY_amount --赔偿金额
+,T2.cust_serv_rep_feedback    --客户服务专员意见
+,T2.cust_serv_responsible_feedback  --客户服务责任人意见
+,T2.sys_manager_feedback    --系统总经理意见
+,T2.warehouse_recipient   --仓库收件人
+,T2.cust_serv_rep_handler  --客户服务专员处理人员 
+,T2.cust_serv_rep_time  --客户服务专员处理时间
+,T2.total_comp_amount   --赔付产品总金额
+,T2.total_comp_area   --赔偿产品总面积
+,T2.complainant_name   --申诉人名称
+,T2.complainant_id  --申诉人ID号
+,T2.process_date  --流程处理日期
+,T2.process_name  --流程名称
+,T2.complaint_review_result_name  --申诉资料审核结果
+,T2.prod_category_name    --产品分类
+,T2.company  --公司
+,T2.mkt_department  --营销部
+,T2.current_node  --当前节点
+,T2.is_return_completed  --是否完成退货入库手续
+,T1.id  
+,T1.mainid
+,T1.SCRQ  as PRODUCE_DATE  --生产日期
+,T1.SDDH as order_no--订单号
+,T1.SCPBM as prod_code--产品编码
+,T1.SSAP as  sap_btn--SAP按钮
+,T1.SCPMC  as  prod_name--产品名称
+,T1.SCPDJ  as  prod_grade--产品等级
+,T1.GKGMSL  as  cust_qty--顾客购买数量
+,T1.SSSL  as  claim_qty--申诉数量
+,T1.DW  as  unit--单位
+,T1.PC  as  batch--批次
+,T1.QTSM  as  other_notes--其他说明
+,T1.QXFL1  as   defect_cat1--缺陷分类1
+,T1.QXFL2 as defect_cat2--缺陷分类2
+,T1.QXFL3  as  defect_cat3--缺陷分类3
+,T1.SCPCC as prod_level--产品层次
+,T1.XSZZ_MX1 as sales_org--销售组织
+,T1.FXQD_MX1 as dist_channel--分销渠道
+,CONCAT('20',SUBSTRING(T1.PC,5,2)) AS  PROD_YEAR--生产年份
+,current_timestamp as  dw_last_update_date
+,T2.RESP_CONV_QTY
+FROM 
+SDI.SDI_FORMTABLE_MAIN_565_dt1_1004  T1
+LEFT JOIN  
+DWRCMP.DWR_CMP_CUST_COMPLAINT_INFO_F T2 
+ON T1.mainid = T2.id
+where 
+SUBSTR(T2.APPROVAL_DATE,1,4) >= '2023'
+
+
+
+
+
+-- CREATE TABLE DWRCMP.DWR_CMP_CUST_COMPENSATE_PROD_F (
+--     APPROVAL_MONTH STRING COMMENT '批复月份',
+--     APPROVAL_DATE STRING COMMENT '批复日期',
+--     CUST_COMP_QTY NUMERIC(38,10) COMMENT '客诉宗数',
+--     cc_class STRING COMMENT '客诉分类',
+--     appeal_num STRING COMMENT '客诉流水号',
+--     CUST_CODE STRING COMMENT '客户编码',
+--     CUST_NAME STRING COMMENT '客户名称',
+--     CUST_COMP_channel STRING COMMENT '客诉渠道',
+--     requestid STRING COMMENT '请求id',
+--     Appeal_type STRING COMMENT '申诉类型',
+--     SUB_Appeal_time STRING COMMENT '提出申诉时间',
+--     contacts STRING COMMENT '联系人',
+--     Telephone STRING COMMENT '联系电话',
+--     is_SAP_ORDER STRING COMMENT '是否有SAP订单号',
+--     consumer_NAME STRING COMMENT '顾客名称',
+--     consumer_tel STRING COMMENT '顾客电话',
+--     consumer_add STRING COMMENT '顾客地址',
+--     DTD_SRVC_NAME STRING COMMENT '上门服务人员',
+--     service_tel STRING COMMENT '服务人员电话',
+--     consumer_purch_date STRING COMMENT '顾客购买日期',
+--     PROD_INSTALL_DATE STRING COMMENT '产品安装日期',
+--     is_quality_issue STRING COMMENT '是否属于质量问题范围',
+--     is_returned STRING COMMENT '是否退回',
+--     compensation_type STRING COMMENT '补偿类型',
+--     compensation_method STRING COMMENT '赔偿方式',
+--     quality_lel STRING COMMENT '质量级别',
+--     CUST_COMP_expectant STRING COMMENT '客户期望值',
+--     SALES_ORG_FINANCIAL_NODES STRING COMMENT '销售组织财务节点',
+--     RESP_NAME STRING COMMENT '责任方名称主表',
+--     RESP_CODE STRING COMMENT '责任方编码主表',
+--     IS_QC_CHECK STRING COMMENT '是否需要品管核查判定',
+--     DEPARTMENT STRING COMMENT '所属部门',
+--     Payment_meth STRING COMMENT '入账方式',
+--     doc_date STRING COMMENT '凭证日期',
+--     Point_voucher STRING COMMENT '积分凭证',
+--     CURR_NODENAME STRING COMMENT '当前节点名称',
+--      INDTY_amount  STRING  COMMENT '赔偿金额',
+--     cust_serv_rep_feedback STRING COMMENT '客户服务专员意见',
+--     cust_serv_responsible_feedback STRING COMMENT '客户服务责任人意见',
+--     sys_manager_feedback STRING COMMENT '系统总经理意见',
+--     warehouse_recipient STRING COMMENT '仓库收件人',
+--     cust_serv_rep_handler STRING COMMENT '客户服务专员处理人员',
+--     cust_serv_rep_time STRING COMMENT '客户服务专员处理时间',
+--     total_comp_amount NUMERIC(38,10) COMMENT '赔付产品总金额',
+--     total_comp_area NUMERIC(38,10) COMMENT '赔偿产品总面积',
+--     complainant_name STRING COMMENT '申诉人名称',
+--     complainant_id STRING COMMENT '申诉人ID号',
+--     process_date STRING COMMENT '流程处理日期',
+--     process_name STRING COMMENT '流程名称',
+--     complaint_review_result STRING COMMENT '申诉资料审核结果',
+--     prod_category STRING COMMENT '产品分类',
+--     company STRING COMMENT '公司',
+--     mkt_department STRING COMMENT '营销部',
+--     current_node STRING COMMENT '当前节点',
+--     is_return_completed STRING COMMENT '是否完成退货入库手续',
+--     id STRING COMMENT 'ID',
+--     mainid STRING COMMENT '主表关联ID',
+--     PRODUCE_DATE STRING COMMENT '生产日期',
+--     order_no STRING COMMENT '订单号',
+--     prod_code STRING COMMENT '产品编码',
+--     sap_btn STRING COMMENT 'SAP按钮',
+--     prod_name STRING COMMENT '产品名称',
+--     prod_grade STRING COMMENT '产品等级',
+--     cust_qty NUMERIC(38,10) COMMENT '顾客购买数量',
+--     claim_qty NUMERIC(38,10) COMMENT '申诉数量',
+--     unit STRING COMMENT '单位',
+--     batch STRING COMMENT '批次',
+--     other_notes STRING COMMENT '其他说明',
+--     defect_cat1 STRING COMMENT '缺陷分类1',
+--     defect_cat2 STRING COMMENT '缺陷分类2',
+--     defect_cat3 STRING COMMENT '缺陷分类3',
+--     prod_level STRING COMMENT '产品层次',
+--     sales_org STRING COMMENT '销售组织',
+--     dist_channel STRING COMMENT '分销渠道',
+--     PROD_YEAR STRING COMMENT '生产年份',
+--     dw_last_update_date  TIMESTAMP 
+-- )
+
+
+
+
+
+

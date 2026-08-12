@@ -1,0 +1,61 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2025/07/19 09:07:39 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+INSERT OVERWRITE TABLE 	DM_SW.DM_SW_BASE_PRODC_DAILY_T		
+SELECT
+product_category, 
+model, 
+calday,
+'江西' as  base ,
+total_grading,
+blowing_dust_defect,
+slip_defect,
+glaze_app_defect,
+furnace_op_defect,
+glaze_defect,
+casting_defect,
+handling_defect,
+current_timestamp as dw_last_update_date
+from 
+dwrotd.DWR_PAM_BASE_FG_DEFECT_JX_F
+UNION ALL 
+SELECT  
+product_category, 
+gc_model, 
+calday,
+'江门' as  base ,
+total_grading,
+blowing_dust_defect,
+slip_defect,
+glaze_app_defect,
+furnace_op_defect,
+glaze_defect,
+casting_defect,
+handling_defect,
+current_timestamp 
+from
+dwrotd.DWR_PAM_BASE_FG_DEFECT_JM_F
+
+
+
+
+-- CREATE TABLE  DM_SW.DM_SW_BASE_PRODC_DAILY_T (
+-- product_category STRING  COMMENT '品类', 
+-- gc_model STRING COMMENT'光瓷型号' ,  
+-- calday STRING COMMENT '日历日',
+-- base STRING  comment'基地',
+-- total_grading decimal(38, 10) COMMENT '分级总数',
+-- blowing_dust_defect decimal(38, 10) COMMENT '吹尘缺陷',
+-- slip_defect decimal(38, 10) COMMENT '浆料缺陷',
+-- glaze_app_defect decimal(38, 10) COMMENT '施釉缺陷',
+-- furnace_op_defect decimal(38, 10) COMMENT '司炉缺陷',
+-- glaze_defect decimal(38, 10) COMMENT '釉料缺陷',
+-- casting_defect decimal(38, 10) COMMENT '注浆缺陷',
+-- handling_defect decimal(38, 10) COMMENT '装车缺陷',
+-- DW_LAST_UPDATE_DATE  TIMESTAMP 
+-- )		

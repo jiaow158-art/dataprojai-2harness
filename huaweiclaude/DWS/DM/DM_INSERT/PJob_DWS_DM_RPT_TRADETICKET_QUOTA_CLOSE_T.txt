@@ -1,0 +1,34 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：商票余额报表（定版）
+-- create time: 2022/09/29 16:39:47 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM dm.dm_rpt_tradeticket_quota_close_t
+ WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))
+ ;
+insert into dm.dm_rpt_tradeticket_quota_close_t
+  SELECT edition_date ,
+		 ac_doc_nr ,
+		 calday ,
+		 calmonth ,
+		 comp_code ,
+		 comp_code___t ,
+		 customer ,
+		 customer___t ,
+		 costcenter ,
+		 costcenter___t ,
+		 gl_account ,
+		 gl_account___t ,
+		 plant ,
+		 plant___t ,
+		 sales_grp ,
+		 sales_grp___t ,
+		 pstng_date ,
+		 zafi_p007_netduedate ,
+		 zafi_p007_wdate ,
+		 zpjje ,
+		 current_timestamp as dw_last_update_date ,
+		 wbs_elemt
+    FROM dm.dm_rpt_tradeticket_quota_t
+   WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))

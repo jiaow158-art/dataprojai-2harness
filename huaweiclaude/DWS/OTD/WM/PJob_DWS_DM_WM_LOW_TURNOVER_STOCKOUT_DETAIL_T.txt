@@ -1,0 +1,516 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/04/22 14:18:33 GMT+08:00
+-- description:低周转和特惠品出库明细
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+DELETE FROM dm.dm_wm_low_turnover_stockout_detail_t 
+where stat_month = replace(substring('${PERIOD_ID_D}',1,7),'-','');
+INSERT INTO dm.dm_wm_low_turnover_stockout_detail_t
+
+with mat as (
+select t1.material_num,t1.product_level2_name,t1.dimension,
+        t1.width * t1.length_1/1000/1000 as product_area
+        ,matl_group_code,external_matl_group_code
+        ,b1.matl_group2_code,b1.matl_group2_name
+from dwimd.dwi_md_data_material_general_t t1 
+left join 
+	(
+    select distinct 
+    		material_num,matl_group2_code,
+    		matl_group2_name
+    from dwimd.dwi_md_data_material_sales_t 
+    where 1=1
+    and distribution_channel_code = '06'
+    and  matl_group2_code in ('KM','ZY','JX','GM')
+	) b1 on t1.material_num = b1.material_num 
+where 1=1
+)
+
+,data_detail as 
+(
+select  
+	a.material_vch_no_mblnr ,
+	a.voucher_post_date ,
+	a.warehouse_manage_move_type,
+	a.material_id ,
+	a.material_num ,
+	a.batch_num ,
+	a.input_unit_qty ,
+	a.base_measure_unit ,
+	case when DR_CR_ID = 'S_SHKZG' then -QUANTITY else  QUANTITY end quantity,
+	a.factory_werks_id ,
+	a.factory_werks_code ,
+	a.factory_werks_name ,
+	a.company_id ,
+	a.company_code ,
+	a.company_name ,
+	a.wbs_element ,
+	a.inv_location,
+	a.store_location_sid,
+	a.affairs_code ,
+	a.delivery_im ,
+	a.delivery_project ,
+	t.FIRST_PROMOTE_DATE,
+	t.PROMOTE_REASON_CODE, t.promote_reason,
+	case when A.factory_werks_code LIKE '%80' and clearance_reason_code='QC19' then  '清仓小堆头' else C1.REJECTS_TYPE end  as  REJECTS_TYPE,
+	replace(substr(VOUCHER_POST_DATE,1,7),'-','') as stat_month,
+	case when DR_CR_ID='S_SHKZG' then -QUANTITY else  QUANTITY end*b.product_area as sales_stock_out_area,
+	current_timestamp() as dw_last_update_date,
+	b.product_level2_name  ,b.dimension,
+	D.SALES_GRP as sales_grp,
+	t5.lev4_name as lv4_department,
+	t5.lev5_name as lv5_department,
+	t5.lev3_name as lv3_department,
+	a.cust_num as customer_code,
+	a.cust_name as customer_name,
+	t5.SALE_GRP_NAME,  -- 线组名称
+	C.REFERENCE_BILL_NUM AS SAP_SO_HEADER_NO, -- SAP销售订单头
+	C.REFERENCE_PROJ_NUM AS SAP_SO_LINE_NO,-- SAP销售订单行
+	T.batch_in_time,--入库时间
+	b.external_matl_group_code,
+	replace(C.dis_channel,'_TVTWT','') as dis_channel_code, --分销渠道编码
+	C.dis_channel_name, --分销渠道名称
+	CASE
+		WHEN T5.lev4_code IN ('H04230600') and T5.lev6_name  like '%零售部%' THEN T5.lev7_name
+		else T5.lev6_name
+	END sales_region_name, -- 销区名称
+	case when DR_CR_ID = 'S_SHKZG' then -QUANTITY else  QUANTITY end * D2.unit_price as amt --业绩
+	,b.matl_group2_code,b.matl_group2_name
+from  dwrotd.DWR_WM_PRODSTOCK_OUT_IN_F a
+left join mat b on a.material_num  = b.material_num
+LEFT JOIN dwrotd.dwr_wm_ladingbill_item_f C on A.delivery_im = C.DELIVERY AND  A.delivery_project = C.delivery_project
+LEFT JOIN (select doc_number,max(coalesce(D.SALES_GRP,D.SALES_GRP)) as  SALES_GRP from dm.dm_ambv2_zzt_xssr_t D group by DOC_NUMBER) d on C.REFERENCE_BILL_NUM = D.DOC_NUMBER
+LEFT JOIN 
+    (
+    select 
+        DOC_NUMBER,s_ord_item,
+        sum(ambperformance) as ambperformance,
+        sum(zxssl) as zxssl,
+        sum(ambperformance)/sum(zxssl) as unit_price
+    from dm.dm_ambv2_zzt_xssr_t  
+    where data_source = 'S'
+    group by DOC_NUMBER,s_ord_item
+    having sum(zxssl) <> 0
+    )D2 on  C.REFERENCE_BILL_NUM = D2.DOC_NUMBER and C.REFERENCE_PROJ_NUM = D2.s_ord_item 
+LEFT JOIN DM.DM_RPT_SALE_GRP_T T5  ON D.SALES_GRP = T5.SALE_GRP
+LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T T
+  ON A.MATERIAL_NUM = T.MATERIAL_NUM
+ AND A.BATCH_NUM = T.BATCH_NUM     
+LEFT JOIN UPLOAD.UPLOAD_REJECTS_DEFINITION_T C1
+  ON T.PROMOTE_REASON_CODE = C1.PROMOTION_REASON_CODE
+where 1=1
+and VOUCHER_POST_DATE>='2022-01-01'
+and replace(substr(VOUCHER_POST_DATE,1,7),'-','') = replace(substring('${PERIOD_ID_D}',1,7),'-','') 
+and A.MOVE_TYPE IN
+				(
+                 '601','602','653','654'  -- 销售出库
+                 )
+)
+
+,all_data as 
+(
+--特惠品出库
+select 
+	A.material_vch_no_mblnr ,
+	A.voucher_post_date ,
+	A.warehouse_manage_move_type ,
+	A.material_id ,
+	A.material_num ,
+	A.batch_num ,
+	A.input_unit_qty ,
+	A.base_measure_unit ,
+	A.quantity ,
+	A.factory_werks_id ,
+	A.factory_werks_code ,
+	A.factory_werks_name ,
+	A.company_id ,
+	A.company_code ,
+	A.company_name ,
+	A.wbs_element ,
+	A.inv_location ,
+	A.store_location_sid ,
+	A.affairs_code ,
+	A.delivery_im ,
+	A.delivery_project ,
+	A.first_promote_date ,
+	A.promote_reason_code ,
+	A.promote_reason ,
+	A.rejects_type ,
+	A.stat_month,
+	A.sales_stock_out_area,
+	A.dw_last_update_date,
+	A.product_level2_name ,
+	A.dimension ,
+	A.sales_grp ,
+	A.lv4_department ,
+	A.lv5_department ,
+	A.lv3_department ,
+	A.customer_code ,
+	A.customer_name ,
+	A.sale_grp_name ,
+	A.sap_so_header_no ,
+	A.sap_so_line_no ,
+	replace(C.dis_channel,'_TVTWT','') as dis_channel_code, 
+	C.dis_channel_name,
+	CASE
+		WHEN T5.lev4_code IN ('H04230600') and T5.lev6_name  like '%零售部%' THEN T5.lev7_name
+		else T5.lev6_name
+	END sales_region_name, -- 销区名称
+	A.quantity*D2.unit_price as amt, --业绩
+	'特惠品' as stock_type,
+	T.batch_in_time,--入库时间
+	b.matl_group2_code
+from DM.DM_WM_DEFECTIVE_PRODUCT_STOCKOUT_T A
+LEFT JOIN dwrotd.dwr_wm_ladingbill_item_f C on A.delivery_im = C.DELIVERY AND  A.delivery_project = C.delivery_project
+LEFT JOIN 
+    (
+    select 
+        DOC_NUMBER,s_ord_item,
+        sum(ambperformance) as ambperformance,
+        sum(zxssl) as zxssl,
+        sum(ambperformance)/sum(zxssl) as unit_price
+    from dm.dm_ambv2_zzt_xssr_t  
+    where data_source = 'S'
+    group by DOC_NUMBER,s_ord_item
+    having sum(zxssl) <> 0
+    )D2 
+on  A.sap_so_header_no = D2.DOC_NUMBER and A.sap_so_line_no = D2.s_ord_item 
+LEFT JOIN DM.DM_RPT_SALE_GRP_T T5  ON A.SALES_GRP = T5.SALE_GRP
+left join mat b on A.material_num  = b.material_num
+LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T T
+  ON A.MATERIAL_NUM = T.MATERIAL_NUM
+ AND A.BATCH_NUM = T.BATCH_NUM 
+where 1=1 
+and A.stat_month = replace(substring('${PERIOD_ID_D}',1,7),'-','')
+and COALESCE(rejects_type,'NAL') not in ('超一年ABC')
+and COALESCE(A.promote_reason_code,'NAL') not in ('AC98', 'AC97', 'AC96')
+
+union all
+
+--低周转主菜单
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	'低周转' as stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from data_detail A
+where 1=1
+and COALESCE(right(A.batch_num,6),'NAL')  not in ('888888', '999999')
+and A.PROMOTE_REASON_CODE in ('AC91','AC92')
+
+union all 
+
+--梦之家滚动库龄一年以上
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	'梦之家滚动库龄一年以上' as stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from data_detail A
+where 1=1
+and A.external_matl_group_code in ('10080')
+and A.batch_in_time < concat(substring('${PERIOD_ID_D}',1,4),'-01-01')
+
+union all 
+
+--DPI
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	'DPI' as stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from data_detail A
+where 1=1
+and A.external_matl_group_code in ('10020','10021','10022','10023','10024')
+and batch_in_time < concat(substring('${PERIOD_ID_D}',1,4),'-01-01')
+
+union all 
+
+--ART+
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	'ART+' as stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from data_detail A
+where 1=1
+and A.external_matl_group_code in ('10060')
+and batch_in_time < concat(substring('${PERIOD_ID_D}',1,4),'-01-01')
+
+union all 
+
+--库龄半年以上订制品
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	'库龄半年以上订制品' as stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from data_detail A
+where 1=1
+and A.matl_group2_code in ('KM','ZY','JX','GM')
+and A.material_num like '%A'
+and A.batch_in_time >= concat(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '12 month', 1, 7),'-01')
+and A.batch_in_time < concat(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '5 month', 1, 7),'-01')
+)
+
+select 
+	material_vch_no_mblnr ,
+	voucher_post_date ,
+	warehouse_manage_move_type ,
+	material_id ,
+	material_num ,
+	batch_num ,
+	input_unit_qty ,
+	base_measure_unit ,
+	quantity ,
+	factory_werks_id ,
+	factory_werks_code ,
+	factory_werks_name ,
+	company_id ,
+	company_code ,
+	company_name ,
+	wbs_element ,
+	inv_location ,
+	store_location_sid ,
+	affairs_code ,
+	delivery_im ,
+	delivery_project ,
+	first_promote_date ,
+	promote_reason_code ,
+	promote_reason ,
+	rejects_type ,
+	stat_month,
+	sales_stock_out_area,
+	current_timestamp() as dw_last_update_date,
+	product_level2_name ,
+	dimension ,
+	sales_grp ,
+	lv4_department ,
+	lv5_department ,
+	lv3_department ,
+	customer_code ,
+	customer_name ,
+	sale_grp_name ,
+	sap_so_header_no ,
+	sap_so_line_no ,
+	dis_channel_code,
+	dis_channel_name,
+	sales_region_name,
+	amt,
+	stock_type,
+	batch_in_time,--入库时间
+	matl_group2_code
+from all_data

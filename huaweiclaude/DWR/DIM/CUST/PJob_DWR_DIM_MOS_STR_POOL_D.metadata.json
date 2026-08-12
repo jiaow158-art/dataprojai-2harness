@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_MOS_STR_POOL_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/CUST",
+    "description": "客户公共池门店",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

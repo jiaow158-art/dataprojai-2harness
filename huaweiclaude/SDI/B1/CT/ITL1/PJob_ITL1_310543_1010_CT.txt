@@ -1,0 +1,51 @@
+--SQL性能优化设置
+			set hive.cbo.enable=true;
+			set hive.mapjoin.smalltable.filesize=100000000;
+			set hive.auto.convert.join.noconditionaltask.size=200000000;
+			set hive.mapred.local.mem=4096;
+		--	INSERT OVERWRITE TABLE SDI.SDI_CT_ITL1_1010 partition(custcode ='310543')
+		ALTER TABLE SDI.SDI_CT_ITL1_1010 drop partition(custcode= '310543'); 
+INSERT INTO TABLE SDI.SDI_CT_ITL1_1010 partition(custcode ='310543')
+(logentry,
+itemcode,
+sysnumber,
+quantity,
+allocqty,
+mdabsentry,
+releaseqty,
+pickedqty,
+cust_code,
+del_flag,
+dw_last_update_date)
+			SELECT
+			 	LogEntry,
+				ItemCode,
+				SysNumber,
+				Quantity,
+				AllocQty,
+				MdAbsEntry,
+				ReleaseQty,
+				PickedQty
+				,'310543' AS CUST_CODE
+,'N' AS DEL_FLAG
+, current_timestamp() as DW_LAST_UPDATE_DATE 
+ FROM STG.STG_ITL1_310543_1010_CT 
+  UNION ALL
+			SELECT
+				T1.LogEntry,
+				T1.ItemCode,
+				T1.SysNumber,
+				T1.Quantity,
+				T1.AllocQty,
+				T1.MdAbsEntry,
+				T1.ReleaseQty,
+				T1.PickedQty,
+				T1.CUST_CODE,
+				T1.DEL_FLAG,
+				T1.DW_LAST_UPDATE_DATE
+			FROM SDI.SDI_CT_ITL1_1010 T1
+            LEFT JOIN STG.STG_ITL1_310543_1010_CT T2
+			ON T1.LogEntry = T2.LogEntry
+			WHERE T1.custcode ='310543'
+AND T1.DEL_FLAG = 'N'
+AND T2.LogEntry IS NULL;

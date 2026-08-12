@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_MM_PRODUCT_LEVEL2_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "产品层次2",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

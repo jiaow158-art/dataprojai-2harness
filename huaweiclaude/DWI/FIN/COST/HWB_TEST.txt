@@ -1,0 +1,22 @@
+CREATE TABLE DM.DM_SO_FZL_ORDER_T_TMP001
+AS 
+SELECT
+      a.VBELN
+	 ,a.POSNR
+	 ,max(e.VMENG) as VMENG
+	 ,min(case when a.KWMENG <= e.VMENG then e.edatu end) as edatu
+FROM SDI.SDI_VBAP_1001 a
+inner join(
+          SELECT VBELN
+		        ,POSNR
+				,edatu
+		        ,SUM(BMENG) OVER(PARTITION BY VBELN,POSNR ORDER BY edatu) as VMENG
+            FROM STG.STG_VBEP_1001
+         ) e
+on a.VBELN = e.VBELN
+and a.POSNR = e.POSNR
+where a.DEL_FLAG = 'N'
+group by
+      a.VBELN
+	 ,a.POSNR
+;

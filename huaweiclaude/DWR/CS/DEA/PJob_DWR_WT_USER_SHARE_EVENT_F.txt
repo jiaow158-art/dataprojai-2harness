@@ -1,0 +1,53 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/08/22 17:18:48 GMT+08:00
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DWRCS.DWR_WT_USER_SHARE_EVENT_F PARTITION (STAT_MONTH)
+SELECT
+       A.ID
+      ,A.STORE_ID
+      ,A.SRC_STORE_NAME
+	  ,B.STORE_NAME
+      ,A.USER_ID
+      ,A.EVENT_TYPE
+      ,A.ITEM_NO
+	  ,E.MODEL AS ITEM_CODE
+	  ,E.NAME AS ITEM_NAME
+	  ,A.SRC_ITEM_NAME
+	  --,C.CATEGORY_ID
+	  --,D.CATEGORY AS CATEGORY_NAME --规格名称
+      ,A.EVENT_TIME
+      ,A.STAT_DATE
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,SUBSTR(REPLACE(A.STAT_DATE,'-',''),1,6) AS STAT_MONTH
+  FROM DWICS.DWI_WT_USER_SHARE_EVENT_T A
+  LEFT JOIN DWIMD.DWI_MD_DMT_STORE_INFO_T B
+    ON A.STORE_ID = B.STORE_ID
+   AND A.STAT_DATE >= B.START_DATE
+   AND A.STAT_DATE <= B.END_DATE 
+/*  LEFT JOIN SDI.SDI_ITEM_CATEGORY_RELATION_1030 C
+    ON A.ITEM_NO = C.ITEM_NO
+   AND C.IS_DELETED = 0
+   AND C.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_ITEM_CATEGORY_1030 D
+    ON C.CATEGORY_ID = D.ID
+   AND D.DEL_FLAG = 'N'
+   AND D.APP_ID = 1831*/
+  LEFT JOIN SDI.SDI_ITEM_1030 E
+    ON A.ITEM_NO = E.ITEM_NO
+   AND E.DEL_FLAG = 'N'
+   AND E.IS_DELETED = 0
+   AND E.APP_ID = 1831
+   AND E.STATUS = 1
+ WHERE A.STAT_DATE >= '2022-01-01'
+;

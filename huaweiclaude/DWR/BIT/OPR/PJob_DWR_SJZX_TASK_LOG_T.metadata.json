@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SJZX_TASK_LOG_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/BIT/OPR",
+    "description": "数据中心调度日志表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

@@ -1,0 +1,115 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 14:56:51 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--共享仓辐射中小经销商提货占比ZB72
+delete from 
+DM.DM_NORTH_SM_T 
+where  
+calmonth = '${PERIOD_ID_M}'  and zb_code ='ZB72';
+with T1 as (
+select 
+T1.calmonth,
+sum(
+case when 
+T1.bus_area  = 'G000' 
+then 
+T1.z_yjsgtzz end ) as FZ_SGTZZ,
+sum(ambperformance) as FM_PERFORMANCE
+from  dm.dm_ambv2_zzt_xssr_t t1
+join 
+(select distinct customer_code from upload.UPLOAD_CT_SHARE_CUSTOMER_REL_1037 
+where customer_end_date = '99991231' and is_small_and_medium = '是'
+)  t2 on t1.customer = t2.customer_code
+left join  dm.dm_rpt_sales_group_t T3 
+on t1.sales_grp =t3.node_name9 
+where
+calmonth >='2024-01'and 
+T3.node_name3 ='H03230618'		  
+and coalesce(t3.NODE_NAME4,'#') <> 'H04240301'
+and coalesce(t3.NODE_name5,'#') not in ('H03230605','H03230612')
+and coalesce(T3.NODE_name5,'#') <> 'H03230627'
+and t1.integrate_channel  = 'GD01'
+group by T1.calmonth
+)
+,TT2 as (
+select 
+calmonth,
+'ZB72' as zb_code,
+FZ_SGTZZ/FM_PERFORMANCE as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from 
+T1
+where calmonth = '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB72' as zb_code,
+0 as 当月实绩,
+SUM(FZ_SGTZZ)/SUM(FM_PERFORMANCE) as 累计实绩,
+0 as 季度累计实绩
+from 
+T1
+where CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+union all 
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB72' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM(FZ_SGTZZ)/SUM(FM_PERFORMANCE)  as 季度累计实绩
+from 
+T1
+where    
+to_char((SUBSTRING(calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) *100 as CM_STAT_AMT,
+sum(累计实绩) *100  as ACC_STAT_AMT,
+sum(季度累计实绩) *100 as QTR_TGT_AMT
+from 
+TT2
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month
+
+
+
+
+

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WM_VENDOR_STOCK_O_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/WM",
+    "description": "SAP供应商特殊库存(O)",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

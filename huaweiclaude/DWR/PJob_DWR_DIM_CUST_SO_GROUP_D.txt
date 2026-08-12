@@ -1,0 +1,28 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: zhangpeng
+-- create time: 2023/10/30 16:09:23 GMT+08:00
+-- 未来改成增量:mandt/kunnr/so_group/bukrs 确定唯一 change_date 增量字段
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_CUST_SO_GROUP_D
+SELECT
+  mandt , 
+  kunnr , 
+  so_group , 
+  bukrs , 
+  sg_describe , 
+  create_date , 
+  change_date , 
+  undertaker , 
+  xblnr , 
+  bktxt , 
+  sg_status , 
+  sg_old_status , 
+  print_times , 
+  clienttype , 
+  discount , 
+  sales ,
+  'N' AS del_flag ,
+  CURRENT_TIMESTAMP() AS dw_last_update_date 
+FROM SDI.SDI_ZGATHERING_SG_1001

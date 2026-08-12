@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_STOCK_AGE_MONTH_CT",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "库存数据",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

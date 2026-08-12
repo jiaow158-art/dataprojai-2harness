@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/07/22 11:43:28 GMT+08:00
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_360_H_NET_DEVEL_INFO_T
+SELECT T.GSDM 													AS COMPANY_CODE 		-- 公司编码
+      ,													                                   
+       T.BBSJ 													AS FILING_DATE 			-- 报备时间
+      ,													                                   
+       T.KHBM 													AS CUST_CODE 			-- 客户编码
+      ,                                                                                    
+       T.JQDWMC 												AS CUST_NAME 			-- 客户名称
+      ,                                                                                    
+       KNVV.BZIRK 												AS OPERAT_CENTRE_CODE 	-- 运营中心编码
+      ,	                                                                                   
+       T1.BZTXT 												AS OPERAT_CENTRE_NAME 	-- 运营中心名称
+      ,                                                                                    
+       KNVV.VKGRP 												AS LINE_GROUP_CODE 		-- 线组编码
+      ,		                                                                               
+       TVGRT.BEZEI 												AS LINE_GROUP_NAME 		-- 线组名称
+	  ,
+	  T.LSH														AS SERIAL_NUMBER		-- 流水号
+      ,                                                                                    
+       'N' 														AS DEL_FLAG 			-- 删除标识
+      ,                                                                                    
+       FROM_UNIXTIME(UNIX_TIMESTAMP(), 'yyyy-MM-dd HH:mm:ss') 	AS DW_LAST_UPDATE_DATE 	-- 同步数据时间
+  FROM (SELECT MAIN.GSDM 	-- 公司编码
+              ,
+               MAIN.KHBM 	-- 客户编码
+              ,
+               MAIN.JQDWMC 	-- 客户名称
+              ,
+               MAIN.BBSJ 	-- 报备时间
+              ,
+               TVKO.VKORG
+			  
+			  ,MAIN.LSH	 	-- 流水号		
+          FROM SDI.SDI_FORMTABLE_MAIN_60_1004 MAIN
+         LEFT JOIN SDI.SDI_TVKO_1001 TVKO
+            ON MAIN.GSDM = TVKO.BUKRS) T
+ LEFT JOIN SDI.SDI_KNVV_1001 KNVV
+    ON T.KHBM = KNVV.KUNNR
+   --AND T.VKORG = KNVV.VKORG
+   AND KNVV.VTWEG = '08'
+   AND KNVV.SPART = '00'
+ LEFT JOIN (SELECT T171T.BZIRK, T171T.BZTXT
+               FROM SDI.SDI_T171T_1001 T171T
+              LEFT JOIN SDI.SDI_Z_CUSTOMIZESINGLESELECT_1004 CUSTOM
+                 ON T171T.BZTXT = CUSTOM.FIRST_RETURN
+                AND T171T.SPRAS = '1'
+                AND CUSTOM.SINGLE_TYPE = 'XSQY'
+                AND CUSTOM.SECOND_RETURN IS NULL
+                AND CUSTOM.ID NOT IN
+                    (11, 31, 38, 41, 42, 121, 122, 123, 124, 139, 140)) T1
+    ON T1.BZIRK = KNVV.BZIRK
+ LEFT JOIN SDI.SDI_TVGRT_1001 TVGRT
+    ON KNVV.VKGRP = TVGRT.VKGRP
+   AND TVGRT.SPRAS = '1'
+ GROUP BY T.GSDM,
+          T.BBSJ,
+          T.KHBM,
+          T.JQDWMC,
+          KNVV.BZIRK,
+          T1.BZTXT,
+          KNVV.VKGRP,
+          TVGRT.BEZEI,
+		  T.LSH

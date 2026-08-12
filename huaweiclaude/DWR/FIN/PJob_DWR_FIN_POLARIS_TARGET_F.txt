@@ -1,0 +1,311 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/05/17 11:25:25 GMT+08:00
+-- description:北极星指标目标表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+
+CREATE TABLE if not exists DWRFIN.DWR_FIN_POLARIS_TARGET_F  (
+    indicator_name STRING COMMENT '指标名称',
+    indicator_owner STRING COMMENT '指标OWNER',
+    target_unit STRING COMMENT '目标单位',
+    indicator_code STRING COMMENT '指标编码',
+    annual_target STRING COMMENT '年度目标',
+    cal_month STRING COMMENT '统计月',
+    monthly_target_amount NUMERIC(38,10) COMMENT '月目标金额',
+    cal_quarterl STRING COMMENT '季度',
+    quarterly_target NUMERIC(38,10) COMMENT '季度目标',
+    monthly_cumulative STRING COMMENT '月累计',
+    monthly_cumulative_amount NUMERIC(38,10) COMMENT '月累计金额',
+    last_update_date TIMESTAMP,
+    DEL_FLAG STRING
+);
+INSERT
+        OVERWRITE TABLE DWRFIN.DWR_FIN_POLARIS_TARGET_F
+select
+        ZBMC, --指标名称
+        ZBOWNER, --指标OWNER
+        zbdy, --指标定义
+        zsgs, --计算口径
+        pjfx, --评价方向 
+        MBDW, --目标单位
+        ZBBM, --指标编码
+        NDMB, --年度目标
+        MB.CALMONTH, --统计月
+        MB.YMBJE, --月目标金额
+        MB.JDMBJE, --季度目标
+        MB.TOTAL_JE, --月累计金额
+        CURRENT_TIMESTAMP AS last_update_date
+from
+        sdi.SDI_FORMTABLE_MAIN_1004 LATERAL VIEW explode(
+                array (
+                        named_struct (
+                                'YMBJE',
+                                YMB_1,
+                                'CALMONTH',
+                                '2024-01',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YMB_1
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_2,
+                                'CALMONTH',
+                                '2024-02',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YLJMB_2
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_3,
+                                'CALMONTH',
+                                '2024-03',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YLJMB_3
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_4,
+                                'CALMONTH',
+                                '2024-04',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_4
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_5,
+                                'CALMONTH',
+                                '2024-05',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_5
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_6,
+                                'CALMONTH',
+                                '2024-06',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_6
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_7,
+                                'CALMONTH',
+                                '2024-07',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_7
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_8,
+                                'CALMONTH',
+                                '2024-08',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_8
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_9,
+                                'CALMONTH',
+                                '2024-09',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_9
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_10,
+                                'CALMONTH',
+                                '2024-10',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_10
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_11,
+                                'CALMONTH',
+                                '2024-11',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_11
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_12,
+                                'CALMONTH',
+                                '2024-12',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_12
+                        )
+                )
+        ) MBTable AS MB
+where
+        calyear = '2024'
+UNION ALL
+select
+        ZBMC, --指标名称
+        ZBOWNER, --指标OWNER
+        zbdy, --指标定义
+        zsgs, --计算口径
+        pjfx, --评价方向 
+        MBDW, --目标单位
+        ZBBM, --指标编码
+        NDMB, --年度目标
+        MB.CALMONTH, --统计月
+        MB.YMBJE, --月目标金额
+        MB.JDMBJE, --季度目标
+        MB.TOTAL_JE, --月累计金额
+        CURRENT_TIMESTAMP AS last_update_date
+from
+        sdi.SDI_FORMTABLE_MAIN_1004 LATERAL VIEW explode(
+                array (
+                        named_struct (
+                                'YMBJE',
+                                YMB_1,
+                                'CALMONTH',
+                                '2025-01',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YMB_1
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_2,
+                                'CALMONTH',
+                                '2025-02',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YLJMB_2
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_3,
+                                'CALMONTH',
+                                '2025-03',
+                                'JDMBJE',
+                                YJDMB,
+                                'TOTAL_JE',
+                                YLJMB_3
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_4,
+                                'CALMONTH',
+                                '2025-04',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_4
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_5,
+                                'CALMONTH',
+                                '2025-05',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_5
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_6,
+                                'CALMONTH',
+                                '2025-06',
+                                'JDMBJE',
+                                EJDMB,
+                                'TOTAL_JE',
+                                YLJMB_6
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_7,
+                                'CALMONTH',
+                                '2025-07',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_7
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_8,
+                                'CALMONTH',
+                                '2025-08',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_8
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_9,
+                                'CALMONTH',
+                                '2025-09',
+                                'JDMBJE',
+                                SJDMB,
+                                'TOTAL_JE',
+                                YLJMB_9
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_10,
+                                'CALMONTH',
+                                '2025-10',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_10
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_11,
+                                'CALMONTH',
+                                '2025-11',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_11
+                        ),
+                        named_struct (
+                                'YMBJE',
+                                YMB_12,
+                                'CALMONTH',
+                                '2025-12',
+                                'JDMBJE',
+                                SIJDMB,
+                                'TOTAL_JE',
+                                YLJMB_12
+                        )
+                )
+        ) MBTable AS MB
+where
+        calyear = '2025'
+         
+         

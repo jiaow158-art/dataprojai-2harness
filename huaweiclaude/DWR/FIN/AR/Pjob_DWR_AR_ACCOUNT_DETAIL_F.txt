@@ -1,0 +1,301 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: zhangpeng
+-- create time: 2023/12/12 16:27:48 GMT+08:00
+-- 20240917 供应商编码逻辑调整、供应商名称信新增兜底逻辑、客户编码改用D1.NAME_ORG2
+-- 20250109 zhz 鉴于月结补数据只补1号数据，导致A表拉数缺漏，因此改为大于等于
+-- ******************************************************************** --
+--优化性能SQL
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE dwrfin.DWR_AR_ACCOUNT_DETAIL_01 --非分区
+SELECT
+	T.GJAHR		      as year		    --年度
+	,substr(T.FISCYEARPER,1,4)||'-'||substr(T.FISCYEARPER,6,2) as month			-- 月度
+	,T.RBUKRS		  as comp_code		-- 公司代码
+    ,D5.BUTXT         as comp_name      -- 公司名称
+	,T.RACCT		  as general_ledger_account  -- 总账科目
+	,D.TXT20		  as general_ledger_account_desc-- 总账科目描述
+	,T.KUNNR		  as cust_code		-- 客户编码
+	,D1.NAME_ORG2	  as cust_name		-- 客户全称
+	,CASE WHEN T.LIFNR <> '' THEN T.LIFNR
+        ELSE CASE WHEN T.GKOAR = 'K' THEN T.GKONT
+                ELSE CASE WHEN T.EBELN <> '' THEN T1.LIFNR
+                        ELSE T2.LIFNR
+                    END
+            END
+        END          as SUPPLIER_CODE  -- 供应商编码
+	,case when COALESCE(D11.NAME_ORG1,'') = '' then D11.name1_text else D11.NAME_ORG1 end  as SUPPLIER_NAME  -- 供应商名称
+	,T.UMSKZ          as special_general_ledger-- 特别总账
+	,T.WSL			  as ori_cu_clos_balance_amt-- 原币期末余额
+	,T.RWCUR		  as voucher_currency-- 凭证货币
+	,D2.KURSF		  as real_exchange_rate-- 实际汇率
+	,T.HSL			  as cur_cu_clos_balance_amt-- 本币期末余额	
+	,T.RHCUR		  as cur_currency	-- 本币货币
+	,T.BELNR		  as VOUCHER_CODE	-- 凭证编码
+	,to_date(from_unixtime(unix_timestamp(T.BLDAT,'yyyyMMdd'))) as VOUCHER_DATE   -- 凭证日期
+	,to_date(from_unixtime(unix_timestamp(T.BUDAT,'yyyyMMdd'))) as POSTING_DATE   -- 过账日期
+	,date_add(to_date(from_unixtime(unix_timestamp(
+	          CASE WHEN D3.ZFBDT = '' OR D3.ZFBDT IS NULL OR D3.ZFBDT = '00000000' THEN '47121231' 
+			       ELSE D3.ZFBDT END,'yyyyMMdd'))),CAST(D3.ZBD1T AS INT)+CAST(D3.ZBD2T AS INT) )  
+				      as DUE_DATE--到期日
+	,NVL(D3.XREF3,'') 	AS WBS		-- WBS
+	,NULL AS wbs_sales_group   --WBS-销售组
+	,NULL AS sales_group_master_file--销售组-主档
+	,T.ZUONR		  as DIVIDE			-- 分配
+	,D4.WBANK         as DRAFT_LONG_NUM --汇票长号
+	,D2.XBLNR         as REFERENCE      --参照
+	,D4.WSTAT         as DRAFT_TYPE     --汇票类型
+	,D4.WDATE         as sign_date      --签发日期
+	,D4.WNAME         as DRAWER         --出票人
+	,D4.WBZOG         as ACCEPT_NEXT    --承兑下一手
+	,D4.WLZBP         as BANK_NAME      --银行名称
+	,D3.ZTERM         as PAY_TERM_CODE	-- 付款条款
+	,D6.VTEXT         as PAY_TERM_DESC  --付款条款文本
+	,T.AWREF		  as REFERENCE_VOUCHER-- 参考凭证
+	,T.KDAUF		  as SALES_VOUCHER	-- 销售凭证
+	,T.ZZXJLL         as CASH_FLOW      --现金流量
+	,D7.DDTEXT        as CASH_FLOW_DESC --现金流量描述
+	,D2.XREF1_HD      AS HD_CODE1       --参考代码
+	,D2.XREF2_HD      AS HD_CODE2       --参考代码2
+	,D3.XREF1         AS CODE1          --参考代码
+	,D3.XREF2         AS CODE2          --参考代码2
+	,T.RECNNR         as CONTRACT_NUM   --合同号
+	,T.EBELN          as PROCURE_VOUCHER--采购凭证
+	,to_date(from_unixtime(unix_timestamp(CASE WHEN T.AUGDT = '00000000' THEN '47121231' ELSE T.AUGDT END,'yyyyMMdd'))) as CLEAR_DATE   -- 清账日期
+	,T.XTRUEREV         as COVER_FLAG     --冲销标识
+	,T.BLART          as VOUCHER_TYPE	-- 凭证类型
+	,T.DOCLN		  as VOUCHER_ITEM	-- 凭证项目
+	,T.SGTXT          as NOTES          -- 项目文本
+	,D3.ZZOSSDH		  as OSS_PLAN_ORDER 	-- OSS计划单号
+	,CURRENT_TIMESTAMP()	AS DW_LAST_UPDATE_DATE				-- 数据同步时间
+	,case when T.BUDAT<>'00000000' or T.RACCT='0031410600' then '1' else '0' end as flag
+FROM 
+	SDI.SDI_ACDOCA_1001 T
+	LEFT JOIN SDI.SDI_EKKO_1001 T1 ON T.EBELN = T1.EBELN
+    LEFT JOIN SDI.SDI_MATDOC_1001 T2 ON SUBSTR(T.SGTXT,6,10) = T2.MBLNR AND SUBSTR(T.SGTXT,18,4) = T2.ZEILE
+	LEFT JOIN SDI.SDI_SKAT_1001 D
+		   ON T.RACCT = D.SAKNR
+		  AND D.KTOPL = 'CNDP'
+	LEFT JOIN SDI.SDI_BUT000_1001 D1
+		   ON T.KUNNR = D1.PARTNER	
+    LEFT JOIN SDI.SDI_BUT000_1001 D11 ON 
+        	CASE WHEN T.LIFNR <> '' THEN T.LIFNR
+                ELSE CASE WHEN T.GKOAR = 'K' THEN T.GKONT
+                        ELSE CASE WHEN T.EBELN <> '' THEN T1.LIFNR
+                                ELSE T2.LIFNR
+                            END
+                    END
+                END  
+        = D11.PARTNER		   
+	LEFT JOIN SDI.SDI_BKPF_1001 D2
+		   ON T.GJAHR = D2.GJAHR
+		  AND T.RBUKRS = D2.BUKRS
+		  AND T.BELNR = D2.BELNR
+	LEFT JOIN SDI.SDI_BSEG_1001 D3
+		   ON T.GJAHR = D3.GJAHR
+		  AND T.RBUKRS = D3.BUKRS
+		  AND T.BELNR = D3.BELNR
+		  AND T.BUZEI = D3.BUZEI
+    LEFT JOIN SDI.SDI_BSED_1001	D4
+          ON D4.BUKRS = T.RBUKRS
+		  AND D4.BELNR = T.BELNR
+		  AND D4.GJAHR = T.GJAHR
+		  AND D4.BUZEI = T.BUZEI
+    LEFT JOIN SDI.SDI_T001_1001 D5	
+          ON D5.BUKRS =T.RBUKRS	
+	LEFT JOIN SDI.SDI_TVZBT_1001 D6
+		   ON D3.ZTERM = D6.ZTERM		-- 付款条款
+		  AND D6.SPRAS = '1'
+	LEFT JOIN sdi.sdi_DD07V_1001 D7 ON D7.DOMVALUE_L = T.zzxjll
+          AND D7.DOMNAME = 'ZZXJLL'
+          AND D7.DDLANGUAGE = '1'
+WHERE substr(T.RACCT,3,1) not in('4','5','6','9')
+ and substr(T.RACCT,3,2) <>'12'
+ and substr(T.RACCT,3,3) not in('130','170','180','190')
+ and substr(T.RACCT,3,4) not in('1501','1502','1505')
+ and substr(T.RACCT,3,8) <>'16030100'--71049982
+ AND SUBSTR(T.DW_LAST_UPDATE_DATE,1,10) >= '${PERIOD_ID_D}'
+union ALL 
+SELECT
+	T.GJAHR		      as year		    --年度
+	,T.GJAHR||'-'||'00'	  as month			-- 月度
+	,T.RBUKRS		  as comp_code		-- 公司代码
+    ,D5.BUTXT         as comp_name      -- 公司名称
+	,'0031410600'		  as general_ledger_account  -- 总账科目
+	,D.TXT20		  as general_ledger_account_desc-- 总账科目描述
+	,NULL		  as cust_code		-- 客户编码
+	,NULL	  as cust_name		-- 客户全称
+	,NULL          as SUPPLIER_CODE  -- 供应商编码
+	,NULL    as SUPPLIER_NAME  -- 供应商名称
+	,NULL          as special_general_ledger-- 特别总账
+	,SUM(T.WSL)*-1			  as ori_cu_clos_balance_amt-- 原币期末余额
+	,'RMB'		  as voucher_currency-- 凭证货币
+	,NULL		  as real_exchange_rate-- 实际汇率
+	,SUM(T.HSL)*-1			  as cur_cu_clos_balance_amt-- 本币期末余额	
+	,'RMB'		  as cur_currency	-- 本币货币
+	,NULL		  as VOUCHER_CODE	-- 凭证编码
+	,NULL as VOUCHER_DATE   -- 凭证日期
+	,'00000000' as POSTING_DATE   -- 过账日期
+	,NULL as DUE_DATE--到期日
+	,NULL 	AS WBS		-- WBS
+	,NULL AS wbs_sales_group   --WBS-销售组
+	,NULL AS sales_group_master_file--销售组-主档
+	,NULL		  as DIVIDE			-- 分配
+	,NULL         as DRAFT_LONG_NUM --汇票长号
+	,NULL         as REFERENCE      --参照
+	,NULL         as DRAFT_TYPE     --汇票类型
+	,NULL         as sign_date      --签发日期
+	,NULL         as DRAWER         --出票人
+	,NULL         as ACCEPT_NEXT    --承兑下一手
+	,NULL         as BANK_NAME      --银行名称
+	,NULL         as PAY_TERM_CODE	-- 付款条款
+	,NULL         as PAY_TERM_DESC  --付款条款文本
+	,NULL		  as REFERENCE_VOUCHER-- 参考凭证
+	,NULL		  as SALES_VOUCHER	-- 销售凭证
+	,NULL         as CASH_FLOW      --现金流量
+	,NULL        as CASH_FLOW_DESC --现金流量描述
+	,NULL      AS HD_CODE1       --参考代码
+	,NULL      AS HD_CODE2       --参考代码2
+	,NULL         AS CODE1          --参考代码
+	,NULL         AS CODE2          --参考代码2
+	,NULL         as CONTRACT_NUM   --合同号
+	,NULL          as PROCURE_VOUCHER--采购凭证
+	,NULL as CLEAR_DATE   -- 清账日期
+	,NULL         as COVER_FLAG     --冲销标识
+	,NULL          as VOUCHER_TYPE	-- 凭证类型
+	,NULL		  as VOUCHER_ITEM	-- 凭证项目
+	,NULL          as NOTES          -- 项目文本
+	,NULL		  as OSS_PLAN_ORDER 	-- OSS计划单号
+	,CURRENT_TIMESTAMP()	AS DW_LAST_UPDATE_DATE				-- 数据同步时间
+	,'1' as flag
+FROM 
+	SDI.SDI_ACDOCA_1001 T
+	LEFT JOIN SDI.SDI_SKAT_1001 D
+		   ON T.RACCT = D.SAKNR
+		  AND D.KTOPL = 'CNDP'
+    LEFT JOIN SDI.SDI_T001_1001 D5	
+          ON D5.BUKRS =T.RBUKRS	
+WHERE T.RACCT ='0031410600'
+ and T.BUDAT<>'00000000'
+ GROUP BY T.GJAHR,T.RBUKRS,D5.BUTXT,D.TXT20;
+ 
+ INSERT OVERWRITE TABLE dwrfin.DWR_AR_ACCOUNT_DETAIL_F --非分区：注意自做了增量！！！
+SELECT
+	T.year		    --年度
+	,T.month			-- 月度
+	,T.comp_code		-- 公司代码
+    ,comp_name      -- 公司名称
+	,T.general_ledger_account  -- 总账科目
+	,general_ledger_account_desc-- 总账科目描述
+	,T.cust_code		-- 客户编码
+	,cust_name		-- 客户全称
+	,T.SUPPLIER_CODE  -- 供应商编码
+	,SUPPLIER_NAME  -- 供应商名称
+	,T.special_general_ledger-- 特别总账
+	,T.ori_cu_clos_balance_amt-- 原币期末余额
+	,T.voucher_currency-- 凭证货币
+	,real_exchange_rate-- 实际汇率
+	,T.cur_cu_clos_balance_amt-- 本币期末余额	
+	,T.cur_currency	-- 本币货币
+	,T.VOUCHER_CODE	-- 凭证编码
+	,VOUCHER_DATE   -- 凭证日期
+	,POSTING_DATE   -- 过账日期
+	,DUE_DATE--到期日
+	,WBS		-- WBS
+	,wbs_sales_group   --WBS-销售组
+	,sales_group_master_file--销售组-主档
+	,DIVIDE			-- 分配
+	,DRAFT_LONG_NUM --汇票长号
+	,REFERENCE      --参照
+	,DRAFT_TYPE     --汇票类型
+	,sign_date      --签发日期
+	,DRAWER         --出票人
+	,ACCEPT_NEXT    --承兑下一手
+	,BANK_NAME      --银行名称
+	,PAY_TERM_CODE	-- 付款条款
+	,PAY_TERM_DESC  --付款条款文本
+	,REFERENCE_VOUCHER-- 参考凭证
+	,SALES_VOUCHER	-- 销售凭证
+	,CASH_FLOW      --现金流量
+	,CASH_FLOW_DESC --现金流量描述
+	,HD_CODE1       --参考代码
+	,HD_CODE2       --参考代码2
+	,CODE1          --参考代码
+	,CODE2          --参考代码2
+	,CONTRACT_NUM   --合同号
+	,PROCURE_VOUCHER--采购凭证
+	,CLEAR_DATE   -- 清账日期
+	,COVER_FLAG     --冲销标识
+	,VOUCHER_TYPE	-- 凭证类型
+	,VOUCHER_ITEM	-- 凭证项目
+	,NOTES          -- 项目文本
+	,OSS_PLAN_ORDER 	-- OSS计划单号
+	,DW_LAST_UPDATE_DATE				-- 数据同步时间
+FROM dwrfin.DWR_AR_ACCOUNT_DETAIL_01 t where flag='1'
+union all
+SELECT
+	T.year		    --年度
+	,T.month			-- 月度 1
+	,T.comp_code		-- 公司代码 1
+    ,T.comp_name      -- 公司名称
+	,T.general_ledger_account  -- 总账科目
+	,T.general_ledger_account_desc-- 总账科目描述
+	,T.cust_code		-- 客户编码
+	,T.cust_name		-- 客户全称
+	,T.SUPPLIER_CODE  -- 供应商编码
+	,T.SUPPLIER_NAME  -- 供应商名称
+	,T.special_general_ledger-- 特别总账
+	,T.ori_cu_clos_balance_amt-- 原币期末余额
+	,T.voucher_currency-- 凭证货币
+	,T.real_exchange_rate-- 实际汇率
+	,T.cur_cu_clos_balance_amt-- 本币期末余额	
+	,T.cur_currency	-- 本币货币
+	,T.VOUCHER_CODE	-- 凭证编码 1
+	,T.VOUCHER_DATE   -- 凭证日期
+	,T.POSTING_DATE   -- 过账日期
+	,T.DUE_DATE--到期日
+	,T.WBS		-- WBS
+	,T.wbs_sales_group   --WBS-销售组
+	,T.sales_group_master_file--销售组-主档
+	,T.DIVIDE			-- 分配
+	,T.DRAFT_LONG_NUM --汇票长号
+	,T.REFERENCE      --参照
+	,T.DRAFT_TYPE     --汇票类型
+	,T.sign_date      --签发日期
+	,T.DRAWER         --出票人
+	,T.ACCEPT_NEXT    --承兑下一手
+	,T.BANK_NAME      --银行名称
+	,T.PAY_TERM_CODE	-- 付款条款
+	,T.PAY_TERM_DESC  --付款条款文本
+	,T.REFERENCE_VOUCHER-- 参考凭证
+	,T.SALES_VOUCHER	-- 销售凭证
+	,T.CASH_FLOW      --现金流量
+	,T.CASH_FLOW_DESC --现金流量描述
+	,T.HD_CODE1       --参考代码
+	,T.HD_CODE2       --参考代码2
+	,T.CODE1          --参考代码
+	,T.CODE2          --参考代码2
+	,T.CONTRACT_NUM   --合同号
+	,T.PROCURE_VOUCHER--采购凭证
+	,T.CLEAR_DATE   -- 清账日期
+	,T.COVER_FLAG     --冲销标识
+	,T.VOUCHER_TYPE	-- 凭证类型
+	,T.VOUCHER_ITEM	-- 凭证项目  1
+	,T.NOTES          -- 项目文本
+	,T.OSS_PLAN_ORDER 	-- OSS计划单号
+	,T.DW_LAST_UPDATE_DATE				-- 数据同步时间
+FROM dwrfin.DWR_AR_ACCOUNT_DETAIL_f t
+left join dwrfin.DWR_AR_ACCOUNT_DETAIL_01 t1   ON T.YEAR = T1.YEAR 
+		  AND T.general_ledger_account = T1.general_ledger_account 
+		  AND T.COMP_CODE = T1.COMP_CODE
+		  AND NVL(T.VOUCHER_CODE,'SNULL') = NVL(T1.VOUCHER_CODE,'SNULL')
+		  AND NVL(T.VOUCHER_ITEM,'SNULL') = NVL(T1.VOUCHER_ITEM,'SNULL')
+WHERE T1.COMP_CODE IS NULL 
+  AND T1.VOUCHER_CODE IS NULL 
+  AND T1.VOUCHER_ITEM IS NULL

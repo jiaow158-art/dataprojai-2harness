@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RESPONSIBILITY_LEFT_1",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "营销系统外剩余待分配责任库存",
+    "connectionName": null,
+    "database": ""
+}

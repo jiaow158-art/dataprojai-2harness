@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_SO_HEAD_OSS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "OSS销售订单头表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

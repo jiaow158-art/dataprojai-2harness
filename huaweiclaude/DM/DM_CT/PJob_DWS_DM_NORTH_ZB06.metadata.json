@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB06",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "毛利率-标A毛利率（工程渠道）ZB06",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

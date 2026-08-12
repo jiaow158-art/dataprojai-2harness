@@ -1,0 +1,105 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/06 14:45:55 GMT+08:00
+-- ******************************************************************** --
+with mat as(
+     select material_num ,
+			material_name , 
+			product_level2_code ,
+			product_level2_name ,
+			dimension,
+			RESERVED_FIELD_1,
+			RESERVED_FIELD_3,
+			width,
+			LENGTH_1 * width / 1000 / 1000 as product_area  
+    from dwimd.dwi_md_data_material_general_t
+),
+mid as 
+(select
+     substr(bstdk,1,8) as stat_date ,
+        t1.vkorg as sales_grp_code , 
+        t3.sales_group_name as sales_grp_name ,
+        t3.subcompany_big_area_code as sales_org_code ,
+        t3.subcompany_big_area_name as sales_org_name ,
+        t1.matnr as material_num ,
+        t2.material_name as material_name ,
+        t2.product_level2_code as category_code ,
+        t2.product_level2_name as category_name , 
+        t2.dimension,
+        case when t1.VTWEG = '06' THEN 'G102'
+             WHEN t2.RESERVED_FIELD_1 = 'G105' THEN 'G105'
+             WHEN t1.VTWEG = '08' THEN 'G103'
+             WHEN t2.RESERVED_FIELD_1 IN( 'G103','104','102') AND t2.RESERVED_FIELD_3 = 'A9' THEN 'G103' 
+             ELSE 'G101' END as def_sales_channel_code,     -- 销售渠道
+        case when t1.VTWEG = '06' THEN '工程'
+             WHEN t2.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+             WHEN t1.VTWEG = '08' THEN '大包'
+             WHEN t2.RESERVED_FIELD_1 IN( 'G103','104','102') AND t2.RESERVED_FIELD_3 = 'A9' THEN '大包' 
+             ELSE '零售' END as def_sales_channel_name,
+        sum( t1.KWMENG*(case when t1.meins  = 'M2' then 1 else t2.product_area end )) as order_area,   -- 应交 
+        sum( t1.NETWR+t1.MWSBP ) as order_amount,
+        sum( case when coalesce(t1.CHARG,'')<>'' then (t1.KWMENG-t1.WQRSL)*(case when t1.meins  = 'M2' then 1 else t2.product_area end ) else 0 end ) as confirm_area,  -- 已交
+        sum( case when coalesce(t1.CHARG,'')<>'' then (t1.KWMENG-t1.WQRSL)/KWMENG*(NETWR+MWSBP) else 0 end ) as confirm_amount,
+        sum( t1.MENGEF*(case when t1.meins  = 'M2' then 1 else t2.product_area end )) as send_area,     -- 已提
+        sum( t1.MENGEF/KWMENG*(NETWR+MWSBP)) as send_amount
+from dm.DM_otd_sales_order_det_t t1
+left join mat t2 On t1.matnr = t2.material_num 
+left join DWIFIN.DWI_GL_SALES_GROUP_DETAIL_T t3 
+On t1.vkgrp  = t3.sales_group_code
+where  substr(bstdk,1,6) >= '202107'
+and t1.MATKL IN('1000010')   -- 瓷砖
+--and t1.EXTWG = '10010'   
+--and substr(t1.WERKS,1,2) in('12','13','15','16','17','18','19','75','77','79','8A')  
+--and t1.werks not like '%80'
+--and t1.matnr not like '%_B'
+--and substr(t1.LGORT,1,2) not in('00','BC') 
+and coalesce(t1.ABGRU,'') in('','56')
+--and substr(t1.VBELN,1,3) not in ('113','112')
+and t3.utilities_dept_code = '11000001' 
+group by substr(bstdk,1,8),t3.subcompany_big_area_code, t3.subcompany_big_area_name,t1.vkorg, t3.sales_group_name,
+         t1.matnr,t2.material_name ,t2.product_level2_code ,t2.product_level2_name , t2.dimension,
+         case when t1.VTWEG = '06' THEN 'G102'
+             WHEN t2.RESERVED_FIELD_1 = 'G105' THEN 'G105'
+             WHEN t1.VTWEG = '08' THEN 'G103'
+             WHEN t2.RESERVED_FIELD_1 IN( 'G103','104','102') AND t2.RESERVED_FIELD_3 = 'A9' THEN 'G103' 
+             ELSE 'G101' END ,     -- 销售渠道
+        case when t1.VTWEG = '06' THEN '工程'
+             WHEN t2.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+             WHEN t1.VTWEG = '08' THEN '大包'
+             WHEN t2.RESERVED_FIELD_1 IN( 'G103','104','102') AND t2.RESERVED_FIELD_3 = 'A9' THEN '大包' 
+             ELSE '零售' END)
+  --          select * from mid
+INSERT OVERWRITE TABLE DM.DM_OTD_SALES_ORDER_OVERVIEW_CURRENT_D
+select 	stat_date
+		,sales_grp_code
+		,sales_grp_name
+		,sales_org_code
+		,sales_org_name
+		,material_num
+		,material_name
+		,category_code
+		,category_name
+		,dimension 
+		,def_sales_channel_code
+		,def_sales_channel_name
+		,order_area
+		,order_amount
+		,order_area-send_area as order_incomplete_area
+		,order_amount-send_amount as order_incomplete_amount
+		,order_area-confirm_area  as order_noresstock_area
+		,order_amount-confirm_amount as order_noresstock_amount
+		,case when stat_date<replace(date_sub(CURRENT_DATE,1),'-','')  then order_area-confirm_area else 0 end as order_noresstock_area_normal
+		,case when stat_date<replace(date_sub(CURRENT_DATE,1),'-','')  then order_amount-confirm_amount else 0 end as order_noresstock_amount_normal
+		,case when stat_date>=replace(date_sub(CURRENT_DATE,1),'-','')  then order_area-confirm_area else 0 end as order_noresstock_area_overdue
+		,case when stat_date>=replace(date_sub(CURRENT_DATE,1),'-','')  then order_amount-confirm_amount else 0 end as order_noresstock_amount_overdue
+		,confirm_area-send_area as order_resstock_area
+		,confirm_amount-send_amount as order_resstock_amount
+		,case when stat_date<replace(date_sub(CURRENT_DATE,1),'-','')  then confirm_area-send_area else 0 end as order_resstock_area_normal
+		,case when stat_date<replace(date_sub(CURRENT_DATE,1),'-','')  then confirm_amount-send_amount else 0 end as order_resstock_amount_normal
+		,case when stat_date>=replace(date_sub(CURRENT_DATE,1),'-','')  then confirm_amount-send_amount else 0 end as order_resstock_area_overdue
+		,case when stat_date>=replace(date_sub(CURRENT_DATE,1),'-','')  then confirm_amount-send_amount else 0 end as order_resstock_amount_overdue
+		,send_area  as order_send_area    
+		,send_amount  as order_send_amount  
+		,current_timestamp() as last_update_date 
+from mid;

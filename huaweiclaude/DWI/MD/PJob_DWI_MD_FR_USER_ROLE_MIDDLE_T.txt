@@ -1,0 +1,19 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：用户角色的中间表
+-- create time: 2022/09/06 16:14:53 GMT+08:00
+-- update from huangwenbin 2024-07-08 增加字段：角色名称
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_FR_USER_ROLE_MIDDLE_T
+SELECT A.ID,
+       A.ROLEID,
+       A.ROLETYPE,
+       A.USERID,
+       A.TENANTID,
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+       'N' AS DEL_FLAG,
+       B.NAME AS ROLE_NAME --角色名称
+  FROM SDI.SDI_FR_FINE_USER_ROLE_MIDDLE_1035 A
+  LEFT JOIN SDI.SDI_FR_FINE_CUSTOM_ROLE_1035 B
+    ON A.ROLEID = B.ID

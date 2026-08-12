@@ -1,0 +1,1688 @@
+/*drop table if exists DM.DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T;
+create TABLE DM.DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T
+(
+    l1                                    varchar(50),
+    l2                                    varchar(50),
+    l3                                    varchar(50),
+    prod_type                             varchar(50),
+    channel                               varchar(50),
+    month_achievement                     numeric(38, 10),
+    budget_month_achievement              numeric(38, 10),
+    last_month_achievement                numeric(38, 10),
+    last_year_month_achievement           numeric(38, 10),
+    month_achievement_includejf           numeric(38, 10),
+    last_month_achievement_includejf      numeric(38, 10),
+    last_year_month_achievement_includejf numeric(38, 10),
+    month_sales_area                      numeric(38, 10),
+    last_month_sales_area                 numeric(38, 10),
+    last_year_month_sales_area            numeric(38, 10),
+    month_gross_profit                    numeric(38, 10),
+    last_month_gross_profit               numeric(38, 10),
+    month_notax                           numeric(38, 10),
+    last_month_notax                      numeric(38, 10),
+    year_achievement                      numeric(38, 10),
+    budget_year_achievement               numeric(38, 10),
+    last_year_achievement                 numeric(38, 10),
+    year_achievement_includejf            numeric(38, 10),
+    last_year_achievement_includejf       numeric(38, 10),
+    year_sales_area                       numeric(38, 10),
+    last_year_sales_area                  numeric(38, 10),
+    year_gross_profit                     numeric(38, 10),
+    year_notax                            numeric(38, 10),
+    budget_all_year_gross_profit          numeric(38, 10),
+    budget_all_year_notax                 numeric(38, 10),
+    budget_all_year_achievement           numeric(38, 10),
+  顺序 varchar(50),
+    calday                                varchar(20),
+    DW_LAST_UPDATE_DATE                   timestamp(6)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(calday);
+comment on table DM.DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T is '瓷砖经营简报2023主要品类规格';*/
+-- DWS sql
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/05/16 11:30:50 GMT+08:00
+-- table desc：瓷砖B1库存-按日快照 dm.dm_sa_b1_inventort_t
+-- 需求人：zhouhaochang
+-- update：2023/06/28 修改逻辑：除了同期业绩读手工表，其余同期全部读新业绩底表
+-- update：2023/08/08 修改逻辑：标A成本剔除成本调整值
+-- update：2023/08/26 修改逻辑：剔除所有手工业绩
+-- update：2023/08/28 修改逻辑：补充预算
+-- update：2023/09/01 修改逻辑：成本剔除安装费
+-- update：2023/10/23 修改逻辑：业绩含积分（成交总价）：条件限制：业务范围不等于G000，含空：业绩（ambperformance）-使用积分（ZSYJF)（其中，使用积分限定：佣金组（commission_group）<>02，含空)，面积同理
+-- update：2023/11/16 修改逻辑：预算表更新为代码，同步更新逻辑
+-- update：2024/01/10 修改逻辑：24年去掉3.8亿逻辑
+-- update：2024/03/01 修改逻辑：24年瓷砖经营分析调整回3个渠道
+-- update：2024/03/06 修改逻辑：剔除24年家居部分
+-- update：2024/03/15 修改逻辑：标A剔除Z0客户组
+-- update：2024/03/18 修改逻辑：不含税修改使用notax_sales_net_amt字段，原公式含事业部内部成本
+-- update：2024/03/21 修改逻辑：大零售渠道修改为零售渠道
+-- update：2024/04/15 修改逻辑：修改与日报一致毛利
+-- update：2024/04/16 修改逻辑：品类规格修改读物料主档，关联主要品类规格清单
+-- update：2024/04/24 修改逻辑：预算过滤空渠道部分
+-- update：2024/04/26 修改逻辑：补充715，大规格，预测等
+-- update：2024/04/28 修改逻辑：架构逻辑修改与日报一致
+-- update：2024/04/29 修改逻辑：莫老姐肖老姐商议后大规格产品所有权过滤补回来
+-- update：2024/06/23 修改逻辑：剔除ART+
+-- ******************************************************************** --
+do
+$$
+    declare
+        P_DATE varchar(500) ;
+    begin
+        for P_DATE in (select day_id
+                       from dm.dm_dim_date_d
+                       where day_id >= to_char(to_date('${PERIOD_ID_D1}'), 'yyyyMMdd')
+                         and day_id <= to_char(to_date('${PERIOD_ID_D2}'), 'yyyyMMdd')
+                       order by day_id)
+            loop
+                delete from DM.DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T where calday = P_DATE;
+                INSERT INTO DM.DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T
+                with data as (
+                    select level1,
+                           channel,
+                           channel_name,
+                           level2,
+                           level3,
+                           prod_type,
+                           sum(month_achievement)                     month_achievement,
+                           sum(budget_month_achievement)              budget_month_achievement,
+                           sum(last_month_achievement)                last_month_achievement,
+                           sum(last_year_month_achievement)           last_year_month_achievement,
+                           sum(month_achievement_includejf)           month_achievement_includejf,
+                           sum(last_month_achievement_includejf)      last_month_achievement_includejf,
+                           sum(last_year_month_achievement_includejf) last_year_month_achievement_includejf,
+                           sum(month_sales_area)                      month_sales_area,
+                           sum(last_month_sales_area)                 last_month_sales_area,
+                           sum(last_year_month_sales_area)            last_year_month_sales_area,
+                           sum(month_gross_profit)                    month_gross_profit,
+                           sum(last_month_gross_profit)               last_month_gross_profit,
+                           sum(month_notax)                           month_notax,
+                           sum(last_month_notax)                      last_month_notax,
+                           sum(year_achievement)                      year_achievement,
+                           sum(budget_year_achievement)               budget_year_achievement,
+                           sum(last_year_achievement)                 last_year_achievement,
+                           sum(year_achievement_includejf)            year_achievement_includejf,
+                           sum(last_year_achievement_includejf)       last_year_achievement_includejf,
+                           sum(year_sales_area)                       year_sales_area,
+                           sum(last_year_sales_area)                  last_year_sales_area,
+                           sum(year_gross_profit)                     year_gross_profit,
+                           sum(year_notax)                            year_notax,
+                           sum(budget_all_year_gross_profit)          budget_all_year_gross_profit,
+                           sum(budget_all_year_notax)                 budget_all_year_notax,
+                           sum(budget_all_year_achievement)           budget_all_year_achievement,
+                           sum(predition_month_achievement)           predition_month_achievement
+                    from (
+                             --正常取数
+                             select b.node_desc3                  level1,
+                                    integrate_channel             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    c.category || c.dimension     prod_type,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         month_achievement,
+                                    0                             budget_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         year_achievement,
+                                    0                             budget_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    0                             budget_all_year_gross_profit,
+                                    0                             budget_all_year_notax,
+                                    0                             budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from dm.dm_ambv2_zzt_xssr_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --毛利
+                             union all
+                             select b.node_desc3                              level1,
+                                    integrate_channel                         channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end             level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end                           level3,
+                                    c.category || c.dimension                 prod_type,
+                                    0                                         month_achievement,
+                                    0                                         budget_month_achievement,
+                                    0                                         last_month_achievement,
+                                    0                                         last_year_month_achievement,
+                                    0                                         month_achievement_includejf,
+                                    0                                         last_month_achievement_includejf,
+                                    0                                         last_year_month_achievement_includejf,
+                                    0                                         month_sales_area,
+                                    0                                         last_month_sales_area,
+                                    0                                         last_year_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else coalesce(last_period_sum_price, 0) end
+                                                                               else coalesce(last_period_sum_price, 0) end
+                                            else 0 end)                       month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                               else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                            else 0 end)                       last_month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       last_month_notax,
+                                    0                                         year_achievement,
+                                    0                                         budget_year_achievement,
+                                    0                                         last_year_achievement,
+                                    0                                         year_achievement_includejf,
+                                    0                                         last_year_achievement_includejf,
+                                    0                                         year_sales_area,
+                                    0                                         last_year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt
+                                            else 0 end) - sum(case
+                                                                  when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                                      and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                                      then
+                                                                      case
+                                                                          when calmonth = to_char(to_date(P_DATE), 'yyyy-MM')
+                                                                              then
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else coalesce(last_period_sum_price, 0) end
+                                                                                  else coalesce(last_period_sum_price, 0) end
+                                                                          else
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                                  else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                                                  else 0 end) year_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       year_notax,
+                                    0                                         budget_all_year_gross_profit,
+                                    0                                         budget_all_year_notax,
+                                    0                                         budget_all_year_achievement,
+                                    0                                         predition_month_achievement
+                             from dm.dm_ambv2_profit_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --正常预算
+                             union all
+                             select b.node_desc3                  level1,
+                                    prod_channel_name             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    c.category || dimension       prod_type,
+                                    0                             month_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_month_achievement,
+                                    0                             last_month_achievement,
+                                    0                             last_year_month_achievement,
+                                    0                             month_achievement_includejf,
+                                    0                             last_month_achievement_includejf,
+                                    0                             last_year_month_achievement_includejf,
+                                    0                             month_sales_area,
+                                    0                             last_month_sales_area,
+                                    0                             last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    0                             year_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_year_achievement,
+                                    0                             last_year_achievement,
+                                    0                             year_achievement_includejf,
+                                    0                             last_year_achievement_includejf,
+                                    0                             year_sales_area,
+                                    0                             last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce((prod_it_amt - standarda), 0)
+                                            else 0 end)           budget_all_year_gross_profit,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt, 0)
+                                            else 0 end)           budget_all_year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt1, 0)
+                                            else 0 end) / 10000   budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from upload.upload_achievement_budget_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sale_grp_name = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.prod_level3_name = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.prod_channel_name = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and prod_channel_name is not null
+                               and to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                             union all--预测
+                             select b.node_desc3            level1,
+                                    a.ct_channel_code       channel,
+                                    channel_name,
+                                    b.node_desc4            level2,
+                                    case
+                                        when node_name4 in ('H04230685') then
+                                            case
+                                                when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                else node_desc4
+                                                end
+                                        when node_name4 in ('H04230600') then case
+                                                                                  when node_desc5 like '%运营中心%'
+                                                                                      then node_desc5
+                                            end
+                                        when node_name4 in ('H04230655') then case
+                                                                                  when node_desc5 like '%子公司%'
+                                                                                      then node_desc5
+                                            end
+                                        else node_desc5
+                                        end                 level3,
+                                    c.category || dimension prod_type,
+                                    0                       month_achievement,
+                                    0                       budget_month_achievement,
+                                    0                       last_month_achievement,
+                                    0                       last_year_month_achievement,
+                                    0                       month_achievement_includejf,
+                                    0                       last_month_achievement_includejf,
+                                    0                       last_year_month_achievement_includejf,
+                                    0                       month_sales_area,
+                                    0                       last_month_sales_area,
+                                    0                       last_year_month_sales_area,
+                                    0                       month_gross_profit,
+                                    0                       last_month_gross_profit,
+                                    0                       month_notax,
+                                    0                       last_month_notax,
+                                    0                       year_achievement,
+                                    0                       budget_year_achievement,
+                                    0                       last_year_achievement,
+                                    0                       year_achievement_includejf,
+                                    0                       last_year_achievement_includejf,
+                                    0                       year_sales_area,
+                                    0                       last_year_sales_area,
+                                    0                       year_gross_profit,
+                                    0                       year_notax,
+                                    0                       budget_all_year_gross_profit,
+                                    0                       budget_all_year_notax,
+                                    0                       budget_all_year_achievement,
+                                    sum(case
+                                            when replace(stat_month, '-', '') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prediction
+                                            else 0 end)     predition_month_achievement
+                             from upload.upload_achievement_prediction_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.org_code = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.category_code = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.ct_channel_code = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and a.ct_channel_code is not null
+                               and replace(stat_month, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      ----715
+                             union all
+                             select b.node_desc3                  level1,
+                                    integrate_channel             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '715规格'                       prod_type,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         month_achievement,
+                                    0                             budget_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         year_achievement,
+                                    0                             budget_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    0                             budget_all_year_gross_profit,
+                                    0                             budget_all_year_notax,
+                                    0                             budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from dm.dm_ambv2_zzt_xssr_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               AND c.product_series_name = '715'
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --毛利
+                             union all
+                             select b.node_desc3                              level1,
+                                    integrate_channel                         channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end             level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end                           level3,
+                                    '715规格'                                   prod_type,
+                                    0                                         month_achievement,
+                                    0                                         budget_month_achievement,
+                                    0                                         last_month_achievement,
+                                    0                                         last_year_month_achievement,
+                                    0                                         month_achievement_includejf,
+                                    0                                         last_month_achievement_includejf,
+                                    0                                         last_year_month_achievement_includejf,
+                                    0                                         month_sales_area,
+                                    0                                         last_month_sales_area,
+                                    0                                         last_year_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else coalesce(last_period_sum_price, 0) end
+                                                                               else coalesce(last_period_sum_price, 0) end
+                                            else 0 end)                       month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                               else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                            else 0 end)                       last_month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       last_month_notax,
+                                    0                                         year_achievement,
+                                    0                                         budget_year_achievement,
+                                    0                                         last_year_achievement,
+                                    0                                         year_achievement_includejf,
+                                    0                                         last_year_achievement_includejf,
+                                    0                                         year_sales_area,
+                                    0                                         last_year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt
+                                            else 0 end) - sum(case
+                                                                  when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                                      and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                                      then
+                                                                      case
+                                                                          when calmonth = to_char(to_date(P_DATE), 'yyyy-MM')
+                                                                              then
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else coalesce(last_period_sum_price, 0) end
+                                                                                  else coalesce(last_period_sum_price, 0) end
+                                                                          else
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                                  else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                                                  else 0 end) year_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       year_notax,
+                                    0                                         budget_all_year_gross_profit,
+                                    0                                         budget_all_year_notax,
+                                    0                                         budget_all_year_achievement,
+                                    0                                         predition_month_achievement
+                             from dm.dm_ambv2_profit_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               AND c.product_series_name = '715'
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --正常预算
+                             union all
+                             select b.node_desc3                  level1,
+                                    prod_channel_name             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '715规格'                       prod_type,
+                                    0                             month_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_month_achievement,
+                                    0                             last_month_achievement,
+                                    0                             last_year_month_achievement,
+                                    0                             month_achievement_includejf,
+                                    0                             last_month_achievement_includejf,
+                                    0                             last_year_month_achievement_includejf,
+                                    0                             month_sales_area,
+                                    0                             last_month_sales_area,
+                                    0                             last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    0                             year_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_year_achievement,
+                                    0                             last_year_achievement,
+                                    0                             year_achievement_includejf,
+                                    0                             last_year_achievement_includejf,
+                                    0                             year_sales_area,
+                                    0                             last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce((prod_it_amt - standarda), 0)
+                                            else 0 end)           budget_all_year_gross_profit,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt, 0)
+                                            else 0 end)           budget_all_year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt1, 0)
+                                            else 0 end) / 10000   budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from upload.upload_achievement_budget_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sale_grp_name = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.prod_level3_name = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.prod_channel_name = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and data_source != 'U'
+                               and node_name6!='H03230627'
+                               AND dimension = '1500X750'
+                               and prod_channel_name is not null
+                               and to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                             union all--预测
+                             select b.node_desc3                  level1,
+                                    a.ct_channel_code             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '715规格'                       prod_type,
+                                    0                             month_achievement,
+                                    0                             budget_month_achievement,
+                                    0                             last_month_achievement,
+                                    0                             last_year_month_achievement,
+                                    0                             month_achievement_includejf,
+                                    0                             last_month_achievement_includejf,
+                                    0                             last_year_month_achievement_includejf,
+                                    0                             month_sales_area,
+                                    0                             last_month_sales_area,
+                                    0                             last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    0                             year_achievement,
+                                    0                             budget_year_achievement,
+                                    0                             last_year_achievement,
+                                    0                             year_achievement_includejf,
+                                    0                             last_year_achievement_includejf,
+                                    0                             year_sales_area,
+                                    0                             last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    0                             budget_all_year_gross_profit,
+                                    0                             budget_all_year_notax,
+                                    0                             budget_all_year_achievement,
+                                    sum(case
+                                            when replace(stat_month, '-', '') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prediction
+                                            else 0 end)           predition_month_achievement
+                             from upload.upload_achievement_prediction_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.org_code = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.category_code = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.ct_channel_code = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and a.ct_channel_code is not null
+                               AND dimension = '1500X750'
+                               and replace(stat_month, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      ----大规格
+                             union all
+                             select b.node_desc3                  level1,
+                                    integrate_channel             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '大规格'                         prod_type,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         month_achievement,
+                                    0                             budget_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_month_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_month_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         year_achievement,
+                                    0                             budget_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then coalesce(ambperformance, 0)
+                                            else 0 end) /
+                                    10000                         last_year_achievement,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then ambperformance
+                                                         else 0 end
+                                                -
+                                                     case when coalesce(commission_group, '#') != '02' then ZSYJF else 0 end
+                                            else 0 end)           last_year_achievement_includejf,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                                then case
+                                                         when coalesce(bus_area, '#') != 'G000' then coalesce(zxsmj, 0)
+                                                         else 0 end
+                                            else 0 end)           last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    0                             budget_all_year_gross_profit,
+                                    0                             budget_all_year_notax,
+                                    0                             budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from dm.dm_ambv2_zzt_xssr_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and c.prod_property='A0001'
+                               and (product_series_name in ('918', '超大板')
+                                 or (product_series_name not in ('918', '超大板') and
+                                     c.product_brand_code in ('A16')))
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --毛利
+                             union all
+                             select b.node_desc3                              level1,
+                                    integrate_channel                         channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end             level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end                           level3,
+                                    '大规格'                                     prod_type,
+                                    0                                         month_achievement,
+                                    0                                         budget_month_achievement,
+                                    0                                         last_month_achievement,
+                                    0                                         last_year_month_achievement,
+                                    0                                         month_achievement_includejf,
+                                    0                                         last_month_achievement_includejf,
+                                    0                                         last_year_month_achievement_includejf,
+                                    0                                         month_sales_area,
+                                    0                                         last_month_sales_area,
+                                    0                                         last_year_month_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else coalesce(last_period_sum_price, 0) end
+                                                                               else coalesce(last_period_sum_price, 0) end
+                                            else 0 end)                       month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then notax_sales_net_amt - case
+                                                                               when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                    coalesce(a.cust_group, '#') != 'Z0'
+                                                                                   THEN
+                                                                                   case
+                                                                                       when a.data_source in ('S', 'T')
+                                                                                           then coalesce(standard_price_a, 0)
+                                                                                       else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                               else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                            else 0 end)                       last_month_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       month_notax,
+                                    sum(case
+                                            when replace(calmonth, '-', '') =
+                                                 to_char(to_date(P_DATE) - interval '1 months', 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       last_month_notax,
+                                    0                                         year_achievement,
+                                    0                                         budget_year_achievement,
+                                    0                                         last_year_achievement,
+                                    0                                         year_achievement_includejf,
+                                    0                                         last_year_achievement_includejf,
+                                    0                                         year_sales_area,
+                                    0                                         last_year_sales_area,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then notax_sales_net_amt
+                                            else 0 end) - sum(case
+                                                                  when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                                      and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                                      then
+                                                                      case
+                                                                          when calmonth = to_char(to_date(P_DATE), 'yyyy-MM')
+                                                                              then
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else coalesce(last_period_sum_price, 0) end
+                                                                                  else coalesce(last_period_sum_price, 0) end
+                                                                          else
+                                                                              case
+                                                                                  when coalesce(a.prod_property, '#') = 'A0001' and
+                                                                                       coalesce(a.cust_group, '#') != 'Z0'
+                                                                                      THEN
+                                                                                      case
+                                                                                          when a.data_source in ('S', 'T')
+                                                                                              then coalesce(standard_price_a, 0)
+                                                                                          else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                                                  else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                                                  else 0 end) year_gross_profit,
+                                    sum(case
+                                            when replace(calmonth, '-', '') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                then (notax_sales_net_amt)
+                                            else 0 end)                       year_notax,
+                                    0                                         budget_all_year_gross_profit,
+                                    0                                         budget_all_year_notax,
+                                    0                                         budget_all_year_achievement,
+                                    0                                         predition_month_achievement
+                             from dm.dm_ambv2_profit_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                                      left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.integrate_channel = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and c.prod_property='A0001'
+                               and (product_series_name in ('918', '超大板')
+                                 or (product_series_name not in ('918', '超大板') and
+                                     c.product_brand_code in ('A16')))
+                               and replace(calmonth, '-', '') between to_char(to_date(P_DATE) - interval '1 years', 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                                      --正常预算
+                             union all
+                             select b.node_desc3                  level1,
+                                    prod_channel_name             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '大规格'                         prod_type,
+                                    0                             month_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_month_achievement,
+                                    0                             last_month_achievement,
+                                    0                             last_year_month_achievement,
+                                    0                             month_achievement_includejf,
+                                    0                             last_month_achievement_includejf,
+                                    0                             last_year_month_achievement_includejf,
+                                    0                             month_sales_area,
+                                    0                             last_month_sales_area,
+                                    0                             last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    0                             year_achievement,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prod_it_amt1
+                                            else 0 end) / 10000   budget_year_achievement,
+                                    0                             last_year_achievement,
+                                    0                             year_achievement_includejf,
+                                    0                             last_year_achievement_includejf,
+                                    0                             year_sales_area,
+                                    0                             last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce((prod_it_amt - standarda), 0)
+                                            else 0 end)           budget_all_year_gross_profit,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt, 0)
+                                            else 0 end)           budget_all_year_notax,
+                                    sum(case
+                                            when to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                                                then coalesce(prod_it_amt1, 0)
+                                            else 0 end) / 10000   budget_all_year_achievement,
+                                    0                             predition_month_achievement
+                             from upload.upload_achievement_budget_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.sale_grp_name = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.prod_level3_name = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.prod_channel_name = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and data_source != 'U'
+                               and prod_property='A0001'
+                               and (dimension = '1800X900'
+                                 or dimension = '1200X1200'
+                                 or (dimension  like 'X' and split_part(dimension, 'X', 1) / 1000 * split_part(dimension, 'X', 2) / 1000 >= 1.62)
+                                 or series in ('A16'))
+                               and prod_channel_name is not null
+                               and to_char(to_date(stat_month), 'yyyyMM') between to_char(to_date(P_DATE), 'yyyy01') and to_char(to_date(P_DATE), 'yyyy12')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                             union all--预测
+                             select b.node_desc3                  level1,
+                                    a.ct_channel_code             channel,
+                                    channel_name,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then b.node_desc4 end level2,
+                                    case
+                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                            then case
+                                                     when node_name4 in ('H04230685') then
+                                                         case
+                                                             when node_name5 in ('Z031', 'Z033') then node_desc5
+                                                             else node_desc4
+                                                             end
+                                                     when node_name4 in ('H04230600') then case
+                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     when node_name4 in ('H04230655') then case
+                                                                                               when node_desc5 like '%子公司%'
+                                                                                                   then node_desc5
+                                                         end
+                                                     else node_desc5
+                                            end end               level3,
+                                    '大规格'                         prod_type,
+                                    0                             month_achievement,
+                                    0                             budget_month_achievement,
+                                    0                             last_month_achievement,
+                                    0                             last_year_month_achievement,
+                                    0                             month_achievement_includejf,
+                                    0                             last_month_achievement_includejf,
+                                    0                             last_year_month_achievement_includejf,
+                                    0                             month_sales_area,
+                                    0                             last_month_sales_area,
+                                    0                             last_year_month_sales_area,
+                                    0                             month_gross_profit,
+                                    0                             last_month_gross_profit,
+                                    0                             month_notax,
+                                    0                             last_month_notax,
+                                    0                             year_achievement,
+                                    0                             budget_year_achievement,
+                                    0                             last_year_achievement,
+                                    0                             year_achievement_includejf,
+                                    0                             last_year_achievement_includejf,
+                                    0                             year_sales_area,
+                                    0                             last_year_sales_area,
+                                    0                             year_gross_profit,
+                                    0                             year_notax,
+                                    0                             budget_all_year_gross_profit,
+                                    0                             budget_all_year_notax,
+                                    0                             budget_all_year_achievement,
+                                    sum(case
+                                            when replace(stat_month, '-', '') =
+                                                 to_char(to_date(P_DATE), 'yyyyMM')
+                                                then prediction
+                                            else 0 end)           predition_month_achievement
+                             from upload.upload_achievement_prediction_t a
+                                      left join dm.dm_rpt_sales_group_t b on a.org_code = b.node_name9
+                                      left join (select distinct category, category_name
+                                                 from dwimd.dwi_md_data_material_general_t) c
+                                                on a.category_code = c.category
+                                      left join upload.upload_business_analysis_channel_t e
+                                                on a.ct_channel_code = e.channel_code
+                             where node_name3 = 'H03230618'
+                               and node_name4 not in ('H03230613', 'H04240301')
+                               and node_name5 not in ('H03230612', 'H03230605')
+                               and node_name9 not in ('R2T', 'REQ')
+                               and node_name6!='H03230627'
+                               and a.ct_channel_code is not null
+                               and prod_property='A0001'
+                               and (product_series_name in ('918', '超大板')
+                                 )
+                               and data_source != 'U'
+                               and replace(stat_month, '-', '') = to_char(to_date(P_DATE), 'yyyyMM')
+                             group by level1, level2, level3, prod_type, channel, channel_name
+                         ) aa
+                    group by level1, channel, channel_name, prod_type, level2, level3
+                )
+                select coalesce(level1, z.node_desc3) || coalesce(bb.channel_name, zz.channel_name) l1,
+                       coalesce(level2, z.node_desc4) || coalesce(bb.channel_name, zz.channel_name) l2,
+                       coalesce(level3, z.node_desc5) || coalesce(bb.channel_name, zz.channel_name) l3,
+                       coalesce(cc.category_name, aa.category_code) || aa.specification             prod_type,
+                       coalesce(channel, zz.channel_code)                                           channel,
+                       sum(month_achievement)                                                       month_achievement,
+                       sum(budget_month_achievement)                                                budget_month_achievement,
+                       sum(last_month_achievement)                                                  last_month_achievement,
+                       sum(last_year_month_achievement)                                             last_year_month_achievement,
+                       sum(month_achievement_includejf)                                             month_achievement_includejf,
+                       sum(last_month_achievement_includejf)                                        last_month_achievement_includejf,
+                       sum(last_year_month_achievement_includejf)                                   last_year_month_achievement_includejf,
+                       sum(month_sales_area)                                                        month_sales_area,
+                       sum(last_month_sales_area)                                                   last_month_sales_area,
+                       sum(last_year_month_sales_area)                                              last_year_month_sales_area,
+                       sum(month_gross_profit)                                                      month_gross_profit,
+                       sum(last_month_gross_profit)                                                 last_month_gross_profit,
+                       sum(month_notax)                                                             month_notax,
+                       sum(last_month_notax)                                                        last_month_notax,
+                       sum(year_achievement)                                                        year_achievement,
+                       sum(budget_year_achievement)                                                 budget_year_achievement,
+                       sum(last_year_achievement)                                                   last_year_achievement,
+                       sum(year_achievement_includejf)                                              year_achievement_includejf,
+                       sum(last_year_achievement_includejf)                                         last_year_achievement_includejf,
+                       sum(year_sales_area)                                                         year_sales_area,
+                       sum(last_year_sales_area)                                                    last_year_sales_area,
+                       sum(year_gross_profit)                                                       year_gross_profit,
+                       sum(year_notax)                                                              year_notax,
+                       sum(budget_all_year_gross_profit)                                            budget_all_year_gross_profit,
+                       sum(budget_all_year_notax)                                                   budget_all_year_notax,
+                       sum(budget_all_year_achievement)                                             budget_all_year_achievement,
+                       aa.seq                                                                       顺序,
+                       P_DATE                                                                       calday,
+                       current_timestamp,
+                       aa.category_code,
+                       aa.specification,
+                       sum(predition_month_achievement)                                             predition_month_achievement,
+                       case
+                           when coalesce(cc.category_name, aa.category_code) || aa.specification in ('715规格', '大规格')
+                               then 1
+                           else 0 end
+                from upload.upload_group_main_category_specification_t aa
+                         left join (select distinct node_desc3,
+                                                    case
+                                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                                            then node_desc4 end node_desc4,
+                                                    case
+                                                        when node_name4 in ('H04230600', 'H04230655', 'H04230672', 'H04230685')
+                                                            then case
+                                                                     when node_name4 in ('H04230685') then
+                                                                         case
+                                                                             when node_name5 in ('Z031', 'Z033')
+                                                                                 then node_desc5
+                                                                             else node_desc4
+                                                                             end
+                                                                     when node_name4 in ('H04230600') then case
+                                                                                                               when node_desc5 like '%运营中心%'
+                                                                                                                   then node_desc5
+                                                                         end
+                                                                     when node_name4 in ('H04230655') then case
+                                                                                                               when node_desc5 like '%子公司%'
+                                                                                                                   then node_desc5
+                                                                         end
+                                                                     else node_desc5
+                                                            end end             node_desc5
+                                    from dm.dm_rpt_sales_group_t
+                                    where node_name3 = 'H03230618'
+                                      and node_name4 not in ('H03230613', 'H04240301')
+                                      and node_name5 not in ('H03230612', 'H03230605')
+                                      and node_name9 not in ('R2T', 'REQ')
+                                      and node_name6!='H03230627'
+                                      and node_desc4 != node_desc3
+                                      and node_desc5 != node_desc4
+                                      and length(node_name5) > 3) z on 1 = 1
+                         left join (select distinct channel_code, channel_name
+                                    from upload.upload_business_analysis_channel_t
+                                    where channel_type = '整合渠道1'
+                                    union all
+                                    select 'GD00', '') zz on 1 = 1
+                         left join (select level1,
+                                           channel,
+                                           channel_name,
+                                           level2,
+                                           level3,
+                                           prod_type,
+                                           month_achievement,
+                                           budget_month_achievement,
+                                           last_month_achievement,
+                                           last_year_month_achievement,
+                                           month_achievement_includejf,
+                                           last_month_achievement_includejf,
+                                           last_year_month_achievement_includejf,
+                                           month_sales_area,
+                                           last_month_sales_area,
+                                           last_year_month_sales_area,
+                                           month_gross_profit,
+                                           last_month_gross_profit,
+                                           month_notax,
+                                           last_month_notax,
+                                           year_achievement,
+                                           budget_year_achievement,
+                                           last_year_achievement,
+                                           year_achievement_includejf,
+                                           last_year_achievement_includejf,
+                                           year_sales_area,
+                                           last_year_sales_area,
+                                           year_gross_profit,
+                                           year_notax,
+                                           budget_all_year_gross_profit,
+                                           budget_all_year_notax,
+                                           budget_all_year_achievement,
+                                           predition_month_achievement
+                                    from data
+                                    where 1 = 1
+                                    union all
+                                    select level1,
+                                           'GD00'                                     channel,
+                                           ''                                         channel_name,
+                                           level2,
+                                           level3,
+                                           prod_type,
+                                           sum(month_achievement)                     month_achievement,
+                                           sum(budget_month_achievement)              budget_month_achievement,
+                                           sum(last_month_achievement)                last_month_achievement,
+                                           sum(last_year_month_achievement)           last_year_month_achievement,
+                                           sum(month_achievement_includejf)           month_achievement_includejf,
+                                           sum(last_month_achievement_includejf)      last_month_achievement_includejf,
+                                           sum(last_year_month_achievement_includejf) last_year_month_achievement_includejf,
+                                           sum(month_sales_area)                      month_sales_area,
+                                           sum(last_month_sales_area)                 last_month_sales_area,
+                                           sum(last_year_month_sales_area)            last_year_month_sales_area,
+                                           sum(month_gross_profit)                    month_gross_profit,
+                                           sum(last_month_gross_profit)               last_month_gross_profit,
+                                           sum(month_notax)                           month_notax,
+                                           sum(last_month_notax)                      last_month_notax,
+                                           sum(year_achievement)                      year_achievement,
+                                           sum(budget_year_achievement)               budget_year_achievement,
+                                           sum(last_year_achievement)                 last_year_achievement,
+                                           sum(year_achievement_includejf)            year_achievement_includejf,
+                                           sum(last_year_achievement_includejf)       last_year_achievement_includejf,
+                                           sum(year_sales_area)                       year_sales_area,
+                                           sum(last_year_sales_area)                  last_year_sales_area,
+                                           sum(year_gross_profit)                     year_gross_profit,
+                                           sum(year_notax)                            year_notax,
+                                           sum(budget_all_year_gross_profit)          budget_all_year_gross_profit,
+                                           sum(budget_all_year_notax)                 budget_all_year_notax,
+                                           sum(budget_all_year_achievement)           budget_all_year_achievement,
+                                           sum(predition_month_achievement)           predition_month_achievement
+                                    from data
+                                    where level1 in ('国内营销系统')
+                                    group by level1, level2, level3, prod_type
+                ) bb on coalesce(aa.category_code, '#') || coalesce(aa.specification, '#') = bb.prod_type
+                    and coalesce(z.node_desc3, '#') = bb.level1
+                    and coalesce(z.node_desc4, '#') = bb.level2 and
+                        coalesce(z.node_desc5, '#') = bb.level3
+                    and coalesce(bb.channel_name, '#') = coalesce(zz.channel_name, '#')
+                         left join (select distinct category, category_name
+                                    from dwimd.dwi_md_data_material_general_t) cc on aa.category_code = cc.category
+                where aa.division_code = 'H11000001'
+                group by l1, l2, l3, coalesce(cc.category_name, aa.category_code) || aa.specification, channel,
+                         zz.channel_code, 顺序,
+                         aa.category_code,
+                         aa.specification;
+            end loop;
+    end ;
+$$

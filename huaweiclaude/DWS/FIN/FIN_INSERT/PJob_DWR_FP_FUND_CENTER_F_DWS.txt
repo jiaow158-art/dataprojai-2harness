@@ -1,0 +1,20 @@
+DELETE FROM 
+  DWRFIN.DWR_FP_FUND_CENTER_F;
+INSERT INTO 
+  DWRFIN.DWR_FP_FUND_CENTER_F
+SELECT
+  TMP.ENABLE_END_DATE,           
+  TMP.FUND_CENTER_CODE,          
+  TMP.FINANCIAL_MANAGEMENT_SCOPE,
+  TMP.GROUP_NUM,                 
+  TMP.INPUT_DATE,                
+  TMP.LAST_UPDATE_DATE,          
+  TMP.CREATER_NAME,              
+  TMP.ENABLE_START_DATE,         
+  TMP.LAST_MODIFIER_ID,          
+  TMP.OWNER_ID,                  
+  TMP.OBJECT_NUM,                
+  TMP.OWNER_NAME,                
+  TMP.DEL_FLAG,                  
+  TMP.DW_LAST_UPDATE_DATE 
+FROM DWRFIN.DWR_FP_FUND_CENTER_TMP TMP;

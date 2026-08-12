@@ -1,0 +1,815 @@
+--SQL性能优化设置
+--修改建议:签收时间状态需要看回单的状态；运输距离（半径）同时保留原有的数值
+-- update 增加合并发货单号 
+--alter table DM.DM_LTC_ORDER_PLAN_SIGN_T add columns (merge_do_no varchar(128))
+--alter table DM.DM_LTC_ORDER_PLAN_SIGN_T add columns (merge_plan_no varchar(128)) 
+-- alter table DM.DM_LTC_ORDER_PLAN_SIGN_T add columns (LADDER string)
+-- alter table DM.DM_LTC_ORDER_PLAN_SIGN_T add columns (ELEVATOR string)
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(DELIVER_GOODS_WEIGHT_merge decimal(38, 10) )
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(gross_weight_merge decimal(38, 10) )
+-- 部分手工单没有sap提货单，从路由信息表获取提货节点日期
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(recp_audit_datetime string )
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(handling_fee decimal(38, 10) comment '搬运费' )
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(SYB STRING comment '事业部' )
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(BK STRING comment '板块' )
+-- alter table dm.DM_LTC_ORDER_PLAN_SIGN_T add columns(sta_weight decimal(38, 10) comment '统计运量，用于处理子公司物流和总部运单取值不一致问题' )
+-- update from huangwenbin 2025-10-20 代码优化：解决数据倾斜问题
+set
+	hive.cbo.enable = true;
+
+set
+	hive.mapjoin.smalltable.filesize = 100000000;
+
+set
+	hive.auto.convert.join.noconditionaltask.size = 200000000;
+
+set
+	hive.mapred.local.mem = 4096;
+
+with
+	salesman1 as (
+		SELECT
+			a.sal_vch_num,
+			concat_ws(',', collect_list(a.person_num)) as salesman_num,
+			concat_ws(',', collect_list(b.nachn)) salesman_name
+		FROM
+			DWROTD.DWR_SO_SAL_PARTNER_SAP_F a
+			left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.person_num = b.pernr
+		where
+			a.group_num = '800'
+			and a.partner_func = 'VE'
+			AND a.DEL_FLAG = 'N'
+		group by
+			a.sal_vch_num
+	),
+	salesman2 as (
+		select
+			kunnr,
+			vkorg,
+			vtweg,
+			spart,
+			concat_ws(',', collect_list(a.pernr)) as salesman_num,
+			concat_ws(',', collect_list(b.nachn)) salesman_name
+		from
+			sdi.sdi_knvp_1001 a
+			left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.pernr = b.pernr
+		where
+			a.mandt = '800'
+			and a.pernr <> '00000000'
+		group by
+			kunnr,
+			vkorg,
+			vtweg,
+			spart
+	),
+	order_group as (
+		SELECT
+			a.VBELN,
+			a.zso_group,
+			b.sg_describe AS ZSO_GROUP_NAME,
+			row_number() over (
+				partition by
+					a.VBELN
+			) as rn
+		FROM
+			SDI.SDI_ZVBAK_1001 a
+			join SDI.SDI_ZGATHERING_SG_1001 b On a.zso_group = b.so_group
+	),
+	SIGN_data01 as (
+		SELECT
+			TO1.ORDERTYPE AS ORDER_TYPE, -- 订单类型
+			T1.NAME AS ORDER_TYPE_NAME, -- 订单类型名称
+			'' as OSS_ORDER_NUM, -- ,DPS.OSS_ORDER_NUM, -- 销售订单头编码
+			'' as PLAN_ORDER_NUM, ---DPS.PLAN_ORDER_NUM, -- 计划订单头编码
+			'' as PLAN_ORDER_ITEM_NUM, ---DPS.PLAN_ORDER_ITEM_NUM, -- 计划订单行编码
+			TD.DO_NO AS TMS_NO, -- 运单号
+			TD.STATUS AS TMS_STATUS, --运单状态
+			T2.NAME AS TMS_STATUS_NAME, --运单状态名称
+			TDD.DO_LINENO AS TMS_LINE_NO, --运单明细
+			TD.ORDER_NO, --订单单号
+			TO1.EXTERNAL_ORDER_CODE, -- 订单的外部订单号
+			TDD.ORDER_LINENO, --订单明细行号
+			TDD.EXTERNNO, --SAP单号
+			TDD.EXTERNLINENO, --SAP提货单行号
+			TD.PLAN_NO, -- 发运计划号
+			TDD.SAP_PLAN_NO, --SAP装载计划号
+			TDD.SALEORDER_NO, --SAP销售订单号
+			TDD.PROJECT_PLAN, --SAP项目计划号
+			TD.WBS AS WBS_NUM, -- WBS编号
+			T3.POST1 AS WBS_NAME, --WBS项目名称
+			TDD.QUANTITY AS DEMAND_QTY, -- 需求数量
+			TO1.REQUEST_DELIVERY_DATE AS DEMAND_DATE, -- 需求时间
+			T6.MATERIAL_ID, --物料ID
+			TDD.SKU_CODE AS MATERIAL_NUM, -- 物料编码
+			T6.MATERIAL_NAME, --物料名称
+			T6.LENGTH_1, --长度
+			T6.WIDTH, --宽度
+			T6.DIMENSION, --规格
+			T6.EXTERNAL_MATL_GROUP_CODE, --外部物料组
+			T6.MATL_GROUP_CODE, --物料组
+			T6.PRODUCT_LEVEL_CODE, --产品层次
+			T6.RESERVED_FIELD_1 AS PRODUCT_CHANNEL_CODE, --产品渠道编码
+			T7.CONFIG_NAME AS PRODUCT_CHANNEL_NAME, --产品渠道名称
+			TD.WMS_PICKING_STATUS, --WMS拣货状态
+			TD.ENTRYDT AS CREATE_DATE, --创建时间
+			TD.CARGO_OWNER_CODE, --运营中心编码
+			TD.SHIPPER_CODE, --发货方编码
+			TD.CARRIER_NAME, --承运商
+			TD.CARRIER_CODE, --承运商编码
+			TD.LOADING_SITE_CODE, --提货站点
+			TD.LOADING_SITE_NAME, --提货站点名称
+			TD.LOADING_ADDR, --提货详实地址
+			TD.UNLOADING_SITE_CODE, --卸货站点编码
+			TD.UNLOADING_SITE_NAME, --卸货站点名称
+			TD.SHIP_METHOD, --运输方式编码
+			TD.OUTSOURCING, --三方订单
+			TD.PICKING_LOCATION, --拣货地点
+			TD.DESCRIPTION, --备注
+			TD.RMS_FLAG, --退货订单
+			TD.SUSR7 AS CABINET_NUMBER, --柜号
+			TD.SUSR8 AS WOODEN_FRAME_QTY, --木架数量
+			TD.SUSR9 AS DELIVER_REQUIREMENT, --发货要求
+			TD.EXPRESS_NO, --承运商面单号
+			TD.LOADING_CONTACT, --提货联系人
+			TD.LOADING_PHONE, --提货联系人电话
+			s3.STREET_NAME AS LOADING_PROVINCE, --提货省
+			s4.STREET_NAME AS LOADING_CITY, --提货市
+			s5.STREET_NAME AS LOADING_COUNTY, --提货区
+			s6.STREET_NAME AS LOADING_TOWN, --提货镇
+			TD.UNLOADING_CONTACT, --卸货联系人1
+			TD.UNLOADING_PHONE, --卸货联系电话1
+			s1.STREET_NAME AS UNLOADING_PROVINCE, --卸货省份
+			s2.STREET_NAME AS UNLOADING_CITY, --卸货城市
+			s9.STREET_NAME AS UNLOADING_COUNTY, --卸货区县
+			s10.STREET_NAME AS UNLOADING_TOWN, --卸货乡镇
+			TD.PLAN_SHIP_DATE, --计划提货时间
+			TD.DEMAND_ARRIVE_DATE, --计划到货时间
+			TD.SHIP_LINE, --路线编码
+			TD.COST_CENTER, --成本中心
+			TD.ACTUAL_SHIP_DATE, --实际发运时间
+			TD.ACTUAL_ARRIVE_DATE, --实际送达时间
+			TD.REQUEST_DELIVERY_DATE, --要求到货日期
+			TD.TOTAL_GOODS_PIECE, --总件数
+			TD.ACTUAL_GOODS_PIECE, --实际件数
+			TD.TOTAL_GOODS_COLUME, --总体积
+			TD.ACTUAL_GOODS_COLUME, --实际总体积
+			TD.TOTAL_ROUGH_WEIGHT, --总体重
+			TD.ACTUAL_ROUGH_WEIGHT, --实际总毛重
+			TD.TOTAL_NET_WEIGHT, --总净重
+			TD.ACTUAL_NET_WEIGHT, --实际总净重
+			TD.TOTAL_BOXES, --总箱数
+			TD.ACTUAL_BOXES, --实际总箱数
+			TD.TOTAL_GOODS_AMOUNTS, --总金额
+			TD.ACTUAL_GOODS_AMOUNTS, --实际金额
+			TD.OWNER_CODE, --货主编码
+			TD.OWNER_NAME, --货主名称
+			TD.SETTLEMENT_METHOD, --结算方式
+			T4.CUST_ID, -- 客户ID
+			TD.CUSTOMER_CODE, --客户编码
+			T4.CUST_NAME, --客户名称
+			T4.ADDRESS_NAME, --客户所在地址
+			TD.SUSPENDDESCRIPTION, --暂挂描述
+			TD.SUSPENDREASON, --暂挂原因编码
+			TD.DELIVERY_TAG, --发货标记
+			TD.ALLOCATECODE, --分配策略
+			TD.WAREHOUSEKEY, --仓库编码
+			TD.COMPANY_ID, --公司ID
+			TD.REGIONAL, --收货所属大区
+			TD.CAR_TYPE, --包车车型
+			TD.SPECIAL_CAR, --是否专车
+			TD.REQUETSTID, --OA流程ID
+			TD.MACHINING_NOTES, --加工备注
+			TD.MACHINING_NO, --加工单号 
+			TD.ACTUAL_REVEIVED_QUANTITY, --实际运输量
+			TDD.WEIGHT, --净重
+			TDD.ACTUAL_FREIGHT_QUANTITY, --实运量
+			TDD.TENANT_ID, --租户号
+			TDD.SKU_TYPE_CODE, --物料类型名称
+			TDD.VOLUME, --体积
+			TDD.PRICE, --价格
+			TDD.AMOUNT, --金额
+			TDD.GROSS_WEIGHT, --重量
+			TDD.BOXES, --箱数
+			TDD.LOTNO, --批次
+			TDD.COST_CENTER_CODE, --成本中心编码
+			T5.FACTORY_ID AS FACTORY_WERKS_ID, --工厂ID
+			TDD.FACTORY_CODE, -- 工厂代码
+			T5.FACTORY_NAME AS FACTORY_WERKS_NAME, --工厂名称
+			TDD.STORAGE_LOCATION, -- 库存地
+			TDD.WEIGHTUNIT, -- 单位
+			TD.UNLOADING_ADDR AS RECEIVING_ADDR, -- 收货地址
+			S1.STREET_NAME AS RECEIVING_PROVINCE, -- 收货省
+			S2.STREET_NAME AS RECEIVING_CITY, -- 收货市
+			S9.STREET_NAME AS RECEIVING_COUNTY, -- 收货县
+			TDD.LICENSE_PLATE_NO, -- 车牌号
+			TDD.DRIVER_NAME, -- 司机名字
+			TDD.DRIVER_PHONE, -- 司机电话
+			TDD.LICENSENO, -- 司机证件
+			TRD.RECEIPT_NO, -- 回单号
+			TRD.OPERATOR AS SIGN_BY, -- 回单签收人 （确认什么状态下为签收）
+			TRD.OPER_DATETIME AS SIGN_DATE, -- 回单签收时间    （确认什么状态下为签收）
+			TRD.ERP_NO AS TMS_PICK_NO, -- TMS提货单号
+			TO1.MANUAL_SINGLE_CATEGORY, --手工单类别
+			TO1.MANUAL_SMALL_CLASS, --手工单小类
+			TO1.STOCK_UP_AREA, --备货区
+			TO1.SALE_LINEGROUP, --销售组编码
+			TO1.PAYER_METHOD, --付款方方式
+			TO1.DRAWER_CODE, --开票公司编码
+			TO1.PAYER, --付款方名称
+			TO1.MACHININGER, --加工方式
+			TO1.DEPARTMENT_CODE, --部门编码
+			TO1.LOADING_METHOD, --提货方式
+			CURRENT_TIMESTAMP () AS DW_LAST_UPDATE_DATE, -- 同步数据时间
+			(
+				CASE
+					WHEN ((td.mileage / 1000) > 1000) THEN '>1000KM'
+					WHEN (
+						((td.mileage / 1000) >= 500)
+						AND ((td.mileage / 1000) <= 1000)
+					) THEN '500-1000KM'
+					ELSE '<500KM'
+				END
+			) AS transportation_radius_type, --运输半径类型
+			(
+				CASE
+					WHEN (tdd.quantity = 0) THEN 0
+					WHEN tdd.do_no IN ('Y0000008023', 'Y0000008015', 'Y0000008016') THEN -- 异常单据源系统处理不了
+					(
+						(
+							tdd.actual_freight_quantity * (tdd.gross_weight / tdd.quantity)
+						) / 1000 / 1000
+					)
+					ELSE (
+						(
+							tdd.actual_freight_quantity * (tdd.gross_weight / tdd.quantity)
+						) / 1000
+					)
+				END
+			) AS deliver_goods_weight, --发货重量
+			T8.descr AS ship_methodname, --运输方式名称
+			T9.descr AS order_department, --运营部名称
+			T10.costcenter_name AS cost_center_name, --成本中心名称
+			to1.TMS_PAY_METHOD,
+			td.CARRIER_DATA as CARRIER_DATE, -- 承运日期
+			T11.BILL_TOTAL AS TOTAL_FREIGHT_FEE, -- 总运费
+			td.susr3 as merge_do_no,
+			t12.PLAN_NO_merge as merge_plan_no,
+			-- added by yangjunhua 
+			to1.orderdate as tms_order_date,
+			T15.name as is_unloading, -- 是否卸货
+			to1.`status` as tms_order_status,
+			t13.name as tms_order_status_name,
+			trdb.OPERATOR as busi_sign_by, -- 业务签收人
+			trdb.OPER_DATETIME as busi_sign_date, -- 业务签收时间
+			DPS.reference_bill_num as landingbill_ref_bill_num,
+			DPS.reference_proj_num as landingbill_ref_proj_num,
+			DPS.create_date as landing_create_date,
+			DPS.create_by as landing_create_by,
+			vbap.ORDER_GROUP,
+			vbap.ORDER_GROUP_NAME,
+			vbap.salesman_num_list,
+			vbap.salesman_name_list,
+			vbap.vkgrp as sales_grp,
+			vbap.vtweg as sales_channel_code,
+			vbrp.invoice_num_list,
+			tdd.obligate_no as resb_num, -- 预留单
+			T14.line_name AS TMS_LINE_NAME,
+			T16.name AS lift_method, -- 搬楼方式
+			EMP.NACHN as landingbill_create_by_name, -- 提单创建者
+			coalesce(
+				concat(
+					substr(DPSH.ACTUAL_GOODS_MOVE_DATE, 1, 10),
+					' ',
+					substr(DPSH.SHIPPING_TIME_IST, 1, 2),
+					':',
+					substr(DPSH.SHIPPING_TIME_IST, 3, 2),
+					':',
+					substr(DPSH.SHIPPING_TIME_IST, 5, 2)
+				),
+				T17.trace_dt
+			) as ACTUAL_GOODS_MOVE_DATE, -- 交货日期
+			vbap.vkorg as sales_org, -- 销售组织
+			trdb.busi_sign_status_name, -- 签收状态
+			td.LADDER,
+			td.ELEVATOR,
+			to1.IS_ALL_INCLUSIVE,
+			case
+				when to1.IS_ALL_INCLUSIVE = '1' then '是'
+				else '否'
+			end as IS_ALL_INCLUSIVE_NAME,
+			t11.freight_fee, -- 运费
+			t11.unloading_fee, -- 缺货费
+			t11.send_fee, -- 送货费
+			t11.parking_fee, -- 倒车费
+			t11.loading_fee, -- 提货费
+			t11.other_fee, -- 其他费用
+			t11.ladder_fee, -- 步梯楼层费
+			t11.site_fee, -- 点费
+			t11.elevator_fee, -- 电梯楼层费
+			t11.move_fee, -- 平移费
+			t11.handling_fee, -- 搬运费
+			trd.recp_audit_datetime -- 回单审核时间
+		FROM
+			SDI.SDI_tms_do_detail_1005 tdd -- 运单行表
+			JOIN SDI.SDI_tms_do_1005 td -- 运单头表
+			ON td.do_no = tdd.do_no
+			and td.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_order_1005 to1 -- 运单订单头表
+			ON td.order_no = to1.code
+			and to1.del_flag = 'N'
+			LEFT JOIN dwiotd.DWI_WM_LADINGBILL_ITEM_T DPS -- 提货单数据
+			ON TDD.EXTERNNO = DPS.DELIVERY
+			AND TDD.EXTERNLINENO = DPS.DELIVERY_PROJECT
+			LEFT JOIN DWIMD.DWI_HR_OA_PERNR_INFO_T EMP on DPS.create_by = EMP.PERNR
+			LEFT JOIN dwiotd.DWI_WM_LADINGBILL_HEADER_T DPSH oN TDD.EXTERNNO = DPSH.DELIVERY
+			LEFT JOIN (
+				select
+					a.vbeln,
+					-- a1.posnr,
+					a.vkorg,
+					a.vtweg,
+					coalesce(b.salesman_num, c.salesman_num) as salesman_num_list,
+					coalesce(b.salesman_name, c.salesman_name) as salesman_name_list,
+					d.zso_group as ORDER_GROUP,
+					d.ZSO_GROUP_NAME as ORDER_GROUP_NAME,
+					e.vkgrp
+				from
+					sdi.sdi_vbak_1001 a
+					--join sdi.sdi_vbap_1001 a1 ON a1.vbeln = a.vbeln
+					left join salesman1 b ON a.vbeln = b.sal_vch_num
+					left join salesman2 c ON a.kunnr = c.kunnr
+					and a.vkorg = c.vkorg
+					and a.vtweg = c.vtweg
+					and a.spart = c.spart
+					left join order_group d ON a.vbeln = d.vbeln
+					and d.rn = 1
+					left join sdi.sdi_KNVV_1001 e On a.kunnr = e.kunnr
+					and a.vkorg = e.vkorg
+					and a.vtweg = e.vtweg
+					and a.spart = e.spart
+			) vbap ON DPS.reference_bill_num = vbap.VBELN --and  DPS.reference_proj_num = vbap.posnr 
+			LEFT JOIN (
+				select
+					vgbel,
+					vgpos,
+					concat_ws(',', collect_list(vbeln)) as invoice_num_list
+				from
+					sdi.sdi_vbrp_1001
+				group by
+					vgbel,
+					vgpos
+			) VBRP ON TDD.EXTERNNO = VBRP.vgbel
+			AND TDD.EXTERNLINENO = VBRP.vgpos
+			LEFT JOIN (
+				-- 物流回单
+				select
+					trd.do_no,
+					trd.do_lineno,
+					TR1.RECEIPT_NO, -- 回单号
+					TR1.OPERATOR, -- 签收人 （确认什么状态下为签收）
+					TR1.OPER_DATETIME, -- 签收时间    （确认什么状态下为签收）
+					TRD.ERP_NO, -- TMS提货单号
+					case
+						when tr1.status <> '01' then tr1.updatedt
+					end as recp_audit_datetime,
+					row_number() over (
+						partition by
+							trd.do_no,
+							trd.do_lineno
+						order by
+							tr1.oper_datetime desc
+					) as rn
+				from
+					SDI.sdi_tms_receipt_detail_1005 trd -- 回单行表
+					LEFT JOIN SDI.SDI_tms_receipt_1005 TR1 -- 回单主表
+					on TR1.receipt_no = trd.receipt_no
+					and TR1.del_flag = 'N'
+				where
+					trd.del_flag = 'N'
+			) TRD ON TRD.do_no = TDD.do_no
+			and TRD.do_lineno = TDD.do_lineno
+			and TRD.rn = 1
+			LEFT JOIN (
+				-- 客户签收
+				select
+					tr1.do_no,
+					trd.do_lineno,
+					TR1.RECEIPT_NO, -- 回单号
+					TR1.OPERATOR, -- 签收人 （确认什么状态下为签收）
+					TR1.OPER_DATETIME, -- 签收时间    （确认什么状态下为签收）
+					-- TRD.ERP_NO,  -- TMS提货单号
+					row_number() over (
+						partition by
+							tr1.do_no,
+							trd.do_lineno
+						order by
+							tr1.oper_datetime desc
+					) as rn,
+					tcode.name as busi_sign_status_name
+				from
+					SDI.sdi_tms_receipt_business_detail_1005 trd -- 回单行表
+					left join SDI.SDI_tms_receipt_business_1005 TR1 -- 回单主表
+					on TR1.receipt_no = trd.receipt_no
+					left join sdi.sdi_plat_code_1005 tcode ON TR1.status = tcode.code
+					and tcode.TYPENAME = 'RECEIPTORDERSTATUS'
+			) trdb ON TRDB.do_no = TDD.do_no
+			and TRDB.do_lineno = TDD.do_lineno
+			and TRDB.rn = 1
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s1 -- 省市区街道四及联动基础数据表
+			ON td.unloading_province = s1.street_code
+			and S1.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s2 ON td.unloading_city = s2.street_code
+			and S2.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s3 ON td.loading_province = s3.street_code
+			and S3.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s4 ON td.loading_city = s4.street_code
+			and S4.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s5 ON td.loading_county = s5.street_code
+			and S5.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s6 ON td.loading_town = s6.street_code
+			and S6.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s9 ON td.UNLOADING_COUNTY = s9.street_code
+			and S9.del_flag = 'N'
+			LEFT JOIN SDI.SDI_tms_site_street_1005 s10 ON td.UNLOADING_TOWN = s10.street_code
+			and s10.del_flag = 'N'
+			LEFT JOIN sdi.sdi_plat_code_1005 T1 -- TMS配置表
+			ON to1.ordertype = T1.CODE
+			AND t1.typename = 'TMS_ORDER_TYPE'
+			and t1.del_flag = 'N'
+			LEFT JOIN sdi.sdi_plat_code_1005 T2 -- TMS配置表
+			ON td.STATUS = T2.CODE
+			AND t2.typename = 'TRANSORDERSTATUS'
+			and t2.del_flag = 'N'
+			LEFT JOIN SDI.SDI_PRPS_1001 T3 -- wbs
+			ON case when coalesce(td.WBS,'$$$') <> '$$$' then td.WBS else concat(rand(10),'#*#') end = t3.posid
+			AND t3.DEL_FLAG = 'N'
+			LEFT JOIN DWRDIM.DWR_DIM_CUST_GENERAL_D T4 -- 客户
+			ON td.CUSTOMER_CODE = T4.cust_num
+			and t4.end_date = '4712-12-31'
+			LEFT JOIN DWRDIM.DWR_DIM_FACTORY_D t5 -- 工厂
+			ON tdd.FACTORY_CODE = t5.factory_code
+			and t5.end_date = '4712-12-31'
+			LEFT JOIN DWRDIM.DWR_DIM_MATERIAL_GENERAL_D t6 -- 物料
+			ON tdd.sku_code = t6.MATERIAL_NUM
+			AND t6.END_DATE = '4712-12-31'
+			LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R t7 -- 配置表
+			ON t6.RESERVED_FIELD_1 = t7.SRC_SYS_CONFIG_CODE
+			AND t7.SOURCE_CODE = 'ZTYL01'
+			LEFT JOIN sdi.sdi_plat_code_1005 T8 -- TMS配置表
+			ON td.ship_method = T8.CODE
+			AND T8.typename = 'TMS_SHIPMETHOD'
+			and T8.del_flag = 'N'
+			LEFT JOIN SDI.SDI_plat_partner_1005 T9 ON TD.susr4 = T9.partner_key
+			AND T9.trade_type = 'ORDER_DEPARTMENT'
+			AND T9.del_flag = 'N'
+			LEFT JOIN SDI.SDI_bms_costcenter_1005 T10 ON tdd.cost_center_code = T10.costcenter_code
+			LEFT JOIN (
+				SELECT
+					BILL_ORDER_NO,
+					SOURCE_ORDER_LINENO,
+					SUM(BILL_TOTAL) AS BILL_TOTAL,
+					SUM(
+						CASE
+							WHEN fee_no = 'T001' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS freight_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T002' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS unloading_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T003' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS send_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T004' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS parking_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T005' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS loading_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T006' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS other_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T016' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS ladder_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T019' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS site_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T017' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS elevator_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T018' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS move_fee,
+					SUM(
+						CASE
+							WHEN fee_no = 'T020' THEN BILL_TOTAL
+							ELSE 0
+						END
+					) AS handling_fee
+				FROM
+					SDI.SDI_BMS_BILL_RESULT_TMS_1005
+				GROUP BY
+					BILL_ORDER_NO,
+					SOURCE_ORDER_LINENO
+					--运费、卸货费、送货费、倒车费、提货费、其他费用、步梯楼层费、点费、电梯楼层费、平移费
+			) T11 ON TDD.DO_NO = T11.BILL_ORDER_NO
+			AND TDD.DO_LINENO = T11.SOURCE_ORDER_LINENO
+			LEFT JOIN sdi.sdi_tms_transport_plan_1005 t12 ON td.plan_no = t12.plan_no
+			LEFT JOIN sdi.sdi_plat_code_1005 T13 -- TMS配置表
+			ON to1.status = T13.CODE
+			AND T13.typename = 'TMS_ORDER_STATUS'
+			and T13.del_flag = 'N'
+			LEFT JOIN SDI.sdi_tms_line_1005 T14 ON TD.SHIP_LINE = T14.line_code
+			LEFT JOIN sdi.sdi_plat_code_1005 T15 -- TMS配置表
+			ON to1.is_unloading = T15.CODE
+			AND T15.typename = 'IS_OR_NOT_PULL_LIST'
+			and T15.del_flag = 'N'
+			LEFT JOIN sdi.sdi_plat_code_1005 T16 -- TMS配置表
+			ON td.susr12 = T16.CODE
+			AND T16.typename = 'WAY_UPSTAIRS'
+			and T16.del_flag = 'N'
+			LEFT JOIN ( -- 部分手工单没有sap提货单，从路由信息表获取提货节点日期
+				SELECT
+					do_no,
+					max(trace_dt) as trace_dt
+				FROM
+					SDI.SDI_TMS_TRACE_LOG_1005 tl
+				where
+					trans_node = 55
+				group by
+					do_no
+			) T17 ON tdd.do_no = t17.do_no
+		where
+			tdd.del_flag = 'N'
+	),
+	SIGN_data02 as (
+		select
+	t.order_type,
+	t.order_type_name,
+    t.oss_order_num,
+    t.plan_order_num,
+    t.plan_order_item_num,
+    t.tms_no,
+    t.tms_status,
+    t.tms_status_name,
+    t.tms_line_no,
+    t.order_no,
+    t.external_order_code,
+    t.order_lineno,
+    t.externno,
+    t.externlineno,
+    t.plan_no,
+    t.sap_plan_no,
+    t.saleorder_no,
+    t.project_plan,
+    t.wbs_num,
+    t.wbs_name,
+    t.demand_qty,
+    t.demand_date,
+    t.material_id,
+    t.material_num,
+    t.material_name,
+    t.length_1,
+    t.width,
+    t.dimension,
+    t.external_matl_group_code,
+    t.matl_group_code,
+    t.product_level_code,
+    t.product_channel_code,
+    t.product_channel_name,
+    t.wms_picking_status,
+    t.create_date,
+    t.cargo_owner_code,
+    t.shipper_code,
+    t.carrier_name,
+    t.carrier_code,
+    t.loading_site_code,
+    t.loading_site_name,
+    t.loading_addr,
+    t.unloading_site_code,
+    t.unloading_site_name,
+    t.ship_method,
+    t.outsourcing,
+    t.picking_location,
+    t.description,
+    t.rms_flag,
+    t.cabinet_number,
+    t.wooden_frame_qty,
+    t.deliver_requirement,
+    t.express_no,
+    t.loading_contact,
+    t.loading_phone,
+    t.loading_province,
+    t.loading_city,
+    t.loading_county,
+    t.loading_town,
+    t.unloading_contact,
+    t.unloading_phone,
+    t.unloading_province,
+    t.unloading_city,
+    t.unloading_county,
+    t.unloading_town,
+    t.plan_ship_date,
+    t.demand_arrive_date,
+    t.ship_line,
+    t.cost_center,
+    t.actual_ship_date,
+    t.actual_arrive_date,
+    t.request_delivery_date,
+    t.total_goods_piece,
+    t.actual_goods_piece,
+    t.total_goods_colume,
+    t.actual_goods_colume,
+    t.total_rough_weight,
+    t.actual_rough_weight,
+    t.total_net_weight,
+    t.actual_net_weight,
+    t.total_boxes,
+    t.actual_boxes,
+    t.total_goods_amounts,
+    t.actual_goods_amounts,
+    t.owner_code,
+    t.owner_name,
+    t.settlement_method,
+    t.cust_id,
+    t.customer_code,
+    t.cust_name,
+    t.address_name,
+    t.suspenddescription,
+    t.suspendreason,
+    t.delivery_tag,
+    t.allocatecode,
+    t.warehousekey,
+    t.company_id,
+    t.regional,
+    t.car_type,
+    t.special_car,
+    t.requetstid,
+    t.machining_notes,
+    t.machining_no,
+    t.actual_reveived_quantity,
+    t.weight,
+    t.actual_freight_quantity,
+    t.tenant_id,
+    t.sku_type_code,
+    t.volume,
+    t.price,
+    t.amount,
+    t.gross_weight,
+    t.boxes,
+    t.lotno,
+    t.cost_center_code,
+    t.factory_werks_id,
+    t.factory_code,
+    t.factory_werks_name,
+    t.storage_location,
+    t.weightunit,
+    t.receiving_addr,
+    t.receiving_province,
+    t.receiving_city,
+    t.receiving_county,
+    t.license_plate_no,
+    t.driver_name,
+    t.driver_phone,
+    t.licenseno,
+    t.receipt_no,
+    t.sign_by,
+    t.sign_date,
+    t.tms_pick_no,
+    t.manual_single_category,
+    t.manual_small_class,
+    t.stock_up_area,
+    t.sale_linegroup,
+    t.payer_method,
+    t.drawer_code,
+    t.payer,
+    t.machininger,
+    t.department_code,
+    t.loading_method,
+    t.dw_last_update_date,
+    t.transportation_radius_type,
+    t.deliver_goods_weight,
+    t.ship_methodname,
+    t.order_department,
+    t.cost_center_name,
+    t.tms_pay_method,
+    t.carrier_date,
+    t.total_freight_fee,
+    t.merge_do_no,
+    t.merge_plan_no,
+    t.tms_order_date,
+    t.is_unloading,
+    t.tms_order_status,
+    t.tms_order_status_name,
+    t.busi_sign_by,
+    t.busi_sign_date,
+    t.landingbill_ref_bill_num,
+    t.landingbill_ref_proj_num,
+    t.landing_create_date,
+    t.landing_create_by,
+    t.order_group,
+    t.order_group_name,
+    t.salesman_num_list,
+    t.salesman_name_list,
+    t.sales_grp,
+    t.sales_channel_code,
+    t.invoice_num_list,
+    t.resb_num,
+    t.tms_line_name,
+    t.lift_method,
+    t.landingbill_create_by_name,
+    t.actual_goods_move_date,
+    t.sales_org,
+    t.busi_sign_status_name,
+    t.ladder,
+    t.elevator,
+    t.is_all_inclusive,
+    t.is_all_inclusive_name,
+    t.freight_fee,
+    t.unloading_fee,
+    t.send_fee,
+    t.parking_fee,
+    t.loading_fee,
+    t.other_fee,
+    t.ladder_fee,
+    t.site_fee,
+    t.elevator_fee,
+    t.move_fee,
+    t.handling_fee,
+    t.recp_audit_datetime,
+			sum(T.DELIVER_GOODS_WEIGHT) over (
+				partition by
+					coalesce(t.merge_plan_no, t.plan_no, t.tms_no)
+			) as DELIVER_GOODS_WEIGHT_merge,
+			sum(T.GROSS_WEIGHT / 1000) over (
+				partition by
+					coalesce(t.merge_plan_no, t.plan_no, t.tms_no)
+			) as gross_weight_merge,
+			t3.cost_center_name_2 as SYB,
+			case
+				when t.ORDER_TYPE_NAME like '%城配%' then '城配'
+				when t3.cost_center_name_2 = '瓷砖事业部'
+				and coalesce(T.WBS_NUM, t2.wbs_num) in ('KM') then '自营工程'
+				when t3.cost_center_name_2 = '瓷砖事业部'
+				and (
+					(
+						t3.cost_center_name_3 = '国内经销板块'
+						and t3.cost_center_name_4 = '工程市场中心'
+					)
+					or t3.cost_center_name_3 in ('战略工程应收追缴项目组')
+				) then '自营工程'
+				when t3.cost_center_name_2 = '瓷砖事业部'
+				and (
+				    (T4.ENG_DEPARTMENT is not NULL
+					   OR T5.ENG_DEPARTMENT IS NOT null) 
+				) then '自营工程'
+				when t3.cost_center_name_2 = '瓷砖事业部'
+				and (t3.cost_center_name_3 IN( '国内直营板块') or t3.cost_center_name_4='区域运营中心' ) then '直营板块'
+				else '其他'
+			end as BK -- 板块
+		from
+			SIGN_data01 t
+			left join dm.dm_ltc_order_plan_stockup_t t2 ON t.externno = t2.delivery_no
+			and t.externlineno = t2.delivery_project
+			left join dwimd.dwi_md_cost_center_info_t t3 on concat('DP00', t.cost_center_code) = t3.zcost_center
+			LEFT JOIN sdi.sdi_engineering_department_t_1037 t4 ON T.ORDER_DEPARTMENT = T4.ENG_DEPARTMENT
+			LEFT JOIN sdi.sdi_engineering_department_t_1037 t5 ON T.COST_CENTER_NAME = T5.ENG_DEPARTMENT
+	)
+INSERT
+	OVERWRITE TABLE DM.DM_LTC_ORDER_PLAN_SIGN_T
+SELECT
+	t.*,
+	case
+		when t.BK = '直营板块' then T.GROSS_WEIGHT / 1000
+		else DELIVER_GOODS_WEIGHT
+	end as sta_weight
+FROM
+	SIGN_data02 t;

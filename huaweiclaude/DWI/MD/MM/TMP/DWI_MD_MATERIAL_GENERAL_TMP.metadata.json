@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_MATERIAL_GENERAL_TMP",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/MM/TMP",
+    "description": "物料主数据（财务数据）临时表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

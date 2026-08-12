@@ -1,0 +1,74 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/05/18 13:56:24 GMT+08:00
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DWRHR.DWR_HR_EMP_ENTRY_INFO_F PARTITION(STAT_MONTH)
+SELECT
+       A.BEGDA AS STAT_DATE --统计日期
+      ,A.PERNR AS EMP_NUM --员工工号
+      ,A.NACHN AS EMP_NAME --姓名
+      ,A.STAT1_T AS EMP_STATUS_NAME --岗位状态
+      ,A.SEX AS GENDER --性别
+      ,A.ZZ_XXL AS ED_NAME --学历
+      ,A.PBTXT AS PERS_AREA_NAME --人事范围
+      ,A.BTEXT AS PERS_SUB_AREA_NAME --人事子范围
+      ,A.PTEXT AS EMP_GROUP_NAME --员工组
+      ,A.PTEXT1 AS EMP_SUB_GROUP_NAME --员工子组
+      ,A.ZZ_ZWJB_TEXT AS EMP_POST_LVL_NAME --职务级别
+	  ,B.LVL1_DEPT_SHORT_NAME AS LVL1_DEPT_NAME --一级部门名称
+	  ,B.LVL2_DEPT_SHORT_NAME AS LVL2_DEPT_NAME --二级部门名称
+      ,A.ORGEHL1_TXT AS LVL3_DEPT_NAME --三级部门名称
+      ,A.ORGEHL2_TXT AS LVL4_DEPT_NAME --四级部门名称
+      ,A.ORGEHL3_TXT AS LVL5_DEPT_NAME --五级部门名称
+      ,A.ORGEHL4_TXT AS LVL6_DEPT_NAME --六级部门名称
+      ,A.ORGEHL5_TXT AS LVL7_DEPT_NAME --七级部门名称
+      ,A.ORGEHL6_TXT AS LVL8_DEPT_NAME --八级部门名称
+      ,A.ORGEH_TXT AS DEPT_NAME --部门
+      ,A.PLANS_TXT AS EMP_POST_NAME --岗位
+      ,A.STELL_TXT AS EMP_POST_SUB_NAME --职务
+      ,A.BEGDA AS ENTRY_DATE --入职日期
+      ,A.MNTXT AS ENTRY_TYPE --入职类型
+      ,A.MGTXT AS ENTRY_REASON --入职原因
+      ,A.ZZ_NLD	AS AGE_SECTN --年龄段
+      ,A.ZZ_RZCS AS ENTRY_CNT --入职次数
+      ,A.ZZ_HKXZ_T AS RSDN_TYPE_NAME --户口性质
+      ,A.ZZ_LS_T AS HAND_TYPE --利手
+      ,A.SCHKZ AS SHIFT_CODE --工作班次
+      ,A.SCHKZ_T AS SHIFT_TYPE --工作班次文本
+      ,A.USRID AS PHONE_NUM --联系电话
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,A.ZZ_GWSX_TEXT AS EMP_POST_ATTR_NAME --岗位属性
+	  ,CASE WHEN SUBSTR(A.BEGDA,1,7) <= '2023-05' THEN C.MPO_CAT_TYPE
+	        ELSE A.ZZ_ZWLBWB
+			 END AS EMP_POST_TYPE_NAME --职族
+	  ,CASE WHEN LENGTH(ZZ_ZJXX) = 18
+	        THEN ROUND(DATEDIFF(CAST(BEGDA AS DATE)
+                               ,CAST(SUBSTR(ZZ_ZJXX,7,4)||'-'||SUBSTR(ZZ_ZJXX,11,2)||'-'||SUBSTR(ZZ_ZJXX,13,2) AS DATE)
+                               )/365)
+             END AS AGE --年龄，入职日期减去身份证的出生日期除以365天，进行四舍五入
+	  ,SUBSTR(A.BEGDA,1,7) AS STAT_MONTH --统计月份  
+  FROM SDI.SDI_ZHRTPA001_01_1001 A
+  LEFT JOIN DWRDIM.DWR_DIM_SAP_DEPT_INFO_F B
+    ON A.ORGEHL1_TXT = B.DEPT_SHORT_NAME
+   AND B.DEPT_LEVEL = 3
+   AND SUBSTR(A.BEGDA,1,7) = B.STAT_MONTH
+  LEFT JOIN SDI.SDI_EHR_EMP_MPO_1037 C
+    ON SUBSTR(A.BEGDA,1,4) = C.STAT_YEAR
+   AND A.PERNR = C.EMP_NUM
+   AND SUBSTR(A.BEGDA,1,7) <= '2023-05' --2023年5月及以前的职族用填报的
+ WHERE SUBSTR(A.BEGDA,1,7) IN(
+      SELECT SUBSTR(A.BEGDA,1,7)
+	    FROM SDI.SDI_ZHRTPA001_01_1001 A
+	   WHERE A.ZUDATE >= REPLACE('${PERIOD_ID_D}','-','')
+     )
+  AND A.MANDT = 800

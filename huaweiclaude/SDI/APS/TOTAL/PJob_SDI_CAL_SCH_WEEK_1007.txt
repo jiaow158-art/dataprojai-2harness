@@ -1,0 +1,24 @@
+insert overwrite table sdi.sdi_cal_sch_week_1007
+select 
+id,
+active_date,
+create_by,
+create_date,
+fri,
+inv_org_id,
+is_phantom,
+mon,
+name,
+sat,
+scheme_id,
+shift_type_id,
+sun,
+sync_id,
+thu,
+tue,
+update_by,
+update_date,
+wed,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_cal_sch_week_1007;

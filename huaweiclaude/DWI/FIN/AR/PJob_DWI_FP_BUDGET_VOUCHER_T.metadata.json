@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_FP_BUDGET_VOUCHER_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "基金管理预算凭证行 (分录凭证)",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

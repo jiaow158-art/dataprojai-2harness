@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_TRA_RESV_DTL_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "一单到底自营工程预约表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

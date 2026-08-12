@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_SO_TKT_RCV_OSS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

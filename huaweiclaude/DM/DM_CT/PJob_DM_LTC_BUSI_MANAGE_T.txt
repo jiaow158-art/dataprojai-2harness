@@ -1,0 +1,155 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/09/29 09:17:44 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+delete from dm.dm_ltc_busi_manage_t where stat_month = substr('${PERIOD_ID_D}',1,7);
+insert into dm.dm_ltc_busi_manage_t
+with tmp as (
+select 
+ z_gcbbh
+,min(calmonth) as calmonth 
+,sum(case when calmonth = substr('${PERIOD_ID_D}',1,7) then ambperformance else 0 end) as ambperformance
+,sum(case when calmonth between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) 
+and substr('${PERIOD_ID_D}',1,7) then ambperformance else 0 end) as ambperformance1
+,sum(case when calmonth = substr('${PERIOD_ID_D}',1,7) then zxsmj else 0 end) as zxsmj
+from dm.dm_ambv2_zzt_xssr_t 
+where z_gcbbh is not null and nvl(ambperformance,0) <> 0
+and data_source not in ('D','U')
+group by 
+z_gcbbh
+)
+,tmp0 as (
+select distinct 
+ substr('${PERIOD_ID_D}',1,7) as stat_month
+,T1.busi_stage_name
+,T.province_name
+,T.city_name
+,T.region_name
+from DWRLTC.DWR_PROJ_BUSI_GATHER_T T 
+join (select 'S1' as busi_stage_name union all select 'S2' union all select 'S3' union all select 'S4' union all select 'S5' ) T1 on 1=1
+where substr(busi_succ_date,1,7) between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) and substr('${PERIOD_ID_D}',1,7)
+and T.data_source = 'CRM' and T.dept_code = '1' and (T.is_bx <> '是' or T.is_bx is null )
+)
+,tmp1 as (
+select 
+ substr('${PERIOD_ID_D}',1,7) as stat_month
+,T.busi_stage_name
+,T.province_name
+,T.city_name
+,T.region_name
+,SUM(case when  busi_stage_name in ('S1','S2','S3','S4','S5') then 1 else 0 end) as RN
+from DWRLTC.DWR_PROJ_BUSI_GATHER_T T
+where substr(busi_succ_date,1,7) between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) and substr('${PERIOD_ID_D}',1,7)
+and T.data_source = 'CRM' and T.dept_code = '1' and (T.is_bx <> '是' or T.is_bx is null )
+group by 
+ T.busi_stage_name
+,T.province_name
+,T.city_name
+,T.region_name
+)
+,tmp2 as (
+SELECT 
+ substr('${PERIOD_ID_D}',1,7) as stat_month 
+,case when T.busi_stage_name = 'SX_INVALID' then 'SX' else T.busi_stage_name end busi_stage_name ---商机阶段
+,T.province_name -- 省
+,T.city_name --市
+,T.region_name --区
+,T.proj_major_cate_name
+,sum(case when substr(T.state_value_end_date,1,10) > last_day('${PERIOD_ID_D}') 
+and (T.apply_staus_name <> '供货完毕' or T.apply_staus_name is null)  then 1 else 0 end) as val_busi_qty  --有效商机数
+,sum(case when substr(T.busi_succ_date,1,7) = substr('${PERIOD_ID_D}',1,7) then 1 else 0 end) as new_busi_qty  --新增商机数 
+,sum(case when T.busi_stage_name in ('SX','SX_INVALID') and substr(T.state_value_end_date,1,7) = substr('${PERIOD_ID_D}',1,7) then 1 else 0 end) as im_busi_qty  --输单商机数
+,sum(case when substr(T.busi_succ_date,1,7) between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) 
+and substr('${PERIOD_ID_D}',1,7) then 1 else 0 end) as M_24_NEW_BUSI_QTY --24个月内新增商机数
+,sum(case when substr(T.busi_succ_date,1,7) between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) 
+and substr('${PERIOD_ID_D}',1,7) and T1.calmonth = substr('${PERIOD_ID_D}',1,7) and nvl(T1.ambperformance,0) > 0 and T.busi_stage_name = 'S5' then 1 else 0 end) as tran_busi_qty--商机转化数
+,sum(case when substr(T.busi_succ_date,1,7) between SUBSTR(to_date('${PERIOD_ID_D}','YYYY-MM-DD') - interval '23 months',1,7) 
+and substr('${PERIOD_ID_D}',1,7) and nvl(T1.ambperformance1,0) > 0 and T.busi_stage_name = 'S5' then 1 else 0 end) as m_24_tran_busi_qty --24个月内转化商机数
+,0 as MN_24_NEW_BUSI_QTY --24个月内新增商机里本阶段以上的数量
+,sum(case when substr(T.state_value_end_date,1,10) > last_day('${PERIOD_ID_D}') 
+and (T.apply_staus_name <> '供货完毕' or T.apply_staus_name is null) then T.busi_exp_use else 0 end) as busi_exp_use --预计用量（平方米）
+,sum(case when substr(T.state_value_end_date,1,10) > last_day('${PERIOD_ID_D}') 
+and (T.apply_staus_name <> '供货完毕' or T.apply_staus_name is null) then T.predict_pur_amt else 0 end) as predict_pur_amt --预计采购金额（万元）
+,T.dept_name
+,sum(nvl(T1.ambperformance/10000,0)) as ambperformance
+,current_timestamp as dw_last_update_date 
+,sum(nvl(zxsmj,0)) as zxsmj
+,T.CUST_NUM 
+,T.CUST_NAME 
+,T.BUSI_5_LEV_DESC
+from DWRLTC.DWR_PROJ_BUSI_GATHER_T T 
+left join TMP T1
+on T.busi_code = T1.z_gcbbh
+where T.data_source = 'CRM' and T.dept_code = '1' and (T.is_bx <> '是' or T.is_bx is null )
+group by 
+ case when T.busi_stage_name = 'SX_INVALID' then 'SX' else T.busi_stage_name end 
+,T.province_name
+,T.city_name
+,T.region_name
+,T.proj_major_cate_name
+,T.dept_name
+-- ,T0.MN_24_NEW_BUSI_QTY
+,T.CUST_NUM 
+,T.CUST_NAME 
+,T.busi_5_lev_desc
+)
+select 
+ T.stat_month 
+,T.busi_stage_name ---商机阶段
+,T.province_name -- 省
+,T.city_name --市
+,T.region_name --区
+,T.proj_major_cate_name
+,T.val_busi_qty  --有效商机数
+,T.new_busi_qty  --新增商机数 
+,T.im_busi_qty  --输单商机数
+,T.M_24_NEW_BUSI_QTY --24个月内新增商机数
+,T.tran_busi_qty--商机转化数
+,T.m_24_tran_busi_qty --24个月内转化商机数
+,0 as mn_24_tran_busi_qty--24个月内新增商机里本阶段以上的数量
+,T.busi_exp_use --预计用量（平方米）
+,T.predict_pur_amt --预计采购金额（万元）
+,T.dept_name
+,T.ambperformance
+,current_timestamp as dw_last_update_date 
+,T.zxsmj
+,T.CUST_NUM 
+,T.CUST_NAME 
+,T.BUSI_5_LEV_DESC
+from tmp2 T 
+UNION ALL 
+SELECT 
+ T1.stat_month 
+,T1.busi_stage_name ---商机阶段
+,T1.province_name AS province_name -- 省
+,T1.city_name AS city_name --市
+,T1.region_name AS region_name --区
+,'' AS proj_major_cate_name
+,0 AS val_busi_qty  --有效商机数
+,0 AS new_busi_qty  --新增商机数 
+,0 AS im_busi_qty  --输单商机数
+,0 AS M_24_NEW_BUSI_QTY --24个月内新增商机数
+,0 AS tran_busi_qty--商机转化数
+,0 AS m_24_tran_busi_qty --24个月内转化商机数
+,coalesce(SUM(T.RN) over (partition by T1.province_name,T1.city_name,T1.region_name order by T1.busi_stage_name DESC),0) as mn_24_tran_busi_qty--24个月内新增商机里本阶段以上的数量
+,0 AS busi_exp_use --预计用量（平方米）
+,0 AS predict_pur_amt --预计采购金额（万元）
+,'' AS dept_name
+,0 AS ambperformance
+,current_timestamp as dw_last_update_date 
+,0 AS zxsmj
+,'' AS CUST_NUM 
+,'' AS CUST_NAME 
+,'' AS BUSI_5_LEV_DESC
+from TMP0 T1
+left join TMP1 T 
+on T.stat_month = T1.stat_month
+and T.busi_stage_name = T1.busi_stage_name
+and coalesce(T.province_name,'##') = coalesce(T1.province_name,'##')
+and coalesce(T.city_name,'##') = coalesce(T1.city_name,'##')
+and coalesce(T.region_name,'##') = coalesce(T1.region_name,'##') 

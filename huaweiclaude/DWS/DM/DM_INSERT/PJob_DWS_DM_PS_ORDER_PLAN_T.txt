@@ -1,0 +1,43 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/04/15 09:01:03 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_PS_ORDER_PLAN_T;
+INSERT INTO DM.DM_PS_ORDER_PLAN_T
+SELECT
+	id ,
+	end_time ,
+	finished_amount ,
+	finished_area ,
+	is_cancel ,
+	item_code ,
+	item_name ,
+	plan_amount ,
+	plan_area ,
+	plan_no ,
+	plan_task_detail_id ,
+	plan_task_id ,
+	process_tech_task_id ,
+	protech_num ,
+	product_area_code ,
+	product_area_id ,
+	product_area_name ,
+	product_order_code ,
+	product_order_id ,
+	promise_delivery ,
+	re_date ,
+	release_start_time ,
+	require_delivery ,
+	resource_code ,
+	resource_id ,
+	resource_name ,
+	re_state ,
+	start_time ,
+	status ,
+	is_canceled ,
+	release_end_time ,
+	area ,
+	product_property ,
+	dw_last_update_date 
+FROM DM.DM_PS_ORDER_PLAN_T_TMP;

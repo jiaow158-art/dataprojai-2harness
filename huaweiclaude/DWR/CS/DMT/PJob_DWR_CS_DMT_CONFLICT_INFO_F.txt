@@ -1,0 +1,84 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/12/27 15:56:18 GMT+08:00
+-- 新增字段：经销商名称、经销商编号、客户来源、客户来源名称、客户来源类别名称 黄文彬 2024-01-04
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_DMT_CONFLICT_INFO_F
+SELECT
+       A.ID	--主键ID
+      ,A.CONFLICT_TYPE AS CONFLCT_TYPE_CODE --冲突类型编码， 1 报备冲突 2 相似冲突
+      ,CASE WHEN A.CONFLICT_TYPE = 1 THEN '报备冲突'
+	        WHEN A.CONFLICT_TYPE = 2 THEN '相似冲突'
+			 END AS CONFLCT_TYPE_NAME --冲突类型名称
+	  ,A.CONFLICT_CODE AS CONFLCT_CODE --冲突编号
+      ,A.OPERATOR_TYPE AS OPR_TYPE_CODE --操作类型编码 1 添加客户 2 修改客户 3 修改阶段
+      ,CASE WHEN A.OPERATOR_TYPE = 1 THEN '添加客户'
+	        WHEN A.OPERATOR_TYPE = 2 THEN '修改客户'
+			WHEN A.OPERATOR_TYPE = 3 THEN '修改阶段'
+			 END AS OPR_TYPE_NAME --操作类型名称
+	  ,A.EMPLOYEE_ID AS EMP_ID --员工ID
+      ,A.EMPLOYEE_NAME AS EMP_NAME --员工名
+	  ,B.DEPT_ID AS STORE_ID --门店ID
+	  ,B.DEPT_NAME AS STORE_NAME --门店名称
+	  ,B.LVL1_DEPT_NAME --一级部门名称
+	  ,B.LVL2_DEPT_NAME --二级部门名称
+	  ,B.LVL3_DEPT_NAME --三级部门名称
+	  ,B.LVL4_DEPT_NAME --四级部门名称
+	  ,B.LVL5_DEPT_NAME --五级部门名称
+	  ,B.LVL6_DEPT_NAME --六级部门名称
+	  ,B.LVL7_DEPT_NAME --七级部门名称
+	  ,B.LVL8_DEPT_NAME --八级部门名称
+	  ,B.PROV_NAME --省份
+	  ,B.CITY_NAME --城市
+	  ,B.OUT_STORE_ID --OA门店编码
+	  ,B.BUSI_TYPE --参与业务（1.瓷砖派单、2.洁具派单、3.线下客户、4.万家灯火派单、5.装到家 6.同城项目）
+      ,A.CLIENT_ID AS CUST_ID --客户ID
+      ,A.CLIENT_NAME AS CUST_NAME --客户名
+      ,A.PHONE AS PHONE_NUM --客户电话
+      ,A.ADDRESS AS ADDR --客户地址
+      ,A.CONFLICT_CLIENT_ID AS CONFLCT_CUST_ID --冲突客户ID
+      ,A.CONFLICT_CLIENT_NAME AS CONFLCT_CUST_NAME --冲突客户名
+      ,A.CONFLICT_PHONE AS CONFLCT_PHONE_NUM --冲突客户电话
+      ,A.CONFLICT_ADDRESS AS CONFLCT_ADDR --冲突客户地址
+	  ,SUBSTR(A.CREATE_TIME,1,10) AS CREATE_DATE --创建日期
+      ,A.CREATE_TIME --创建时间
+      ,A.CREATER_ID	--创建人ID
+      ,A.CREATER_NAME --创建人名称
+      ,A.UPDATE_TIME --更新时间
+      ,A.UPDATE_ID --更新人ID
+      ,A.UPDATE_NAME --更新人名称
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+      ,F.DEALER_NAME AS DEALER_NAME --经销商名称
+	  ,F.DEALER_NO AS DEALER_NUM --经销商编号
+	  ,C.SOURCE AS CUST_SRC_CODE --客户来源
+	  ,D.NAME AS CUST_SRC_NAME --客户来源名称
+	  ,COALESCE(E.NAME,D.NAME) AS CUST_SRC_CAT_NAME --客户来源类别名称
+  FROM SDI.SDI_CLIENT_CONFLICT_TIP_LOG_1030 A
+  LEFT JOIN(SELECT *
+                  ,ROW_NUMBER() OVER(PARTITION BY EMP_ID ORDER BY DEPT_ID DESC) AS RN
+              FROM DWRDIM.DWR_DIM_DMT_EMP_INFO_D
+		   ) B
+	ON A.EMPLOYEE_ID = B.EMP_ID
+   AND B.RN = 1
+  LEFT JOIN SDI.SDI_CLIENT_INFO_1030 C
+    ON A.CLIENT_ID = C.ID
+   AND A.APP_ID = C.APP_ID
+   AND A.EP_ID = C.EP_ID 
+  LEFT JOIN SDI.SDI_CLIENT_SOURCE_INFO_1030 D
+    ON C.SOURCE = D.ID
+   AND A.EP_ID = D.EP_ID
+   AND D.DEL_FLAG = 'N'
+   AND D.DELETED = 0   
+  LEFT JOIN SDI.SDI_CLIENT_SOURCE_INFO_1030 E
+    ON D.PARENT_ID = E.ID
+   AND A.EP_ID = E.EP_ID	
+   AND E.DEL_FLAG = 'N'
+   AND E.DELETED = 0
+  LEFT JOIN DWRDIM.DWR_DIM_DMT_DEPT_INFO_D F
+    ON B.DEPT_ID = F.STORE_ID
+   AND A.APP_ID = F.APP_ID
+   AND A.EP_ID = F.EP_ID 
+ WHERE A.DELETE_FLAG = 0
+   AND A.APP_ID = 1831
+   AND A.EP_ID = 3044

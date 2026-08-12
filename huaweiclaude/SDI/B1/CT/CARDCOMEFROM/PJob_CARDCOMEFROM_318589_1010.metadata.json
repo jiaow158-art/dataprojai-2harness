@@ -1,0 +1,8 @@
+{
+    "name": "PJob_CARDCOMEFROM_318589_1010",
+    "type": "HiveSQL",
+    "directory": "/SDI/B1/CT/CARDCOMEFROM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

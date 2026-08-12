@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_PROD_STOCK_S",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "物料库存月表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

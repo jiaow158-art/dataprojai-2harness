@@ -1,0 +1,53 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002330
+-- table desc：销售渠道
+-- create time: 2022/12/07 17:30:23 GMT+08:00
+-- ******************************************************************** --
+delete
+from dm.dm_rpt_sales_channel_t
+where calmonth = to_char(current_date - 1, 'yyyyMM');
+
+
+insert into dm.dm_rpt_sales_channel_t
+select distinct
+to_char(current_date - 1, 'yyyyMM' ) as  calmonth,
+case
+    when distr_chan_code = '06' and coalesce(product_channel_code, '00') != 'G105' then '工程'   --工程：分销渠道06，产品渠道不等于G105或者为空
+    when (distr_chan_code = '06' and coalesce(product_channel_code, '00') = 'G105') or            --设计师：1.分销渠道06，产品渠道G105
+         (distr_chan_code != '06' and coalesce(product_channel_code, '00') = 'G105' and right(coalesce(plant, '00'), 2) != '80') or  --设计师：2.工厂结尾2位不等于80或者工厂为空，分销渠道不等于06，产品渠道等于G105
+         (distr_chan_code = '09' and right(plant, 2) = '80') then '设计师'  --设计师：3.工厂结尾2位等于80，分销渠道09
+    else case
+            when (right(plant, 2) != '80' or plant is null) then   
+                case
+                    when channel_unit_code = 'G103' then '大包'  --大包：1.工厂结尾2位不等于80或者工厂为空，整合渠道G103
+                    when channel_unit_code = 'G101' then '零售'  --零售：1.工厂结尾2位不等于80或者工厂为空，整合渠道不等于G103（整合渠道G101）
+                    else '零售'                                 
+				end
+            when right(plant, 2) = '80' then
+                case
+                    when distr_chan_code = '08' then '大包'    --大包：2.工厂结尾2位等于80，分销渠道08
+                    when distr_chan_code not in ('06', '08', '09') or distr_chan_code is null then '零售'   --零售：2.工厂结尾2位等于80，分销渠道不等于06,08,09或为空
+                end
+		end
+    end channel_name      --渠道（统计业绩用）
+,coalesce(distr_chan_code ,'00') as  distr_chan_code    --分销渠道
+,coalesce(product_channel_code ,'00')  as  product_chan_code   --产品渠道
+,coalesce(channel_unit_code,'00')  as  unit_channel_code    --综合渠道
+,coalesce(plant,'00')  as  factory_code    --工厂
+,CURRENT_TIMESTAMP() AS dw_last_update_date
+from 
+(
+select distinct 
+distr_chan as distr_chan_code
+,zyl01 as product_channel_code
+,zqdzh as channel_unit_code
+,plant  
+from DM.DM_RPT_GROUP_ACHIEVEMENT_AMB_T
+UNION all
+select distinct 
+distr_chan_code
+,product_channel_code
+,channel_unit_code
+,plant
+from dm.dm_rpt_sales_achievement_send_rpt_t)

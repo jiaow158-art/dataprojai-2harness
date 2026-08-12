@@ -1,0 +1,28 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：用户表
+-- create time: 2022/09/06 16:41:20 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_FR_FINE_USER_T
+SELECT ID,
+       BIRTHDAY,
+       CREATIONTYPE,
+       DESCRIPTION,
+       EMAIL,
+       ENABLE,
+       LANGUAGE,
+       LASTOPERATIONTYPE,
+       MALE,
+       MOBILE,
+       PASSWORD,
+       REALNAME,
+       USERNAME,
+       WORKPHONE,
+       REALALIAS,
+       USERALIAS,
+       TENANTID,
+       SALT,
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+       'N' AS DEL_FLAG
+  FROM SDI.SDI_FR_FINE_USER_1035

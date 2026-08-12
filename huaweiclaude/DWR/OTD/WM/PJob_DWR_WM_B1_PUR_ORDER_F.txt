@@ -1,0 +1,148 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/16 11:30:43 GMT+08:00
+-- ******************************************************************** --
+--性能优化SQL
+set hive.cbo.enable=false;				
+--set hive.mapjoin.smalltable.filesize=100000000;
+--set hive.auto.convert.join.noconditionaltask.size=200000000;
+--set hive.mapred.local.mem=4096;
+--set yarn.timeline-service.enabled=true;
+--set hive.auto.convert.sortmerge.join=false;
+--set hive.optimize.skewjoin=true;
+-- 删除临时表
+DROP TABLE IF EXISTS DWIOTD.DWR_WM_B1_PUR_ORDER_F_TMP001;
+--创建临时表并写入数据
+CREATE TABLE DWIOTD.DWR_WM_B1_PUR_ORDER_F_TMP001 AS
+SELECT 'SW'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       t1.customer_code,     -- 经销商编码
+	   t3.DocDate as pick_up_date, 		-- 提货日期
+       t3.DocNum as pick_up_num,   	-- 提货单据编号
+       t1.DocDate as task_over_date, 	-- 收货日期
+	   t1.DocNum as task_over_num, 		-- 收货单据编号
+	   t1.CardCode as supplier_num,		-- 供应商编码
+	   t1.CardName as supplier_name_cn, 	-- 供应商名称
+	   t2.ItemCode AS material_num, 	-- 物料编码
+	   t2.Dscription AS material_name, 	-- 物料名称
+	   t2.Quantity,		-- 数量
+	   t2.price , 		-- 单价
+	   t2.LineTotal, 	-- 金额合计
+	   t2.WhsCode as wm_num,		-- 仓库编号
+	   t2.BaseType as bill_type,		-- 单据类型,当basetype = 18 时, 存在预留发票 
+	   t4.U_DistNumber as batch_num, -- 批次
+	   case when t3.InvntSttus='C' then '交货' 
+	        when t3.InvntSttus='O' then '未清' 
+	        else t3.InvntSttus 
+	   end as delivery_status ,	-- '交货状态 C：交货，O：未清'
+	   t4.U_A1_BaseType as sap_bill_type, -- SAP发票类型
+	   t4.U_A1_BaseNum as sap_bill_voucher, -- SAP发票凭证
+	   t4.u_A1_baseline as sap_item_name, -- SAP行项目
+	   t4.U_warehouse as pick_up_wm,   -- 提货仓库
+	   t4.U_factory as pick_up_factory,     -- 提货工厂
+	   t4.Linestatus as line_status	 -- 行状态
+FROM DWIOTD.DWI_WM_B1_OPDN_T T1
+INNER JOIN DWIOTD.DWI_WM_b1_PDN1_T T2
+ON T1.DocEntry = T2.DocEntry
+AND t1.customer_code = t2.customer_code
+INNER JOIN DWIOTD.DWI_WM_B1_OPCH_T T3
+ON T2.BaseEntry = T3.docentry 
+AND t2.customer_code = t3.customer_code
+INNER JOIN DWIOTD.DWI_WM_B1_PCH1_T T4
+ON t3.DocEntry = T4.DocEntry 
+and t2.LineNum  = T4.LineNum 
+AND t2.customer_code = t4.customer_code
+where t1.customer_type= 'SW'
+and t2.customer_type= 'SW'
+AND T3.customer_type= 'SW'
+AND T4.customer_type= 'SW'
+UNION ALL
+SELECT 'CT'	as customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       t1.customer_code,     -- 经销商编码
+	   t3.DocDate as pick_up_date, 		-- 提货日期
+       t3.DocNum as pick_up_num,   	-- 提货单据编号
+       t1.DocDate as task_over_date, 	-- 收货日期
+	   t1.DocNum as task_over_num, 		-- 收货单据编号
+	   t1.CardCode as supplier_num,		-- 供应商编码
+	   t1.CardName as supplier_name_cn, 	-- 供应商名称
+	   t2.ItemCode AS material_num, 	-- 物料编码
+	   t2.Dscription AS material_name, 	-- 物料名称
+	   t2.Quantity,		-- 数量
+	   t2.price , 		-- 单价
+	   t2.LineTotal, 	-- 金额合计
+	   t2.WhsCode as wm_num,		-- 仓库编号
+	   t2.BaseType as bill_type,		-- 单据类型,当basetype = 18 时, 存在预留发票 
+	   t4.U_DistNumber as batch_num, -- 批次
+	   case when t3.InvntSttus='C' then '交货' 
+	        when t3.InvntSttus='O' then '未清' 
+	        else t3.InvntSttus 
+	   end as delivery_status ,	-- '交货状态 C：交货，O：未清'
+	   t4.U_A1_BaseType as sap_bill_type, -- SAP发票类型
+	   t4.U_A1_BaseNum as sap_bill_voucher, -- SAP发票凭证
+	   t4.u_A1_baseline as sap_item_name, -- SAP行项目
+	   t4.U_warehouse as pick_up_wm,   -- 提货仓库
+	   t4.U_factory as pick_up_factory,     -- 提货工厂
+	   t4.Linestatus as line_status	 -- 行状态
+FROM DWIOTD.DWI_WM_B1_OPDN_T T1
+INNER JOIN DWIOTD.DWI_WM_b1_PDN1_T T2
+ON T1.DocEntry = T2.DocEntry
+AND t1.customer_code = t2.customer_code
+INNER JOIN DWIOTD.DWI_WM_B1_OPCH_T T3
+ON T2.BaseEntry = T3.docentry 
+AND t2.customer_code = t3.customer_code
+INNER JOIN DWIOTD.DWI_WM_B1_PCH1_T T4
+ON t3.DocEntry = T4.DocEntry 
+and t2.LineNum  = T4.LineNum 
+AND t2.customer_code = t4.customer_code
+where t1.customer_type= 'CT'
+and t2.customer_type= 'CT'
+AND T3.customer_type= 'CT'
+AND T4.customer_type= 'CT';
+-- 关联物料工厂主数据
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_B1_PUR_ORDER_F
+SELECT T1.customer_type, -- 客户类型 CT:瓷砖  SW:洁具
+       T1.customer_code,     -- 经销商编码
+	   T1.pick_up_date, 		-- 提货日期
+       T1.pick_up_num,   	-- 提货单据编号
+       T1.task_over_date, 	-- 收货日期
+	   T1.task_over_num, 		-- 收货单据编号
+	   T1.supplier_num,		-- 供应商编码
+	   T1.supplier_name_cn, 	-- 供应商名称
+	   T1.material_num, 	-- 物料编码
+	   T1.material_name, 	-- 物料名称
+	   T2.matl_type_code   , -- 物料类型
+  	   T2.matl_type_name   , --物料类型名称
+       T2.product_group_code  ,-- 产品组
+  	   T2.product_group_name  , --产品组名称 
+       T2.product_classify_code  ,-- 产品分级
+       T2.product_classify_name  ,-- 产品分级名称
+       T2.product_level_code ,--  '产品层次' 
+       T2.product_level_name ,--  '产品层次名称' 
+  	   T2.product_level1_code,--   '产品层次1' 
+       T2.product_level1_name,--   '产品层次1名称' 
+       T2.product_level2_code,--   '产品层次2' 
+       T2.product_level2_name,--   '产品层次2名称' 
+       T2.product_level3_code,--   '产品层次3' 
+       T2.product_level3_name,--   '产品层次3名称'
+       T2.product_level4_code,--   '产品层次4'
+       T2.product_level4_name,--   '产品层次4名称' 
+	   t1.Quantity,		-- 数量
+	   t1.price , 		-- 单价
+	   t1.LineTotal, 	-- 金额合计
+	   T1.wm_num,		-- 仓库编号
+	   T1.bill_type,		-- 单据类型,当basetype = 18 时, 存在预留发票 
+	   T1.batch_num, -- 批次
+	   T1.delivery_status ,	-- '交货状态 C：交货，O：未清'
+	   T1.sap_bill_type, -- SAP发票类型
+	   T1.sap_bill_voucher, -- SAP发票凭证
+	   T1.sap_item_name, -- SAP行项目
+	   T1.pick_up_wm,   -- 提货仓库
+	   T1.pick_up_factory,     -- 提货工厂
+	   T1.line_status,	 -- 行状态
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   t2.material_id  -- 物料ID
+FROM DWIOTD.DWR_WM_B1_PUR_ORDER_F_TMP001 T1
+LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T_HIS T2
+ON t1.material_num = T2.material_num
+AND substring(cast(T1.task_over_date as string),1,10) >= T2.start_date
+AND substring(cast(T1.task_over_date as string),1,10) < T2.END_DATE;

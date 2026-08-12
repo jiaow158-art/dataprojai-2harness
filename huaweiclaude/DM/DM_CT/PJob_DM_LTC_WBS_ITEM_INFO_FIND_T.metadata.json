@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_WBS_ITEM_INFO_FIND_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "WBS项目信息查询",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

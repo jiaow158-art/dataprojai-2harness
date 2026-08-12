@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CS_ORDER_ALL_BUSINESS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS",
+    "description": "订单总头(包含瓷砖以及卫浴)",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrcs"
+}

@@ -1,0 +1,19 @@
+insert overwrite table sdi.sdi_net_demand_upload_1007
+select 
+id,
+begin_upload_time,
+cancel_flag,
+create_by,
+create_date,
+end_time,
+finish_flag,
+inv_org_id,
+is_process,
+order_code,
+order_line_no,
+sale_order_detail_id,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_net_demand_upload_1007;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_OTD_WM_SSSSS_T",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

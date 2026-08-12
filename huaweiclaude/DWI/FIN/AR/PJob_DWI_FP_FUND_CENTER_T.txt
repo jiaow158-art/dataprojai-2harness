@@ -1,0 +1,26 @@
+insert overwrite table  dwifin.DWI_FP_FUND_CENTER_T   --基金中心
+select 
+(case 
+when T1.DATBIS < '19000101' THEN from_unixtime(unix_timestamp('19000101','yyyyMMdd'),'yyyy-MM-dd')
+when T1.DATBIS > '47121231' THEN from_unixtime(unix_timestamp('47121231','yyyyMMdd'),'yyyy-MM-dd')
+else from_unixtime(unix_timestamp(T1.DATBIS,'yyyyMMdd'),'yyyy-MM-dd') end) AS ENABLE_END_DATE,
+T1.FICTR     AS FUND_CENTER_CODE,
+T1.FIKRS     AS FINANCIAL_MANAGEMENT_SCOPE,
+T1.MANDT     AS GROUP_NUM,
+(case 
+when T1.ERFDAT < '19000101' THEN from_unixtime(unix_timestamp('19000101','yyyyMMdd'),'yyyy-MM-dd')
+when T1.ERFDAT > '47121231' THEN from_unixtime(unix_timestamp('47121231','yyyyMMdd'),'yyyy-MM-dd')
+else from_unixtime(unix_timestamp(T1.ERFDAT,'yyyyMMdd'),'yyyy-MM-dd') end) AS INPUT_DATE,
+T1.AENDAT    AS LAST_UPDATE_DATE,
+T1.ERFNAME   AS CREATER_NAME,
+(case 
+when T1.DATAB < '19000101' THEN from_unixtime(unix_timestamp('19000101','yyyyMMdd'),'yyyy-MM-dd')
+when T1.DATAB > '47121231' THEN from_unixtime(unix_timestamp('47121231','yyyyMMdd'),'yyyy-MM-dd')
+else from_unixtime(unix_timestamp(T1.DATAB,'yyyyMMdd'),'yyyy-MM-dd') end) AS ENABLE_START_DATE,
+T1.AENNAME   AS LAST_MODIFIER_ID,
+T1.BOSSID    AS OWNER_ID,
+T1.CTR_OBJNR AS OBJECT_NUM,
+T1.BOSSNAME  AS OWNER_NAME,
+T1.DEL_FLAG,
+CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE       
+FROM SDI.SDI_FMFCTR_1001 T1;

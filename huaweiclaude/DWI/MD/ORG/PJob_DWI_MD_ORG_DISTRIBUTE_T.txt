@@ -1,0 +1,330 @@
+--  CREATE TABLE `DWIMD.DWI_MD_ORG_DISTRIBUTE_T`(
+--   `org_unit_id` int COMMENT '组织单位ID', 
+--   `employee_id` int COMMENT '员工ID', 
+--   `company_id` int COMMENT '公司ID',
+--   `group_num` string COMMENT '集团', 
+--   `comp_code` string COMMENT '公司代码', 
+--   `org_code` string COMMENT '组织码', 
+--   `org_unit_code` string COMMENT '组织单位', 
+--   `cost_center_code` string COMMENT '成本中心代码', 
+--   `employee_num` string COMMENT '员工号', 
+--   `employee_name` string COMMENT '员工姓名 (按姓和名排序)', 
+--   `work_contract_code` string COMMENT '工作合同', 
+--   `post_level_code` string COMMENT '岗位层级', 
+--   `job_clan_code` string COMMENT '职族', 
+--   `grade_code` string COMMENT '职系', 
+--   `title_code` string COMMENT '职衔', 
+--   `position_code` string COMMENT '职位', 
+--   `job_title_code` string COMMENT '职务', 
+--   `superior_post_code` string COMMENT '直接上级岗位', 
+--   `supervisors_scope_code` string COMMENT '主管人员范围', 
+--   `admin_group_code` string COMMENT '管理人员组', 
+--   `salary_scope_code` string COMMENT '工资范围', 
+--   `employee_group_code` string COMMENT '员工组', 
+--   `employee_subgroup_code` string COMMENT '员工子组', 
+--   `info_type_record_num` string COMMENT '信息类型记录号', 
+--   `sub_type` string COMMENT '子信息类型', 
+--   `object_flag` string COMMENT '对象标识', 
+--   `object_type` string COMMENT '对象类型', 
+--   `business_scope_code` string COMMENT '业务范围', 
+--   `control_scope_code` string COMMENT '控制范围', 
+--   `personnel_scope_code` string COMMENT '人事范围', 
+--   `personnel_subscope_code` string COMMENT '人事子范围', 
+--   `expiry_date_transfer` date COMMENT '转岗考察到期日期', 
+--   `inspection_period` string COMMENT '考察期绩效考核成绩', 
+--   `transfer_inspection_period` string COMMENT '转岗考察期', 
+--   `onboarding_assess_result` string COMMENT '入职转正考核成绩', 
+--   `entry_results_comprehensive` string COMMENT '入职成绩(综合制度)', 
+--   `entry_results_iso` string COMMENT '入职成绩(ISO体系)', 
+--   `probation_results` string COMMENT '试用期绩效考核成绩', 
+--   `firstlevel_unit_code` string COMMENT '一级单位代码', 
+--   `firstlevel_unit_name` string COMMENT '一级单位名称', 
+--   `secondary_unit_code` string COMMENT '二级单位代码', 
+--    `secondary_unit_name` string COMMENT '二级单位名称', 
+--   `thirdlevel_unit_code` string COMMENT '三级单位代码', 
+--   `thirdlevel_unit_name` string COMMENT '三级单位名称',
+--   `fourlevel_unit_code` string COMMENT '四级单位代码', 
+--   `fourlevel_unit_name` string COMMENT '四级单位名称',
+--   `fivelevel_unit_code` string COMMENT '五级单位代码',
+--   `fivelevel_unit_name` string COMMENT '五级单位名称',   
+--   `sixthlevel_unit_code` string COMMENT '六级单位代码', 
+--   `sixthlevel_unit_name` string COMMENT '六级单位名称', 
+--   `change_object_user_name` string COMMENT '更改对象用户的名称', 
+--   `applicant_format_name` string COMMENT '员工或申请人的格式姓名', 
+--   `last_modify_date` date COMMENT '最后更改的日期', 
+--   `del_flag` string COMMENT '删除标识', 
+--   `dw_last_update_date` timestamp COMMENT 'DW最后更新日期', 
+--   `start_date` date COMMENT '开始日期', 
+--   `end_date` date COMMENT '结束日期')  
+
+ set hive.execution.engine=spark;
+
+
+ with sdi_tmp as (      
+-- INSERT OVERWRITE TABLE DWIMD.DWI_MD_ORG_DISTRIBUTE_T   
+-- 把SDI层的数据全量拿出来
+ SELECT 
+ case when t1.pernr  is null then -9999999 else nvl(t5.org_unit_id,-999998) end org_unit_id
+,case when t1.BUKRS   is null then -9999999 else nvl(t3.employee_id,-999998) end employee_id
+,case when t1.ORGEH  is null then  -9999999 else nvl(t4.company_id ,-999998)  end company_id 
+,t1.MANDT     GROUP_NUM     
+,t1.BUKRS     COMP_CODE              		
+,t1.VDSK1     ORG_CODE               		
+,t1.ORGEH     ORG_UNIT_CODE               
+,t1.KOSTL     COST_CENTER_CODE            
+,t1.PERNR     EMPLOYEE_NUM          		
+,t1.SNAME     EMPLOYEE_NAME          		
+,t1.ANSVH     WORK_CONTRACT_CODE          
+,t1.ZZ_ZWJB   POST_LEVEL_CODE             		
+,t1.ZZ_ZWLB   JOB_CLAN_CODE        	   		
+,t1.ZZ_ZWXL   GRADE_CODE         	       		
+,t1.ZZ_ZX     TITLE_CODE                   		
+,t1.PLANS     POSITION_CODE               
+,t1.STELL     JOB_TITLE_CODE              		
+,t1.ZZ_ZJSJ   SUPERIOR_POST_CODE          		
+,t1.MSTBR     SUPERVISORS_SCOPE_CODE      		
+,t1.SBMOD     ADMIN_GROUP_CODE            		
+,t1.ABKRS     SALARY_SCOPE_CODE           		
+,t1.PERSG     EMPLOYEE_GROUP_CODE         		
+,t1.PERSK     EMPLOYEE_SUBGROUP_CODE      
+,t1.SEQNR     INFO_TYPE_RECORD_NUM   		
+,t1.SUBTY     SUB_TYPE        	   		
+,t1.OBJPS     OBJECT_FLAG        	   		
+,t1.OTYPE     OBJECT_TYPE        	   		
+,t1.GSBER     BUSINESS_SCOPE_CODE     	
+,t1.KOKRS     CONTROL_SCOPE_CODE     	   	
+,t1.WERKS     PERSONNEL_SCOPE_CODE    	
+,t1.BTRTL     PERSONNEL_SUBSCOPE_CODE     		
+,FROM_UNIXTIME(UNIX_TIMESTAMP(CASE WHEN t1.ZZ_KCDQRQ='00000000' THEN '19000101' ELSE t1.ZZ_KCDQRQ END ,'yyyymmdd'),'yyyy-mm-dd')  EXPIRY_DATE_TRANSFER       
+,t1.ZZ_KCKH   INSPECTION_PERIOD           
+,t1.ZZ_KCQ    TRANSFER_INSPECTION_PERIOD  
+,t1.ZZ_ZZCJ   ONBOARDING_ASSESS_RESULT    
+,t1.ZZ_RZCJ   ENTRY_RESULTS_COMPREHENSIVE 
+,t1.ZZ_RZCJ1  ENTRY_RESULTS_ISO        	
+,t1.ZZ_SYKH   PROBATION_RESULTS        	
+,t1.ZZ_YJDW   FIRSTLEVEL_UNIT_CODE 
+,t6.org_unit_name FIRSTLEVEL_UNIT_NAME
+,t1.ZZ_EJDW   SECONDARY_UNIT_CODE 
+,t7.org_unit_name SECONDARY_UNIT_NAME
+,t1.ZZ_SJDW   THIRDLEVEL_UNIT_CODE   
+,t8.org_unit_name THIRDLEVEL_UNIT_NAME
+,t1.ZZ_IJDW   FOURLEVEL_UNIT_CODE 
+,t9.org_unit_name FOURLEVEL_UNIT_NAME
+,t1.ZZ_WJDW   FIVELEVEL_UNIT_CODE   
+,t10.org_unit_name  FIVELEVEL_UNIT_NAME
+,t1.ZZ_LJDW   SIXTHLEVEL_UNIT_CODE 
+,t11.org_unit_name SIXTHLEVEL_UNIT_NAME
+,t1.UNAME     CHANGE_OBJECT_USER_NAME     
+,t1.ENAME     APPLICANT_FORMAT_NAME      
+,FROM_UNIXTIME(UNIX_TIMESTAMP(t1.AEDTM ,'yyyymmdd'),'yyyy-mm-dd')     LAST_MODIFY_DATE  
+,'N' DEL_FLAG
+,CURRENT_TIMESTAMP() DW_LAST_UPDATE_DATE
+,FROM_UNIXTIME(UNIX_TIMESTAMP(t1.BEGDA ,'yyyymmdd'),'yyyy-mm-dd')     START_DATE      			
+,case when  FROM_UNIXTIME(UNIX_TIMESTAMP(t1.ENDDA ,'yyyymmdd'),'yyyy-mm-dd') = '9999-12-31' then '4712-12-31' else  
+ date_add(FROM_UNIXTIME(UNIX_TIMESTAMP(t1.ENDDA ,'yyyymmdd'),'yyyy-mm-dd'),1)
+end     END_DATE       			
+FROM sdi.sdi_pa0001_1001 t1
+ left join (select group_num,emp_num,employee_id from dwimd.dwi_md_employee_basic_info_t where end_date = '4712-12-31') t3 on t1.mandt = t3.group_num and t1.pernr = t3.emp_num
+ LEFT join (select group_num,company_code,company_id from DWIMD.DWI_MD_COMPANY_T where end_date='4712-12-31') t4 on t1.mandt = t4.group_num and t1.BUKRS = t4.company_code
+ left join  dwimd.dwi_md_org_unit_t  t5 on t1.mandt = t5.group_num and t1.ORGEH = t5.org_unit_code and t5.end_date='4712-12-31'  
+ left join  dwimd.dwi_md_org_unit_t  t6 on t1.mandt = t6.group_num and t1.ZZ_YJDW = t6.org_unit_code and t6.end_date='4712-12-31'
+ left join  dwimd.dwi_md_org_unit_t  t7 on t1.mandt = t7.group_num and t1.ZZ_EJDW = t7.org_unit_code and t7.end_date='4712-12-31'
+ left join  dwimd.dwi_md_org_unit_t  t8 on t1.mandt = t8.group_num and t1.ZZ_SJDW = t8.org_unit_code and t8.end_date='4712-12-31'
+ left join  dwimd.dwi_md_org_unit_t  t9 on t1.mandt = t9.group_num and t1.ZZ_IJDW = t9.org_unit_code and t9.end_date='4712-12-31'
+ left join  dwimd.dwi_md_org_unit_t  t10 on t1.mandt = t10.group_num and t1.ZZ_WJDW = t10.org_unit_code and t10.end_date='4712-12-31'
+ left join  dwimd.dwi_md_org_unit_t  t11 on t1.mandt = t11.group_num and t1.ZZ_LJDW = t11.org_unit_code and t11.end_date='4712-12-31'
+ )
+ 
+
+
+,dwi_tmp as(   
+  -- dwi层数据全量拿出来
+select 
+ org_unit_id
+,employee_id
+,company_id 
+,GROUP_NUM     
+,COMP_CODE              		
+,ORG_CODE               		
+,ORG_UNIT_CODE               
+,COST_CENTER_CODE            
+,EMPLOYEE_NUM          		
+,EMPLOYEE_NAME          		
+,WORK_CONTRACT_CODE          
+,POST_LEVEL_CODE             		
+,JOB_CLAN_CODE        	   		
+,GRADE_CODE         	       		
+,TITLE_CODE                   		
+,POSITION_CODE               
+,JOB_TITLE_CODE              		
+,SUPERIOR_POST_CODE          		
+,SUPERVISORS_SCOPE_CODE      		
+,ADMIN_GROUP_CODE            		
+,SALARY_SCOPE_CODE           		
+,EMPLOYEE_GROUP_CODE         		
+,EMPLOYEE_SUBGROUP_CODE      
+,INFO_TYPE_RECORD_NUM   		
+,SUB_TYPE        	   		
+,OBJECT_FLAG        	   		
+,OBJECT_TYPE        	   		
+,BUSINESS_SCOPE_CODE     	
+,CONTROL_SCOPE_CODE     	   	
+,PERSONNEL_SCOPE_CODE    	
+,PERSONNEL_SUBSCOPE_CODE     		
+,EXPIRY_DATE_TRANSFER
+,INSPECTION_PERIOD           
+,TRANSFER_INSPECTION_PERIOD  
+,ONBOARDING_ASSESS_RESULT    
+,ENTRY_RESULTS_COMPREHENSIVE 
+,ENTRY_RESULTS_ISO        	
+,PROBATION_RESULTS        	
+,FIRSTLEVEL_UNIT_CODE 
+,FIRSTLEVEL_UNIT_NAME
+,SECONDARY_UNIT_CODE  
+,SECONDARY_UNIT_NAME
+,THIRDLEVEL_UNIT_CODE
+,THIRDLEVEL_UNIT_NAME
+,FOURLEVEL_UNIT_CODE
+,FOURLEVEL_UNIT_NAME
+,FIVELEVEL_UNIT_CODE 
+,FIVELEVEL_UNIT_NAME
+,SIXTHLEVEL_UNIT_CODE  
+,SIXTHLEVEL_UNIT_NAME
+,CHANGE_OBJECT_USER_NAME     
+,APPLICANT_FORMAT_NAME    
+,LAST_MODIFY_DATE  
+,DEL_FLAG
+,DW_LAST_UPDATE_DATE
+,START_DATE      		
+,END_DATE       		   
+ from DWIMD.DWI_MD_ORG_DISTRIBUTE_T  )
+ 
+
+
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_ORG_DISTRIBUTE_T  
+
+-- dwi left join sdi 如果dwi存在且sdi不存在。则将DEL_FLAG改为Y
+select 
+ t1.ORG_UNIT_ID
+,t1.employee_id
+,t1.company_id 
+,t1.GROUP_NUM     
+,t1.COMP_CODE              		
+,t1.ORG_CODE               		
+,t1.ORG_UNIT_CODE               
+,t1.COST_CENTER_CODE            
+,t1.EMPLOYEE_NUM          		
+,t1.EMPLOYEE_NAME          		
+,t1.WORK_CONTRACT_CODE          
+,t1.POST_LEVEL_CODE             		
+,t1.JOB_CLAN_CODE        	   		
+,t1.GRADE_CODE         	       		
+,t1.TITLE_CODE                   		
+,t1.POSITION_CODE               
+,t1.JOB_TITLE_CODE              		
+,t1.SUPERIOR_POST_CODE          		
+,t1.SUPERVISORS_SCOPE_CODE      		
+,t1.ADMIN_GROUP_CODE            		
+,t1.SALARY_SCOPE_CODE           		
+,t1.EMPLOYEE_GROUP_CODE         		
+,t1.EMPLOYEE_SUBGROUP_CODE      
+,t1.INFO_TYPE_RECORD_NUM   		
+,t1.SUB_TYPE        	   		
+,t1.OBJECT_FLAG        	   		
+,t1.OBJECT_TYPE        	   		
+,t1.BUSINESS_SCOPE_CODE     	
+,t1.CONTROL_SCOPE_CODE     	   	
+,t1.PERSONNEL_SCOPE_CODE    	
+,t1.PERSONNEL_SUBSCOPE_CODE     		
+,t1.EXPIRY_DATE_TRANSFER
+,t1.INSPECTION_PERIOD           
+,t1.TRANSFER_INSPECTION_PERIOD  
+,t1.ONBOARDING_ASSESS_RESULT    
+,t1.ENTRY_RESULTS_COMPREHENSIVE 
+,t1.ENTRY_RESULTS_ISO        	
+,t1.PROBATION_RESULTS        	
+,t1.FIRSTLEVEL_UNIT_CODE 
+,t1.FIRSTLEVEL_UNIT_NAME
+,t1.SECONDARY_UNIT_CODE  
+,t1.SECONDARY_UNIT_NAME
+,t1.THIRDLEVEL_UNIT_CODE
+,t1.THIRDLEVEL_UNIT_NAME
+,t1.FOURLEVEL_UNIT_CODE
+,t1.FOURLEVEL_UNIT_NAME
+,t1.FIVELEVEL_UNIT_CODE 
+,t1.FIVELEVEL_UNIT_NAME
+,t1.SIXTHLEVEL_UNIT_CODE  
+,t1.SIXTHLEVEL_UNIT_NAME      		
+,t1.CHANGE_OBJECT_USER_NAME     
+,t1.APPLICANT_FORMAT_NAME    
+,t1.LAST_MODIFY_DATE  
+,case when t2.employee_NUM IS NULL THEN 'Y' else t1.DEL_FLAG end DEL_FLAG
+,t1.DW_LAST_UPDATE_DATE
+,t1.START_DATE      		
+,t1.END_DATE  
+from dwi_tmp t1 left join sdi_tmp t2 on t1.GROUP_NUM = t2.GROUP_NUM and t1.EMPLOYEE_NUM = t2.EMPLOYEE_NUM 
+			       and t1.START_DATE = t2.START_DATE and t1.END_DATE = t2.END_DATE 
+ union all 
+ -- sdi left join dwi 取dwi不存在的为新增数据
+ select 
+ t1.ORG_UNIT_ID
+,t1.employee_id
+,t1.company_id 
+,t1.GROUP_NUM     
+,t1.COMP_CODE              		
+,t1.ORG_CODE               		
+,t1.ORG_UNIT_CODE               
+,t1.COST_CENTER_CODE            
+,t1.EMPLOYEE_NUM          		
+,t1.EMPLOYEE_NAME          		
+,t1.WORK_CONTRACT_CODE          
+,t1.POST_LEVEL_CODE             		
+,t1.JOB_CLAN_CODE        	   		
+,t1.GRADE_CODE         	       		
+,t1.TITLE_CODE                   		
+,t1.POSITION_CODE               
+,t1.JOB_TITLE_CODE              		
+,t1.SUPERIOR_POST_CODE          		
+,t1.SUPERVISORS_SCOPE_CODE      		
+,t1.ADMIN_GROUP_CODE            		
+,t1.SALARY_SCOPE_CODE           		
+,t1.EMPLOYEE_GROUP_CODE         		
+,t1.EMPLOYEE_SUBGROUP_CODE      
+,t1.INFO_TYPE_RECORD_NUM   		
+,t1.SUB_TYPE        	   		
+,t1.OBJECT_FLAG        	   		
+,t1.OBJECT_TYPE        	   		
+,t1.BUSINESS_SCOPE_CODE     	
+,t1.CONTROL_SCOPE_CODE     	   	
+,t1.PERSONNEL_SCOPE_CODE    	
+,t1.PERSONNEL_SUBSCOPE_CODE     		
+,t1.EXPIRY_DATE_TRANSFER
+,t1.INSPECTION_PERIOD           
+,t1.TRANSFER_INSPECTION_PERIOD  
+,t1.ONBOARDING_ASSESS_RESULT    
+,t1.ENTRY_RESULTS_COMPREHENSIVE 
+,t1.ENTRY_RESULTS_ISO        	
+,t1.PROBATION_RESULTS        	
+,t1.FIRSTLEVEL_UNIT_CODE 
+,t1.FIRSTLEVEL_UNIT_NAME
+,t1.SECONDARY_UNIT_CODE  
+,t1.SECONDARY_UNIT_NAME
+,t1.THIRDLEVEL_UNIT_CODE
+,t1.THIRDLEVEL_UNIT_NAME
+,t1.FOURLEVEL_UNIT_CODE
+,t1.FOURLEVEL_UNIT_NAME
+,t1.FIVELEVEL_UNIT_CODE 
+,t1.FIVELEVEL_UNIT_NAME
+,t1.SIXTHLEVEL_UNIT_CODE  
+,t1.SIXTHLEVEL_UNIT_NAME     		
+,t1.CHANGE_OBJECT_USER_NAME     
+,t1.APPLICANT_FORMAT_NAME    
+,t1.LAST_MODIFY_DATE  
+,t1.DEL_FLAG
+,t1.DW_LAST_UPDATE_DATE
+,t1.START_DATE      		
+,t1.END_DATE  
+from sdi_tmp  t1 
+left join dwi_tmp t2 on t1.GROUP_NUM = t2.GROUP_NUM and t1.EMPLOYEE_NUM = t2.EMPLOYEE_NUM 
+		and t1.START_DATE = t2.START_DATE and t1.END_DATE = t2.END_DATE 
+ where t2.EMPLOYEE_NUM is null 

@@ -1,0 +1,95 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/01/10 11:23:04 GMT+08:00
+-- description:车间抛光线发砖日记录表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- create table dwrotd.dwr_pam_base_shop_brick_day_t (
+--  SITE_CODE STRING comment '工厂代码'
+-- ,WORK_SHOP_CODE STRING comment '车间代码'
+-- ,PRODUCT_LINE_CODE STRING comment '产线代码'
+-- ,GROUP_CODE	STRING comment '班组代码'
+-- ,SHIFT_DATE STRING comment '班次日期'
+-- ,SHIFT_CODE STRING comment '班次代码'
+-- ,SHIFT_START_TIME timestamp comment '班次开始时间'
+-- ,SHIFT_END_TIME	timestamp comment '班次结束时间'
+-- ,MATERIAL_NUM	STRING comment '产品代码'
+-- ,MATERIAL_NAME	STRING comment '产品名称'
+-- ,BILLET_PRODUCT_DATE STRING comment '产坯日期'
+-- ,KILN_NUM STRING comment '窑号班次'
+-- ,POLISH_PRODUCT_LINE_CODE STRING comment '抛光产线'
+-- ,WORKSHOP_BRICKS_QTY decimal(38,10) comment '车间发砖数量(片)'
+-- ,WORKSHOP_LOSS_QTY decimal(38,10) comment '车间损耗(片)'
+-- ,NUM_STORED_REPLACE_QTY decimal(38,10) comment '接班抛光线存砖数量(片)'
+-- ,NUM_STORE_REPLACE_QTY decimal(38,10) comment '交班抛光线存砖数量(片)'
+-- ,CREATER STRING comment '创建人'
+-- ,CREATE_DATE date comment '创建时间'
+-- ,UPDATER STRING comment '修改人'
+-- ,LAST_UPDATE_DATE date comment '修改时间'
+-- ,PROD_SIZE STRING comment '产品规格'
+-- ,ACTUAL_UP_BRICKS_QTY decimal(38,10) comment '实际上砖数量'
+-- ,POLISH_LOSS_QTY decimal(38,10) comment '抛光损耗'
+-- ,ACTUAL_DOWN_BRICK_QTY decimal(38,10) comment '实际下砖数量'
+-- ,POLISH_PRODUCT_LINE_NAME STRING comment '抛光产线名称'
+-- ,UNIT_AREA decimal(38,10) comment '单位面积'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+-- PARTITIONED by (
+-- `period_id_m` string )
+
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_SHOP_BRICK_DAY_T PARTITION(PERIOD_ID_M)
+SELECT
+ SITE AS SITE_CODE	--工厂代码
+,WORKSHOP AS WORK_SHOP_CODE 	--车间代码
+,PRODUCT_LINE AS PRODUCT_LINE_CODE	--线体代码
+,TEAM AS GROUP_CODE	--班组代码
+,SHIFT_DATE	--班次日期
+,SHIFT AS SHIFT_CODE--班次代码
+,SHIFT_START_TIME --班次开始时间
+,SHIFT_END_TIME	--班次结束时间
+,PRODUCT_CODE AS MATERIAL_NUM	--产品代码
+,PRODUCT_NAME AS MATERIAL_NAME	--产品名称
+,BILLET_PRODUCTION_DATE	AS BILLET_PRODUCT_DATE--产坯日期
+,KILN_NUM	--窑号班次
+,POLISHING_PRODUCTION_LINE AS POLISH_PRODUCT_LINE_CODE	--抛光产线
+,WORKSHOP_BRICKS_NUM AS WORKSHOP_BRICKS_QTY	---车间发砖数量(片)
+,WORKSHOP_LOSS	AS WORKSHOP_LOSS_QTY--车间损耗(片)
+,NUM_STORED_REPLACEMENT	AS NUM_STORED_REPLACE_QTY--接班抛光线存砖数量(片)
+,NUM_STORE_REPLACEMENT	AS NUM_STORE_REPLACE_QTY--交班抛光线存砖数量(片)
+,CREATE_BY AS CREATER	--创建人
+,CREATE_DATE	--创建时间
+,LAST_UPDATE_BY	AS UPDATER--修改人
+,LAST_UPDATE_DATE	--修改时间
+,GROUP_SPECIFICATION AS PROD_SIZE	--产品规格
+,ACTUAL_UP_BRICKS_NUM AS ACTUAL_UP_BRICKS_QTY	--实际上砖数量
+,POLISHING_LOSS	AS POLISH_LOSS_QTY--抛光损耗
+,ACTUAL_DOWN_BRICK_NUM AS ACTUAL_DOWN_BRICK_QTY	--实际下砖数量
+,POLISHING_PRODUCTION_LINE_NAME	AS POLISH_PRODUCT_LINE_NAME--抛光产线名称
+,( CASE WHEN REGEXP_EXTRACT(UPPER(GROUP_SPECIFICATION),UPPER('X'),0) = UPPER('X') THEN 
+						   SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('X'))[0]
+						WHEN REGEXP_EXTRACT(UPPER(GROUP_SPECIFICATION),UPPER('\\*'),0) = UPPER('*') THEN
+					       SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('\\*'))[0]
+					ELSE SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('X'))[0] END) *
+			 -- 长 600X600 按X拆分字段,拆前部分，可能会有*
+			( CASE WHEN REGEXP_EXTRACT(UPPER(GROUP_SPECIFICATION),UPPER('X'),0) = UPPER('X') THEN 
+						   SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('X'))[1]
+					WHEN REGEXP_EXTRACT(UPPER(GROUP_SPECIFICATION),UPPER('\\*'),0) = UPPER('*') THEN
+					       SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('\\*'))[1]
+					ELSE SPLIT(UPPER(GROUP_SPECIFICATION), UPPER('X'))[1] 
+				END) / 1000000 AS UNIT_AREA --宽
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+,SUBSTR(SHIFT_DATE,1,7) AS PERIOD_ID_M
+FROM SDI.SDI_D_SHOP_BRICK_DAY_RECORD_1006 	 
+WHERE DELETE_FLAG = 1 
+AND SHIFT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')

@@ -1,0 +1,744 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/23 08:59:46 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM 10004400 20250116 积分返点均只取收入成本表
+-- UPDATE FROM 15000571 20250120 销售数量及销售面积指标补充过滤条件，不取其他收支表数据
+-- UPDATE FROM 15000571 20250219 产品系列逻辑优化 
+-- UPDATE FROM 15000571 20250303 新增实际成本合计（剔除物流成本）指标
+-- UPDATE FROM 15000571 20250623 将第九层级做非空处理（九层级拿不到拿上层级）并新增字段
+-- UPDATE FROM 15000571 20251216 新增字段mt_height, tow_lev_channel_code, tow_lev_channel_name
+-- UPDATE FROM 15000571 20260507 整合渠道层级1逻辑优化，取填报表DM.DM_DIM_INTEGRATE_CHANNEL_D
+-- ******************************************************************** -- --
+truncate table dm.dm_fin_operations_mix_sum_t;
+with tmp as (
+select 
+t1.calmonth ,
+case when substr(t1.calday,1,8) = '00000000' then replace(t1.calmonth||'-01','-','') else substr(replace(t1.calday,'-',''),1,8) end  as calday,
+t1.distr_chan,
+t2.config_name as distr_chan__t,
+integrate_channel,  -- 缺文本
+integrate_channel_desc as integrate_channel__t,
+integrate_channel2,  -- 缺文本
+integrate_channel2_desc as integrate_channel2__t,
+t3.dimension,  -- 量纲
+t3.category,
+t3.category_name,  -- 品类描述
+t3.PRODUCT_BRAND_CODE,
+t3.PRODUCT_BRAND_NAME, --产品系列
+case 
+    when t1.distr_chan in ('06','10') and t3.product_level4_code ='3006002002' THEN '陶瓷'
+    when t9.stat_year IS NOT NULL AND t9.product_code IS NOT NULL then '浴室柜'
+    when t8.prod_line_name is null then '其他类'
+    else t8.prod_line_name END  as product_line,
+t3.product_series_name, -- 产品规格1
+t1.export_country,  -- 出口国
+--t1.country,  --缺
+--t1.country__t, --缺
+t1.zsfqc,   --是否清仓
+t1.zchanq,   -- 产区
+t1.sales_grp,
+sg.node_desc1 ,
+sg.node_name1 ,
+sg.node_desc2 ,
+sg.node_name2 ,
+sg.node_desc3 ,
+sg.node_name3 ,
+sg.node_desc4 ,
+sg.node_name4 ,
+sg.node_desc5 ,
+sg.node_name5 ,
+sg.node_desc6 ,
+sg.node_name6 ,
+sg.node_desc7 ,
+sg.node_name7 ,
+sg.node_desc8 ,
+sg.node_name8 ,
+sg.node_desc9 ,
+sg.node_name9 ,
+t1.customer ,
+t4.cust_name ,-- 客户编码的文本
+t1.wbs_elemt ,
+t1.material  as material_num,
+t3.material_name ,
+t3.basic_calc_unit_name ,
+t3.prod_property,
+t3.prod_property_name,
+t3.product_place_code,
+t3.product_place_name,
+t3.reserved_field_8,
+t3.reserved_field8_name,
+t3.faces_name,
+t3.color_name,
+t3.texture_2_name, -- 纹理
+t3.reserved_field7_name,-- 产品胚体名称
+t3.texture_1_name,--产品材质
+t3.product_listed_date,   -- t3.产品上市时间
+t3.external_matl_group_code,
+t3.external_matl_group_name,
+t3.matl_group_code ,
+t3.matl_group_name ,
+t3.product_level_code ,
+t3.product_level_name ,
+t3.product_level2_code ,
+t3.product_level2_name ,
+t3.product_level3_code ,
+t3.product_level3_name ,
+    matl_group1_code ,
+	matl_group2_code ,
+	matl_group3_code ,
+	matl_group4_code ,
+	matl_group1_name ,
+	matl_group2_name ,
+	matl_group3_name ,
+	matl_group4_name,
+-- 物料组1-4
+t1.bstnk_vf,
+t1.bstnk_vf_t,
+t1.z_zcck,
+t1.zcmc,
+t4.region_code,
+t4.region_province_name ,
+t5.works_category,
+t6.cust_group_code,
+t6.cust_group_name,
+t6.cust_group1_name,
+t6.cust_group2_name,
+t6.cust_group3_name,
+t3.reserved_field4_name,
+t3.menu_desc_name,
+t3.reserved_field1_name, -- 产品渠道名称（主档）
+t3.reserved_field6_name, -- 产品等级名称
+t3.reserved_field3_name, --  盈利分析名称（主档）
+t4.cust_mkt_segmentation_name,
+sum(t1.ambperformance) as ambperformance , -- 业绩
+sum(t1.notax_sales_net_amt) as notax_sales_net_amt,  -- 不含税销售净额
+sum(t1.gross_profit_after_sharing) as gross_profit_after_sharing, -- 分成后整体毛利额
+sum(t1.a_overall_profit_amt) as a_overall_profit_amt,   -- 标A毛利额 
+sum(t1.amb_profit_amt) as amb_profit_amt,-- 阿米巴毛利额
+sum(t1.s_zxsmj) as s_zxsmj,    -- 销售面积
+sum(t1.s_zxssl) as s_zxssl,    -- 销售数量
+sum(case when t1.infoprov='dm_zzt_xssr_qt_t' then 0 else  t1.zxsmj end ) as zxsmj,    -- 销售面积
+sum(case when t1.infoprov='dm_zzt_xssr_qt_t' then 0 else  t1.zxssl end ) as zxssl,    -- 销售数量
+sum(t1.act_cost_sum_amt) as act_cost_sum_amt,   -- 实际成本合计计算实际A单位成本
+sum(t1.standard_price_a) as standard_price_a ,  -- 计算标A单位成本
+sum(t1.amb_internal_price) as amb_internal_price,  -- 用于计算
+sum(case when t1.infoprov='dm_ambv2_profit_t' then t1.zfdje end) as zfdje ,   -- 返点
+sum(case when t1.infoprov='dm_ambv2_profit_t' then t1.zsyjf end) as zsyjf,   -- 使用积分
+sum(case when t1.infoprov='dm_ambv2_profit_t' then t1.zytjf_sg + t1.zytjf_xt end ) as zytjf  -- 预提积分
+,null as ambperformance_ys
+,null as zfdje_ys --"预算返点-集团"
+,null as zsyjf_ys --"预算使用积分-集团"
+,null as zytjf_ys --"预算预提积分-集团"
+,null as notax_sales_net_amt_ys --"预算不含税销售净额-集团"
+,null as act_cost_sum_amt_ys --"预算成本A-集团"
+,null as standard_price_a_ys --"预算标A成本-集团"
+,null as amb_internal_price_ys   --"预算阿米巴成本-集团"
+,null as s_zxsmj_ys --"预算销售面积-集团"
+,null as s_zxssl_ys --"预算销售数量-集团"
+,null::numeric as ambperformance_yc   
+,t1.data_source 
+,sum(t1.deal_price_total) as deal_price_total
+,SUM(T1.actual_cost_exclude_logistics) AS actual_cost_exclude_logistics
+from dm.dm_fin_operations_mix_t t1    
+left join (
+select src_sys_config_code,config_name from DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R 
+where lang_code ='1'
+and source_code='TVTWT'
+and group_num = 800
+) t2  on t1.distr_chan = t2.src_sys_config_code
+left join dwimd.dwi_md_data_material_general_t t3 on t1.material  = t3.material_num 
+left join dwrdim.dwr_dim_cust_general_d t4 on t1.customer   = t4.cust_num  and substr(t4.end_date,1,10)='4712-12-31' 
+left join (
+select distinct WBS_NUM ,SALES_GRP,works_category
+  from(
+   select WBS_LEVEL3 as WBS_NUM,SALES_GRP,works_category
+   from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F
+   union all 
+   select WBS_LEVEL2 as WBS_NUM,SALES_GRP,works_category
+   from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F
+   union all 
+   select WBS_LEVEL1 as WBS_NUM,SALES_GRP,works_category
+   from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F) a
+   where SALES_GRP is not null
+) t5 on t1.wbs_elemt  = t5.WBS_NUM 
+left join dwrdim.dwr_dim_cust_sales_area_d2 t6 on t1.customer  = t6.cust_num and t1.salesorg  = t6.sales_org_code and t1.distr_chan = t6.distribution_chnl_code and substr(t6.end_date,1,10)='4712-12-31' 
+left join dm.dm_rpt_sales_group_t sg on case when t1.data_source in('S','T')  then coalesce(t5.sales_grp,t6.sales_group_code  ,t1.sales_grp ) else t1.sales_grp end  = sg.node_name9
+left join dwimd.dwi_md_data_material_sales_t t7 on t1.salesorg = t7.sales_org_code and t1.material = t7.material_num and t1.distr_chan  = t7.distribution_channel_code 
+left join DM.DM_RPT_PROD_CATEGORY_T t8 on coalesce(t3.product_level3_code,t3.product_level2_code)  = t8.prod_level3_code
+left join upload.upload_sw_cabinet_basin_t t9 on t1.material = t9.product_code  and substr(t1.calmonth,1,4) = t9.stat_year
+where coalesce(t1.comp_code,'#')<>'8000'  and coalesce(t1.cust_group,'#') <> 'Z0'
+group by t1.calmonth ,
+t1.calday ,
+t1.distr_chan,
+t2.config_name ,
+integrate_channel,  -- 缺文本
+integrate_channel_desc ,
+integrate_channel2,  -- 缺文本
+integrate_channel2_desc  ,
+t3.dimension,  -- 量纲
+t3.category,
+t3.category_name,  -- 品类描述
+t3.PRODUCT_BRAND_CODE,
+t3.PRODUCT_BRAND_NAME, --产品系列
+case 
+    when t1.distr_chan in ('06','10') and t3.product_level4_code ='3006002002' THEN '陶瓷'
+    when t9.stat_year IS NOT NULL AND t9.product_code IS NOT NULL then '浴室柜'
+    when t8.prod_line_name is null then '其他类'
+    else t8.prod_line_name END ,
+t3.product_series_name, -- 产品规格1
+t1.export_country,  -- 出口国
+--t1.country,  --缺
+--t1.country__t, --缺
+t1.zsfqc,   --是否清仓
+t1.zchanq,   -- 产区
+t1.sales_grp,
+sg.node_desc1 ,
+sg.node_name1 ,
+sg.node_desc2 ,
+sg.node_name2 ,
+sg.node_desc3 ,
+sg.node_name3 ,
+sg.node_desc4 ,
+sg.node_name4 ,
+sg.node_desc5 ,
+sg.node_name5 ,
+sg.node_desc6 ,
+sg.node_name6 ,
+sg.node_desc7 ,
+sg.node_name7 ,
+sg.node_desc8 ,
+sg.node_name8 ,
+sg.node_desc9 ,
+sg.node_name9 ,
+t1.customer ,
+t4.cust_name ,-- 客户编码的文本
+t1.wbs_elemt ,
+t1.material ,
+t3.material_name ,
+t3.basic_calc_unit_name ,
+t3.prod_property,
+t3.prod_property_name,
+t3.product_place_code,
+t3.product_place_name,
+t3.reserved_field_8,
+t3.reserved_field8_name,
+t3.faces_name,
+t3.color_name,
+t3.texture_2_name, -- 纹理
+t3.reserved_field7_name,-- 产品胚体名称
+t3.texture_1_name,--产品材质
+t3.product_listed_date,   -- t3.产品上市时间
+t3.external_matl_group_code,
+t3.external_matl_group_name,
+t3.matl_group_code ,
+t3.matl_group_name ,
+t3.product_level_code ,
+t3.product_level_name ,
+t3.product_level2_code ,
+t3.product_level2_name ,
+t3.product_level3_code ,
+t3.product_level3_name ,
+    matl_group1_code ,
+	matl_group2_code ,
+	matl_group3_code ,
+	matl_group4_code ,
+	matl_group1_name ,
+	matl_group2_name ,
+	matl_group3_name ,
+	matl_group4_name,
+-- 物料组1-4
+t1.bstnk_vf,
+t1.bstnk_vf_t,
+t1.z_zcck,
+t1.zcmc,
+t4.region_code,
+t4.region_province_name ,
+t5.works_category,
+t6.cust_group_code,
+t6.cust_group_name,
+t6.cust_group1_name,
+t6.cust_group2_name,
+t6.cust_group3_name,
+t3.reserved_field4_name,
+t3.menu_desc_name,
+t3.reserved_field1_name, -- 产品渠道名称（主档）
+t3.reserved_field6_name, -- 产品等级名称
+t3.reserved_field3_name, --  盈利分析名称（主档）
+t4.cust_mkt_segmentation_name,
+t1.data_source
+union all   
+SELECT substr(a.stat_month,1,7) as "日历年/月"
+      ,replace(a.stat_month,'-','') as "日历日"
+      ,a.distribution_channel as "分销渠道"
+      ,b.vtext as "分销渠道的文本"
+      ,a.prod_channel_name as "整合渠道层级1"
+      ,k.channel_name as "整合渠道层级1的文本"
+      ,a.zqdzh23_2 as "整合渠道层级2"
+      ,case when a.zqdzh23_2 = 'GD04' then '特惠品'
+      when a.zqdzh23_2 = 'GG01' then 'N品类产品'
+	  when a.zqdzh23_2 = 'GG02' then '瓷砖产品'
+	  when a.zqdzh23_2 = 'GG03' then '大包专供产品'
+	  when a.zqdzh23_2 = 'GG05' then '非设计师产品'
+	  when a.zqdzh23_2 = 'GG06' then '零售产品'
+	  when a.zqdzh23_2 = 'GG08' then '设计师专供产品'
+	  when a.zqdzh23_2 = 'PM001' then '其他类'
+	  when a.zqdzh23_2 = 'PW009' then '卫浴其它'
+	  when a.zqdzh23_2 = 'PW002' then '小便器'
+	  when a.zqdzh23_2 = 'PW003' then '普通坐便器'
+	  when a.zqdzh23_2 = 'PW005' then '智能坐便器'
+	  when a.zqdzh23_2 = 'PW006' then '浴室家具'
+	  when a.zqdzh23_2 = 'PW008' then '淋浴器'
+	  when a.zqdzh23_2 = 'PW007' then '淋浴房类'
+	  when a.zqdzh23_2 = 'PW013' then '盆'
+	  when a.zqdzh23_2 = 'PW004' then '蹲便器'
+	  when a.zqdzh23_2 = 'PW001' then '陶瓷其它'
+	  when a.zqdzh23_2 = 'PW010' then '龙头'
+	  else tt42.value_desc
+	  end as "整合渠道层级2的文本"       
+      ,a.dimension as "大小/量纲"
+      ,a.prod_level3_name as "品类（主档）"  
+	  ,f.config_name as "品类描述-主档"
+	  ,a.series as "产品系列"
+      ,j.value_desc as "产品系列名称"
+	  ,a.product_line as "产品线"
+	  ,h.product_series_name as "产品规格1"
+	  ,'' -- 出口国
+	  ,''
+	  ,'' 
+      ,a.sale_grp_name as "销售组（客户主数据+WBS主数据）"
+     ,d.node_desc1 
+       ,d.node_name1
+       ,d.node_desc2 
+       ,d.node_name2 
+       ,d.node_desc3 
+       ,d.node_name3 
+       ,d.node_desc4
+       ,d.node_name4 
+       ,d.node_desc5 
+       ,d.node_name5 
+       ,d.node_desc6 
+       ,d.node_name6 
+       ,d.node_desc7 
+       ,d.node_name7 
+       ,d.node_desc8 
+       ,d.node_name8 
+       ,d.node_desc9 
+       ,d.node_name9 
+      ,''
+      ,''
+      ,''
+       ,''
+      ,''
+      ,''
+,a.prod_property as "产品所有权"
+      ,e.config_name as "产品所有权名称"
+ ,a.product_process as "产品工艺编码"
+       ,g.config_name as "产品工艺名称"
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''-- t3.产品上市时间
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+-- 物料组1-4
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,null   -- 业绩
+,null   -- 不含税销售净额
+,null  -- 分成后整体毛利额
+,null    -- 标A毛利额 
+,null -- 阿米巴毛利额
+,null     -- 销售面积
+,null    -- 销售数量
+,null     -- 销售面积
+,null    -- 销售数量
+,null    -- 实际成本合计计算实际A单位成本
+,null   -- 计算标A单位成本
+,null   -- 用于计算阿米巴单价
+,null    -- 返点
+,null    -- 使用积分
+,null    --
+,prod_it_amt1 as ambperformance_ys
+      , a.rebate as zfdje_ys --"预算返点-集团"
+	  ,a.prod_integral_amt as zsyjf_ys --"预算使用积分-集团"
+      ,a.withholding_integral as zytjf_ys --"预算预提积分-集团"
+      ,a.prod_it_amt as notax_sales_net_amt_ys --"预算不含税销售净额-集团"
+      ,a.a_cost as act_cost_sum_amt_ys --"预算成本A-集团"
+      ,a.standarda as standard_price_a_ys --"预算标A成本-集团"
+      ,a.ambcost as amb_internal_price_ys   --"预算阿米巴成本-集团"
+      ,a.sales_area as s_zxsmj_ys --"预算销售面积-集团"
+      ,a.quantity as s_zxssl_ys --"预算销售数量-集团"
+      ,null::numeric  as ambperformance_yc
+      ,a.data_source 
+      ,null::numeric 
+      ,null::numeric 
+  FROM UPLOAD.UPLOAD_ACHIEVEMENT_BUDGET_T a
+  left join DM.DM_SDI_TVTWT_1001_T b
+    on a.distribution_channel = b.vtweg
+   and MANDT = '800'
+   AND SPRAS = '1'
+   AND DEL_FLAG = 'N'
+  left join dm.dm_rpt_sales_group_t d
+    on a.sale_grp_name = d.node_name9  
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R e
+    on a.prod_property  = e.src_sys_config_code 
+   and e.SOURCE_CODE = 'DD07T_ZE_YL09'
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R g
+    on a.product_process  = g.src_sys_config_code 
+   and g.SOURCE_CODE = 'DD07T_ZE_CPGY'  
+  left join dwimd.dwi_md_data_material_general_t h
+    on a.material_code = h.material_num
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R f
+    on a.prod_level3_name = f.src_sys_config_code
+   and f.SOURCE_CODE = 'ZTYL10'
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R i
+    on a.series = i.src_sys_config_code
+   and i.SOURCE_CODE = 'ZC011'	
+  left join DWRDIM.DWR_DIM_MATERIAL_FIELD_DICTIONARY j 
+    on a.series = j.value_code
+    and j.mandt = 800 and j.fieldname = 'WLPP'
+    left join dwrdim.dim_material_config_t tt42 on a.zqdzh23_2 = tt42.value_code and tt42.fieldname = 'YL10'
+    left join DM.DM_DIM_INTEGRATE_CHANNEL_D k
+    on a.prod_channel_name = k.channel_code
+    and k.CHANNEL_TYPE = '整合渠道1'
+
+
+    
+    
+ where substr(a.stat_month,1,4) >= '2024' 
+ union all 
+ -- 业绩预算
+ 
+SELECT substr(a.stat_month,1,7) as "日历年/月"
+      ,replace(a.stat_month||'-01','-','') as "日历日"
+      ,a.distribution_channel_code as "分销渠道"
+      ,b.vtext as "分销渠道的文本"
+      ,ct_channel_code  -- 缺文本
+      ,i.channel_name
+      ,null as "整合渠道层级2"
+      ,null as "整合渠道层级2的文本"       
+      ,a.dimension as "大小/量纲"
+      ,a.category_code as "品类（主档）"  
+	  ,f.config_name as "品类描述-主档"
+	  ,null  as "产品系列"
+      ,null as "产品系列名称"
+	  ,null  as "产品线"
+	  ,a.product_series_name  as "产品规格1"
+	  ,'' -- 出口国
+	  ,''
+	  ,'' 
+      ,null as "销售组（客户主数据+WBS主数据）"
+      ,d.node_desc1 
+       ,d.node_name1
+       ,d.node_desc2 
+       ,d.node_name2 
+       ,d.node_desc3 
+       ,d.node_name3 
+       ,d.node_desc4
+       ,d.node_name4 
+       ,d.node_desc5 
+       ,d.node_name5 
+       ,null  
+       ,null
+       ,null
+       ,null
+       ,null
+       ,null
+       ,null
+       ,null
+      ,''
+      ,''
+      ,''
+       ,''
+      ,''
+      ,''
+,a.prod_property as "产品所有权"
+      ,e.config_name as "产品所有权名称"
+ ,null as "产品工艺编码"
+ ,null as "产品工艺名称"
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''-- t3.产品上市时间
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+-- 物料组1-4
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,''
+,null   -- 业绩
+,null   -- 不含税销售净额
+,null  -- 分成后整体毛利额
+,null    -- 标A毛利额 
+,null -- 阿米巴毛利额
+,null     -- 销售面积
+,null    -- 销售数量
+,null     -- 销售面积
+,null    -- 销售数量
+,null    -- 实际成本合计计算实际A单位成本
+,null   -- 计算标A单位成本
+,null   -- 用于计算阿米巴单价
+,null    -- 返点
+,null    -- 使用积分
+,null    --
+,null   as ambperformance_ys
+      , null as zfdje_ys --"预算返点-集团"
+	  ,null as zsyjf_ys --"预算使用积分-集团"
+      ,null as zytjf --"预算预提积分-集团"
+      ,null as notax_sales_net_amt_ys --"预算不含税销售净额-集团"
+      ,null as act_cost_sum_amt_ys --"预算成本A-集团"
+      ,null as standard_price_a_ys --"预算标A成本-集团"
+      ,null as amb_internal_price_ys   --"预算阿米巴成本-集团"
+      ,null as s_zxsmj_ys --"预算销售面积-集团"
+      ,null as s_zxssl_ys --"预算销售数量-集团"
+      ,a.prediction*10000  as ambperformance_yc
+      ,a.data_source 
+      ,null::numeric 
+      ,null::numeric 
+  FROM upload.upload_achievement_prediction_t a
+  left join DM.DM_SDI_TVTWT_1001_T b
+    on a.distribution_channel_code = b.vtweg
+   and b.MANDT = '800'
+   AND b.SPRAS = '1'
+   AND b.DEL_FLAG = 'N'
+   left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R e
+    on a.prod_property  = e.src_sys_config_code 
+   and e.SOURCE_CODE = 'DD07T_ZE_YL09'
+  /*left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R g
+    on a.product_process  = g.src_sys_config_code 
+   and g.SOURCE_CODE = 'DD07T_ZE_CPGY'  */
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R f
+    on a.category_code = f.src_sys_config_code
+   and f.SOURCE_CODE = 'ZTYL10'
+  left join  dm.dm_rpt_sales_group_t d
+    on a.org_code  = d.node_name9  
+    left join DM.DM_DIM_INTEGRATE_CHANNEL_D i
+    on a.ct_channel_code = i.channel_code
+    and i.CHANNEL_TYPE = '整合渠道1'    
+    
+  /*left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R i
+    on a.series = i.src_sys_config_code
+   and i.SOURCE_CODE = 'ZC011'	*/
+ where a.stat_month>= '2024'
+)
+
+insert into dm.dm_fin_operations_mix_sum_t
+select 
+t1.calmonth,
+t1.calday,
+t1.distr_chan,
+t1.distr_chan__t,
+t1.integrate_channel,
+t1.integrate_channel__t,
+t1.integrate_channel2,
+t1.integrate_channel2__t,
+t1.dimension,
+t1.category,
+t1.category_name,
+t1.product_brand_code,
+t1.product_brand_name,
+t1.product_line,
+t1.product_series_name,
+t2.CNTRY_REGION_NAME   ,
+t1.zsfqc,
+t1.zchanq,
+t1.sales_grp,
+node_desc1,
+node_name1,
+node_desc2,
+node_name2,
+node_desc3,
+node_name3,
+node_desc4,
+node_name4,
+node_desc5,
+node_name5,
+node_desc6,
+node_name6,
+node_desc7,
+node_name7,
+node_desc8,
+node_name8,
+node_desc9,
+-- node_name9,
+coalesce(node_name9,node_name8,node_name7,node_name6,node_name5,node_name4,node_name3,node_name2) as node_name9,
+customer,
+cust_name,
+wbs_elemt,
+t1.material_num,
+t1.material_name,
+t1.basic_calc_unit_name,
+t1.prod_property,
+t1.prod_property_name,
+t1.product_place_code,
+t1.product_place_name,
+t1.reserved_field_8,
+t1.reserved_field8_name,
+t1.faces_name,
+t1.color_name,
+t1.texture_2_name,
+t1.reserved_field7_name,
+t1.texture_1_name,
+t1.product_listed_date,
+t1.external_matl_group_code,
+t1.external_matl_group_name,
+t1.matl_group_code,
+t1.matl_group_name,
+t1.product_level_code,
+t1.product_level_name,
+t1.product_level2_code,
+t1.product_level2_name,
+t1.product_level3_code,
+t1.product_level3_name,
+t1.matl_group1_code,
+t1.matl_group2_code,
+t1.matl_group3_code,
+t1.matl_group4_code,
+t1.matl_group1_name,
+t1.matl_group2_name,
+t1.matl_group3_name,
+t1.matl_group4_name,
+t1.bstnk_vf,
+t1.bstnk_vf_t,
+t1.z_zcck,
+t1.zcmc,
+t1.region_code,
+t1.region_province_name,
+t1.works_category,
+t1.cust_group_code,
+t1.cust_group_name,
+t1.cust_group1_name,
+t1.cust_group2_name,
+t1.cust_group3_name,
+t1.reserved_field4_name,
+t1.menu_desc_name,
+t1.reserved_field1_name,
+t1.reserved_field6_name,
+t1.reserved_field3_name,
+t1.cust_mkt_segmentation_name,
+t1.ambperformance,
+t1.notax_sales_net_amt,
+t1.gross_profit_after_sharing,
+t1.a_overall_profit_amt,
+t1.amb_profit_amt,
+s_zxsmj,
+s_zxssl,
+zxsmj,
+zxssl,
+act_cost_sum_amt,
+standard_price_a,
+amb_internal_price,
+zfdje,
+zsyjf,
+zytjf,
+ambperformance_ys,
+zfdje_ys,
+zsyjf_ys,
+zytjf_ys,
+notax_sales_net_amt_ys,
+act_cost_sum_amt_ys,
+standard_price_a_ys,
+amb_internal_price_ys,
+s_zxsmj_ys,
+s_zxssl_ys,
+ambperformance_yc,
+data_source,
+deal_price_total,
+actual_cost_exclude_logistics,
+t3.cntry_region_name   ,--国家
+t4.height  as mt_height,
+t4.tow_lev_channel_code,
+t4.tow_lev_channel_name
+from  
+tmp  t1 
+left  join 
+DWRDIM.DWR_DIM_COUNTRY_NAME_D t2 
+on t1.export_country  = t2.CNTRY_REGION_CODE
+and  t2.LANGUAGE_CODE = '1'
+left join ( select distinct cntry_region_name,cust_num 
+ from dwrdim.dwr_dim_cust_general_d 
+ where 
+ end_date = '4712-12-31') t3 
+on t1.customer = t3.cust_num
+left join dwimd.dwi_md_data_material_general_t t4
+on t1.material_num  = t4.material_num 
+
+
+
+
+

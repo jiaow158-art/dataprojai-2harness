@@ -1,0 +1,194 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2025/08/18 14:07:21 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM wjh 时间<2025年8月22日> 新增江西七线
+-- ******************************************************************** -- --
+set
+	hive.cbo.enable = true;
+
+set
+	hive.mapjoin.smalltable.filesize = 100000000;
+
+set
+	hive.auto.convert.join.noconditionaltask.size = 200000000;
+
+set
+	hive.mapred.local.mem = 4096;
+
+--设置成非严格模式
+set
+	hive.exec.dynamic.partition = true;
+
+set
+	hive.exec.dynamic.partition.mode = nonstrict;
+
+with
+	FRACTIONATION_RELATION as (
+		select
+			fractionation_date,
+			FRACTIONATION_code,
+			type
+		from
+			SDI.SDI_FRACTIONATION_RELATION_1043
+		where
+			FRACTIONATION_code <> 'NULL'
+			AND FRACTIONATION_code <> 'NOREAD'
+			and fractionation_date = '${PERIOD_ID_D}'
+		group by
+			fractionation_date,
+			FRACTIONATION_code,
+			type
+	),
+	INKJET_RELATION as (
+		select
+			INKJET_code,
+			type
+		from
+			SDI.SDI_INKJET_RELATION_1043
+		where
+			INKJET_DATE >= DATE_ADD('${PERIOD_ID_D}', -6)
+			AND INKJET_DATE < DATE_ADD('${PERIOD_ID_D}', 1)
+		group by
+			INKJET_code,
+			type
+	),
+	tmp as (
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'清远三线' as asprocess1,
+			'清远三线分级工序' AS asprocess2,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('清远三线喷墨工序', '清远四线喷墨工序2', '清远四线喷墨工序3', '清远四线喷墨工序4')
+		where
+			t1.type = '清远三线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		union all
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'清远四线' asprocess,
+			'清远四线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('清远三线喷墨工序', '清远四线喷墨工序2', '清远四线喷墨工序3', '清远四线喷墨工序4')
+		where
+			t1.type = '清远四线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'清远四A' asprocess,
+			'清远四线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('清远四线喷墨工序4')
+		where
+			t1.type = '清远四线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'清远七线' asprocess,
+			'清远七线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('清远七线喷墨工序')
+		where
+			t1.type = '清远七线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'江西一线' asprocess,
+			'江西一线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('江西一线喷墨工序')
+		where
+			t1.type = '江西一线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'重庆七线' asprocess,
+			'重庆八线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('重庆八线喷墨工序')
+		where
+			t1.type = '重庆八线分级工序'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'重庆二线' asprocess,
+			'重庆二线分级工序3' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('重庆二线喷墨工序10', '重庆二线喷墨工序11', '重庆二线喷墨工序12')
+		where
+			t1.type = '重庆二线分级工序3'
+		GROUP BY
+			T1.fractionation_date
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'重庆二线' asprocess,
+			'重庆二线分级工序4' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('重庆二线喷墨工序10', '重庆二线喷墨工序11', '重庆二线喷墨工序12')
+		where
+			t1.type = '重庆二线分级工序4'
+		GROUP BY
+			T1.fractionation_date
+			
+			
+		UNION ALL
+		SELECT
+			T1.fractionation_date AS calday, --识别日期
+			'江西七线' asprocess,
+			'江西七线分级工序' AS gx,
+			COUNT(T2.INKJET_code) AS FRACTIONATION_ASCEND_QTY
+		FROM
+			FRACTIONATION_RELATION t1
+			LEFT JOIN INKJET_RELATION t2 ON T1.FRACTIONATION_code = T2.INKJET_code
+			and T2.type IN ('江西七线喷墨工序')
+		where
+			t1.type = '江西七线分级工序'
+		GROUP BY
+			T1.fractionation_date			
+	)
+insert
+	OVERWRITE table dm.dm_asprocess_detail_t PARTITION (period_id_d)
+select
+	*,
+	current_timestamp,
+	calday
+from
+	tmp

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB73",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "强商收入ZB73",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

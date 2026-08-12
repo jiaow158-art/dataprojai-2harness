@@ -1,0 +1,208 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2022/11/17 15:10:14 GMT+08:00
+-- ******************************************************************** --
+delete from dm.dm_sw_risk_INVENTORY_T WHERE stat_month = substr('${PERIOD_ID_D}',1,7);
+insert into dm.dm_sw_risk_INVENTORY_T
+with mat as (
+select b.material_num,c.matl_group2_code,
+bath_category_name as category_name
+from dwimd.dwi_md_data_material_general_t as b 
+left join (select t.material_num,max(t.matl_group2_code) as matl_group2_code from dwimd.dwi_md_data_material_sales_t_his as t 
+where start_date < last_day(to_date( concat( substr('${PERIOD_ID_D}',1,4),'-',substr('${PERIOD_ID_D}',6,2),'-','01'),'YYYY-MM-DD'))
+and end_date >= last_day(to_date( concat( substr('${PERIOD_ID_D}',1,4),'-',substr('${PERIOD_ID_D}',6,2),'-','01'),'YYYY-MM-DD'))
+group by t.material_num ) c on b.material_num = c.material_num
+left join upload.upload_wm_sw_sap_prod_grp_t as k on b.product_level3_code = k.prod_code3 
+where c.matl_group2_code = 'J10' 
+)
+,
+tmp as(
+select substr("BUDAT" ,1,6) as 月份, "MATNR" as 物料编码,"MBLNR",c.purchase_voucher_type,
+       sum(case when "BWART" in('101','911','162','123','131') and ( c.purchase_voucher_type <> 'ZSUB' or c.purchase_voucher_type is null ) and (substr("LIFNR",1,6) <> '000000' or "LIFNR" is null )--排除内部供应商
+       then  "MENGE" when "BWART" in('102','912','161','122','132') and ( c.purchase_voucher_type <> 'ZSUB' or c.purchase_voucher_type is null ) and (substr("LIFNR",1,6) <> '000000' or "LIFNR" is null ) then  -"MENGE"  else 0 end ) as 入库,--排除库存转移
+       sum(case when "BWART" in('101','911','162','123','131') and ( c.purchase_voucher_type <> 'ZSUB' or c.purchase_voucher_type is null ) and (substr("LIFNR",1,6) <> '000000' or "LIFNR" is null ) 
+       then  "DMBTR" when "BWART" in('102','912','161','122','132') and ( c.purchase_voucher_type <> 'ZSUB' or c.purchase_voucher_type is null ) and (substr("LIFNR",1,6) <> '000000' or "LIFNR" is null ) then  -"DMBTR"  else 0 end ) as 入库金额,
+       sum(case when "BWART" in('601','654') then "MENGE" when "BWART" in('602','653') then  -"MENGE"  else 0 end ) as 销售出库,
+       sum(case when "BWART" in('601','654') then  "DMBTR" when "BWART" in('602','653') then  -"DMBTR"  else 0 end ) as 销售出库金额,
+       sum(case when "BWART" IN('933','951') then  "MENGE" when "BWART" IN('934','952') then  -"MENGE"  else 0 end ) as 其他出库,
+       sum(case when "BWART" IN('933','951') then  "DMBTR" when "BWART" IN('934','952') then  -"DMBTR"  else 0 end ) as 其他出库金额,
+       sum(case when "BWART" not IN('101','911','102','912', '601','602','933','951','934','952','131','132','122','123','161','162' ) then case when "SHKZG" = 'S' then "MENGE"  else  -"MENGE"  end else 0 end) 变动
+from dm.dm_rpt_bic_azemm_o0032_t a
+left join (select distinct purchase_voucher_num,purchase_voucher_type from DWRPUR.DWR_PTP_PURCHASE_VCH_HEADER_F) c on  a."EBELN" = c.purchase_voucher_num 
+where "WERKS"  like '3%'
+and "WERKS" not like '3A%'
+and "WERKS" not like '39%'
+and substr("BUDAT" ,1,6)=regexp_replace(substr('${PERIOD_ID_D}',1,7),'\D','','g') 
+and "LGORT" is not null
+and ("KUNNR" not in ('0000322217') or "KUNNR" is null) 
+group by substr("BUDAT" ,1,6), "MBLNR", "MATNR" ,c.purchase_voucher_type
+),
+
+ZT as (
+select 
+ material_num as 物料编码
+--,stat_month
+,category_name as 品类
+,transit_num as 在途数量
+,transit_amount as 在途金额
+from dm.dm_transit_inventory_t 
+where 1 = 1
+and stat_month = regexp_replace(substr('${PERIOD_ID_D}',1,7),'\D','','g')
+
+)
+,
+tmp0 as (
+select c.prod_code as 物料编码,m.category_name as 品类, 
+	   sum(c.sales_cost)/10000 as 销售出库金额
+from dm.dm_rpt_bathroom_prodsales_s as c 
+join mat m on c.prod_code = m.material_num 
+where c.calendar_year_month = regexp_replace(substr('${PERIOD_ID_D}',1,7),'\D','','g') and c.seller_to_party <> '0000322217' and ( substr(seller_to_party,1,6) <> '000000' or seller_to_party is null )
+group by c.prod_code,m.category_name 
+),
+tmp1 as (  
+select c.prod_code as 物料编码,m.category_name as 品类, 
+	   sum( no_sto_sales_qty + sto_qty ) as 捐赠数量,
+	   sum((c.no_sto_sales_qty + c.sto_qty)*c.unit_cost) as 捐赠金额
+from dm.dm_rpt_bathroom_prodsales_s as c 
+join mat m on c.prod_code = m.material_num
+where c.calendar_year_month = regexp_replace(substr('${PERIOD_ID_D}',1,7),'\D','','g') and c.seller_to_party = '0000322217' --捐赠客编
+group by c.prod_code,m.category_name
+),
+tmp2 as(
+select coalesce(t1.物料编码, t2.物料编码) as 物料编码,
+       coalesce(t1.品类, t2.品类) as 品类,
+       coalesce(t2.月末库存数量,0) as 期初库存数量,
+       t2.月末库存金额/10000 as 期初库存金额,
+       coalesce(t1.月末库存数量,0) as 期末库存数量,
+       t1.月末库存金额/10000 as 期末库存金额,
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.入库 else 0 end as 入库, 
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.销售出库 else 0 end as 销售出库, 
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.其他出库 else 0 end as 其他出库,
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.入库金额/10000 else 0 end as 入库金额, 
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.销售出库金额/10000 else 0 end as 销售出库金额, 
+       case when t1.物料编码 is not null and t2.物料编码 is not null then  t3.其他出库金额/10000 else 0 end as 其他出库金额,
+       case when t1.物料编码 is null  then t2.月末库存数量 else 0 end as 型号剔除数量,
+       case when t1.物料编码 is null  then t2.月末库存金额 else 0 end as 型号剔除金额,
+       case when t2.物料编码 is null  then t1.月末库存数量 else 0 end as 型号新增数量,
+       case when t2.物料编码 is null  then t1.月末库存金额 else 0 end as 型号新增金额,
+       t2.月末库存金额/10000 as 上月库存金额,
+       t1.月末库存金额/10000 as 本月库存金额
+  from (
+ SELECT 物料编码,m.category_name as 品类,sum(月末库存金额+月末外协寄售金额) 月末库存金额,sum(月末库存数量+月末外协寄售数量) 月末库存数量 
+ from dm.dm_own_inventory_t a   
+ join mat m on a.物料编码 = m.material_num
+ where a."工厂" not like '39%' and a.库存月份 =regexp_replace(substr('${PERIOD_ID_D}',1,7),'\D','','g')  -- 所选月份
+ group by 物料编码,m.category_name 
+ ) t1 full outer  join 
+  (  SELECT 物料编码,m.category_name as 品类,sum(月末库存金额+月末外协寄售金额) 月末库存金额,sum(月末库存数量+月末外协寄售数量) 月末库存数量 
+ from dm.dm_own_inventory_t a   
+ join mat m on a.物料编码 = m.material_num
+ where a."工厂" not like '39%' and a.库存月份=substr(regexp_replace(concat(substr('${PERIOD_ID_D}',1,7),'-01')+ INTERVAL '-1 month','\D','','g'),1,6)  -- 所选月份上一月份
+ group by 物料编码,m.category_name
+  
+ ) t2 on t1.物料编码  = t2.物料编码
+left join (
+ select 月份, 物料编码,
+       sum(入库) as 入库,
+       sum(销售出库 ) as 销售出库,
+       sum(其他出库 ) as 其他出库,
+       sum(入库金额) as 入库金额,
+       sum(销售出库金额 ) as 销售出库金额,
+       sum(其他出库金额 ) as 其他出库金额
+from tmp
+group by 月份,物料编码
+ ) t3 on coalesce (t1.物料编码,t2.物料编码) = t3.物料编码
+ )
+ ,
+ tmp3 as(
+ select 
+ a.物料编码,a.品类,期初库存数量,期初库存金额 ,期末库存数量,期末库存金额,coalesce(b.捐赠数量,0) as 捐赠数量,coalesce(b.捐赠金额,0) as 捐赠金额,
+      入库,销售出库, 其他出库,case when 期末库存数量 <> 0 then 入库*(期末库存金额/期末库存数量) else 入库金额 end as 入库金额
+      ,c.销售出库金额, case when 期末库存数量 <> 0 then 其他出库*(期末库存金额/期末库存数量) else 其他出库金额 end as 其他出库金额
+      ,型号剔除数量,型号新增数量,上月库存金额,本月库存金额,型号剔除金额,型号新增金额,d.在途数量,d.在途金额  
+ from tmp2 a  
+ left join tmp1 b on a.物料编码 = b.物料编码 
+ left join tmp0 c on a.物料编码 = c.物料编码 
+ left join ZT d on a.物料编码 = d.物料编码 
+
+ ) 
+ ,
+ tmp4 as (
+  select 物料编码,品类,期初库存数量,期初库存金额 ,期末库存数量,期末库存金额,捐赠数量,捐赠金额,在途数量,在途金额,
+      入库,销售出库, 其他出库,入库金额,销售出库金额,其他出库金额,型号剔除数量,型号新增数量,上月库存金额,本月库存金额,
+      (期末库存数量-期初库存数量)-(入库+型号新增数量-型号剔除数量-销售出库-其他出库-捐赠数量) as 调节,
+      (期末库存金额-期初库存金额)-(入库金额+型号新增金额-型号剔除金额-销售出库金额-其他出库金额-捐赠金额) as 金额调节  
+ from tmp3
+ )
+ select 
+  substr('${PERIOD_ID_D}',1,7) as stat_month
+ ,物料编码 as material_num
+ ,品类 as category_name_name
+ ,期初库存数量 as pbeg_qty
+ ,期初库存金额 as pbeg_amount
+ ,期末库存数量 as pend_qty
+ ,期末库存金额 as pend_amount
+ ,捐赠数量 as donate_qty
+ ,捐赠金额 as donate_amount
+ ,调节 as qty_adjust
+ ,金额调节 as amount_adjust
+ ,在途数量 as onway_qty
+ ,在途金额 as onway_amount
+ ,入库+case when 调节>0 then 调节 else 0 end as in_qty
+ ,销售出库 as sales_out_qty
+ ,其他出库+case when 调节<0 then -调节 else 0 end as other_out_qty
+ ,上月库存金额 as last_inv_amount
+ ,本月库存金额 as cur_inv_amount
+ ,入库金额+case when 金额调节>0 then 金额调节 else 0 end as in_amount
+ ,销售出库金额 as sales_out_amount
+ ,其他出库金额+case when 金额调节<0 then -金额调节 else 0 end as other_out_amount
+ ,current_timestamp as last_update_date
+  from tmp4;
+
+
+--  create table dm.dm_sw_risk_INVENTORY_T (
+--  stat_month varchar(10)
+-- ,material_num varchar(80)
+-- ,category_name_name varchar(40)
+-- ,pbeg_qty numeric(38,10)
+-- ,pbeg_amount numeric(38,10)
+-- ,pend_qty numeric(38,10)
+-- ,pend_amount numeric(38,10)
+-- ,donate_qty numeric(38,10)
+-- ,donate_amount numeric(38,10)
+-- ,qty_adjust numeric(38,10)
+-- ,amount_adjust numeric(38,10)
+-- ,onway_qty numeric(38,10) 
+-- ,onway_amount numeric(38,10)
+-- ,in_qty numeric(38,10)
+-- ,sales_out_qty numeric(38,10)
+-- ,other_out_qty numeric(38,10)
+-- ,last_inv_amount numeric(38,10)
+-- ,cur_inv_amount numeric(38,10)
+-- ,in_amount numeric(38,10)
+-- ,sales_out_amount numeric(38,10)
+-- ,other_out_amount numeric(38,10)
+-- ,last_update_date timestamp
+--  )
+--comment on column dm.dm_sw_risk_INVENTORY_T.stat_month is '年月' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.material_num is '物料编码' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.category_name_name is '品类' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.pbeg_qty is '期初库存数量' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.pbeg_amount is '期初库存金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.pend_qty is '期末库存数量' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.pend_amount is '期末库存金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.donate_qty is '捐赠数量' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.donate_amount is '捐赠金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.qty_adjust is '调节' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.amount_adjust is '金额调节' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.onway_qty is '在途数量' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.onway_amount is '在途金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.in_qty is '入库' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.sales_out_qty is '销售出库' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.other_out_qty is '其他出库' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.last_inv_amount is '上月库存金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.cur_inv_amount is '本月库存金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.in_amount is '入库金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.sales_out_amount is '销售出库金额' ;
+--comment on column dm.dm_sw_risk_INVENTORY_T.other_out_amount is '其他出库金额' ;  

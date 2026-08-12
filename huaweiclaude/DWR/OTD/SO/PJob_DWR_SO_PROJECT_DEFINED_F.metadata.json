@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_PROJECT_DEFINED_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "SAP项目定义表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

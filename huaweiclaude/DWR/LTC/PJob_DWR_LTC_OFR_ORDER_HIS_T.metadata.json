@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_OFR_ORDER_HIS_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "OSS价审信息表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

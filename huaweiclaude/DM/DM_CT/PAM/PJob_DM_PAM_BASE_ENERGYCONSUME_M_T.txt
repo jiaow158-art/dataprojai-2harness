@@ -1,0 +1,656 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/06/03 11:41:49 GMT+08:00
+-- description:瓷砖各基地能源消耗表(月)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20240618 物耗数据从2024-01-01开始，非物耗（电、气、煤）从2023-01-01 开始
+-- UPDATE FROM CHENZHIYOGN 20240620 修改电耗数据从2024-01-01开始
+-- UPDATE FROM CHENZHIYONG 20240624 优化非重庆的气有使用量无入库产量的问题
+-- UPDATE FROM CHENZHIYONG 20240625 修改物耗（整个基地）入库产量为0的时候，就算有使用量也要赋值0，否则保持不变
+-- UPDATE FROM CHENZHIYONG 20240912 修改物耗逻辑(当月基地物耗的如入库产量为0，使用量给0)
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+-- 瓷砖各基地能源消耗表(月)
+WITH DM_PAM_BASE_INSTOCKYIELD_S_DATA AS(  -- 入库产量数据（电、物耗）
+	SELECT period_id_m, -- 分区字段
+		   start_month, -- 月份
+		   site_code, -- 基地
+		   work_shop_code, -- 车间
+		   product_line_code, -- 产线
+		   SUM(stock_qty) AS instock_qty  -- 入库数量
+	FROM DM.DM_PAM_BASE_INSTOCKYIELD_S -- 瓷砖各基地入库产量表
+	WHERE del_flag = 'N'
+	AND period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code,
+			 work_shop_code,
+			 product_line_code
+),
+DM_PAM_BASE_INSTOCKYIELD_S_NO_CQ_GAS_DATA AS(  -- 入库产量数据（非重庆的气）
+	SELECT period_id_m, -- 分区字段
+		   start_month, -- 月份
+		   site_code, -- 基地
+		   work_shop_code, -- 车间
+		   product_line_code, -- 产线
+		   '2' AS business_type_code, -- 气
+		   '气' AS business_type_name, -- 气
+		   SUM(stock_qty) AS instock_qty  -- 入库数量
+	FROM DM.DM_PAM_BASE_INSTOCKYIELD_S -- 瓷砖各基地入库产量表
+	WHERE site_code <> '1800'
+	AND del_flag = 'N'
+	AND period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code,
+			 work_shop_code,
+			 product_line_code
+),
+DM_PAM_BASE_INSTOCKYIELD_S_GAS_DATA AS(  -- 入库产量数据（重庆）
+	SELECT period_id_m, -- 分区字段
+		   start_month, -- 日期
+		   site_code, -- 基地
+		   product_line_code, -- 产线
+		   SUM(instock_qty) AS instock_qty  -- 入库数量
+	FROM DM_PAM_BASE_INSTOCKYIELD_S_DATA -- 瓷砖各基地入库产量表
+	WHERE site_code = 1800
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code,
+			 product_line_code
+),
+COST_CENTER_DATA_MATERIAL as( -- 成本中心数据
+	SELECT T1.start_month, -- 月份
+		   T1.business_type_code,
+		   T1.business_type_name, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		   1 AS ANALYSIS_TYPE_CODE,
+		   '成本中心' AS ANALYSIS_TYPE_NAME, -- 分析类型名称(1:成本中心 2:工序 3:产线 4:车间 5:基地)
+		   T1.site_code,  -- 基地编码
+		   T3.work_shop AS work_shop_code, -- 车间编码
+		   T3.product_line AS product_line_code, -- 产线编码
+		   T3.work_no_code AS work_no_code, -- 工序编码
+		   T1.cost_center_code, -- 成本中心编码
+		   T1.use_qty, -- 实际用量
+		   NVL(T2.instock_qty,0) AS instock_qty,-- 入库产量
+		   T1.period_id_m 
+	FROM DWROTD.DWR_PAM_BASE_ENERGYCONSUME_M_F T1 -- 瓷砖各基地能源用量表(月)
+	LEFT JOIN DM_PAM_BASE_INSTOCKYIELD_S_GAS_DATA T2 -- 瓷砖各基地入库产量表(重庆)
+	ON T1.period_id_m = T2.period_id_m  -- 分区字段
+	AND T1.start_month = T2.start_month  -- 日期
+	AND T1.site_code = T2.site_code -- 基地
+	AND T1.product_line_code = T2.product_line_code -- 产线
+	LEFT JOIN SDI.sdi_dj_powerconsumption_costcenter_maintenance_1006 T3 -- 清远-用电与成本中心维护表
+	ON T1.site_code = T3.SITE
+	AND T1.cost_center_code = T3.cost_center 
+	AND T3.delete_flag = 1
+	AND T3.site = 1800
+	WHERE T1.del_flag = 'N'
+	AND T1.business_type_code = 2  -- 气
+	AND T1.site_code = '1800'  -- 重庆
+	AND t1.period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	AND T1.period_id_m >= '2023-01'  -- 固定条件，原因见注释
+	UNION ALL
+	SELECT COALESCE(T1.start_month,T2.start_month) AS start_month, -- 月份
+		   COALESCE(T1.business_type_code,T2.business_type_code) AS business_type_code,
+		   COALESCE(T1.business_type_name,T2.business_type_name) AS business_type_name, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		   1 AS ANALYSIS_TYPE_CODE,
+		   '成本中心' AS ANALYSIS_TYPE_NAME, -- 分析类型名称(1:成本中心 2:工序 3:产线 4:车间 5:基地)
+		   COALESCE(T1.site_code,T2.site_code) AS site_code,  -- 基地编码
+		   COALESCE(T1.work_shop_code,T2.work_shop_code) AS work_shop_code, -- 车间编码
+		   COALESCE(T1.product_line_code,T2.product_line_code) AS product_line_code, -- 产线编码
+		   CASE WHEN COALESCE(T1.site_code,T2.site_code) = '1300' 
+		        AND COALESCE(T1.work_shop_code,T2.work_shop_code) = 'CJ_QY7'
+		        AND COALESCE(T1.product_line_code,T2.product_line_code) = '0B8_CX08'
+		        AND T1.work_no_code IS NULL THEN '0B8_CX08'
+		   ELSE T1.work_no_code
+		   END AS work_no_code, -- 工序编码
+		   CASE WHEN COALESCE(T1.site_code,T2.site_code) = '1300' 
+		        AND COALESCE(T1.work_shop_code,T2.work_shop_code) = 'CJ_QY7'
+		        AND COALESCE(T1.product_line_code,T2.product_line_code) = '0B8_CX08'
+		        AND T1.cost_center_code IS NULL THEN '1300MA0060'
+		   ELSE T1.cost_center_code
+		   END AS cost_center_code, -- 成本中心编码
+		   COALESCE(T1.use_qty,0) AS use_qty,  -- 实际用量
+		   COALESCE(T2.instock_qty,0) AS instock_qty,-- 入库产量
+		   COALESCE(T1.period_id_m,T2.period_id_m) AS period_id_m 
+	FROM DWROTD.DWR_PAM_BASE_ENERGYCONSUME_M_F T1 -- 瓷砖各基地能源用量表(月)
+	FULL OUTER JOIN DM_PAM_BASE_INSTOCKYIELD_S_NO_CQ_GAS_DATA T2 -- 瓷砖各基地入库产量表
+    ON T1.period_id_m = T2.period_id_m  -- 分区字段
+	AND T1.start_month = T2.start_month  -- 月份
+	AND T1.site_code = T2.site_code -- 基地
+	AND T1.work_shop_code = T2.work_shop_code -- 车间
+	AND T1.product_line_code = T2.product_line_code -- 产线
+	AND T1.business_type_code = T2.business_type_code
+	AND T1.business_type_name = t2.business_type_name
+	WHERE 1 = 1
+	AND COALESCE(t1.period_id_m,T2.period_id_m) >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	AND COALESCE(T1.site_code,T2.site_code) <> '1800'   -- 非重庆的气
+	AND COALESCE(T1.business_type_code,T2.business_type_code) = 2 
+	AND COALESCE(T1.period_id_m,T2.period_id_m) >= '2023-01' -- 固定条件，原因见注释
+	UNION ALL
+	SELECT T1.start_month, -- 月份
+		   T1.business_type_code,
+		   T1.business_type_name, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		   1 AS ANALYSIS_TYPE_CODE,
+		   '成本中心' AS ANALYSIS_TYPE_NAME, -- 分析类型名称(1:成本中心 2:工序 3:产线 4:车间 5:基地)
+		   T1.site_code,  -- 基地编码
+		   T1.work_shop_code, -- 车间编码
+		   T1.product_line_code, -- 产线编码
+		   T1.work_no_code, -- 工序编码
+		   T1.cost_center_code, -- 成本中心编码
+		   T1.use_qty, -- 实际用量
+		   NVL(T2.instock_qty,0) AS instock_qty,-- 入库产量
+		   T1.period_id_m 
+	FROM DWROTD.DWR_PAM_BASE_ENERGYCONSUME_M_F T1 -- 瓷砖各基地能源用量表(月)
+	LEFT JOIN DM_PAM_BASE_INSTOCKYIELD_S_DATA T2 -- 瓷砖各基地入库产量表
+	ON T1.period_id_m = T2.period_id_m  -- 分区字段
+	AND T1.start_month = T2.start_month  -- 月份
+	AND T1.site_code = T2.site_code -- 基地
+	AND T1.work_shop_code = T2.work_shop_code -- 车间
+	AND T1.product_line_code = T2.product_line_code -- 产线
+	WHERE T1.del_flag = 'N'
+	AND t1.period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	AND T1.business_type_code IN (1,4)   -- 电 、 物耗
+	AND T1.period_id_m >= '2024-01'
+),
+WORK_NO_DATA_MATERIAL AS( -- 工序
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '2' AS analysis_type_code,
+		   '工序' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   MAX(instock_qty) AS instock_qty, -- 因产量到产线，所以这里用MAX
+		   period_id_m
+	FROM COST_CENTER_DATA_MATERIAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code, 
+			 product_line_code, 
+			 work_no_code
+),
+PRODUCT_LINE_DATA_MATERIAL AS( -- 产品线
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '3' AS analysis_type_code,
+		   '产线' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   MAX(instock_qty) AS instock_qty,
+		   period_id_m
+	FROM COST_CENTER_DATA_MATERIAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code, 
+			 product_line_code
+),
+WROK_SHOP_DATA_MATERIAL AS( -- 车间
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '4' AS analysis_type_code,
+		   '车间' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   '' AS product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   SUM(instock_qty) AS instock_qty,
+		   period_id_m
+	FROM PRODUCT_LINE_DATA_MATERIAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code
+),
+SITE_DATA_MATERIAL AS( -- 基地
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '5' AS analysis_type_code,
+		   '基地' AS analysis_type_name,
+		   site_code, 
+		   '' AS work_shop_code, 
+		   '' AS product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   SUM(instock_qty) AS instock_qty,
+		   period_id_m
+	FROM WROK_SHOP_DATA_MATERIAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code
+),
+RESULT_DATA_MATERIAL AS(
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   instock_qty,
+		   period_id_m
+	FROM COST_CENTER_DATA_MATERIAL -- 成本中心
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   instock_qty,
+		   period_id_m
+	FROM WORK_NO_DATA_MATERIAL -- 工序
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   instock_qty,
+		   period_id_m
+	FROM PRODUCT_LINE_DATA_MATERIAL  -- 产线
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   instock_qty,
+		   period_id_m
+	FROM WROK_SHOP_DATA_MATERIAL -- 车间
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   instock_qty,
+		   period_id_m
+	FROM SITE_DATA_MATERIAL -- 基地
+),
+DM_PAM_BASE_INSTOCKYIELD_S_COAL AS(  -- 入库产量数据(煤)
+    SELECT period_id_m, -- 分区字段
+		   start_month, -- 月份
+		   site_code, -- 基地
+		   SUM(stock_qty) AS instock_qty  -- 分级数量
+	FROM DM.DM_PAM_BASE_INSTOCKYIELD_S -- 瓷砖各基地入库产量表
+	WHERE del_flag = 'N'
+	AND period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code
+),
+COST_CENTER_DATA_COAL as( -- 成本中心数据(煤)
+	SELECT T1.start_month, -- 月份
+		   T1.business_type_code,
+		   T1.business_type_name, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		   1 AS ANALYSIS_TYPE_CODE,
+		   '成本中心' AS ANALYSIS_TYPE_NAME, -- 分析类型名称(1:成本中心 2:工序 3:产线 4:车间 5:基地)
+		   T1.site_code,  -- 基地编码
+		   T1.work_shop_code, -- 车间编码
+		   T1.product_line_code, -- 产线编码
+		   T1.work_no_code, -- 工序编码
+		   T1.cost_center_code, -- 成本中心编码
+		   T1.use_qty, -- 实际用量
+		   T1.period_id_m 
+	FROM DWROTD.DWR_PAM_BASE_ENERGYCONSUME_M_F T1 -- 瓷砖各基地能源用量表(月)
+	WHERE T1.del_flag = 'N'
+	AND t1.period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	AND T1.business_type_code = 3  -- 煤
+	AND T1.period_id_m >= '2023-01' -- 固定条件，原因见注释
+),
+WORK_NO_DATA_COAL AS( -- 工序(煤)
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '2' AS analysis_type_code,
+		   '工序' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   period_id_m
+	FROM COST_CENTER_DATA_COAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code, 
+			 product_line_code, 
+			 work_no_code
+),
+PRODUCT_LINE_DATA_COAL AS( -- 产线(煤)
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '3' AS analysis_type_code,
+		   '产线' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   period_id_m
+	FROM COST_CENTER_DATA_COAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code, 
+			 product_line_code
+),
+WROK_SHOP_DATA_COAL AS( -- 车间（煤）
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '4' AS analysis_type_code,
+		   '车间' AS analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   '' AS product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   period_id_m
+	FROM PRODUCT_LINE_DATA_COAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code, 
+			 work_shop_code
+),
+SITE_DATA_COAL AS( -- 基地（煤）
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   '5' AS analysis_type_code,
+		   '基地' AS analysis_type_name,
+		   site_code, 
+		   '' AS work_shop_code, 
+		   '' AS product_line_code, 
+		   '' AS work_no_code,
+		   '' AS cost_center_code,
+		   SUM(use_qty) AS use_qty,
+		   period_id_m
+	FROM WROK_SHOP_DATA_COAL t
+	GROUP BY period_id_m,
+			 start_month, 
+			 business_type_code, 
+			 business_type_name,
+			 site_code
+),
+RESULT_DATA_COAL_01 AS(   -- 煤
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   period_id_m
+	FROM COST_CENTER_DATA_COAL -- 成本中心（煤）
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   period_id_m
+	FROM WORK_NO_DATA_COAL -- 工序（煤）
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   period_id_m
+	FROM PRODUCT_LINE_DATA_COAL  -- 产线（煤）
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   period_id_m
+	FROM WROK_SHOP_DATA_COAL -- 车间（煤）
+	UNION ALL
+	SELECT start_month, 
+		   business_type_code, 
+		   business_type_name,
+		   analysis_type_code,
+		   analysis_type_name,
+		   site_code, 
+		   work_shop_code, 
+		   product_line_code, 
+		   work_no_code,
+		   cost_center_code,
+		   use_qty,
+		   period_id_m
+	FROM SITE_DATA_COAL -- 基地(煤)
+),
+RESULT_DATA_COAL AS( -- 煤
+	SELECT  T1.start_month,   -- 月份
+			T1.BUSINESS_TYPE_CODE,  -- 业务类型
+			T1.BUSINESS_TYPE_NAME,  -- 业务类型
+			T1.ANALYSIS_TYPE_CODE,  -- 分析类型
+			T1.ANALYSIS_TYPE_NAME,  -- 分析类型
+			T1.SITE_CODE, -- 基地编码
+			T1.WORK_SHOP_CODE, -- 车间编码
+			T1.PRODUCT_LINE_CODE, -- 产线编码
+			T1.WORK_NO_CODE, -- 工序编码
+			T1.COST_CENTER_CODE, -- 成本中心
+			T1.USE_QTY, -- 实际使用量
+			NVL(T2.instock_qty,0) AS instock_qty, -- 入库产量
+			T1.PERIOD_ID_M -- 分区月
+	FROM RESULT_DATA_COAL_01 T1 -- 煤
+	LEFT JOIN DM_PAM_BASE_INSTOCKYIELD_S_COAL T2  -- 入库产量数据(煤)
+	ON T1.period_id_m = T2.period_id_m
+	AND T1.start_month = T2.start_month
+	AND T1.site_code = T2.site_code
+),
+DM_PAM_BASE_INSTOCKYIELD_S_SITE_DATA AS(  -- 基地入库产量数据
+	SELECT period_id_m, -- 分区字段
+		   start_month, -- 月份
+		   site_code, -- 基地
+		   SUM(stock_qty) AS instock_qty  -- 入库数量
+	FROM DM.DM_PAM_BASE_INSTOCKYIELD_S -- 瓷砖各基地入库产量表
+	WHERE del_flag = 'N'
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code
+),
+DM_PAM_BASE_INSTOCKYIELD_S_WROK_CQ_DATA AS(  -- 车间入库产量数据（重庆）
+	SELECT period_id_m, -- 分区字段
+		   start_month, -- 月份
+		   site_code, -- 基地
+		   work_shop_code ,-- 车间
+		   SUM(stock_qty) AS cq_instock_qty  -- 入库数量
+	FROM DM.DM_PAM_BASE_INSTOCKYIELD_S -- 瓷砖各基地入库产量表
+	WHERE del_flag = 'N'
+	AND site_code = '1800'
+	AND period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD
+	GROUP BY period_id_m,
+			 start_month,
+			 site_code,
+			 work_shop_code
+)
+INSERT OVERWRITE TABLE DM.DM_PAM_BASE_ENERGYCONSUME_M_T PARTITION(PERIOD_ID_M)
+SELECT  T1.start_month,   -- 月份
+		T1.business_type_code, -- 业务类型
+		T1.business_type_name,
+		T1.analysis_type_code, -- 分析类型
+		T1.analysis_type_name,
+		T1.site_code,  -- 基地编码
+		T1.work_shop_code, -- 车间编码
+		T1.product_line_code, -- 产线编码
+		T1.work_no_code, -- 工序编码
+		T1.cost_center_code, -- 成本中心
+		CASE WHEN T1.business_type_code = 4 AND T1.SITE_SUM_INSTOCK_PRODUCT_QTY = 0 then--物耗的入库产量(基地)为0，使用量给0
+		     0 
+		else 
+		  CASE WHEN business_type_code = 4 AND
+			CASE WHEN T1.analysis_type_code <> 5 AND T4.work_shop_type = '成型车间' THEN    -- 当类型不为基地且车间类型为成型车间，取车间、产线的入库产量，否则取基地(重庆另外)
+		         CASE WHEN T1.site_code = '1800' THEN  -- 重庆的成型车间只到车间
+		           NVL(T5.cq_instock_qty,0)
+		           ELSE
+		             CASE WHEN NVL(T1.actual_use_qty,0) <> 0 AND  nvl(T1.instock_product_qty,0) = 0 then
+		                NVL(T1.actual_use_qty,0)
+		              else nvl(T1.instock_product_qty,0) 
+		              END  
+		          END -- update from chenzhiyong 20240912 当使用量不为0且入库产量为0，取使用量，否则取入库产量
+		     ELSE NVL(T3.instock_qty,0) END = 0 THEN 0
+		   ELSE T1.actual_use_qty END 
+		 END AS actual_use_qty,  -- 实际用量
+		CASE WHEN T1.analysis_type_code <> 5 AND T4.work_shop_type = '成型车间' THEN    -- 当类型不为基地且车间类型为成型车间，取车间、产线的入库产量，否则取基地(重庆另外)
+		         CASE WHEN T1.site_code = '1800' THEN  -- 重庆的成型车间只到车间
+		           NVL(T5.cq_instock_qty,0)
+		           ELSE
+			       NVL(T1.instock_product_qty,0) END
+		     ELSE NVL(T3.instock_qty,0) END AS instock_product_qty,-- 入库产量
+		T1.del_flag,  -- 删除数据标识
+		T1.dw_last_update_date, -- 同步数据时间
+		T1.period_id_m -- 分区月
+FROM(
+	SELECT  start_month,
+			business_type_code,
+			business_type_name,
+			analysis_type_code,
+			analysis_type_name,
+			site_code,
+			work_shop_code,
+			product_line_code,
+			work_no_code,
+			cost_center_code,
+			use_qty AS ACTUAL_USE_QTY,
+			instock_qty AS INSTOCK_PRODUCT_QTY,
+			'N' AS DEL_FLAG , -- 删除数据标识
+			CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+			period_id_m,
+			sum(instock_qty) over(partition by start_month,
+                                			business_type_code,
+                                			business_type_name,
+                                			analysis_type_code,
+                                			analysis_type_name,
+                                			site_code) as SITE_SUM_INSTOCK_PRODUCT_QTY -- 基地入库产量 update from chenzhiyong 20240912
+	FROM RESULT_DATA_MATERIAL   -- 电、气 、物耗
+	UNION ALL
+	SELECT  start_month,
+			business_type_code,
+			business_type_name,
+			analysis_type_code,
+			analysis_type_name,
+			site_code,
+			work_shop_code,
+			product_line_code,
+			work_no_code,
+			cost_center_code,
+			use_qty AS ACTUAL_USE_QTY,
+			instock_qty AS INSTOCK_PRODUCT_QTY,
+			'N' AS DEL_FLAG , -- 删除数据标识
+			CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+			period_id_m,
+			0 AS SITE_SUM_INSTOCK_PRODUCT_QTY
+	FROM RESULT_DATA_COAL  -- 煤
+)T1
+LEFT JOIN DM_PAM_BASE_INSTOCKYIELD_S_SITE_DATA T3 -- 基地入库产量数据
+ON T1.period_id_m = T3.period_id_m  -- 分区字段
+AND T1.start_month = T3.start_month  -- 月份
+AND T1.site_code = T3.site_code -- 基地 
+LEFT JOIN DWRDIM.DWR_DIM_PAM_WORK_SHOP_D T4 -- 车间维表
+ON T1.site_code = T4.site_code
+AND T1.work_shop_code = T4.work_shop_code 
+AND T4.del_flag = 'N'
+LEFT JOIN DM_PAM_BASE_INSTOCKYIELD_S_WROK_CQ_DATA  T5-- 重庆的车间入库产量
+ON T1.period_id_m = T5.period_id_m  -- 分区字段
+AND T1.start_month = T5.start_month  -- 月份
+AND T1.site_code = T5.site_code -- 基地 
+AND T1.work_shop_code = T5.work_shop_code -- 车间
+;

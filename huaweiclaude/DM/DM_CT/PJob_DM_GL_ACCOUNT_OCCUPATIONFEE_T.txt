@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/02/26 16:09:40 GMT+08:00
+-- ******************************************************************** --
+--资金占用成本
+INSERT OVERWRITE TABLE DM.DM_GL_ACCOUNT_OCCUPATIONFEE_T
+SELECT DISTINCT 
+ B.BELNR AS ACCOUNT_VOUCHER_NUM --会计凭证号码
+,COM.COMPANY_ID --公司ID
+,B.BUKRS AS COMPANY_CODE --公司代码
+,COM.COMPANY_NAME --公司名称
+,B.GJAHR AS FISCAL_YEAR --财年
+,B.BKTXT AS VOUCHER_HEADER_TEXT --凭证抬头文本
+,CASE WHEN B.BUDAT < '19000101' THEN from_unixtime(unix_timestamp('19000101','yyyyMMdd'),'yyyy-MM-dd')
+      WHEN B.BUDAT > '47121231' THEN from_unixtime(unix_timestamp('47121231','yyyyMMdd'),'yyyy-MM-dd')
+      ELSE from_unixtime(unix_timestamp(B.BUDAT,'yyyyMMdd'),'yyyy-MM-dd')
+	   END AS VOUCHER_POST_DATE --凭证中的过帐日期
+,CASE WHEN B.BLDAT < '19000101' THEN from_unixtime(unix_timestamp('19000101','yyyyMMdd'),'yyyy-MM-dd')
+      WHEN B.BLDAT > '47121231' THEN from_unixtime(unix_timestamp('47121231','yyyyMMdd'),'yyyy-MM-dd')
+      ELSE from_unixtime(unix_timestamp(B.BLDAT,'yyyyMMdd'),'yyyy-MM-dd') 
+      END AS VOUCHER_DATE --凭证中的凭证日期
+,B.XBLNR AS REFERENCE_VOUCHER_NUM --参考凭证号
+,COALESCE(A.WRBTR,0) AS VOUCHER_CURRENCY_AMOUNT --凭证货币金额
+,D.SUPPLIER_OR_CREDITOR_ID --供应商ID
+,A.LIFNR AS SUPPLIER_OR_CREDITOR_NUM --供应商或债权人的帐号
+,D.SUPPLIER_OR_CREDITOR_NAME --供应商名称
+,E.PRODUCT_AREA_ID --产区
+,E.PRODUCT_AREA_CODE --产区编码
+,E.PRODUCT_AREA_NAME --产区名称
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+FROM SDI.SDI_BSEG_1001 A
+INNER JOIN SDI.SDI_BKPF_1001 B 
+ON A.BELNR = B.BELNR 
+AND A.BUKRS = B.BUKRS AND A.GJAHR = B.GJAHR
+INNER JOIN DWRDIM.DWR_DIM_SUPPLIER_PUR_ORG_D C 
+ON C.SRC_SUPPLIER_NUM = A.lifnr 
+AND C.PUR_ORG_CODE = '1030'
+AND C.DEL_FLAG = 'N'
+LEFT JOIN DWIMD.DWI_MD_SUPPLIER_GENERAL_T D
+ON A.LIFNR = D.SUPPLIER_OR_CREDITOR_NUM
+AND A.MANDT = D.GROUP_NUM
+AND D.DEL_FLAG = 'N'
+AND D.END_DATE ='4712-12-31'
+LEFT JOIN DWIMD.DWI_MD_COMPANY_T COM    ------与公司主数据关联，取COMPANY_ID 
+ON COM.COMPANY_CODE  = B.BUKRS
+AND COM.group_num = A.MANDT
+AND COM.DEL_FLAG  = 'N'
+AND COM.END_DATE  = '4712-12-31'
+LEFT JOIN(
+         SELECT A.SUPPLIER_OR_CREDITOR_NUM
+               ,A.PRODUCT_AREA_ID
+               ,A.PRODUCT_AREA_CODE
+               ,A.PRODUCT_AREA_NAME
+           FROM DWRDIM.DWR_DIM_PRODUCT_AREA_D A
+          GROUP BY 
+                A.SUPPLIER_OR_CREDITOR_NUM
+               ,A.PRODUCT_AREA_ID
+               ,A.PRODUCT_AREA_CODE
+               ,A.PRODUCT_AREA_NAME
+) E
+ON E.SUPPLIER_OR_CREDITOR_NUM = A.LIFNR
+WHERE A.UMSKZ = 'A'
+AND A.KOART = 'K' --帐户类型
+AND A.DEL_FLAG = 'N'
+AND B.DEL_FLAG = 'N'
+--AND B.BUDAT <= '20220131' 
+AND B.BLART IN ( 'SA','KZ' )
+AND B.STBLG = ''   --不是冲销凭证
+AND B.XREVERSED = '' --不是被冲销凭证
+AND A.AUGDT = '00000000' --清帐日期
+;

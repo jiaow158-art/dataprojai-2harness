@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_FIN_OPERATIONS_MIX_T",
+    "type": "DWSSQL",
+    "directory": "/DWR/FIN/GL",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

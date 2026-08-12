@@ -1,0 +1,83 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：DMT门店主数据
+-- create time: 2022/08/19 14:25:56 GMT+08:00
+-- ******************************************************************** --
+WITH T AS(
+SELECT F.STORE_ID
+      ,COUNT(1) AS SALE_EMP_CNT --门店导购数
+  FROM SDI.SDI_BUZ_EMPLOYEE_1030 F
+ WHERE F.EP_ID = 3044
+   AND F.APP_ID = 1831
+   AND F.STATUS = 1
+ GROUP BY F.STORE_ID   
+)
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_DMT_STORE_INFO_T
+SELECT ROW_NUMBER() OVER() AS ID 		-- 代理主键
+	  ,A.ID AS STORE_ID 					-- 门店ID
+      ,A.NAME AS STORE_NAME 				-- 门店名称
+      ,A.ABBREVIATION AS STORE_BYNAME 	-- 门店简称
+      ,A.STATUS 							-- 状态
+      ,A.PROVINCE_ID 						-- 省区域ID      
+      ,A.PROVINCE	AS PROVINCE_NAME 		-- 省
+      ,A.CITY_ID 							-- 市区域ID      
+      ,A.CITY AS CITY_NAME 				-- 市
+      ,A.DISTRICT_ID 						-- 区区域ID      
+      ,A.DISTRICT AS DISTRICT_NAME 		-- 区
+      ,A.ADDRESS AS ADDR_NAME 			-- 详细地址
+      ,A.OWNER_ID							-- 店长用户ID
+      ,A.TEL AS TEL_NUM 					-- 店铺联系方式
+      ,A.LENGTH 							-- 店铺长度
+      ,A.WIDTH 							-- 店铺宽度
+      ,A.BUSINESS_START_HOUR				-- 经营开始时间	
+      ,A.BUSINESS_END_HOUR 				-- 经营结束时间		
+      ,A.LONGITUDE 						-- 门店经度
+      ,A.LATITUDE 						-- 门店纬度
+      ,A.BD_LONGITUDE 					-- 百度地图经度
+      ,A.BD_LATITUDE 						-- 百度地图纬度
+      ,A.FIELD 							-- 门店所属板块（领域）
+      ,A.APP_ID 							-- 店铺ID
+      ,A.`DESCRIBE` 						-- 描述
+      ,A.`TYPE` AS STORE_TYPE				-- 门店类型（0：门店 1：商圈）
+      ,A.BUSINESS_DAYOFWEEK 				-- 门店营业星期
+      ,A.UPDATE_TIME						-- 最后更新时间
+      ,A.CREATE_TIME 						-- 创建时间	
+      ,A.IS_OPEN 							-- 是否营业 1-营业，0-打烊
+      ,A.OUT_STORE_ID 					-- 外部门店编号
+      ,A.PARENT_ID 						-- 父ID
+      ,A.MODE								-- 模式, 0:直营; 1:经销商
+      ,A.DEALER_ID 						-- 经销商ID
+      ,A.MERCHANT_TYPE 					-- 0-普通商户 1-平台自营 2-品牌自营
+      ,A.CONTACT_NAME						-- 联系人
+      ,A.CONTACT_PHONE 					-- 联系人手机号
+      ,A.SYN_BRAND_TEMPLATE 				-- 是否同步品牌模板
+      ,A.LOCK_BRAND_TEMPLATE				-- 锁定门店装修模板
+      ,A.CATEGORY							-- 经营类目
+      ,A.OUT_DEALER_ID 					-- 外部经销商ID
+      ,A.HOTEL_NAME 						-- 酒店名称
+      ,A.STORE_TYPE AS HOTEL_TYPE			-- 酒店类型:0:非酒店1:酒店
+      ,A.STORE_TAG 						-- 门店标签
+      ,A.OPEN_STATUS_CHANGE_TIME 			-- 营业状态变更时间
+      ,A.OPEN_STATUS_CHANGE_PER_USER_ID 	-- 营业状态变更人ID
+      ,A.OPEN_STATUS_CHANGE_PER_USER_NAME	-- 营业状态变更人名称
+      ,SUBSTR(A.CREATE_TIME,1,10) AS START_DATE 	-- 开始日期
+      ,SUBSTR(A.UPDATE_TIME,1,10) AS UPDATE_DATE	-- 更新日期
+	  ,'4712-12-31' AS END_DATE 				-- 结束日期
+      ,'初始化数据' AS DATA_TYPE 				-- 数据类型
+      ,'N' AS DEL_FLAG 							-- 删除标识
+      ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+      ,A.DEP_ID AS DEPT_ID --部门ID
+	  ,B.SALE_EMP_CNT --门店导购数
+	  ,A.PARTICIPATION_IN_BUSINESS AS BUSI_TYPE   --参与业务（1.瓷砖派单、2.洁具派单、3.线下客户、4.万家灯火派单、5.装到家 6.同城项目）
+	  ,E.LVL2_DEPT_NAME	AS DEPT_NAME --部门名称
+FROM SDI.SDI_BUZ_STORE_1030 A
+LEFT JOIN T AS B
+  ON A.ID = B.STORE_ID 
+LEFT JOIN DWRDIM.DWR_DIM_DMT_DEPT_INFO_D E
+    ON A.ID = E.STORE_ID
+   AND E.EP_ID = 3044
+   AND E.APP_ID = 1831
+WHERE A.EP_ID = 3044
+AND A.APP_ID = 1831
+; 

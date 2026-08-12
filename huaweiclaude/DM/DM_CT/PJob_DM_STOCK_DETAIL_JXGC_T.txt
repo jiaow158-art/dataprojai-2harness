@@ -1,0 +1,173 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/06/25 11:19:16 GMT+08:00
+-- description: 瓷砖工程 - 库存明细
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+DELETE FROM dm.DM_STOCK_DETAIL_JXGC_T;
+insert into dm.DM_STOCK_DETAIL_JXGC_T
+
+with get_ys_price as
+(
+select  operation_desc,coalesce(prod_level3_name,'其他品类') as prod_level3_name,coalesce(dimension,'其他规格') as dimension,
+datatool.division_by_zero(sum(coalesce(prod_it_amt1,0)),sum(coalesce(sales_area,0))) as ys_price--预算全年品类规格单价
+FROM UPLOAD.UPLOAD_ACHIEVEMENT_BUDGET_T 
+where substring(stat_month,1,4) = substring(date_sub(current_date,1),1,4)
+group by operation_desc,coalesce(prod_level3_name,'其他品类'),coalesce(dimension,'其他规格')
+)
+
+select 
+case 
+	when wbse.zjhdid is not null then
+		case when t1.lb_type like '%留货%' then '项目库存订单留货' when t1.lb_type like '%备货%' then '项目库存订单备货' end
+	else 
+		case when t1.lb_type like '%留货%' then '非项目库存留货' when t1.lb_type like '%备货%' then '非项目库存备货'end
+end as sotok_detail_type,--库存明细类型	
+t1.sal_vch_num,--订单号	
+t1.sal_vch_item_num,--订单行	
+t1.creator_name,--订单创建人	
+t1.stockout_order_no,--提货单号	
+t1.stockout_order_item_no,--提货单行	
+t1.plan_order_type,--计划订单类型	
+t1.pre_type,--备货类型	
+t1.cust_num,--客户编码	
+t1.cust_name,--客户名称	
+t1.distribution_channel_code,--渠道	
+t1.prod_name2,--产品分类	
+t1.prod_name2_desc,--品类名称	
+t1.dimension,--规格	
+t1.batch_num,--批次	
+t1.factory_code,--工厂	
+t1.inv_location,--库存地点	
+t1.lb_type,--留备货类型	
+t1.sal_pre_res_area,--留备货面积	
+0 as available_stock_area  ,--项目可用库存面积	
+0 as frozen_stock_area,--项目冻结库存面积	
+0 as qc_stock_area,--项目质检库存面积	
+ysp.ys_price as ys_price,--平均单价(平方米)	
+t1.order_sub_date,--仓租报表扣费开始时间	
+t1.acc_time_date,--应提时间	
+t1.res_stock_date,--留货日期	
+t1.user_delivery_date,--需求日期	
+t1.salesman_name_list,--业务员名称	
+t1.sale_grp,--线组	
+t1.lev4_name,--销售区域L4	
+t1.lev5_name,--销售部门L5	
+t1.lev6_name,--销售部门L6	
+t1.lev7_name,--销售部门L7	
+t1.zjhd,--WBS计划号	
+t1.zjhdid,--WBS计划行	
+t2.wbs_top_level_desc,--wbs项目名称
+wbse.pernrname,--WBS计划行创建人	
+wbse.zcjrq,--wbs计划行创建时间	
+wbse.ddzt,--WBS计划单类型	
+t1.business_opportunity,--商机报备号	
+COALESCE(t7."name",T5.YWY) as bus_gjr,--商机跟踪人
+NOW() as dw_last_update_dat,
+wbse.zvkgrp, --销售组
+t5.xmmc, --工程名称
+t1.material_num,
+t1.material_name,
+t8.PRODUCE_DATE, --生产日期
+t1.sal_pre_res_qty, --留备货数量
+0 as available_stock_qty,
+0 as frozen_stock_qty,
+0 as qc_stock_qty,
+t2.wbs_level3_desc, --WBS元素描述
+tl.LGOBE --库存地点秒速
+from  DM.DM_RPT_SALES_DELIVER_2023_T t1
+left join dwimd.dwi_md_data_material_general_t mat on t1.material_num = mat.material_num
+left join dm.dm_otd_wbs_plan_order_det_t wbse on t1.zjhdid = wbse.zjhdid
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F t2 on t1.zjhdid = t2.wbs_level3
+left join dm.dm_rpt_sales_group_t t4 on t1.sale_grp = t4.node_name9 
+left join get_ys_price ysp on t4.node_name5 = ysp.operation_desc and mat.category = ysp.prod_level3_name and mat.dimension = ysp.dimension
+left join dm.dm_sdi_zsd_sjxx_1001_t t5 on t1.business_opportunity = t5.sjh
+left join dm.dm_SDI_NEW_OPPORTUNITY_1046 t6 on t1.business_opportunity = t6.value54
+left join api_log.api_to_dws_people_information t7 on t6.value88 = t7."_id"
+left join DWIMD.DWI_MD_MATL_BATCH_INFO_T t8 on t1.batch_num = t8.batch_num and t1.material_num = t8.material_num
+left join dm.DM_SDI_T001L_1001_T tl on t1.factory_code = tl.WERKS and t1.inv_location = tl.LGORT and tl.MANDT = '800'
+where 1=1
+and t1.stat_month = replace(substring(date_sub(current_date,1),1,7),'-','')
+and t1.lb_type in ('销售订单留货','销售订单备货')
+and t1.distribution_channel_code = '06'
+and mat.external_matl_group_code in ('10010')
+and mat.matl_group_code in ('1000010')
+
+union all 
+
+select
+'项目库存可用库存&冻结库存&质检库存' as sotok_detail_type,--库存明细类型	
+null as sal_vch_num,--订单号	
+null as sal_vch_item_num,--订单行	
+null as creator_name,--订单创建人	
+null as stockout_order_no,--提货单号	
+null as stockout_order_item_no,--提货单行	
+null as plan_order_type,--计划订单类型	
+null pre_type,--备货类型	
+t1.cust_num as cust_num,--客户编码	
+t1.cust_name as cust_name,--客户名称	
+t1.distribution_channel_code as distribution_channel_code,--渠道	
+mat.product_level2_code as prod_name2,--产品分类	
+mat.product_level2_name as prod_name2_desc,--品类名称	
+mat.DIMENSION as dimension,--规格	
+t1.batch_num as batch_num,--批次	
+t1.factory_code as factory_code,--工厂	
+t1.inv_location as inv_location,--库存地点	
+null as lb_type,--留备货类型	
+null as sal_pre_res_area,--留备货面积	
+(t1.available_stock_qty*mat.length_1*mat.width)/1000000 as available_stock_area  ,--项目可用库存面积	
+(t1.frozen_stock_qty*mat.length_1*mat.width)/1000000 as frozen_stock_area,--项目冻结库存面积	
+(t1.qc_stock_qty*mat.length_1*mat.width)/1000000 as qc_stock_area,--项目质检库存面积	
+ysp.ys_price as ys_price,--平均单价(平方米)	
+null as order_sub_date,--仓租报表扣费开始时间	
+t1.promise_stock_date as acc_time_date,--应提时间	
+substr(to_date (wbse.last_confirm_date,'yyyy-MM-dd'),1,10) as res_stock_date,--留货日期	
+t1.expect_date as user_delivery_date,--需求日期	
+t1.salesman_name as salesman_name_list,--业务员名称	
+t1.zlkhmc as sale_grp,--线组	
+t1.lev4_name as lev4_name,--销售区域L4	
+t1.lev5_name as lev5_name,--销售部门L5	
+t1.lev6_name as lev6_name,--销售部门L6	
+t1.lev7_name as lev7_name,--销售部门L7	
+t1.top_wbs_num as zjhd,--WBS计划号	
+t1.wbs_num as zjhdid,--WBS计划行	
+t3.wbs_top_level_desc as wbs_top_level_desc,--wbs项目名称
+wbse.pernrname,--WBS计划行创建人	
+wbse.zcjrq,--wbs计划行创建时间	
+wbse.ddzt,--WBS计划单类型
+wbse.business_opportunity,--商机报备号	
+COALESCE(t7."name",T5.YWY)  as bus_gjr,--商机跟踪人
+NOW() as dw_last_update_dat,
+wbse.zvkgrp as zvkgrp, --销售组
+t5.xmmc, --工程名称
+t1.material_num as material_num,
+mat.material_name as material_name,
+t8.PRODUCE_DATE as PRODUCE_DATE, --生产日期
+0 as sal_pre_res_qty,--留备货数量
+t1.available_stock_qty as available_stock_qty  ,--项目可用库存数量
+t1.frozen_stock_qty as frozen_stock_qty,--项目冻结库存数量
+t1.qc_stock_qty as qc_stock_qty,--项目质检库存数量
+t3.wbs_level3_desc, --WBS元素描述
+tl.LGOBE --库存地点描述
+from dwrotd.dwr_wm_wbs_stock_f t1
+left join dwimd.dwi_md_data_material_general_t mat on t1.material_num = mat.material_num
+left join dm.dm_otd_wbs_plan_order_det_t wbse on t1.wbs_num = wbse.zjhdid
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F t3 on t1.wbs_num = t3.wbs_level3
+
+left join dm.dm_rpt_sales_group_t t4 on t1.zlkhmc = t4.node_name9 
+left join get_ys_price ysp on t4.node_name5 = ysp.operation_desc and mat.category = ysp.prod_level3_name and mat.dimension = ysp.dimension
+
+left join dm.dm_sdi_zsd_sjxx_1001_t t5 on wbse.business_opportunity = t5.sjh
+left join dm.dm_SDI_NEW_OPPORTUNITY_1046 t6 on wbse.business_opportunity = t6.value54
+left join api_log.api_to_dws_people_information t7 on t6.value88 = t7."_id"
+left join DWIMD.DWI_MD_MATL_BATCH_INFO_T t8 on t1.batch_num = t8.batch_num and t1.material_num = t8.material_num
+left join dm.DM_SDI_T001L_1001_T tl on t1.factory_code = tl.WERKS and t1.inv_location = tl.LGORT and tl.MANDT = '800'
+where 1=1 
+and t1.start_month = replace(substring(date_sub(current_date,1),1,7),'-','')
+-- and wbse.ddzt <> '工程项目备货计划单'
+and t1.distribution_channel_code = '06'
+and mat.external_matl_group_code in ('10010')
+and mat.matl_group_code in ('1000010')
+and not (available_stock_qty = 0 and frozen_stock_qty = 0 and qc_stock_qty = 0)

@@ -1,0 +1,24 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- desc：大区下管业务员
+-- create time: 2022/10/14 18:42:54 GMT+08:00
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_REGION_SALESMEN_T
+SELECT CON.SALESMAN_CODE			AS SALESMAN_CODE, 		--业务员
+       ISC.MARKETING_DEPARTMENT 	AS MARKETING_DEPARTMENT,--门店所属大区
+	   'N'							AS DEL_FLAG,			--删除标识
+		current_timestamp() 		AS DW_LAST_UPDATE_DATE  --数据同步时间
+  FROM SDI.SDI_ICPOS_STORE_1027 IST	
+  LEFT JOIN SDI.SDI_ICPOS_STORE_CONTACTS_INFO_1027 CON
+    ON CON.STORE_CONTACTS_ID = IST.STORE_ID
+  LEFT JOIN SDI.SDI_ICPOS_STORE_CONTACTS_1027 ISC
+    ON IST.STORE_ID = ISC.STORE_ID
+ WHERE CON.DELETE_FLAG = 0
+   AND CON.CONTACTS_TYPE = '0' --联系人信息必备条件
+ GROUP BY CON.SALESMAN_CODE, ISC.MARKETING_DEPARTMENT
+ ORDER BY MARKETING_DEPARTMENT

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_FIN_CT_BUSINESS_BRIEFING_2023_PRODTYPE_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "瓷砖经营简报2023主要品类规格",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

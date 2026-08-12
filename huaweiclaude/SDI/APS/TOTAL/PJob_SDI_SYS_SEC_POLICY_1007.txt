@@ -1,0 +1,15 @@
+insert overwrite table sdi.sdi_sys_sec_policy_1007
+select 
+id,
+case_sensitivity,
+failed_pwd_times,
+length,
+lock_time,
+neet_letter,
+neet_number,
+neet_symbol,
+pwd_validity,
+sync_id,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_sec_policy_1007;

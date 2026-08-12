@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB22",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标-大规格产品销售面积占比（零售渠道）ZB22",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

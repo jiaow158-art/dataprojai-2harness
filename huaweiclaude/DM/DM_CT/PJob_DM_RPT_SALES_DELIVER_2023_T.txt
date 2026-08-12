@@ -1,0 +1,599 @@
+-- HIVE sql 
+-- ********************************************************************* --
+-- author: DP_10004701
+-- create time: 2023/08/02 14:22:07 GMT+08:00
+-- upodate 20240716 qyj 新增产品层次2名称字段、修改销售雇员获取逻辑
+-- upodate 20240803 qyj 工具类的删除
+-- upodate 20240926 qyj 平均单价逻辑调整
+-- upodate 20241021 qyj 新增商机号字段
+-- upodate 20241128 qyj 新增是否特惠品
+-- update 20250828 yjh 专属留货客编销售雇员取订单
+-- ******************************************************************** --
+-- SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+---- 设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with get_nopick_amt as 
+(
+select *, 
+sum(XS_NETWR) over(partition by vbeln,posnr,vgbel,vgpos order by createdate) as XS_NETWR_SUM,
+row_number() over(partition by vbeln,posnr,vgbel,vgpos order by createdate desc) XS_NETWR_SUM_RN
+from dwrotd.dwr_accumulate_overdue_nopick_f
+where createdate_month <=  replace(substring(date_sub(current_date,1),1,7),'-','')
+and sale_region_name like '%运营中心'
+)
+,get_nopick_amt_lj as 
+(
+select vbeln,posnr, 
+sum(XS_NETWR) as XS_NETWR_SUM_lj
+from dwrotd.dwr_accumulate_overdue_nopick_f
+where createdate_month <=  replace(substring(date_sub(current_date,1),1,7),'-','')
+and sale_region_name like '%运营中心'
+group by vbeln,posnr
+)
+,tmp as(
+select 
+	CHARG_SID
+	,mat_pspnr--已估价的销售订单库存工作分解结构要素
+    ,matnr--物料编码
+    ,werks--工厂
+    ,min(BUDAT) as BUDAT--过账日期 取第一个
+from sdi.sdi_MATDOC_1001 i
+where bwart IN ('601','652')--转入的项目库存，多批次取最后的时间
+and sobkz = 'Q'
+and DEL_FLAG = 'N'
+group by CHARG_SID,mat_pspnr,matnr,werks
+)
+,salesman1 as (
+SELECT a.sal_vch_num , 
+       concat_ws(',',collect_list( a.person_num)) as salesman_num,
+       concat_ws(',',collect_list( b.nachn)) salesman_name  
+ FROM DWROTD.DWR_SO_SAL_PARTNER_SAP_F  a  
+left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.person_num  = b.pernr 
+where a.group_num  ='800'
+and a.partner_func  ='VE'
+AND a.DEL_FLAG = 'N'
+group by a.sal_vch_num 
+)
+,salesman2 as(
+select kunnr,vkorg,vtweg,spart,
+       concat_ws(',',collect_list( a.pernr)) as salesman_num,
+       concat_ws(',',collect_list( b.nachn)) salesman_name
+from sdi.sdi_knvp_1001 a  
+left join DWIMD.DWI_HR_OA_PERNR_INFO_T b on a.pernr  = b.pernr 
+where a.mandt='800'
+and a.pernr<>'00000000'
+group by kunnr,vkorg,vtweg,spart
+)
+,unit_price1 as (
+ select sub_grp,distr_chan,material,sum(sales_amt)/sum(sales_area) as avg_price1
+ from dm.dm_order_deliver_day_report
+ where  time_type = '1'
+ group by sub_grp,distr_chan,material
+)
+,unit_price2 as (
+ select sub_grp,distr_chan,zprodh2,size_dim,sum(sales_amt)/sum(sales_area) as avg_price2
+ from dm.dm_order_deliver_day_report
+ where  time_type = '1'
+ group by sub_grp,distr_chan,zprodh2,size_dim
+)
+,unit_price3 as (
+ select sub_grp,distr_chan,zprodh2,size_dim,sum(sales_amt)/sum(sales_area) as avg_price2
+ from dm.dm_order_deliver_day_report
+ where  time_type = '3'
+ group by sub_grp,distr_chan,zprodh2,size_dim
+)
+,unit_price6 as (
+ select sub_grp,distr_chan,zprodh2,size_dim,sum(sales_amt)/sum(sales_area) as avg_price2
+ from dm.dm_order_deliver_day_report
+ where  time_type = '6'
+ group by sub_grp,distr_chan,zprodh2,size_dim
+)
+,A as(
+	select A1.*,
+		t3.material_name,
+		t3.DIMENSION,
+		t3.product_level2_code as prod_name2,
+		t3.length_1,
+		t3.width
+	from dwrotd.dwr_wm_stock_res_from_sales A1
+	left join dwimd.dwi_md_data_material_general_t t3 on A1.material_num = t3.material_num
+	where 1=1 
+	and t3.matl_group_code in ('1000010')
+	and (
+        prod_property in ('A0001','A0002','E0001','C0002')
+		)
+	and (
+		A1.inv_location not in ('CX02','GFZ','CF01','QF04','TF01','SF01','XF01','CP01','CX02','QX02','TX02')
+		and substr(A1.inv_location,1,1) not in ('A','V' )
+		and substr(A1.inv_location,1,2) not in ('00' )
+		)
+	and substr(A1.factory_code,1,2) not in ('73','80','81','82','83','85','88')
+	and A1.batch_num is not null
+)
+
+/*
+ * 备货
+*/
+,B as(
+	select B1.*,
+		t3.material_name,
+		t3.DIMENSION,
+		t3.product_level2_code as prod_name2,
+		t3.length_1,
+		t3.width
+	from dwrotd.dwr_wm_stock_prepare_from_stockout B1
+	left join dwimd.dwi_md_data_material_general_t t3 on B1.material_num = t3.material_num
+	where 1=1 
+	and t3.matl_group_code in ('1000010')
+	and (
+        prod_property in ('A0001','A0002','E0001','C0002')
+		)
+	and (
+		B1.inv_location not in ('CX02','GFZ','CF01','QF04','TF01','SF01','XF01','CP01','CX02','QX02','TX02')
+		and substr(B1.inv_location,1,1) not in ('A','V' )
+		and substr(B1.inv_location,1,2) not in ('00' )
+		)
+	and substr(B1.factory_code,1,2) not in ('73','80','81','82','83','85','88')
+	and B1.batch_num is not null
+)
+
+-- 明细为了方便对数
+,tem as(
+select 
+	A.create_time,
+	A.res_stock_date,
+	A.batch_num,
+	'销售订单留货' as lb_type,
+	A.inv_location,
+	A.factory_code,
+	A.lev1_name,
+	A.lev2_name,
+	A.lev3_name,
+	A.lev4_name,
+	A.lev5_name,
+	A.sal_vch_num,
+	A.sal_vch_item_num,
+	A.wbs_element,
+	A.material_num,
+	A.material_name,
+	A.DIMENSION,
+	A.prod_name2,
+	A.distribution_channel_code,
+	A.total_sku_confirm_qty  as sal_pre_res_qty,
+	A.acc_time_date,
+	A.user_delivery_date, --用户需求交货时间
+	''	as stockout_order_no,
+	''  as stockout_order_item_no,
+	A.sale_grp,
+	A.plan_order_type,
+	A.CUST_NUM,
+	A.CUST_NAME,
+	A.SALES_ORG_CODE,
+	case when COALESCE(vrkme,'') in ('','PC') then (A.total_sku_confirm_qty*A.length_1*A.width)/1000000  
+        	when vrkme = 'M2' then A.total_sku_confirm_qty 
+        	else A.total_sku_confirm_qty end as sal_pre_res_area,
+	A.creator_id,
+	A.creator_name,
+	A.zh_channel_code4,
+	A.BSARK,
+    A.zjhd,
+    A.zjhdid,
+    A.length_1,
+    A.width,
+    A.order_sub_date,
+    A.pre_type,
+    A.vrkme,
+    A.lev6_name,
+    A.lev7_name,
+    A.cal_start_date
+from A 
+where 1=1 
+and 
+	(
+		A.cust_num not in 
+			(
+			select distinct lpad(payer_id,10,0) from sdi.sdi_sd_forecast_special_custom_t_1037
+			)
+		and sal_vch_num  like '11%'
+	)
+	
+union ALL 
+
+select 
+	B.create_time,
+	B.res_stock_date,
+	B.batch_num,
+	'销售订单备货' as lb_type,
+	B.inv_location,
+	B.factory_code,
+	B.lev1_name,
+	B.lev2_name,
+	B.lev3_name,
+	B.lev4_name,
+	B.lev5_name,
+	B.reference_bill_num as sal_vch_num,
+	B.reference_proj_num as sal_vch_item_num,
+	B.wbs_element,
+	B.material_num,
+	B.material_name,
+	B.DIMENSION,
+	B.prod_name2,
+	B.distribution_channel_code,
+	B.total_prepare_qty as sal_pre_res_qty,
+	B.acc_time_date,
+	B.user_delivery_date, --用户需求交货时间
+	B.stockout_order_no,
+	B.stockout_order_item_no,
+	B.sale_grp,
+	B.plan_order_type,
+	B.CUST_NUM,
+	B.CUST_NAME,
+	B.SALES_ORG_CODE,
+	case when COALESCE(vrkme,'') in ('','PC') then (B.total_prepare_qty*B.length_1*B.width)/1000000
+	        when vrkme = 'M2' then B.total_prepare_qty 
+	        else B.total_prepare_qty end as sal_pre_res_area,
+	'' as creator_id,
+	'' as creator_name,
+	B.zh_channel_code4,
+	B.BSARK,
+    B.zjhd,
+    B.zjhdid,
+    B.length_1,
+    B.width,
+    B.order_sub_date,
+    B.pre_type,
+    B.vrkme,
+    B.lev6_name,
+    B.lev7_name,
+    b.cal_start_date
+from B
+where 1=1 
+and 
+	(
+		reference_bill_num  like '11%'  
+	)
+
+union ALL 
+
+--转储单留货
+select 
+	'' as create_time,
+	t1.res_stock_date,
+	t1.batch_num,
+	'转储单留货' as lb_type,
+	t1.inv_location,
+	t1.stockin_factory_code as factory_code,
+	t2.node_desc1 as lev1_name,
+	t2.node_desc2 as lev2_name,
+	t2.node_desc3 as lev3_name,
+	t2.node_desc4 as lev4_name,
+	t2.node_desc5 as lev5_name,
+	t1.purchase_order_num as sal_vch_num,
+	t1.purchase_order_item_num as sal_vch_item_num,
+	t1.wbs_element,
+	t1.material_num,
+	t3.material_name,
+	t3.DIMENSION,
+	t3.product_level2_code as prod_name2,
+	'' as distribution_channel_code,
+	t1.res_stock_qty as sal_pre_res_qty,
+	'' as acc_time_date,
+	'' as user_delivery_date, --用户需求交货时间
+	'' as stockout_order_no,
+	'' as stockout_order_item_no,
+	t2.node_name5 as sale_grp,
+	'' as plan_order_type,
+	t1.CUST_NUM,
+	t1.CUST_NAME,
+	t1.SALES_ORG_CODE,
+	t1.res_stock_qty*t3.length_1*t3.width/1000000 as sal_pre_res_area,
+	'' as creator_id,
+	'' as creator_name,
+	'' as zh_channel_code4,
+	'' as BSARK,
+    '' as zjhd,
+    '' as zjhdid,
+    t3.length_1,
+    t3.width,
+    '' as order_sub_date,
+    '' as pre_type,
+    '' as vrkme,
+    null as lev6_name,
+    null as lev7_name,
+    null as cal_start_date
+from  dwrotd.dwr_wm_stock_res_from_purchase t1
+left join (select distinct node_desc1,node_desc2,node_desc3,node_desc4,node_name5,node_desc5 from dm.dm_rpt_sales_group_t where  node_desc5 like '%运营中心') t2 
+	on t1.belong_company = t2.node_desc5
+left join dwimd.dwi_md_data_material_general_t t3
+	on t1.material_num = t3.material_num
+where 1=1 
+and t3.matl_group_code in ('1000010')
+and t3.prod_property in ('A0001','A0002','E0001','C0002')
+
+union ALL 
+
+--转储单备货
+select 
+	B.create_time,
+	B.res_stock_date,
+	B.batch_num,
+	'转储单备货' as lb_type,
+	B.inv_location,
+	B.factory_code,
+	t2.node_desc1 lev1_name,
+	t2.node_desc2 lev2_name,
+	t2.node_desc3 lev3_name,
+	t2.node_desc4 lev4_name,
+	t2.node_desc5 lev5_name,
+	B.reference_bill_num as sal_vch_num,
+	B.reference_proj_num as sal_vch_item_num,
+	B.wbs_element,
+	B.material_num,
+	B.material_name,
+	B.DIMENSION,
+	B.prod_name2,
+	B.distribution_channel_code,
+	B.total_prepare_qty as sal_pre_res_qty,
+	B.acc_time_date,
+	B.user_delivery_date, --用户需求交货时间
+	B.stockout_order_no,
+	B.stockout_order_item_no,
+	COALESCE(t2.node_name5,B.sale_grp) as sale_grp,
+	B.plan_order_type,
+	B.CUST_NUM,
+	B.CUST_NAME,
+	B.SALES_ORG_CODE,
+	case when COALESCE(vrkme,'') in ('','PC') then (B.total_prepare_qty*B.length_1*B.width)/1000000 
+	        when vrkme = 'M2' then B.total_prepare_qty 
+	        else  B.total_prepare_qty end as sal_pre_res_area,
+	'' as creator_id,
+	'' as creator_name,
+	B.zh_channel_code4,
+	B.BSARK,
+    B.zjhd,
+    B.zjhdid,
+    B.length_1,
+    B.width,
+    B.order_sub_date,
+    B.pre_type,
+    B.vrkme,
+    null as lev6_name,
+    null as lev7_name,
+    null as cal_start_date
+from B
+left join (select distinct node_desc1,node_desc2,node_desc3,node_desc4,node_name5,node_desc5 from dm.dm_rpt_sales_group_t where  node_desc5 like '%运营中心') t2 
+	on B.butxt = t2.node_desc5
+where 1=1 
+and (reference_bill_num like'46%'  or reference_bill_num like'47%') and butxt is not null
+
+union ALL 
+
+--专属客编留货
+select
+	A.create_time,
+	A.res_stock_date,
+	A.batch_num,
+	'专属客编留货' as lb_type,
+	A.inv_location,
+	A.factory_code,
+	A.lev1_name,
+	A.lev2_name,
+	A.lev3_name,
+	A.lev4_name,
+	A.lev5_name,
+	A.sal_vch_num,
+	A.sal_vch_item_num,
+	A.wbs_element,
+	A.material_num,
+	A.material_name,
+	A.DIMENSION,
+	A.prod_name2,
+	A.distribution_channel_code,
+	A.total_sku_confirm_qty  sal_pre_res_qty,
+	A.acc_time_date,
+	A.user_delivery_date, --用户需求交货时间
+	''	as stockout_order_no,
+	''  as stockout_order_item_no,
+	A.sale_grp,
+	A.plan_order_type,
+	A.CUST_NUM,
+	A.CUST_NAME,
+	A.SALES_ORG_CODE,
+	case when COALESCE(A.vrkme,'') in ('','PC') then (A.total_sku_confirm_qty*A.length_1*A.width)/1000000  
+	        when A.VRKME = 'M2' then A.total_sku_confirm_qty 
+	        else A.total_sku_confirm_qty end as sal_pre_res_area,
+	A.creator_id,
+	A.creator_name,
+	A.zh_channel_code4,
+	A.BSARK,
+    A.zjhd,
+    A.zjhdid,
+    A.length_1,
+    A.width,
+    A.order_sub_date,
+    A.pre_type,
+    A.vrkme,
+    A.lev6_name,
+    A.lev7_name,
+    A.cal_start_date
+from A
+where 1=1
+and A.cust_num in 
+	(
+	select distinct lpad(payer_id,10,0) from sdi.sdi_sd_forecast_special_custom_t_1037
+	)
+)
+,result as 
+(
+select 
+	a.create_time,
+	a.res_stock_date,
+	a.batch_num,
+	a.lb_type,
+	a.inv_location,
+	a.factory_code,
+	a.lev3_name,
+	a.lev4_name,
+	case when a.lb_type in ('转储单留货','转储单备货') and a.CUST_NAME in ('战略工程仓') then '战略地产' else  a.lev5_name end as lev5_name,
+	a.sal_vch_num,
+	a.sal_vch_item_num,
+	a.wbs_element,
+	a.material_num,
+	a.material_name,
+	a.dimension,
+	a.prod_name2,
+	a.distribution_channel_code,
+	a.sal_pre_res_qty,
+	a.acc_time_date,
+	a.user_delivery_date,
+	a.stockout_order_no,
+	a.stockout_order_item_no,
+	current_timestamp() as dw_last_update_date,
+    a.sale_grp,
+	a.plan_order_type,
+	a.CUST_NUM,
+	a.CUST_NAME,
+	a.SALES_ORG_CODE,
+	coalesce(case when a.cust_num in('1000000281',
+'1000000282',
+'1000000262',
+'1000000788',
+'0000311477',
+'1000000263',
+'0000315546',
+'1000005495'
+	) then b.salesman_num end , wbse.salesman_num_list, c.salesman_num,a.creator_id)  as salesman_num_list,   -- 子公司留货客编为公共客编,子公司留货客编的雇员取订单的销售雇员
+	coalesce(case when a.cust_num in('1000000281',
+'1000000282',
+'1000000262',
+'1000000788',
+'0000311477',
+'1000000263',
+'0000315546',
+'1000005495'
+	) then b.salesman_name end,wbse.salesman_name_list, c.salesman_name,a.creator_name) as salesman_name_list,
+	a.sal_pre_res_area,
+	a.creator_id,
+	a.creator_name,
+	a.zh_channel_code4,
+	case 
+    	when lb_type = '专属客编留货' then coalesce(up1.avg_price1,up2.avg_price2,up3.avg_price2,up6.avg_price2) 
+    	when COALESCE(a.vrkme,'') in ('','PC') then coalesce(wbse.yj_unit_price,qq5.yj_unit_price)
+    	else coalesce((wbse.yj_unit_price*(t3.length_1*t3.width)/1000000),(qq5.yj_unit_price*(t3.length_1*t3.width)/1000000))
+    end as avg_price,
+	a.BSARK,
+    a.zjhd,
+    a.zjhdid,
+    a.length_1,
+    a.width,
+    a.order_sub_date,
+    a.pre_type,
+    a.vrkme,
+    a.lev6_name,
+    a.lev7_name,
+    a.lev2_name,
+    t3.product_level2_name as prod_name2_desc,
+    COALESCE(vbak.dh,wbse.business_opportunity) as business_opportunity,
+    case when a.factory_code LIKE '%80' OR bt.promote_reason_code in ('AC01','AC02','AC03','AC04','AC05') then '是' else '否' end is_discount_mat,
+    row_number() over(partition by a.sal_vch_num,a.sal_vch_item_num order by a.stockout_order_no,a.stockout_order_item_no desc) order_index,
+    COALESCE(wbse.znka,qq5.znka) as znka,--KA类型
+    COALESCE(wbse.znka_kunnr,qq5.znka_kunnr) as znka_kunnr,--KA客户
+    COALESCE(wbse.znka_type,qq5.znka_type) as znka_type,--客户产品类型
+    qq5.czjhdh,
+    qq5.is_xh,
+    a.cal_start_date,
+    qq5.kz_date
+from tem a
+left join salesman1 b ON a.sal_vch_num = b.sal_vch_num 
+left join salesman2 c ON a.CUST_NUM = c.kunnr and a.SALES_ORG_CODE = c.vkorg and a.distribution_channel_code = c.vtweg 	
+left join dm.dm_cz_ywbm_group_t gr on a.sale_grp = gr.sales_grp
+left join unit_price1 up1 on gr.sub_grp_name_xt = up1.sub_grp and a.distribution_channel_code = up1.distr_chan and a.material_num = up1.material
+left join unit_price2 up2 on gr.sub_grp_name_xt = up2.sub_grp and a.distribution_channel_code = up2.distr_chan and a.prod_name2 = up2.zprodh2 and a.DIMENSION = up2.size_dim
+left join unit_price3 up3 on gr.sub_grp_name_xt = up3.sub_grp and a.distribution_channel_code = up3.distr_chan and a.prod_name2 = up3.zprodh2 and a.DIMENSION = up3.size_dim
+left join unit_price6 up6 on gr.sub_grp_name_xt = up6.sub_grp and a.distribution_channel_code = up6.distr_chan and a.prod_name2 = up6.zprodh2 and a.DIMENSION = up6.size_dim
+left join dm.dm_otd_wbs_plan_order_det_t wbse on a.zjhdid = wbse.zjhdid
+left join dwimd.dwi_md_data_material_general_t t3 on a.material_num = t3.material_num
+left join DM.DM_OTD_SALES_ORDER_DET_T qq5 on a.sal_vch_num = qq5.vbeln and a.sal_vch_item_num = qq5.posnr
+left join DWIMD.DWI_MD_MATL_BATCH_INFO_T bt on a.batch_num = bt.BATCH_NUM and a.material_num = bt.MATERIAL_NUM
+left join sdi.sdi_vbak_1001 vbak on a.sal_vch_num = vbak.vbeln
+where 1=1 
+and sal_pre_res_qty > 0
+and inv_location not in ('7F21')
+and prod_name2 not in ('6102','6104') --工具类、物料类的删除
+and COALESCE(a.distribution_channel_code,'NAL') not in ('07')
+)
+INSERT OVERWRITE TABLE DM.DM_RPT_SALES_DELIVER_2023_T partition (stat_month)
+select 
+	a.create_time,
+	a.res_stock_date,
+	a.batch_num,
+	a.lb_type,
+	a.inv_location,
+	a.factory_code,
+	a.lev3_name,
+	a.lev4_name,
+	a.lev5_name,
+	a.sal_vch_num,
+	a.sal_vch_item_num,
+	a.wbs_element,
+	a.material_num,
+	a.material_name,
+	a.dimension,
+	a.prod_name2,
+	a.distribution_channel_code,
+	a.sal_pre_res_qty,
+	a.acc_time_date,
+	a.user_delivery_date,
+	a.stockout_order_no,
+	a.stockout_order_item_no,
+	a.dw_last_update_date,
+    a.sale_grp,
+	a.plan_order_type,
+	a.CUST_NUM,
+	a.CUST_NAME,
+	a.SALES_ORG_CODE,
+	a.salesman_num_list,
+	a.salesman_name_list,
+	a.sal_pre_res_area,
+	a.creator_id,
+	a.creator_name,
+	a.zh_channel_code4,
+	a.avg_price,
+	a.BSARK,
+    a.zjhd,
+    a.zjhdid,
+    a.length_1,
+    a.width,
+    a.order_sub_date,
+    coalesce(sap_order.STK_TYPE_NAME, a.pre_type) as pre_type,
+    a.vrkme,
+    a.lev6_name,
+    a.lev7_name,
+    a.lev2_name,
+    a.prod_name2_desc,
+    a.business_opportunity,
+    a.is_discount_mat,
+    -- coalesce(gna1.XS_NETWR_SUM,gna.XS_NETWR_SUM) as nopick_amount,
+    gna2.XS_NETWR_SUM_lj as nopick_amount,
+    coalesce(gna1.mianji,gna.mianji) as nopick_area,
+    a.znka,--KA类型
+    a.znka_type,--客户产品类型
+    a.znka_kunnr,--KA客户
+    a.czjhdh,
+    a.is_xh,
+    a.cal_start_date,
+    a.kz_date,
+    coalesce(wbsmain.wbs_level3_desc,LTC_CRM.BUSI_NAME) as wbs_level3_desc,
+	SUBSTRING(replace(date_sub(current_date,1),'-',''),1,6) as stat_month 
+from result a
+left join get_nopick_amt gna on a.sal_vch_num= gna.VBELN and gna.POSNR = a.sal_vch_item_num and gna.DATATYPETXT = '留货' and gna.XS_NETWR_SUM_RN = 1
+left join get_nopick_amt gna1 on a.stockout_order_no= gna1.vgbel and a.stockout_order_item_no = gna1.vgpos  and gna1.DATATYPETXT = '备货' and gna1.XS_NETWR_SUM_RN = 1
+left join get_nopick_amt_lj gna2 on a.sal_vch_num= gna2.VBELN and gna2.POSNR = a.sal_vch_item_num  and a.order_index = 1
+left join DWROTD.DWR_SAP_ORDER_INFO_T sap_order on a.sal_vch_num = sap_order.order_num and a.sal_vch_item_num = sap_order.order_item_num
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F wbsmain on coalesce(a.wbs_element,'NAL') = wbsmain.pspnr
+left join DWRLTC.DWR_LTC_CRM_OPPORTUNITY_T LTC_CRM on a.business_opportunity = LTC_CRM.BUSI_CODE

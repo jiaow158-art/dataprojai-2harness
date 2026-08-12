@@ -1,0 +1,887 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/02/26 11:18:35 GMT+08:00
+-- qyj 20240627 解决RESB逻辑调整，但是中台代码逻辑没调整的问题
+-- update from huangwenbin 2025-03-26 修改备货库存的逻辑
+-- update from zhz 2025-08-19 新增wbs长号
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+
+with t1 as(
+select
+     a.MATERIAL_ID
+	,a.MATERIAL_NUM AS MATERIAL_NUM  -- matnr
+    ,a.MATERIAL_NAME	
+	,a.FACTORY_ID
+	,a.FACTORY_CODE AS FACTORY_CODE  -- werks
+	,a.FACTORY_NAME
+	,a.STOCK_PLACE as INV_LOCATION  -- lgort
+	,a.BATCH_NUM AS BATCH_NUM  -- CHARG
+	,RETAIL_VOUCHER_NO AS SAL_VCH_NUM --销售订单号  SO_NO
+	,RETAIL_VOUCHER_PROJECT_NO AS SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,WBS_ELEMENT AS WBS_ELEMENT  -- WBS_NUM
+	,CUST_ID
+	,CUST_NUM --客户  CUSTOMER 
+	,CUST_NAME
+	,SUPPLIER_OR_CREDITOR_ID
+	,SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,SUPPLIER_OR_CREDITOR_NAME
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') in('','K_T148T') AND COALESCE(STOCK_TYPE,'') = '01' then COALESCE(STOCK_QTY,0) else 0 end) as zkkc--总库
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') = 'Q_T148T'  AND COALESCE(STOCK_TYPE,'') = '01' then COALESCE(STOCK_QTY,0) else 0 end) as xmkc--项目库存数
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') in('','K_T148T') AND COALESCE(STOCK_TYPE,'') = '02' then COALESCE(STOCK_QTY,0) else 0 end) as zjkc--质检数
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') in('','K_T148T') AND COALESCE(STOCK_TYPE,'') = '07' then COALESCE(STOCK_QTY,0) else 0 end) as djkc--冻结数
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') = 'Q_T148T' AND COALESCE(STOCK_TYPE,'') = '02' then COALESCE(STOCK_QTY,0) else 0 end) as xmzjkc--项目质检数
+	,sum(case when COALESCE(SPECIAL_STOCK_FLAG,'') = 'Q_T148T' AND COALESCE(STOCK_TYPE,'') = '07' then COALESCE(STOCK_QTY,0) else 0 end) as xmdjkc--项目冻结数
+	,SUM(COALESCE(STOCK_QTY,0)) AS STOCK_QTY
+from DWROTD.DWR_WM_ALL_TYPE_STOCK_F a  -- ZCDSV_TOTALSTCK
+group by a.MATERIAL_ID
+	    ,a.MATERIAL_NUM
+        ,a.MATERIAL_NAME	
+	    ,a.FACTORY_ID
+	    ,a.FACTORY_CODE
+	    ,a.FACTORY_NAME
+	    ,a.STOCK_PLACE 
+	    ,a.BATCH_NUM
+	    ,RETAIL_VOUCHER_NO
+	    ,RETAIL_VOUCHER_PROJECT_NO
+	    ,WBS_ELEMENT
+	    ,CUST_ID
+	    ,CUST_NUM
+	    ,CUST_NAME
+	    ,SUPPLIER_OR_CREDITOR_ID
+	    ,SUPPLIER_OR_CREDITOR_NUM
+	    ,SUPPLIER_OR_CREDITOR_NAME
+)
+--留货库存
+,t11 as(
+SELECT 
+--SUM(COALESCE(A.SKU_CONFIRM_QTY,0)) SKU_CONFIRM_QTY -- VMENG
+	sum(case when COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'Q_T163I' then COALESCE(A.SKU_CONFIRM_QTY,0) else 0 end) as SKU_PROCONFIRM_QTY --项目留货数
+   ,SUM(case when (COALESCE(A.SUBJECT_DISTR_TYPE,'') = '' OR  (COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(A.REQ_TYPE,'') = '01'))
+	then COALESCE(A.SKU_CONFIRM_QTY,0) else 0 end) as SKU_CONFIRM_QTY -- VMENG 留货数
+    ,A.MATERIAL_ID
+	,A.MATERIAL_NUM
+    ,A.MATERIAL_NAME
+	,A.FACTORY_ID
+	,A.FACTORY_CODE
+	,A.FACTORY_NAME
+	,A.INV_LOCATION -- LGORT
+	,A.BATCH_NUM -- CHARG
+	,A.SAL_VCH_NUM --销售凭证 VBELN
+	,A.SAL_VCH_ITEM_NUM --销售凭证项目 POSNR
+	,A.WBS_ELEMENT --WBS 要素 PSPEL
+	,A.CUST_ID
+	,A.CUST_NUM--客户  CUSTOMER KUNNR
+	,A.CUST_NAME	
+	,NULL AS SUPPLIER_OR_CREDITOR_ID
+	,NULL AS SUPPLIER_OR_CREDITOR_NUM --供应商 VENDOR
+	,NULL AS SUPPLIER_OR_CREDITOR_NAME
+FROM DWROTD.DWR_SO_SAL_REQ_SAP_F A-- VBBE
+WHERE COALESCE(A.SALES_DIS_VCH_TYPE,'') = 'C_VBTYPL'  -- VBTYP
+AND ( (COALESCE(A.SUBJECT_DISTR_TYPE,'') = '' OR  (COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(A.REQ_TYPE,'') = '01'))  -- KNTTP  bdart
+    OR  COALESCE(A.SUBJECT_DISTR_TYPE,'') = 'Q_T163I' )--项目留货数
+AND COALESCE(A.SKU_CONFIRM_QTY,0) > 0 
+	group by MATERIAL_ID
+	,MATERIAL_NUM
+    ,MATERIAL_NAME
+	,FACTORY_ID
+	,FACTORY_CODE
+	,FACTORY_NAME
+	,INV_LOCATION -- LGORT
+	,BATCH_NUM -- CHARG
+	,SAL_VCH_NUM --销售凭证 VBELN
+	,SAL_VCH_ITEM_NUM --销售凭证项目 POSNR
+	,WBS_ELEMENT --WBS 要素 PSPEL
+	,CUST_ID
+	,CUST_NUM --客户  CUSTOMER KUNNR
+	,CUST_NAME		
+union all
+SELECT --'转储单留货'
+	0  as SKU_PROCONFIRM_QTY --项目留货数
+   ,SUM(t1.res_stock_qty) as SKU_CONFIRM_QTY -- VMENG 留货数
+    ,t3.MATERIAL_ID
+	,t3.MATERIAL_NUM
+    ,t3.MATERIAL_NAME
+	,null as FACTORY_ID
+	,t1.stockout_FACTORY_CODE as FACTORY_CODE --发出
+	,null as   FACTORY_NAME
+	,t1.inv_location as INV_LOCATION -- LGORT
+	,t1.batch_num as BATCH_NUM -- CHARG
+	,t1.purchase_order_num as SAL_VCH_NUM --销售凭证 VBELN
+	,t1.purchase_order_item_num as SAL_VCH_ITEM_NUM --销售凭证项目 POSNR
+	,t1.wbs_element as WBS_ELEMENT --WBS 要素 PSPEL
+	,null as CUST_ID
+	,t1.CUST_NUM as CUST_NUM--客户  CUSTOMER KUNNR
+	,t1.CUST_NAME as CUST_NAME	
+	,NULL AS SUPPLIER_OR_CREDITOR_ID
+	,NULL AS SUPPLIER_OR_CREDITOR_NUM --供应商 VENDOR
+	,NULL AS SUPPLIER_OR_CREDITOR_NAME
+from  dwrotd.dwr_wm_stock_res_from_purchase t1
+left join (select distinct lev1_name,lev2_name,lev3_name,lev4_name,lev5_name from dm.dm_rpt_sale_grp_t) t2 
+	on t1.belong_company = t2.lev5_name
+left join dwimd.dwi_md_data_material_general_t t3
+	on t1.material_num = t3.material_num
+group by 
+    t3.MATERIAL_ID
+	,t3.MATERIAL_NUM
+    ,t3.MATERIAL_NAME
+    ,t1.stockout_FACTORY_CODE
+    ,t1.inv_location 
+	,t1.batch_num 
+	,t1.purchase_order_num 
+	,t1.purchase_order_item_num 
+	,t1.wbs_element
+	,t1.CUST_NUM 
+	,t1.CUST_NAME 
+)
+
+--备货库存
+,t21 as(
+SELECT
+     MATERIAL_ID
+	,MATERIAL_NUM -- matnr
+	,MATERIAL_NAME
+	,FACTORY_ID
+	,FACTORY_CODE -- werks
+	,FACTORY_NAME
+	,INV_LOCATION -- lgort
+	,BATCH_NUM -- CHARG
+	,SAL_VCH_NUM --销售凭证 VBELN
+	,SAL_VCH_ITEM_NUM --销售凭证项目  POSNR
+	,WBS_ELEMENT --WBS 要素 PSPEL
+	,CUST_ID
+	,CUST_NUM--客户 as CUSTOMER  KUNNR
+	,CUST_NAME
+	,NULL AS SUPPLIER_OR_CREDITOR_ID
+	,NULL AS SUPPLIER_OR_CREDITOR_NUM --供应商 VENDOR
+	,NULL AS SUPPLIER_OR_CREDITOR_NAME
+--	,SUM(COALESCE(SKU_CONFIRM_QTY,0)) as SKU_CONFIRM_QTY -- vmeng
+	,sum(case when COALESCE(SUBJECT_DISTR_TYPE,'') = 'Q_T163I' then COALESCE(SKU_CONFIRM_QTY,0) else 0 end) as SKU_PROCONFIRM_QTY --项目备货数
+    ,SUM(case when (COALESCE(SUBJECT_DISTR_TYPE,'') = '' OR  (COALESCE(SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(REQ_TYPE,'') = '01'))
+	then COALESCE(SKU_CONFIRM_QTY,0) else 0 end) as SKU_CONFIRM_QTY -- VMENG 备货数
+FROM DWROTD.DWR_SO_SAL_REQ_SAP_F -- VBBE
+WHERE COALESCE(SALES_DIS_VCH_TYPE,'') = 'J_VBTYPL'  -- VBTYP
+AND ( (COALESCE(SUBJECT_DISTR_TYPE,'') = '' OR(COALESCE(SUBJECT_DISTR_TYPE,'') = 'M_T163I' AND COALESCE(REQ_TYPE,'') = '01'))  -- KNTTP  bdart
+OR  COALESCE(SUBJECT_DISTR_TYPE,'') = 'Q_T163I' )--项目备货数
+AND COALESCE(SKU_CONFIRM_QTY,0) > 0
+GROUP BY MATERIAL_ID
+	,MATERIAL_NUM -- matnr
+	,MATERIAL_NAME
+	,FACTORY_ID
+	,FACTORY_CODE -- werks
+	,FACTORY_NAME
+	,INV_LOCATION -- lgort
+	,BATCH_NUM -- CHARG
+	,SAL_VCH_NUM --销售凭证 VBELN
+	,SAL_VCH_ITEM_NUM --销售凭证项目  POSNR
+	,WBS_ELEMENT --WBS 要素 PSPEL
+	,CUST_ID
+	,CUST_NUM--客户 as CUSTOMER  KUNNR
+	,CUST_NAME
+)
+
+,t22 as(
+SELECT 
+     T.MATERIAL_ID
+	,a.matnr AS MATERIAL_NUM
+	,T.MATERIAL_NAME
+	,T1.FACTORY_ID
+	,a.werks AS FACTORY_CODE
+	,T1.FACTORY_NAME
+	,a.lgort AS INV_LOCATION
+	,a.CHARG AS BATCH_NUM
+	,a.AUFNR AS SAL_VCH_NUM --销售凭证
+	,a.AUFPS AS SAL_VCH_ITEM_NUM--销售凭证项目
+	,a.PSPEL AS WBS_ELEMENT --WBS要素
+	,NULL AS CUST_ID--客户
+	,NULL AS CUST_NUM
+	,NULL AS CUST_NAME
+	,D.SUPPLIER_OR_CREDITOR_ID
+    ,D.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+    ,D.SUPPLIER_OR_CREDITOR_NAME
+	,SUM(COALESCE(a.erfmg,0)) erfmg
+	,SUM(COALESCE(a.enmng,0)) enmng
+FROM SDI.SDI_RESB_1001 a
+left join DWIMD.DWI_MD_MATERIAL_GENERAL_T T	--关联物料主数据表,取MATERIAL_NAME
+ON T.MATERIAL_NUM = a.matnr		--物料ID
+AND T.GROUP_NUM = a.MANDT			--集团
+AND T.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+AND A.DEL_FLAG = 'N'					--删除标识'N'
+LEFT JOIN DWIMD.DWI_MD_FACTORY_T T1			--关联工厂主数据表,取FACTORY_NAME
+ON  T1.FACTORY_CODE = a.werks		--工厂ID
+AND T1.GROUP_NUM = a.MANDT			--集团
+AND T1.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+AND A.DEL_FLAG = 'N'					--删除标识'N'
+left join SDI.SDI_RKPF_1001 b
+on a.RSNUM = b.RSNUM
+and COALESCE(b.NPLNR,'') <> ''
+left join(
+  SELECT PURCHASE_VOUCHER_NUM, -- EBELN
+         PURCHASE_VCH_ITEM_NUM1, -- EBELP
+		 CUST_NUM -- KUNNR
+  FROM DWRPUR.DWR_PTP_PURCHASE_VCH_ITEM_F -- EKPO    可以干掉这段逻辑，因为关联是left join,也没有取出字段
+  GROUP BY PURCHASE_VOUCHER_NUM,
+           PURCHASE_VCH_ITEM_NUM1,
+		   CUST_NUM) c
+on a.BANFN = c.PURCHASE_VOUCHER_NUM
+and a.BNFPO = c.PURCHASE_VCH_ITEM_NUM1
+left join(
+	SELECT PURCHASE_VOUCHER_NUM, -- EBELN
+		   SUPPLIER_OR_CREDITOR_ID,
+		   SUPPLIER_OR_CREDITOR_NUM, -- LIFNR
+		   SUPPLIER_OR_CREDITOR_NAME
+	FROM DWRPUR.DWR_PTP_PURCHASE_VCH_HEADER_F -- EKkO
+	GROUP BY PURCHASE_VOUCHER_NUM,
+	         SUPPLIER_OR_CREDITOR_ID,
+		     SUPPLIER_OR_CREDITOR_NUM, -- LIFNR
+		     SUPPLIER_OR_CREDITOR_NAME
+) d
+on a.BANFN = d.PURCHASE_VOUCHER_NUM
+WHERE COALESCE(a.xloek,'') = ''
+AND COALESCE(a.kzear,'') = ''
+AND COALESCE(a.erfmg,0) > 0 
+and a.bdart not in ('BB','SB')
+and b.NPLNR is null
+group by T.MATERIAL_ID
+	,a.matnr
+	,T.MATERIAL_NAME
+	,T1.FACTORY_ID
+	,a.werks
+	,T1.FACTORY_NAME
+	,a.lgort
+	,a.CHARG
+	,a.AUFNR
+	,a.AUFPS
+	,a.PSPEL
+	,D.SUPPLIER_OR_CREDITOR_ID
+    ,D.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+    ,D.SUPPLIER_OR_CREDITOR_NAME
+)
+,t23 as(
+SELECT 
+	     A.MATERIAL_ID
+	    ,a.MATERIAL_NUM
+	    ,A.MATERIAL_NAME
+	    ,A.FACTORY_ID
+	    ,a.FACTORY_CODE
+	    ,A.FACTORY_NAME
+	    ,a.INV_LOCATION
+	    ,a.BATCH_NUM
+	    ,a.SAL_VCH_NUM --销售凭证
+	    ,a.SAL_VCH_ITEM_NUM--销售凭证项目
+	    ,a.WBS_ELEMENT --WBS要素
+	    ,A.CUST_ID--客户
+	    ,A.CUST_NUM
+	    ,A.CUST_NAME
+	    ,A.SUPPLIER_OR_CREDITOR_ID
+        ,A.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+        ,A.SUPPLIER_OR_CREDITOR_NAME
+	,sum(COALESCE(a.SKU_CONFIRM_QTY,0) + COALESCE(a.erfmg,0) - COALESCE(a.enmng,0)) bhkc  -- vmeng
+	,SUM(COALESCE(a.SKU_PROCONFIRM_QTY,0)) xmbhkc
+FROM (
+	select 
+		 MATERIAL_ID
+	    ,a.MATERIAL_NUM
+	    ,A.MATERIAL_NAME
+	    ,A.FACTORY_ID
+	    ,a.FACTORY_CODE
+	    ,A.FACTORY_NAME
+	    ,a.INV_LOCATION
+	    ,a.BATCH_NUM
+	    ,a.SAL_VCH_NUM --销售凭证
+	    ,a.SAL_VCH_ITEM_NUM--销售凭证项目
+	    ,a.WBS_ELEMENT --WBS要素
+	    ,A.CUST_ID--客户
+	    ,A.CUST_NUM
+	    ,A.CUST_NAME
+	    ,A.SUPPLIER_OR_CREDITOR_ID
+        ,A.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+        ,A.SUPPLIER_OR_CREDITOR_NAME
+		,a.SKU_CONFIRM_QTY -- vmeng
+		,a.SKU_PROCONFIRM_QTY
+		,0 as erfmg
+		,0 as enmng
+	from t21 a
+	union all
+	select 
+		 B.MATERIAL_ID
+	    ,B.MATERIAL_NUM
+	    ,B.MATERIAL_NAME
+	    ,B.FACTORY_ID
+	    ,B.FACTORY_CODE
+	    ,B.FACTORY_NAME
+	    ,B.INV_LOCATION
+	    ,B.BATCH_NUM
+	    ,B.SAL_VCH_NUM --销售凭证
+	    ,B.SAL_VCH_ITEM_NUM--销售凭证项目
+	    ,B.WBS_ELEMENT --WBS要素
+	    ,B.CUST_ID--客户
+	    ,B.CUST_NUM
+	    ,B.CUST_NAME
+	    ,B.SUPPLIER_OR_CREDITOR_ID
+        ,B.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+        ,B.SUPPLIER_OR_CREDITOR_NAME
+		,0 as SKU_CONFIRM_QTY -- vmeng
+		,0 as SKU_PROCONFIRM_QTY -- vmeng
+		,b.erfmg
+		,b.enmng
+	from t22 b
+) a
+group by A.MATERIAL_ID
+	    ,a.MATERIAL_NUM
+	    ,A.MATERIAL_NAME
+	    ,A.FACTORY_ID
+	    ,a.FACTORY_CODE
+	    ,A.FACTORY_NAME
+	    ,a.INV_LOCATION
+	    ,a.BATCH_NUM
+	    ,a.SAL_VCH_NUM --销售凭证
+	    ,a.SAL_VCH_ITEM_NUM--销售凭证项目
+	    ,a.WBS_ELEMENT --WBS要素
+	    ,A.CUST_ID--客户
+	    ,A.CUST_NUM
+	    ,A.CUST_NAME
+	    ,A.SUPPLIER_OR_CREDITOR_ID
+        ,A.SUPPLIER_OR_CREDITOR_NUM -- LIFNR
+        ,A.SUPPLIER_OR_CREDITOR_NAME
+)
+,T33 AS(
+select
+	 a.MATERIAL_ID
+	,a.MATERIAL_NUM  -- matnr
+    ,a.MATERIAL_NAME	
+	,a.FACTORY_ID
+	,a.FACTORY_CODE AS FACTORY_WERKS_CODE -- werks
+	,a.FACTORY_NAME
+	,a.INV_LOCATION  -- lgort
+	,a.BATCH_NUM  -- CHARG
+	,a.SAL_VCH_NUM --销售订单号  SO_NO
+	,a.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,a.WBS_ELEMENT  -- WBS_NUM
+	,a.CUST_ID
+	,a.CUST_NUM --客户  CUSTOMER 
+	,a.CUST_NAME
+	,a.SUPPLIER_OR_CREDITOR_ID
+	,a.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,a.SUPPLIER_OR_CREDITOR_NAME
+	,a.zkkc--总库
+	,a.xmkc--项目库存数
+	,a.zjkc--质检数
+	,a.djkc--冻结数
+	,a.xmzjkc--项目质检数
+	,a.xmdjkc--项目冻结数
+	,0 as lhkc --留货库存
+	,0 as bhkc --备货库存
+	,0 as xmlhkc --项目留货库存
+	,0 as xmbhkc --项目备货库存
+	,STOCK_QTY
+from t1 a
+union all
+SELECT 
+	 b.MATERIAL_ID
+	,b.MATERIAL_NUM  -- matnr
+    ,b.MATERIAL_NAME	
+	,b.FACTORY_ID
+	,b.FACTORY_CODE AS FACTORY_WERKS_CODE -- werks
+	,b.FACTORY_NAME
+	,b.INV_LOCATION  -- lgort
+	,b.BATCH_NUM  -- CHARG
+	,b.SAL_VCH_NUM --销售订单号  SO_NO
+	,b.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,b.WBS_ELEMENT  -- WBS_NUM
+	,b.CUST_ID
+	,b.CUST_NUM --客户  CUSTOMER 
+	,b.CUST_NAME
+	,b.SUPPLIER_OR_CREDITOR_ID
+	,b.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,b.SUPPLIER_OR_CREDITOR_NAME
+	,0 AS zkkc--总库
+	,0 AS xmkc--项目库存数
+	,0 AS zjkc--质检数
+	,0 AS djkc--冻结数
+	,0 as xmzjkc--项目质检数
+	,0 as xmdjkc--项目冻结数
+	,b.SKU_CONFIRM_QTY as lhkc --留货库存  -- VMENG	
+	,0 as bhkc --备货库存
+	,b.SKU_PROCONFIRM_QTY as xmlhkc --项目留货库存  -- VMENG
+	,0 as xmbhkc --项目备货库存
+	,0 AS STOCK_QTY
+from t11 b
+UNION ALL
+SELECT
+	 a.MATERIAL_ID
+	,a.MATERIAL_NUM  -- matnr
+    ,a.MATERIAL_NAME	
+	,a.FACTORY_ID
+	,a.FACTORY_CODE AS FACTORY_WERKS_CODE -- werks
+	,a.FACTORY_NAME
+	,a.INV_LOCATION  -- lgort
+	,a.BATCH_NUM  -- CHARG
+	,a.SAL_VCH_NUM --销售订单号  SO_NO
+	,a.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,a.WBS_ELEMENT  -- WBS_NUM
+	,a.CUST_ID
+	,a.CUST_NUM --客户  CUSTOMER 
+	,a.CUST_NAME
+	,a.SUPPLIER_OR_CREDITOR_ID
+	,a.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,a.SUPPLIER_OR_CREDITOR_NAME
+	,0 AS zkkc--总库
+	,0 AS xmkc--项目库存数
+	,0 AS zjkc--质检数
+	,0 AS djkc--冻结数
+	,0 as xmzjkc--项目质检数
+	,0 as xmdjkc--项目冻结数
+	,0 as lhkc --留货库存
+	,a.bhkc --备货库存
+	,0 as xmlhkc --项目留货库存  -- VMENG
+	,a.xmbhkc --项目备货库存
+	,0 AS STOCK_QTY
+FROM T23 a
+LEFT JOIN (
+  SELECT MATERIAL_NUM, -- matnr
+         FACTORY_CODE, -- werks
+		 INV_LOCATION -- lgort
+		 --,BATCH_NUM -- CHARG
+  FROM t1
+  GROUP BY MATERIAL_NUM,
+           FACTORY_CODE,
+		   INV_LOCATION--,BATCH_NUM
+) b
+on a.MATERIAL_NUM = b.MATERIAL_NUM
+AND a.FACTORY_CODE = b.FACTORY_CODE
+AND a.INV_LOCATION = b.INV_LOCATION
+--AND a.BATCH_NUM = b.BATCH_NUM
+WHERE b.MATERIAL_NUM IS NOT null
+)
+,T43 AS(
+SELECT 
+      MATERIAL_NUM,BATCH_NUM
+     ,MAX(VOUCHER_POST_DATE) AS LATEST_VOUCHER_POST_DATE --批次最晚入库日期
+     ,MIN(VOUCHER_POST_DATE) AS EARLIEST_VOUCHER_POST_DATE --批次最早入库日期
+  FROM DWROTD.DWR_WM_PRODSTOCK_OUT_IN_F
+ WHERE MOVE_TYPE in('101','102') 
+ GROUP BY
+      MATERIAL_NUM,
+      BATCH_NUM
+),T53 AS(
+SELECT 
+	 A.MATERIAL_ID
+	,A.MATERIAL_NUM  -- matnr
+    ,A.MATERIAL_NAME	
+	,B.EXTERNAL_MATL_GROUP_CODE --外部物料组
+	,B.MATL_GROUP_CODE --物料组
+	,B.SIZE_UNIT --规格单位
+	,B.LENGTH_1 --长度
+	,B.WIDTH --宽度
+	,B.DIMENSION --规格
+	,B.RESERVED_FIELD_1 AS PRODUCT_CHANNEL_CODE --产品渠道编码
+	,B.PRODUCT_LEVEL_CODE --产品层次
+	,B2.CONFIG_NAME AS PRODUCT_CHANNEL_NAME --产品渠道名称
+	,B1.VTEXT AS PRODUCT_STAGE2 --产品层次2
+	,CASE WHEN COALESCE(BD.BRAND_NAME,'') <> '' THEN BD.BRAND_NAME
+	      WHEN COALESCE(BD1.BRAND_NAME,'') <> '' THEN BD1.BRAND_NAME
+	      WHEN COALESCE(BD2.BRAND_NAME,'') <> '' THEN BD2.BRAND_NAME
+		  ELSE 'NA'
+		   END AS BRAND_NAME --品牌名称  
+	,A.FACTORY_ID AS FACTORY_WERKS_ID
+	,A.FACTORY_WERKS_CODE  -- werks
+	,A.FACTORY_NAME AS FACTORY_WERKS_NAME
+    ,null as PRODUCT_AREA_ID --产区
+    ,null as PRODUCT_AREA_CODE --产区
+    ,null as PRODUCT_AREA_NAME --产区		
+	,A.INV_LOCATION  -- lgort
+	,A.BATCH_NUM  -- CHARG
+	,F.LATEST_VOUCHER_POST_DATE --批次最晚入库日期
+	,F.EARLIEST_VOUCHER_POST_DATE --批次最早入库日期	
+	,A.SAL_VCH_NUM --销售订单号  SO_NO
+	,A.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,A.WBS_ELEMENT  -- WBS_NUM
+	,A.CUST_ID
+	,A.CUST_NUM --客户  CUSTOMER 
+	,A.CUST_NAME
+	,A.SUPPLIER_OR_CREDITOR_ID
+	,A.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,A.SUPPLIER_OR_CREDITOR_NAME
+	,SUM(A.zkkc) AS TOTAL_Inventory_QUANTITY --总库数量
+	,SUM(A.xmkc) AS Project_Inventory_QUANTITY --项目库存数量
+	,SUM(A.zjkc) AS QC_Inventory_QUANTITY --质检库存数量
+	,SUM(A.djkc) AS Frozen_Inventory_QUANTITY --冻结库存数量
+	,SUM(A.xmzjkc) AS ProjectQc_Inventory_QUANTITY --项目质检库存数量
+	,SUM(A.xmdjkc) AS ProFrozen_Inventory_QUANTITY --项目冻结库存数量
+	,SUM(A.lhkc) AS reserve_Inventory_QUANTITY --留货库存数量
+	,SUM(A.bhkc) AS prepar_Inventory_QUANTITY --备货库存数量
+	,SUM(A.xmlhkc) AS Proreserve_Inventory_QUANTITY --项目留货库存数量 add
+	,SUM(A.xmbhkc) AS Proprepar_Inventory_QUANTITY --项目备货库存数量 add	
+	--可用数 = 总库 - 留货数 - 备货数
+	,SUM(zkkc - lhkc - bhkc) Available_Inventory_QUANTITY --可用库存数量 
+	,SUM(xmkc - xmlhkc - xmbhkc) Available_ProInventory_QUANTITY --可用项目库存数量 add
+	,SUM(A.zkkc * B.LENGTH_1 * B.WIDTH /1000000) AS TOTAL_Inventory_AREA --总库面积
+	,SUM(A.xmkc * B.LENGTH_1 * B.WIDTH /1000000) AS Project_Inventory_AREA --项目库存面积
+	,SUM(A.zjkc * B.LENGTH_1 * B.WIDTH /1000000) AS QC_Inventory_AREA --质检库存面积
+	,SUM(A.djkc * B.LENGTH_1 * B.WIDTH /1000000) AS Frozen_Inventory_AREA --冻结库存面积
+	,SUM(A.lhkc * B.LENGTH_1 * B.WIDTH /1000000) AS reserve_Inventory_AREA --留货库存面积
+	,SUM(A.bhkc * B.LENGTH_1 * B.WIDTH /1000000) AS prepar_Inventory_AREA --备货库存面积
+	--可用数 = 总库 - 留货数 - 备货数
+	,SUM((zkkc - lhkc - bhkc) * B.LENGTH_1 * B.WIDTH /1000000) Available_Inventory_AREA --可用库存面积
+	,SUM(STOCK_QTY ) AS STOCK_QTY
+	,SUM(STOCK_QTY - A.zkkc - A.xmkc - A.xmzjkc - A.xmdjkc - A.zjkc - A.djkc) as other_stock_qty
+FROM T33 A
+LEFT JOIN DWRDIM.DWR_DIM_MATERIAL_GENERAL_D B
+ON A.MATERIAL_NUM = B.MATERIAL_NUM
+AND B.end_date = '4712-12-31'
+AND B.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 B1 --产品品类
+ON B1.MANDT = B.GROUP_NUM
+AND B1.SPRAS = '1'
+AND B1.DEL_FLAG = 'N'
+AND SUBSTR(B.PRODUCT_LEVEL_CODE,1,4) = B1.PRODH
+LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R B2
+ON B.RESERVED_FIELD_1 = B2.SRC_SYS_CONFIG_CODE
+AND B2.SOURCE_CODE = 'ZTYL01'
+LEFT JOIN DWRDIM.DWR_DIM_MATERIAL_BRAND_D BD
+ON A.FACTORY_WERKS_CODE = BD.FACTORY_WERKS_CODE
+AND B.EXTERNAL_MATL_GROUP_CODE = BD.EXTERNAL_MATL_GROUP_CODE
+AND B.MATL_GROUP_CODE = BD.MATL_GROUP_CODE
+LEFT JOIN DWRDIM.DWR_DIM_MATERIAL_BRAND_D BD1
+ON A.FACTORY_WERKS_CODE = BD1.FACTORY_WERKS_CODE
+AND BD1.EXTERNAL_MATL_GROUP_CODE = ''
+AND B.MATL_GROUP_CODE = BD1.MATL_GROUP_CODE 
+LEFT JOIN (SELECT DISTINCT FACTORY_WERKS_CODE
+                          ,BRAND_NAME
+             FROM DWRDIM.DWR_DIM_MATERIAL_BRAND_D
+			WHERE MATL_GROUP_CODE = ''
+		   ) BD2
+ON A.FACTORY_WERKS_CODE = BD2.FACTORY_WERKS_CODE
+/*LEFT JOIN (SELECT A.SUPPLIER_OR_CREDITOR_ID
+                 ,A.PRODUCT_AREA_ID
+	             ,A.PRODUCT_AREA_CODE
+                 ,A.PRODUCT_AREA_NAME
+             FROM DWRDIM.DWR_DIM_PRODUCT_AREA_D A
+			GROUP BY 
+			      A.SUPPLIER_OR_CREDITOR_ID
+                 ,A.PRODUCT_AREA_ID
+	             ,A.PRODUCT_AREA_CODE
+                 ,A.PRODUCT_AREA_NAME
+		  ) D
+ON A.SUPPLIER_OR_CREDITOR_ID = D.SUPPLIER_OR_CREDITOR_ID*/
+LEFT JOIN T43 F
+ON A.BATCH_NUM = F.BATCH_NUM and A.MATERIAL_NUM = F.MATERIAL_NUM
+--WHERE MATERIAL_NUM = 'FG801554_A'
+	GROUP BY 
+	      A.MATERIAL_ID
+	,A.MATERIAL_NUM  -- matnr
+    ,A.MATERIAL_NAME	
+	,B.EXTERNAL_MATL_GROUP_CODE --外部物料组
+	,B.MATL_GROUP_CODE --物料组
+	,B.SIZE_UNIT --规格单位
+	,B.LENGTH_1 --长度
+	,B.WIDTH --宽度
+	,B.DIMENSION --规格
+	,B.RESERVED_FIELD_1 --产品渠道编码
+	,B.PRODUCT_LEVEL_CODE
+	,B2.CONFIG_NAME --产品渠道名称
+	,B1.VTEXT --产品层次2
+	,CASE WHEN COALESCE(BD.BRAND_NAME,'') <> '' THEN BD.BRAND_NAME
+	      WHEN COALESCE(BD1.BRAND_NAME,'') <> '' THEN BD1.BRAND_NAME
+	      WHEN COALESCE(BD2.BRAND_NAME,'') <> '' THEN BD2.BRAND_NAME
+		  ELSE 'NA'
+		   END --品牌名称  
+	,A.FACTORY_ID
+	,A.FACTORY_WERKS_CODE  -- werks
+	,A.FACTORY_NAME
+    --,D.PRODUCT_AREA_ID --产区
+    --,D.PRODUCT_AREA_CODE --产区
+    --,D.PRODUCT_AREA_NAME --产区		
+	,A.INV_LOCATION  -- lgort
+	,A.BATCH_NUM  -- CHARG
+	,F.LATEST_VOUCHER_POST_DATE --批次最晚入库日期
+	,F.EARLIEST_VOUCHER_POST_DATE --批次最早入库日期	
+	,A.SAL_VCH_NUM --销售订单号  SO_NO
+	,A.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,A.WBS_ELEMENT  -- WBS_NUM
+	,A.CUST_ID
+	,A.CUST_NUM --客户  CUSTOMER 
+	,A.CUST_NAME
+	,A.SUPPLIER_OR_CREDITOR_ID
+	,A.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,A.SUPPLIER_OR_CREDITOR_NAME
+),T63 AS(
+SELECT A.CHARG
+      ,A.MATNR
+      ,MAX(CASE WHEN C.ATNAM = 'Z_CXREASON' THEN D.ATWRT END) AS PROMOTE_REASON_CODE --促销原因编码
+	  ,MAX(CASE WHEN C.ATNAM = 'Z_QTYPE' THEN D.ATWRT END) AS CLEARANCE_REASON_CODE --清仓原因编码
+	  ,MAX(CASE WHEN C.ATNAM = 'Z_CXREASON' THEN E.ATWTB END) AS PROMOTE_REASON --促销原因
+	  ,MAX(CASE WHEN C.ATNAM = 'Z_QTYPE' THEN E.ATWTB END) AS CLEARANCE_REASON --清仓原因
+FROM SDI.SDI_MCH1_1001 A 
+LEFT JOIN SDI.SDI_AUSP_1001 B
+ON A.CUOBJ_BM = B.OBJEK
+AND A.MANDT = B.MANDT 
+AND B.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_CABN_1001 C
+ON B.ATINN = C.ATINN 
+AND A.MANDT = C.MANDT 
+AND C.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_CAWN_1001 D
+ON B.ATWRT = D.ATWRT
+AND A.MANDT = D.MANDT 
+AND D.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_CAWNT_1001 E
+ON D.MANDT = E.MANDT
+AND D.ATINN = E.ATINN
+AND D.ATZHL = E.ATZHL
+AND E.DEL_FLAG = 'N'
+AND E.SPRAS = '1'
+WHERE A.MANDT = 800
+AND A.DEL_FLAG = 'N'
+AND C.ATNAM IN('Z_QTYPE','Z_CXREASON')
+GROUP BY 
+       A.CHARG
+      ,A.MATNR
+),T73 AS(
+SELECT T.MATNR,
+T1.MAKTX,
+T.MTART,
+A1.VTEXT AS VTEXT1,
+B1.VTEXT AS VTEXT2,
+C1.VTEXT AS VTEXT3,
+D1.VTEXT AS VTEXT4,
+E1.VTEXT AS VTEXT5,
+F1.VTEXT AS VTEXT6
+FROM SDI.SDI_MARA_1001 T--物料产品层次
+INNER JOIN SDI.SDI_MAKT_1001 T1 
+ON T.MATNR = T1.MATNR 
+AND T1.SPRAS = '1'
+AND T.DEL_FLAG = 'N'
+AND T1.DEL_FLAG = 'N'
+AND T.MANDT = T1.MANDT
+LEFT JOIN SDI.SDI_T179_1001 AS A 
+ON SUBSTR(T.PRDHA,1,2) = A.PRODH 
+AND A.STUFE = '1'
+AND T.MANDT = A.MANDT
+AND A.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS A1 
+ON A.PRODH = A1.PRODH
+AND T.MANDT = A1.MANDT
+AND A1.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179_1001 AS B 
+ON SUBSTR(T.PRDHA,1,4) = B.PRODH 
+AND B.STUFE = '2'
+AND T.MANDT = B.MANDT
+AND B.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS B1
+ON B.PRODH = B1.PRODH
+AND T.MANDT = B1.MANDT
+AND B1.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179_1001 AS C 
+ON SUBSTR(T.PRDHA,1,7) = C.PRODH
+AND T.MANDT = C.MANDT
+AND C.STUFE = '3'
+AND C.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS C1 
+ON C.PRODH = C1.PRODH
+AND T.MANDT = C1.MANDT
+AND C1.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179_1001 AS D 
+ON SUBSTR(T.PRDHA,1,10) = D.PRODH 
+AND T.MANDT = D.MANDT
+AND D.STUFE = '4'
+AND D.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS D1 
+ON D.PRODH = D1.PRODH
+AND T.MANDT = D1.MANDT
+AND D1.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179_1001 AS E 
+ON SUBSTR(T.PRDHA,1,15) = E.PRODH
+AND T.MANDT = E.MANDT
+AND E.STUFE = '5'
+AND E.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS E1 
+ON E.PRODH = E1.PRODH
+AND E1.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179_1001 AS F
+ON SUBSTR(T.PRDHA,1,18) = F.PRODH
+AND T.MANDT = F.MANDT
+AND F.STUFE = '6'
+AND F.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_T179T_1001 AS F1
+ON F.PRODH = F1.PRODH
+AND T.MANDT = F1.MANDT
+AND F1.DEL_FLAG = 'N'
+),T83 AS(
+SELECT CASE WHEN COALESCE(B.DATE_FROM,'') NOT IN('00000000','') 
+            THEN from_unixtime(unix_timestamp(B.DATE_FROM,'yyyyMMdd'),'yyyy-MM-dd')
+			 END AS PRODUCTION_DATE --生产日期
+      ,A.CHARG
+	  ,A.MATNR 
+FROM SDI.SDI_MCH1_1001 A 
+LEFT JOIN SDI.SDI_AUSP_1001 B
+ON A.CUOBJ_BM = B.OBJEK
+AND A.MANDT = B.MANDT 
+AND B.DEL_FLAG = 'N'
+LEFT JOIN SDI.SDI_CABN_1001 C
+ON B.ATINN = C.ATINN 
+AND A.MANDT = C.MANDT 
+AND C.DEL_FLAG = 'N'
+WHERE A.MANDT = 800
+AND C.ATNAM = 'Z_ERDAT'
+AND A.DEL_FLAG = 'N'
+)
+INSERT OVERWRITE TABLE DM.DM_WM_ALL_TYPE_STOCK_T
+SELECT 
+	 A.MATERIAL_ID
+	,A.MATERIAL_NUM  -- matnr
+    ,A.MATERIAL_NAME	
+	,A.EXTERNAL_MATL_GROUP_CODE --外部物料组
+	,A.MATL_GROUP_CODE --物料组
+	,A.SIZE_UNIT --规格单位
+	,A.LENGTH_1 --长度
+	,A.WIDTH --宽度
+	,A.DIMENSION --规格
+	,A.PRODUCT_CHANNEL_CODE --产品渠道编码
+	,A.PRODUCT_CHANNEL_NAME --产品渠道名称
+	,A.PRODUCT_STAGE2 --产品层次2
+	,A.BRAND_NAME --品牌名称  
+	,A.FACTORY_WERKS_ID
+	,A.FACTORY_WERKS_CODE  -- werks
+	,A.FACTORY_WERKS_NAME	
+	,A.INV_LOCATION  -- lgort
+	,A.BATCH_NUM  -- CHARG
+	,A.LATEST_VOUCHER_POST_DATE --批次最晚入库日期
+	,H.BATCH_IN_TIME AS EARLIEST_VOUCHER_POST_DATE --批次最早入库日期	
+	,A.SAL_VCH_NUM --销售订单号  SO_NO
+	,A.SAL_VCH_ITEM_NUM --销售订单项目  SO_ITEM
+	,A.WBS_ELEMENT  -- WBS_NUM
+	,A.CUST_ID
+	,A.CUST_NUM --客户  CUSTOMER 
+	,A.CUST_NAME
+	,A.SUPPLIER_OR_CREDITOR_ID
+	,A.SUPPLIER_OR_CREDITOR_NUM --供应商  VENDOR
+	,A.SUPPLIER_OR_CREDITOR_NAME
+    ,A.PRODUCT_AREA_ID --产区
+    ,A.PRODUCT_AREA_CODE --产区
+    ,A.PRODUCT_AREA_NAME --产区		
+	,A.TOTAL_Inventory_QUANTITY --总库数量（非限制性库存）
+	,A.Project_Inventory_QUANTITY --项目库存数
+	,A.QC_Inventory_QUANTITY --质检数
+	,A.Frozen_Inventory_QUANTITY --冻结数
+	,A.reserve_Inventory_QUANTITY --留货库存
+	,A.prepar_Inventory_QUANTITY --备货库存
+	--可用数 = 总库 - 留货数 - 备货数
+	,A.Available_Inventory_QUANTITY --可用库存
+	,A.TOTAL_Inventory_AREA --总库面积
+	,A.Project_Inventory_AREA --项目库存数
+	,A.QC_Inventory_AREA --质检数
+	,A.Frozen_Inventory_AREA --冻结数
+	,A.reserve_Inventory_AREA --留货库存
+	,A.prepar_Inventory_AREA --备货库存
+	--可用数 = 总库 - 留货数 - 备货数
+	,A.Available_Inventory_AREA --可用库存
+    ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+	,A.PRODUCT_LEVEL_CODE --产品层次
+	,B.PROMOTE_REASON --促销原因
+	,C.MATL_GROUP1_CODE --物料组1编码
+    ,C.MATL_GROUP1_NAME --物料组1名称
+    ,C.MATL_GROUP2_CODE --物料组2编码
+    ,C.MATL_GROUP2_NAME --物料组2名称
+    ,C.MATL_GROUP3_CODE --物料组3编码
+    ,C.MATL_GROUP3_NAME --物料组3名称
+    ,C.MATL_GROUP4_CODE --物料组4编码
+    ,C.MATL_GROUP4_NAME --物料组4名称
+    ,C.MATL_GROUP5_CODE --物料组5编码
+    ,C.MATL_GROUP5_NAME --物料组5名称
+	,D.VTEXT1 AS PRODUCT_LEVEL_CODE1 --产品层次1
+	,D.VTEXT2 AS PRODUCT_LEVEL_CODE2 --产品层次2
+	,D.VTEXT3 AS PRODUCT_LEVEL_CODE3 --产品层次3
+	,D.VTEXT4 AS PRODUCT_LEVEL_CODE4 --产品层次4 
+	,D.VTEXT5 AS PRODUCT_LEVEL_CODE5 --产品层次5 
+	,D.VTEXT6 AS PRODUCT_LEVEL_CODE6 --产品层次6 
+    ,A.LENGTH_1 * A.WIDTH /1000000 AS SUIT_AREA --单位面积（平方米）
+	,E.PRODUCTION_DATE --生产日期
+	,B.PROMOTE_REASON_CODE --促销原因编码
+    ,B.CLEARANCE_REASON_CODE --清仓原因编码
+    ,B.CLEARANCE_REASON --清仓原因
+	,from_unixtime(unix_timestamp(F.FIRSTDATE,'yyyyMMdd'),'yyyy-MM-dd') AS FIRST_PROMOTE_DATE --首次维护促销原因日期
+	,G.LGOBE AS INV_LOCATION_NAME --库存地点名称
+	,A.projectqc_inventory_quantity --项目质检库存
+	,A.profrozen_inventory_quantity --项目冻结库存
+	,A.proreserve_inventory_quantity --项目留货库存
+	,A.proprepar_inventory_quantity --项目备货库存
+	,A.available_proinventory_quantity --项目可用库存
+	,A.STOCK_QTY as  all_stock_quantity   -- 所有库存
+	,A.other_stock_qty as other_stock_quantity  -- 其他库存
+	,I.POSID AS LONG_WBS_ELEMENT --WBS（长号）
+FROM T53 A
+LEFT JOIN T63 B
+ON A.MATERIAL_NUM = B.MATNR
+AND A.BATCH_NUM = B.CHARG
+LEFT JOIN(SELECT MATERIAL_NUM
+                ,MATL_GROUP1_CODE --物料组1编码
+                ,MATL_GROUP1_NAME --物料组1名称
+                ,MATL_GROUP2_CODE --物料组2编码
+                ,MATL_GROUP2_NAME --物料组2名称
+                ,MATL_GROUP3_CODE --物料组3编码
+                ,MATL_GROUP3_NAME --物料组3名称
+                ,MATL_GROUP4_CODE --物料组4编码
+                ,MATL_GROUP4_NAME --物料组4名称
+                ,MATL_GROUP5_CODE --物料组5编码
+                ,MATL_GROUP5_NAME --物料组5名称
+				,SALES_ORG_CODE --销售组织
+                ,ROW_NUMBER() OVER(PARTITION BY MATERIAL_NUM ORDER BY SALES_ORG_CODE ASC) AS RN
+                FROM DWIMD.DWI_MD_DATA_MATERIAL_SALES_T
+                WHERE DEL_FLAG = 'N'
+                AND END_DATE = '4712-12-31'
+                AND GROUP_NUM = 800
+         ) C
+   ON A.MATERIAL_NUM = C.MATERIAL_NUM
+  AND C.RN = 1
+ LEFT JOIN T73 D
+   ON A.MATERIAL_NUM = D.MATNR
+ LEFT JOIN T83 E
+   ON A.MATERIAL_NUM = E.MATNR
+  AND A.BATCH_NUM = E.CHARG
+ LEFT JOIN(SELECT MATNR
+                 ,CHARG
+				 ,FIRSTDATE
+             FROM SDI.SDI_ZSD_CXYY_1001
+			WHERE FIRSTDATE <> '00000000'
+              AND MANDT = '800'
+			GROUP BY MATNR
+			        ,CHARG
+					,FIRSTDATE
+          ) F
+   ON A.MATERIAL_NUM = F.MATNR
+  AND A.BATCH_NUM = F.CHARG
+ LEFT JOIN SDI.SDI_T001L_1001 G
+   ON A.INV_LOCATION = G.LGORT
+  AND A.FACTORY_WERKS_CODE = G.WERKS
+  AND G.MANDT = 800
+ LEFT JOIN DWIMD.DWI_MD_MATL_BATCH_INFO_T H
+   ON A.MATERIAL_NUM = H.MATERIAL_NUM
+  AND A.BATCH_NUM = H.BATCH_NUM
+ LEFT JOIN SDI.SDI_PRPS_1001 I  
+   ON A.WBS_ELEMENT = I.PSPNR
+WHERE 
+( A.TOTAL_Inventory_QUANTITY > 0
+OR A.Project_Inventory_QUANTITY > 0
+OR A.QC_Inventory_QUANTITY > 0
+OR A.Frozen_Inventory_QUANTITY > 0
+OR A.reserve_Inventory_QUANTITY > 0
+OR A.prepar_Inventory_QUANTITY > 0
+OR A.Available_Inventory_QUANTITY > 0 
+OR A.projectqc_inventory_quantity > 0 
+OR A.profrozen_inventory_quantity > 0 
+OR A.proreserve_inventory_quantity > 0 
+OR A.proprepar_inventory_quantity > 0 
+OR A.available_proinventory_quantity > 0
+OR A.STOCK_QTY >0 ) 
+;

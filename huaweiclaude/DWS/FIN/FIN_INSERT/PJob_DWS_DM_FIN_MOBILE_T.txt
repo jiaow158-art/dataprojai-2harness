@@ -1,0 +1,1128 @@
+/*drop table if exists DM.DM_FIN_MOBILE_T;
+create TABLE DM.DM_FIN_MOBILE_T
+(
+    calday                                 varchar(20),
+    customer                               varchar(20),
+    sales_grp                              varchar(20),
+    distr_chan                             varchar(20),
+    distr_chan_desc                        varchar(200),
+    prod_type                              varchar(200),
+    dimension                              varchar(200),
+    data_source                            varchar(200),
+    day_achievement                        numeric(38, 10),
+    month_achievement                      numeric(38, 10),
+    year_achievement                       numeric(38, 10),
+    last_month_day_achievement             numeric(38, 10),
+    last_month_month_achievement           numeric(38, 10),
+    last_month_year_achievement            numeric(38, 10),
+    last_year_day_achievement              numeric(38, 10),
+    last_year_month_achievement            numeric(38, 10),
+    last_year_year_achievement             numeric(38, 10),
+    day_no_tax                             numeric(38, 10),
+    month_no_tax                           numeric(38, 10),
+    year_no_tax                            numeric(38, 10),
+    last_month_day_no_tax                  numeric(38, 10),
+    last_month_month_no_tax                numeric(38, 10),
+    last_month_year_no_tax                 numeric(38, 10),
+    last_year_day_no_tax                   numeric(38, 10),
+    last_year_month_no_tax                 numeric(38, 10),
+    last_year_year_no_tax                  numeric(38, 10),
+    day_A_sales_cost                       numeric(38, 10),
+    month_A_sales_cost                     numeric(38, 10),
+    year_A_sales_cost                      numeric(38, 10),
+    last_month_day_A_sales_cost            numeric(38, 10),
+    last_month_month_A_sales_cost          numeric(38, 10),
+    last_month_year_A_sales_cost           numeric(38, 10),
+    last_year_day_A_sales_cost             numeric(38, 10),
+    last_year_month_A_sales_cost           numeric(38, 10),
+    last_year_year_A_sales_cost            numeric(38, 10),
+    day_standard_A_sales_cost              numeric(38, 10),
+    month_standard_A_sales_cost            numeric(38, 10),
+    year_standard_A_sales_cost             numeric(38, 10),
+    last_month_day_standard_A_sales_cost   numeric(38, 10),
+    last_month_month_standard_A_sales_cost numeric(38, 10),
+    last_month_year_standard_A_sales_cost  numeric(38, 10),
+    last_year_day_standard_A_sales_cost    numeric(38, 10),
+    last_year_month_standard_A_sales_cost  numeric(38, 10),
+    last_year_year_standard_A_sales_cost   numeric(38, 10),
+    day_budget_achievement                 numeric(38, 10),
+    month_budget_achievement               numeric(38, 10),
+    year_budget_achievement                numeric(38, 10),
+    day_budget_no_tax                      numeric(38, 10),
+    month_budget_no_tax                    numeric(38, 10),
+    year_budget_no_tax                     numeric(38, 10),
+    day_budget_A_sales_cost                numeric(38, 10),
+    month_budget_A_sales_cost              numeric(38, 10),
+    year_budget_A_sales_cost               numeric(38, 10),
+    day_budget_standard_A_sales_cost       numeric(38, 10),
+    month_budget_standard_A_sales_cost     numeric(38, 10),
+    year_budget_standard_A_sales_cost      numeric(38, 10),
+    DW_LAST_UPDATE_DATE                    timestamp(6),
+  cust_group varchar(500),
+  quarter_achievment numeric(38, 10),
+last_month_quarter_achievement           numeric(38, 10),
+  last_year_quarter_achievement           numeric(38, 10),
+  quarter_no_tax numeric(38, 10),
+  last_month_quarter_no_tax numeric(38, 10),
+  last_year_quarter_no_tax numeric(38, 10),
+  quarter_A_sales_cost numeric(38, 10),
+   last_month_quarter_A_sales_cost numeric(38, 10),
+  last_year_quarter_A_sales_cost numeric(38, 10),
+  quarter_standard_A_sales_cost numeric(38, 10),
+   last_month_quarter_standard_A_sales_cost numeric(38, 10),
+  last_year_quarter_standard_A_sales_cost numeric(38, 10),
+  quarter_budget_achievement numeric(38, 10),
+  quarter_budget_no_tax numeric(38, 10),
+  quarter_budget_A_sales_cost numeric(38, 10),
+  quarter_budget_standard_A_sales_cost  numeric(38, 10),
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(calday,customer,cust_group,sales_grp,distr_chan,prod_type,dimension,data_source );*/
+-- DWS sql
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/05/16 11:30:50 GMT+08:00
+-- table desc：移动端 DM.DM_FIN_MOBILE_T
+-- 需求人：zhouhaochang
+-- update：2023/05/22 zhouhaochang 新增客户字段
+-- update：2023/06/01 zhouhaochang 修改为管理架构树
+-- update：2023/06/16 zhouhaochang 预算渠道读取修改
+-- update：2023/06/19 zhouhaochang 过滤今年或去年业绩为0
+-- update：2023/06/20 zhouhaochang 历史A成本修改
+-- update：2023/06/26 zhouhaochang 去掉本年或去年业绩过滤，用于核算预算
+-- update：2023/06/27 zhouhaochang 预算渠道修改
+-- update：2023/06/30 zhouhaochang 补充架构所有字段、客户组字段
+-- update：2023/08/03 zhouhaochang 删除架构其余字段
+-- update：2023/08/08 zhouhaochang 标A逻辑修改
+-- update：2023/08/23 zhouhaochang 增加季度相关
+-- update：2023/09/01 zhouhaochang 毛利额修改成本调整值，成本剔除安装费
+-- update：2023/11/16 修改逻辑：预算表更新为代码，同步更新逻
+-- update：2023/12/25 修改逻辑：预算表事业部字段编码更新为中文，导致代码错误，修改读组织架构
+-- update：2024/01/17 增加阿米巴成本逻辑
+-- update：2024/03/01 修改逻辑：24年瓷砖经营分析调整回3个渠道
+-- update：2024/03/07 修改逻辑：业绩表等源表to_char(to_date((calmonth||'-01')),'yyyy0Q')字段修改为yyyy0Q代码修改使用calmonth
+-- update：2024/03/18 修改逻辑：不含税修改使用notax_sales_net_amt字段，原公式含事业部内部成本。实际A使用act_cost_sum_amt-zyywcb_zxf-zyywcb_yf
+-- update：2024/03/18 修改逻辑：同期实际A使用act_cost_sum_amt-zyywcb_zxf-zyywcb_yf
+-- update：2024/03/26 修改逻辑：季度A成本修改逻辑,去掉线组空-瓷砖产品并入瓷砖事业部逻辑
+-- update：2024/03/29 修改逻辑：A成本加上安装费
+-- update：2024/04/25 修改逻辑：标A逻辑修改
+-- update：2024/09/09 修改逻辑：由于可能重跑，成本相关字段补充判断是否当月逻辑（当月读上期周期总价，历史月读取对应逻辑）
+-- update：2024/09/13 修改逻辑：修改客户+wbs组织
+-- ******************************************************************** --
+do
+$$
+    declare
+        P_DATE varchar(500) ;
+    begin
+        for P_DATE in (select day_id
+                       from dm.dm_dim_date_d
+                       where day_id >= to_char(to_date('${PERIOD_ID_D1}'), 'yyyyMMdd')
+                         and day_id <= to_char(to_date('${PERIOD_ID_D2}'), 'yyyyMMdd')
+                       order by day_id)
+            loop
+                DELETE
+                from DM.DM_FIN_MOBILE_T
+                where calday = to_char(to_date(P_DATE), 'yyyyMMdd');
+                INSERT INTO DM.DM_FIN_MOBILE_T
+                select calday,
+                       customer,
+                       node_name9,
+                       new_distr_chan                              distr_chan,
+                       new_distr_chan_desc                         distr_chan_desc,
+                       prod_type,
+                       dimension,
+                       data_source,
+                       sum(day_achievement)                        day_achievement,
+                       sum(month_achievement)                      month_achievement,
+                       sum(year_achievement)                       year_achievement,
+                       sum(last_month_day_achievement)             last_month_day_achievement,
+                       sum(last_month_month_achievement)           last_month_month_achievement,
+                       sum(last_month_year_achievement)            last_month_year_achievement,
+                       sum(last_year_day_achievement)              last_year_day_achievement,
+                       sum(last_year_month_achievement)            last_year_month_achievement,
+                       sum(last_year_year_achievement)             last_year_year_achievement,
+                       sum(day_no_tax)                             day_no_tax,
+                       sum(month_no_tax)                           month_no_tax,
+                       sum(year_no_tax)                            year_no_tax,
+                       sum(last_month_day_no_tax)                  last_month_day_no_tax,
+                       sum(last_month_month_no_tax)                last_month_month_no_tax,
+                       sum(last_month_year_no_tax)                 last_month_year_no_tax,
+                       sum(last_year_day_no_tax)                   last_year_day_no_tax,
+                       sum(last_year_month_no_tax)                 last_year_month_no_tax,
+                       sum(last_year_year_no_tax)                  last_year_year_no_tax,
+                       sum(day_A_sales_cost)                       day_A_sales_cost,
+                       sum(month_A_sales_cost)                     month_A_sales_cost,
+                       sum(year_A_sales_cost)                      year_A_sales_cost,
+                       sum(last_month_day_A_sales_cost)            last_month_day_A_sales_cost,
+                       sum(last_month_month_A_sales_cost)          last_month_month_A_sales_cost,
+                       sum(last_month_year_A_sales_cost)           last_month_year_A_sales_cost,
+                       sum(last_year_day_A_sales_cost)             last_year_day_A_sales_cost,
+                       sum(last_year_month_A_sales_cost)           last_year_month_A_sales_cost,
+                       sum(last_year_year_A_sales_cost)            last_year_year_A_sales_cost,
+                       sum(day_standard_A_sales_cost)              day_standard_A_sales_cost,
+                       sum(month_standard_A_sales_cost)            month_standard_A_sales_cost,
+                       sum(year_standard_A_sales_cost)             year_standard_A_sales_cost,
+                       sum(last_month_day_standard_A_sales_cost)   last_month_day_standard_A_sales_cost,
+                       sum(last_month_month_standard_A_sales_cost) last_month_month_standard_A_sales_cost,
+                       sum(last_month_year_standard_A_sales_cost)  last_month_year_standard_A_sales_cost,
+                       sum(last_year_day_standard_A_sales_cost)    last_year_day_standard_A_sales_cost,
+                       sum(last_year_month_standard_A_sales_cost)  last_year_month_standard_A_sales_cost,
+                       sum(last_year_year_standard_A_sales_cost)   last_year_year_standard_A_sales_cost,
+                       sum(day_budget_achievement)                 day_budget_achievement,
+                       sum(month_budget_achievement)               month_budget_achievement,
+                       sum(year_budget_achievement)                year_budget_achievement,
+                       sum(day_budget_no_tax)                      day_budget_no_tax,
+                       sum(month_budget_no_tax)                    month_budget_no_tax,
+                       sum(year_budget_no_tax)                     year_budget_no_tax,
+                       sum(day_budget_A_sales_cost)                day_budget_A_sales_cost,
+                       sum(month_budget_A_sales_cost)              month_budget_A_sales_cost,
+                       sum(year_budget_A_sales_cost)               year_budget_A_sales_cost,
+                       sum(day_budget_standard_A_sales_cost)       day_budget_standard_A_sales_cost,
+                       sum(month_budget_standard_A_sales_cost)     month_budget_standard_A_sales_cost,
+                       sum(year_budget_standard_A_sales_cost)      year_budget_standard_A_sales_cost,
+                       CURRENT_TIMESTAMP(),
+                       cust_group,
+                       sum(quarter_achievment),
+                       sum(last_month_quarter_achievement),
+                       sum(last_year_quarter_achievement),
+                       sum(quarter_no_tax),
+                       sum(last_month_quarter_no_tax),
+                       sum(last_year_quarter_no_tax),
+                       sum(quarter_A_sales_cost),
+                       sum(last_month_quarter_A_sales_cost),
+                       sum(last_year_quarter_A_sales_cost),
+                       sum(quarter_standard_A_sales_cost),
+                       sum(last_month_quarter_standard_A_sales_cost),
+                       sum(last_year_quarter_standard_A_sales_cost),
+                       sum(quarter_budget_achievement),
+                       sum(quarter_budget_no_tax),
+                       sum(quarter_budget_A_sales_cost),
+                       sum(quarter_budget_standard_A_sales_cost),
+                       sum(coalesce(day_amb_gross_profit, 0)),
+                       sum(coalesce(month_amb_gross_profit, 0)),
+                       sum(coalesce(year_amb_gross_profit, 0)),
+                       sum(coalesce(last_month_day_amb_gross_profit, 0)),
+                       sum(coalesce(last_month_month_amb_gross_profit, 0)),
+                       sum(coalesce(last_month_year_amb_gross_profit, 0)),
+                       sum(coalesce(last_year_day_amb_gross_profit, 0)),
+                       sum(coalesce(last_year_month_amb_gross_profit, 0)),
+                       sum(coalesce(last_year_year_amb_gross_profit, 0)),
+                       sum(coalesce(quarter_amb_gross_profit, 0)),
+                       sum(coalesce(last_month_quarter_amb_gross_profit, 0)),
+                       sum(coalesce(last_year_quarter_amb_gross_profit, 0))
+                from (
+                         select P_DATE                  calday,
+                                customer,
+                                d.node_name9,
+                                case
+                                    when d.node_name2 = 'H11000001' then
+                                        integrate_channel
+                                    else distr_chan end new_distr_chan,
+                                case
+                                    when d.node_name2 = 'H11000001' then
+                                        case
+                                            when integrate_channel = 'GD03' then '工程渠道'
+                                            when integrate_channel = 'GD01' then '大零售渠道'
+                                            when integrate_channel = 'GD02' then '整装头部' end
+                                    else b.vtext end    new_distr_chan_desc,
+                                c.product_level3_name   prod_type,
+                                c.dimension,
+                                data_source,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE), 'yyyyMMdd') then ambperformance
+                                        else 0 end)     day_achievement,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     month_achievement,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     year_achievement,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_month_day_achievement,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_month_month_achievement,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 months', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_month_year_achievement,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_year_day_achievement,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_year_month_achievement,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_year_year_achievement,
+                                0                       day_no_tax,
+                                0                       month_no_tax,
+                                0                       year_no_tax,
+                                0                       last_month_day_no_tax,
+                                0                       last_month_month_no_tax,
+                                0                       last_month_year_no_tax,
+                                0                       last_year_day_no_tax,
+                                0                       last_year_month_no_tax,
+                                0                       last_year_year_no_tax,
+                                0                       day_A_sales_cost,
+                                0                       month_A_sales_cost,
+                                0                       year_A_sales_cost,
+                                0                       last_month_day_A_sales_cost,
+                                0                       last_month_month_A_sales_cost,
+                                0                       last_month_year_A_sales_cost,
+                                0                       last_year_day_A_sales_cost,
+                                0                       last_year_month_A_sales_cost,
+                                0                       last_year_year_A_sales_cost,
+                                0                       day_standard_A_sales_cost,
+                                0                       month_standard_A_sales_cost,
+                                0                       year_standard_A_sales_cost,
+                                0                       last_month_day_standard_A_sales_cost,
+                                0                       last_month_month_standard_A_sales_cost,
+                                0                       last_month_year_standard_A_sales_cost,
+                                0                       last_year_day_standard_A_sales_cost,
+                                0                       last_year_month_standard_A_sales_cost,
+                                0                       last_year_year_standard_A_sales_cost,
+                                0                       day_budget_achievement,
+                                0                       month_budget_achievement,
+                                0                       year_budget_achievement,
+                                0                       day_budget_no_tax,
+                                0                       month_budget_no_tax,
+                                0                       year_budget_no_tax,
+                                0                       day_budget_A_sales_cost,
+                                0                       month_budget_A_sales_cost,
+                                0                       year_budget_A_sales_cost,
+                                0                       day_budget_standard_A_sales_cost,
+                                0                       month_budget_standard_A_sales_cost,
+                                0                       year_budget_standard_A_sales_cost,
+                                a.cust_group,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     quarter_achievment,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '3 months', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '3 months', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_month_quarter_achievement,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '1 years', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then ambperformance
+                                        else 0 end)     last_year_quarter_achievement,
+                                0                       quarter_no_tax,
+                                0                       last_month_quarter_no_tax,
+                                0                       last_year_quarter_no_tax,
+                                0                       quarter_A_sales_cost,
+                                0                       last_month_quarter_A_sales_cost,
+                                0                       last_year_quarter_A_sales_cost,
+                                0                       quarter_standard_A_sales_cost,
+                                0                       last_month_quarter_standard_A_sales_cost,
+                                0                       last_year_quarter_standard_A_sales_cost,
+                                0                       quarter_budget_achievement,
+                                0                       quarter_budget_no_tax,
+                                0                       quarter_budget_A_sales_cost,
+                                0                       quarter_budget_standard_A_sales_cost,
+                                0                       day_amb_gross_profit,
+                                0                       month_amb_gross_profit,
+                                0                       year_amb_gross_profit,
+                                0                       last_month_day_amb_gross_profit,
+                                0                       last_month_month_amb_gross_profit,
+                                0                       last_month_year_amb_gross_profit,
+                                0                       last_year_day_amb_gross_profit,
+                                0                       last_year_month_amb_gross_profit,
+                                0                       last_year_year_amb_gross_profit,
+                                0                       quarter_amb_gross_profit,
+                                0                       last_month_quarter_amb_gross_profit,
+                                0                       last_year_quarter_amb_gross_profit
+                         from dm.dm_ambv2_zzt_xssr_t a
+                                  left join dm.dm_sdi_tvtwt_1001_t b
+                                            on a.distr_chan = b.vtweg and b.spras = '1' and b.mandt = '800'
+                                  left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                               left join dm.dm_rpt_zmaster_cus_t z
+                            on a.customer = z."ACCOUNT_NUMBER"
+                                and a.distr_chan = z."SALES_CHANNEL_CODE"
+                                and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                                and z."PARVW" = 'AG'
+                  left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F zz
+                            on a.wbs_elemt = zz.WBS_LEVEL3
+                  left join dm.dm_rpt_sales_group_t d on case
+                                                               when a.data_source in ('S', 'T')
+                                                                   then COALESCE(
+                                                                       COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                                       a.sales_grp)
+                                                               else a.sales_grp
+                                                               end = d.node_name9
+                         where calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                           and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                         group by customer, d.node_name9, new_distr_chan, new_distr_chan_desc, prod_type, c.dimension,
+                                  data_source,
+                                  a.cust_group, a.PROD_PROPERTY_NAME
+                         union all
+                         select P_DATE                  calday,
+                                customer,
+                                d.node_name9,
+                                case
+                                    when d.node_name2 = 'H11000001' then
+                                        integrate_channel
+                                    else distr_chan end new_distr_chan,
+                                case
+                                    when d.node_name2 = 'H11000001' then
+                                        case
+                                            when integrate_channel = 'GD03' then '工程渠道'
+                                            when integrate_channel = 'GD01' then '大零售渠道'
+                                            when integrate_channel = 'GD02' then '整装头部' end
+                                    else b.vtext end    new_distr_chan_desc,
+                                c.product_level3_name   prod_type,
+                                c.dimension,
+                                data_source,
+                                0                       day_achievement,
+                                0                       month_achievement,
+                                0                       year_achievement,
+                                0                       last_month_day_achievement,
+                                0                       last_month_month_achievement,
+                                0                       last_month_year_achievement,
+                                0                       last_year_day_achievement,
+                                0                       last_year_month_achievement,
+                                0                       last_year_year_achievement,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     day_no_tax,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     month_no_tax,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     year_no_tax,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_month_day_no_tax,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_month_month_no_tax,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 months', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_month_year_no_tax,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_year_day_no_tax,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_year_month_no_tax,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            notax_sales_net_amt
+                                        else 0 end)     last_year_year_no_tax,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            coalesce(last_period_sum_price, 0) + coalesce(zzyywcb_azf, 0)
+                                        else 0 end)     day_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(current_date - 1, 'yyyy-MM')
+                                                    then
+                                                        (case
+                                                             when d.node_name2 = 'H11000003' and
+                                                                  customer in ('0000315546', '0000315548', '0000315552')
+                                                                 then 0
+                                                             else coalesce(last_period_sum_price, 0) end) +
+                                                        coalesce(zzyywcb_azf, 0)
+                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf end
+                                        else 0 end)     month_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then
+                                                case
+                                                    when calmonth = to_char(current_date - 1, 'yyyy-MM') then
+                                                        coalesce(last_period_sum_price, 0)  + coalesce(zzyywcb_azf, 0)
+                                        else
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf end
+                                    else 0 end)
+                                                        year_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_month_day_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_month_month_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 months', 'yyyy-01') and to_char(to_date(P_DATE) - interval '2 months', 'yyyy-MM')
+                                            and left(calmonth, 4) = to_char(to_date(P_DATE), 'yyyy')
+                                            then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)
+                                    + sum(case
+                                              when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                                   calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                                  then act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                              else 0 end
+                                    )                   last_month_year_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_year_day_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_year_month_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(
+                                                to_date(P_DATE) - interval '1 years', 'yyyy-MM')
+                                            then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end
+                                    )                   last_year_year_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     day_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(current_date - 1, 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     month_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(current_date - 1, 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     year_standard_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_month_day_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_month_month_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 months', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_month_year_standard_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_year_day_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_year_month_standard_A_sales_cost,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM')
+                                            and calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_year_year_standard_A_sales_cost,
+                                0                       day_budget_achievement,
+                                0                       month_budget_achievement,
+                                0                       year_budget_achievement,
+                                0                       day_budget_no_tax,
+                                0                       month_budget_no_tax,
+                                0                       year_budget_no_tax,
+                                0                       day_budget_A_sales_cost,
+                                0                       month_budget_A_sales_cost,
+                                0                       year_budget_A_sales_cost,
+                                0                       day_budget_standard_A_sales_cost,
+                                0                       month_budget_standard_A_sales_cost,
+                                0                       year_budget_standard_A_sales_cost,
+                                a.cust_group,
+                                0                       quarter_achievment,
+                                0                       last_month_quarter_achievement,
+                                0                       last_year_quarter_achievement,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then notax_sales_net_amt
+                                        else 0 end)     quarter_no_tax,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '3 months', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '3 months', 'yyyyMMdd')
+                                            then notax_sales_net_amt
+                                        else 0 end)     last_month_quarter_no_tax,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '1 years', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then notax_sales_net_amt
+                                        else 0 end)     last_year_quarter_no_tax,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy0Q') and
+                                             calmonth != to_char(current_date - 1, 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)
+                                    + sum(case
+                                              when calmonth = to_char(current_date - 1, 'yyyy-MM') and
+                                                   calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                                  then coalesce(last_period_sum_price, 0)
+                                              else 0 end + coalesce(zzyywcb_azf, 0)
+                                    )                   quarter_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '3 months', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '3 months', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_month_quarter_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '1 years', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            act_cost_sum_amt - zyywcb_zxf - zyywcb_yf
+                                        else 0 end)     last_year_quarter_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then
+                                            case
+                                                when calmonth = to_char(current_date - 1, 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     quarter_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '3 months', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '3 months', 'yyyyMMdd')
+                                            then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_month_quarter_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '1 years', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then
+                                            case
+                                                when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') then
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else coalesce(last_period_sum_price, 0) end
+                                                        else coalesce(last_period_sum_price, 0) end
+                                                else
+                                                    case
+                                                        when coalesce(a.prod_property, '#') = 'A0001' and
+                                                             coalesce(a.cust_group, '#') != 'Z0' THEN
+                                                            case
+                                                                when a.data_source in ('S', 'T')
+                                                                    then coalesce(standard_price_a, 0)
+                                                                else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                                                        else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end
+                                        else 0 end)     last_year_quarter_standard_A_sales_cost,
+                                0                       quarter_budget_achievement,
+                                0                       quarter_budget_no_tax,
+                                0                       quarter_budget_A_sales_cost,
+                                0                       quarter_budget_standard_A_sales_cost,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     day_amb_gross_profit,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE), 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     month_amb_gross_profit,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            and left(calmonth, 4) = to_char(to_date(P_DATE), 'yyyy')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end
+                                    )                   year_amb_gross_profit,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     last_month_day_amb_gross_profit,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     last_month_month_amb_gross_profit,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 months', 'yyyy-01') and to_char(to_date(P_DATE) - interval '1 months', 'yyyy-MM')
+                                            and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 months', 'yyyyMMdd')
+                                            and left(calmonth, 4) = to_char(to_date(P_DATE), 'yyyy')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end)
+                                                        last_month_year_amb_gross_profit,
+                                sum(case
+                                        when calday = to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     last_year_day_amb_gross_profit,
+                                sum(case
+                                        when calmonth = to_char(to_date(P_DATE) - interval '1 years', 'yyyy-MM') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd') then
+                                            amb_profit_amt
+                                        else 0 end)     last_year_month_amb_gross_profit,
+                                sum(case
+                                        when calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(
+                                                to_date(P_DATE) - interval '1 years', 'yyyy-MM')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end
+                                    )                   last_year_year_amb_gross_profit,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end)     quarter_amb_gross_profit,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '3 months', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '3 months', 'yyyyMMdd')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end)     last_month_quarter_amb_gross_profit,
+                                sum(case
+                                        when to_char(to_date((calmonth || '-01')), 'yyyy0Q') =
+                                             to_char(to_date(P_DATE) - interval '1 years', 'yyyy0Q') and
+                                             calday <= to_char(to_date(P_DATE) - interval '1 years', 'yyyyMMdd')
+                                            then
+                                            amb_profit_amt
+                                        else 0 end)     last_year_quarter_amb_gross_profit
+                         from dm.dm_ambv2_profit_t a
+                                  left join dm.dm_sdi_tvtwt_1001_t b
+                                            on a.distr_chan = b.vtweg and b.spras = '1' and b.mandt = '800'
+                                  left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                                   left join dm.dm_rpt_zmaster_cus_t z
+                            on a.customer = z."ACCOUNT_NUMBER"
+                                and a.distr_chan = z."SALES_CHANNEL_CODE"
+                                and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                                and z."PARVW" = 'AG'
+                  left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F zz
+                            on a.wbs_elemt = zz.WBS_LEVEL3
+                  left join dm.dm_rpt_sales_group_t d on case
+                                                               when a.data_source in ('S', 'T')
+                                                                   then COALESCE(
+                                                                       COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                                       a.sales_grp)
+                                                               else a.sales_grp
+                                                               end = d.node_name9
+                         where calmonth between to_char(to_date(P_DATE) - interval '1 years', 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                           and calday <= to_char(to_date(P_DATE), 'yyyyMMdd')
+                         group by customer, d.node_name9, new_distr_chan, new_distr_chan_desc, prod_type, c.dimension,
+                                  data_source,
+                                  a.cust_group, a.PROD_PROPERTY_NAME
+                         union all
+                         select P_DATE                         calday,
+                                ''                             customer,
+                                sale_grp_name                  sales_grp,
+                                case
+                                    when node_name2 = 'H11000001' then
+                                        prod_channel_name
+                                    else prod_channel_name end new_distr_chan,
+                                case
+                                    when node_name2 = 'H11000001' then
+                                        case
+                                            when prod_channel_name = 'GD03' then '工程渠道'
+                                            when prod_channel_name = 'GD01' then '大零售渠道'
+                                            when prod_channel_name = 'GD02' then '整装头部' end
+                                    else b.vtext end           new_distr_chan_desc,
+                                d.category_name                prod_type,
+                                dimension,
+                                'S'                            data_source,
+                                0                              day_achievement,
+                                0                              month_achievement,
+                                0                              year_achievement,
+                                0                              last_month_day_achievement,
+                                0                              last_month_month_achievement,
+                                0                              last_month_year_achievement,
+                                0                              last_year_day_achievement,
+                                0                              last_year_month_achievement,
+                                0                              last_year_year_achievement,
+                                0                              day_no_tax,
+                                0                              month_no_tax,
+                                0                              year_no_tax,
+                                0                              last_month_day_no_tax,
+                                0                              last_month_month_no_tax,
+                                0                              last_month_year_no_tax,
+                                0                              last_year_day_no_tax,
+                                0                              last_year_month_no_tax,
+                                0                              last_year_year_no_tax,
+                                0                              day_A_sales_cost,
+                                0                              month_A_sales_cost,
+                                0                              year_A_sales_cost,
+                                0                              last_month_day_A_sales_cost,
+                                0                              last_month_month_A_sales_cost,
+                                0                              last_month_year_A_sales_cost,
+                                0                              last_year_day_A_sales_cost,
+                                0                              last_year_month_A_sales_cost,
+                                0                              last_year_year_A_sales_cost,
+                                0                              day_standard_A_sales_cost,
+                                0                              month_standard_A_sales_cost,
+                                0                              year_standard_A_sales_cost,
+                                0                              last_month_day_standard_A_sales_cost,
+                                0                              last_month_month_standard_A_sales_cost,
+                                0                              last_month_year_standard_A_sales_cost,
+                                0                              last_year_day_standard_A_sales_cost,
+                                0                              last_year_month_standard_A_sales_cost,
+                                0                              last_year_year_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then prod_it_amt1
+                                        else 0 end)            day_budget_achievement,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then prod_it_amt1
+                                        else 0 end)            month_budget_achievement,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            then prod_it_amt1
+                                        else 0 end)            year_budget_achievement,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then prod_it_amt
+                                        else 0 end)            day_budget_no_tax,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then prod_it_amt
+                                        else 0 end)            month_budget_no_tax,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            then prod_it_amt
+                                        else 0 end)            year_budget_no_tax,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then a_cost
+                                        else 0 end)            day_budget_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then a_cost
+                                        else 0 end)            month_budget_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            then a_cost
+                                        else 0 end)            year_budget_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then standarda
+                                        else 0 end)            day_budget_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') =
+                                             to_char(to_date(P_DATE), 'yyyy-MM') then standarda
+                                        else 0 end)            month_budget_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-MM') between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                                            then standarda
+                                        else 0 end)            year_budget_standard_A_sales_cost,
+                                '',
+                                0                              quarter_achievment,
+                                0                              last_month_quarter_achievement,
+                                0                              last_year_quarter_achievement,
+                                0                              quarter_no_tax,
+                                0                              last_month_quarter_no_tax,
+                                0                              last_year_quarter_no_tax,
+                                0                              quarter_A_sales_cost,
+                                0                              last_month_quarter_A_sales_cost,
+                                0                              last_year_quarter_A_sales_cost,
+                                0                              quarter_standard_A_sales_cost,
+                                0                              last_month_quarter_standard_A_sales_cost,
+                                0                              last_year_quarter_standard_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy-0Q')
+                                            and to_char(to_date(stat_month), 'yyyy-MM-dd') <=
+                                                to_char(to_date(P_DATE), 'yyyy-MM-dd') then prod_it_amt1
+                                        else 0 end)            quarter_budget_achievement,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy-0Q')
+                                            and to_char(to_date(stat_month), 'yyyy-MM-dd') <=
+                                                to_char(to_date(P_DATE), 'yyyy-MM-dd') then prod_it_amt
+                                        else 0 end)            quarter_budget_no_tax,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy-0Q')
+                                            and to_char(to_date(stat_month), 'yyyy-MM-dd') <=
+                                                to_char(to_date(P_DATE), 'yyyy-MM-dd') then a_cost
+                                        else 0 end)            quarter_budget_A_sales_cost,
+                                sum(case
+                                        when to_char(to_date(stat_month), 'yyyy-0Q') =
+                                             to_char(to_date(P_DATE), 'yyyy-0Q')
+                                            and to_char(to_date(stat_month), 'yyyy-MM-dd') <=
+                                                to_char(to_date(P_DATE), 'yyyy-MM-dd') then standarda
+                                        else 0 end)            quarter_budget_standard_A_sales_cost,
+                                0                              day_amb_gross_profit,
+                                0                              month_amb_gross_profit,
+                                0                              year_amb_gross_profit,
+                                0                              last_month_day_amb_gross_profit,
+                                0                              last_month_month_amb_gross_profit,
+                                0                              last_month_year_amb_gross_profit,
+                                0                              last_year_day_amb_gross_profit,
+                                0                              last_year_month_amb_gross_profit,
+                                0                              last_year_year_amb_gross_profit,
+                                0                              quarter_amb_gross_profit,
+                                0                              last_month_quarter_amb_gross_profit,
+                                0                              last_year_quarter_amb_gross_profit
+                         from upload.upload_achievement_budget_t a
+                                  left join dm.dm_sdi_tvtwt_1001_t b
+                                            on a.zqdzh23_2 = b.vtweg and b.spras = '1' and b.mandt = '800'
+                                  left join dm.dm_rpt_sales_group_t c on a.sale_grp_name = c.node_name9
+                                  left join (select distinct category, category_name
+                                             from dwimd.dwi_md_data_material_general_t) d
+                                            on a.prod_level3_name = d.category
+                         where to_char(to_date(stat_month), 'yyyy-MM') between to_char(to_date(P_DATE), 'yyyy-01') and to_char(to_date(P_DATE), 'yyyy-MM')
+                         group by sales_grp, new_distr_chan, new_distr_chan_desc, prod_type, dimension, data_source
+                     ) aa
+                group by calday,
+                         customer,
+                         node_name9,
+                         distr_chan,
+                         distr_chan_desc,
+                         prod_type,
+                         dimension,
+                         data_source,
+                         cust_group;
+            end loop;
+    end ;
+$$

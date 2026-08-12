@@ -1,0 +1,69 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/02 17:40:31 GMT+08:00
+-- update from chenzhiyong 20221124 11:00 新增库存地点名称
+-- ******************************************************************** --
+-- alter table DWROTD.DWR_WM_ALL_TYPE_STOCK_MONTH_T add  columns(stock_amt decimal(38,10))
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+insert overwrite table DWROTD.DWR_WM_ALL_TYPE_STOCK_MONTH_T partition(month_date) 
+select  t1.group_num , 
+		t1.company_code ,
+		t1.factory_werks_code, 
+		t1.INV_LOCATION,
+        t1.batch_num, 
+        t1.VENDOR_SUBJECT_NO_SID , 
+        t1.REVALUED_SALES_ORDER_NO, 
+        t1.REVALUED_SALES_ORDER_PROJ,
+        t1.CUST_NUM, 
+		t1.GOODS_MOVE_STOCK_TYPE_SID, 
+		t1.SPECIAL_STOCK_FLAG_2,
+		t1.material_num,
+        sum(t1.stock_qty) as stock_qty,
+        current_timestamp as dw_last_update_date,
+        t1.base_measure_unit,
+        t2.lgobe as INV_LOCATION_NAME,
+        t1.SALES_ORDER_STOCK_WBS AS wbs_element,
+        sum(t1.stock_symbol_amt) as stock_amt,
+        month_id as stat_month
+from   DWIOTD.DWI_WM_PRODSTOCK_OUT_IN_T t1
+join  (select month_id,
+			  max(day_id) as day_dt 
+	   from dm.dm_dim_date_d dddd 
+       where 1=1
+       and day_dt  >= date_sub( '${PERIOD_ID_D}',35) and day_dt<= '${PERIOD_ID_D}'
+       group by month_id  
+	   ) t0 
+on 1 = 1
+--join dwimd.dwi_md_data_material_general_t t2 on t1.material_num  = t2.material_num 
+left join (
+  select T.werks,T.lgort,T.lgobe from  sdi.sdi_t001l_1001 t where t.mandt = '800' and t.del_flag  = 'N'
+) t2
+on t1.factory_werks_code = t2.werks
+and t1.INV_LOCATION = t2.lgort
+where VOUCHER_POST_DATE < date_add(concat(substr(t0.day_dt,1,4),'-',substr(t0.day_dt,5,2),'-',substr(t0.day_dt,7,2)),1)
+--and t2.matl_group_code ='1000010'
+group by t1.group_num , 
+		 t1.company_code ,
+		 t1.factory_werks_code, 
+		 t1.INV_LOCATION,
+         t1.batch_num, 
+		 t1.VENDOR_SUBJECT_NO_SID , 
+		 t1.REVALUED_SALES_ORDER_NO, 
+		 t1.REVALUED_SALES_ORDER_PROJ,
+         t1.CUST_NUM, 
+		 t1.GOODS_MOVE_STOCK_TYPE_SID, 
+		 t1.SPECIAL_STOCK_FLAG_2,
+		 t1.material_num,
+		 month_id,
+		 t1.base_measure_unit,
+		 t2.lgobe,
+		 t1.SALES_ORDER_STOCK_WBS;

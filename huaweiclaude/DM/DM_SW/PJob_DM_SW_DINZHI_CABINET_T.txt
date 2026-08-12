@@ -1,0 +1,435 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/11/13 15:36:50 GMT+08:00
+-- description: 卫浴定制柜报表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm_sw.dm_sw_dinzhi_cabinet_t where month_cnt = substring('${PERIOD_ID_D}',1,7);
+insert into dm_sw.dm_sw_dinzhi_cabinet_t
+
+with data_detail as 
+(
+select 
+t1.org_lev5_name
+,lpad(t1.cust_num,10,'0') cust_num
+,t1.cust_name
+,case 
+	when t3.belong_company is not null then belong_company
+	when t5.ZZKUNNR is not null then ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+-- 	else lpad(t1.cust_num,10,'0')
+end as parent_cust_num
+,t1.order_date
+,count(distinct t1.order_num) order_qty
+,sum(t1.total_amt) total_amt
+,0 as tqmonth_order_qty
+,0 as tqmonth_total_amt
+,0 as curyear_order_qty
+,0 as curyear_total_amt
+,0 as lastyear_order_qty
+,0 as lastyear_total_amt
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then '浴缸'
+end dinzhi_category
+,0 as curmonth_performance
+,0 as tqmonth_performance
+,0 as curyear_performance
+,0 as lastyear_performance
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end son_category
+,count(distinct concat(t1.order_num,t1.order_item_num )) curday_order_line_qty
+,0 as tqmonth_order_line_qty
+,0 as curyear_order_line_qty
+,0 as lastyear_order_line_qty
+
+,0 as tqmonth_order_qty_d
+,0 as tqmonth_total_amt_d
+,0 as lastyear_order_qty_d
+,0 as lastyear_total_amt_d
+,0 as tqmonth_order_line_qty_d
+,0 as lastyear_order_line_qty_d
+,0 as tqmonth_performance_d
+,0 as lastyear_performance_d
+,t2.oem_flag
+from dm_sw.dm_otd_sales_order_det_sw t1
+left join upload.upload_sw_dinzhi_material t2 on t1.material_num  =t2.material_num
+left join upload.upload_sw_company_customer t3 on t1.sales_org_code = t3.sales_group and t1.cust_num = lpad(t3.customer,10,'0')
+left join dwrdim.dwr_dim_cust_sales_area_d2 t4 on t1.sales_org_code = t4.sales_org_code 
+		and t1.cust_num = t4.cust_num and t4.distribution_chnl_code = '01' and t4.end_date= '4712-12-31'
+left join DWIPI.DWI_WF_ZSD_ZMKB_WY_T t5 on  t1.sales_org_code = t5.VKORG and t1.cust_num = t5.KUNNR and t5.VTWEG = '01'
+left join dwimd.dwi_md_data_material_general_t mat on t1.material_num = mat.material_num
+where 1=1
+and t1.channel_code = '01'
+and substring(order_date,1,7) = SUBSTR('${PERIOD_ID_D}',1,7)
+and 
+(
+    (t2.material_num is not null and substring(t1.order_num,1,4) in ('1339')) OR --定制柜和阳台柜
+    substring(t1.material_num,1,2) in ('GB') OR --淋浴房
+    mat.product_level3_code in ('4014001') --浴缸类
+)
+and t1.sales_org_code in ('3320', '3720',  '3820' ,'3830','3831','3832')
+group by 
+t1.org_lev5_name
+,lpad(t1.cust_num,10,'0')
+,t1.cust_name
+,case 
+	when t3.belong_company is not null then belong_company
+	when t5.ZZKUNNR is not null then ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+-- 	else lpad(t1.cust_num,10,'0')
+end
+,t1.order_date
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then '浴缸'
+end 
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end
+,t2.oem_flag
+
+union all 
+
+--同期月、年累计、同期年累计
+select 
+t1.org_lev5_name
+,lpad(t1.cust_num,10,'0') cust_num
+,t1.cust_name
+,case 
+	when t3.belong_company is not null then belong_company
+	when t5.ZZKUNNR is not null then ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+-- 	else lpad(t1.cust_num,10,'0')
+end as parent_cust_num
+,'${PERIOD_ID_D}' as order_date
+,0 as order_qty
+,0 as total_amt
+--同期月
+,count(distinct case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+	then t1.order_num
+end) tqmonth_order_qty
+,sum(case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+	then total_amt
+	else 0
+end) tqmonth_total_amt
+--年累计
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR('${PERIOD_ID_D}',1,4) then t1.order_num
+end) curyear_order_qty
+,sum(case 
+	when substring(order_date,1,4) = SUBSTR('${PERIOD_ID_D}',1,4) then total_amt
+	else 0
+end) curyear_total_amt
+--同期年累计
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and replace(substring(order_date,1,7),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) ,'-','')
+    then t1.order_num
+end) lastyear_order_qty
+,sum(case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and replace(substring(order_date,1,7),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) ,'-','')
+    then t1.total_amt
+	else 0
+end) lastyear_total_amt
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then '浴缸'
+end dinzhi_category
+,0 as curmonth_performance
+,0 as tqmonth_performance
+,0 as curyear_performance
+,0 as lastyear_performance
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end son_category
+,0 as curday_order_line_qty
+,count(distinct case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7)  
+    then concat(t1.order_num,t1.order_item_num )
+end)  as tqmonth_order_line_qty
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR('${PERIOD_ID_D}',1,4) then concat(t1.order_num,t1.order_item_num )
+end) as curyear_order_line_qty
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and replace(substring(order_date,1,7),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) ,'-','')
+    then concat(t1.order_num,t1.order_item_num )
+end) as lastyear_order_line_qty
+
+,count(distinct case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+	and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+	then t1.order_num
+end) as tqmonth_order_qty_d
+,sum(case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+	and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+	then total_amt
+	else 0
+end) as tqmonth_total_amt_d
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+    then t1.order_num
+end) as lastyear_order_qty_d
+,sum(case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+    then t1.total_amt
+	else 0
+end) as lastyear_total_amt_d
+,count(distinct case 
+	when substring(order_date,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7)  
+    and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+    then concat(t1.order_num,t1.order_item_num )
+end) as tqmonth_order_line_qty_d
+,count(distinct case 
+	when substring(order_date,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+	and order_date <= SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) 
+    then concat(t1.order_num,t1.order_item_num )
+end) as lastyear_order_line_qty_d
+,0 as tqmonth_performance_d
+,0 as lastyear_performance_d
+,t2.oem_flag
+from dm_sw.dm_otd_sales_order_det_sw t1
+left join upload.upload_sw_dinzhi_material t2 on t1.material_num  =t2.material_num
+left join upload.upload_sw_company_customer t3 on t1.sales_org_code = t3.sales_group and t1.cust_num = lpad(t3.customer,10,'0')
+left join dwrdim.dwr_dim_cust_sales_area_d2 t4 on t1.sales_org_code = t4.sales_org_code 
+		and t1.cust_num = t4.cust_num and t4.distribution_chnl_code = '01' and t4.end_date= '4712-12-31'
+left join DWIPI.DWI_WF_ZSD_ZMKB_WY_T t5 on  t1.sales_org_code = t5.VKORG and t1.cust_num = t5.KUNNR and t5.VTWEG = '01'
+left join dwimd.dwi_md_data_material_general_t mat on t1.material_num = mat.material_num
+where 1=1
+and t1.channel_code = '01'
+and substring(order_date,1,4) in ( SUBSTR('${PERIOD_ID_D}',1,4),SUBSTR('${PERIOD_ID_D}',1,4)-1 )
+and order_date <= '${PERIOD_ID_D}'
+and 
+(
+    (t2.material_num is not null and substring(t1.order_num,1,4) in ('1339')) OR --定制柜和阳台柜
+    substring(t1.material_num,1,2) in ('GB') OR --淋浴房
+    mat.product_level3_code in ('4014001') --浴缸类
+)
+and t1.sales_org_code in ('3320', '3720',  '3820' ,'3830','3831','3832')
+group by 
+t1.org_lev5_name
+,lpad(t1.cust_num,10,'0')
+,t1.cust_name
+,case 
+	when t3.belong_company is not null then belong_company
+	when t5.ZZKUNNR is not null then ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+-- 	else lpad(t1.cust_num,10,'0')
+end
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then '浴缸'
+end 
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material_num,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end
+,t2.oem_flag
+
+union all 
+
+select 
+rsg.node_desc5 as org_lev5_name
+,t1.customer cust_num
+,cust.cust_name as cust_name
+,case 
+	when t3.belong_company is not null then t3.belong_company
+	when t5.ZZKUNNR is not null then t5.ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+-- 	else lpad(t1.cust_num,10,'0')
+end as parent_cust_num
+,'${PERIOD_ID_D}' as order_date
+,0 as order_qty
+,0 as total_amt
+--同期月
+,0 as tqmonth_order_qty
+,0 as  tqmonth_total_amt
+--年累计
+,0 as curyear_order_qty
+,0 as curyear_total_amt
+--同期年累计
+,0 as lastyear_order_qty
+,0 as lastyear_total_amt
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then '浴缸'
+end dinzhi_category
+
+--当月业绩
+,sum(case 
+	when substring(calmonth,1,7) = SUBSTR('${PERIOD_ID_D}', 1, 7) then ambperformance
+	else 0
+end) curmonth_performance
+--同期月业绩
+,sum(case 
+	when substring(calmonth,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+    then ambperformance
+	else 0
+end) tqmonth_performance
+--年累计业绩
+,sum(case 
+	when substring(calmonth,1,4) = SUBSTR('${PERIOD_ID_D}',1,4) then ambperformance
+	else 0
+end) curyear_performance
+--同期年累计业绩
+,sum(case 
+	when substring(calmonth,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+    and replace(substring(t1.calday,1,6),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) ,'-','')
+    then t1.ambperformance
+    else 0
+end) lastyear_performance
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end son_category
+,0 as curday_order_line_qty
+,0 as tqmonth_order_line_qty
+,0 as curyear_order_line_qty
+,0 as lastyear_order_line_qty
+
+,0 as tqmonth_order_qty_d
+,0 as tqmonth_total_amt_d
+,0 as lastyear_order_qty_d
+,0 as lastyear_total_amt_d
+,0 as tqmonth_order_line_qty_d
+,0 as lastyear_order_line_qty_d
+,sum(case 
+	when substring(calmonth,1,7) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 7) 
+	and replace(substring(t1.calday,1,10),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) ,'-','')
+    then ambperformance
+	else 0
+end) as tqmonth_performance_d
+,sum(case 
+	when substring(calmonth,1,4) = SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 4) 
+    and replace(substring(t1.calday,1,10),'-','') <= replace(SUBSTR(TO_DATE('${PERIOD_ID_D}', 'YYYY-MM-DD') - INTERVAL '1 year', 1, 10) ,'-','')
+    then t1.ambperformance
+    else 0
+end) as lastyear_performance_d
+,t2.oem_flag
+from dm.dm_ambv2_zzt_xssr_t t1
+left join dm.dm_rpt_sales_group_t rsg on t1.sales_grp = rsg.node_name9
+left join upload.upload_sw_dinzhi_material t2 on t1.material  =t2.material_num
+left join upload.upload_sw_company_customer t3 on t1.salesorg = t3.sales_group and t1.customer = lpad(t3.customer,10,'0')
+left join dwrdim.dwr_dim_cust_sales_area_d2 t4 on t1.salesorg = t4.sales_org_code 
+		and t1.customer = t4.cust_num and t4.distribution_chnl_code = '01' and t4.end_date= '4712-12-31'
+left join DWIPI.DWI_WF_ZSD_ZMKB_WY_T t5 on  t1.salesorg = t5.VKORG and t1.customer = t5.KUNNR and t5.VTWEG = '01'
+left join dwimd.dwi_md_data_material_general_t mat on t1.material = mat.material_num
+left join dwrdim.dwr_dim_cust_general_d cust on t1.customer = cust.cust_num and cust.end_date = '4712-12-31'
+where 1=1
+and t1.distr_chan = '01'
+and substring(t1.calmonth,1,4) in ( SUBSTR('${PERIOD_ID_D}',1,4),SUBSTR('${PERIOD_ID_D}',1,4)-1 )
+and t1.calday <= replace('${PERIOD_ID_D}','-','')
+and substring(t1.calday,1,6) = replace(t1.calmonth,'-','')
+and 
+(
+    (t2.material_num is not null and substring(t1.doc_number,1,4) in ('1339')) OR --定制柜和阳台柜
+    substring(t1.material,1,2) in ('GB') OR --淋浴房
+    mat.product_level3_code in ('4014001') --浴缸类
+)
+and t1.salesorg in ('3320', '3720',  '3820' ,'3830','3831','3832')
+group by 
+rsg.node_desc5
+,t1.customer
+,cust.cust_name
+,case 
+	when t3.belong_company is not null then t3.belong_company
+	when t5.ZZKUNNR is not null then t5.ZZKUNNR
+	when t4.parent_cust_num is not null then lpad(t4.parent_cust_num,10,'0')
+end 
+,case 
+	when t2.dinzhi_category is not null then dinzhi_category
+	when substring(t1.material,1,2) in ('GB') then '淋浴房'
+	when mat.product_level3_code in ('4014001') then '浴缸'
+end 
+,case 
+    when t2.dinzhi_category is not null then dinzhi_category
+    when substring(t1.material,1,2) in ('GB') then '淋浴房'
+    when mat.product_level3_code in ('4014001') then mat.product_level4_name
+end 
+,t2.oem_flag
+)
+
+select 
+t1.org_lev5_name
+,t1.cust_num
+,t1.cust_name
+,case 
+	when t1.parent_cust_num like '%子公司' then null
+	else coalesce(t1.parent_cust_num,t1.cust_num)
+	end as parent_cust_num
+,case 
+	when t1.parent_cust_num like '%子公司' then parent_cust_num
+	else coalesce(cust.cust_name,t1.cust_name)
+	end as parent_cust_name
+,t1.order_date
+,sum(t1.order_qty) as order_qty
+,sum(t1.total_amt)/10000 as total_amt
+,sum(t1.tqmonth_order_qty) as tqmonth_order_qty
+,sum(t1.tqmonth_total_amt)/10000 as tqmonth_total_amt
+,sum(t1.curyear_order_qty) as curyear_order_qty
+,sum(t1.curyear_total_amt)/10000 as curyear_total_amt
+,sum(t1.lastyear_order_qty) as lastyear_order_qty
+,sum(t1.lastyear_total_amt)/10000 as lastyear_total_amt
+,current_timestamp() as dw_last_update_date
+,substring('${PERIOD_ID_D}',1,7) month_cnt
+,t1.dinzhi_category
+,sum(t1.curmonth_performance)/10000 as curmonth_performance
+,sum(t1.tqmonth_performance)/10000 as tqmonth_performance
+,sum(t1.curyear_performance)/10000 as curyear_performance
+,sum(t1.lastyear_performance)/10000 as  lastyear_performance
+,son_category
+,sum(curday_order_line_qty) as curday_order_line_qty
+,sum(tqmonth_order_line_qty) as tqmonth_order_line_qty
+,sum(curyear_order_line_qty) as curyear_order_line_qty
+,sum(lastyear_order_line_qty) as lastyear_order_line_qty
+
+,sum(tqmonth_order_qty_d) as tqmonth_order_qty_d
+,sum(tqmonth_total_amt_d)/10000 as tqmonth_total_amt_d
+,sum(lastyear_order_qty_d) as lastyear_order_qty_d
+,sum(lastyear_total_amt_d)/10000 as lastyear_total_amt_d
+,sum(tqmonth_order_line_qty_d) as tqmonth_order_line_qty_d
+,sum(lastyear_order_line_qty_d) as lastyear_order_line_qty_d
+,sum(tqmonth_performance_d)/10000 as tqmonth_performance_d
+,sum(lastyear_performance_d)/10000 as lastyear_performance_d
+,oem_flag
+from data_detail t1
+left join  DWRDIM.dwr_dim_cust_general_d cust ON cust.cust_num = t1.parent_cust_num and cust.end_date ='4712-12-31'
+group by 
+t1.org_lev5_name
+,t1.cust_num
+,t1.cust_name
+,case 
+	when t1.parent_cust_num like '%子公司' then null
+	else coalesce(t1.parent_cust_num,t1.cust_num)
+	end
+,case 
+	when t1.parent_cust_num like '%子公司' then parent_cust_num
+	else coalesce(cust.cust_name,t1.cust_name)
+	end 
+,t1.order_date
+,t1.dinzhi_category
+,son_category
+,t1.oem_flag

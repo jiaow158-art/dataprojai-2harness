@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_MOBILE_LOG_BW_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

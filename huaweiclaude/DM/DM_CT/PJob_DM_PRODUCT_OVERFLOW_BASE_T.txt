@@ -1,0 +1,78 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/03/13 17:24:54 GMT+08:00
+-- updated by yangjunhua 20230410 close_time应该按月汇总才能计算正常溢出和非正常溢出
+-- ******************************************************************** --
+with tmp as(
+select  uarfc.factory, dtl.item_code,dtl.item_name,dtl.PLAN_AREA,
+       dtl.plan_no,dtl.resource_name,end_time,close_time,
+       coalesce ( uapsti.spec_tech_name , '常规产品') tech_name,dtl.CATEGORY,dtl.PRODUCT_PROPERTY,
+       sum(case when  stockin_time<'2022-05-13' and uarfc.factory='湖南'  and substr( dtl.batch_no,-1,1)<>'7' then dtl.stockin_qty*dtl.area
+                when  stockin_time<'2022-05-13' and uarfc.factory<>'湖南' and substr( dtl.batch_no,-1,1) not in('7','9') then  dtl.stockin_qty*dtl.area
+                when  stockin_time>='2022-05-13' and substr( dtl.batch_no,-1,1) not in('7','9') then  dtl.stockin_qty*dtl.area else 0 end) as qc_stockin_area,
+       sum(dtl.stockin_qty*dtl.area) as stockin_area,
+      def_order_type_set_name,order_type_set_name_set ,
+      workshop_code,workshop_name,factory_code,factory_name  
+from  dm.dm_aps_daily_schedule_dtl  dtl
+left join sdi.sdi_aps_resource_factory_cfg_1037 uarfc  on dtl.resource_name = uarfc.resource_name
+left join sdi.sdi_aps_product_spec_tech_info_1037 uapsti  on dtl.item_code  = uapsti.item_code and uarfc.factory  = uapsti.factory 
+where 1=1
+group by dtl.id, uarfc.factory, dtl.item_code,dtl.item_name,dtl.PLAN_AREA,dtl.plan_no,dtl.resource_name,
+       coalesce ( uapsti.spec_tech_name , '常规产品') ,dtl.CATEGORY,dtl.PRODUCT_PROPERTY,end_time,close_time,def_order_type_set_name,order_type_set_name_set,workshop_code,workshop_name,factory_code,factory_name 
+) 
+-- select * from tmp where factory  is null
+,tmp2 as(
+select t.factory,t.workshop_name,t.item_code,t.item_name,t.tech_name,t.CATEGORY,t.PRODUCT_PROPERTY,substr(t.close_time,1,7) as close_time,
+     case when t.PRODUCT_PROPERTY in('A','B') then '一类溢出'
+          when t2.material_num is not null then '一类溢出'
+          when  t.PRODUCT_PROPERTY in('C','D','T','CC') then '二类溢出' end as productover_type,
+       sum(PLAN_AREA) PLAN_AREA,
+       sum(stockin_area) as stockin_area,
+       sum(qc_stockin_area) qc_stockin_area
+from tmp t  
+left join sdi.sdi_aps_spec_product_list_cfg_1037 t2 ON t.item_code = t2.material_num
+WHERE 1=1
+and coalesce(t.PRODUCT_PROPERTY,' ')<>'H'
+and t.def_order_type_set_name<>'新品首批订单'
+and t.resource_name not like '%加工%'
+group by t.factory,t.workshop_name,t.item_code,t.item_name,t.tech_name,t.CATEGORY,t.PRODUCT_PROPERTY,substr(t.close_time,1,7),
+case when t.PRODUCT_PROPERTY in('A','B') then '一类溢出'
+          when t2.material_num is not null then '一类溢出'
+          when  t.PRODUCT_PROPERTY in('C','D','T','CC') then '二类溢出' end
+)
+,tmp3 as(
+select t.*, 
+       coalesce(uaoc1.overproduct_rate, uaoc2.overproduct_rate) as overproduct_rate,
+       coalesce(uaoc1.fix_amount,uaoc2.fix_amount) as fix_amount,
+       least( t.PLAN_AREA*coalesce(uaoc1.overproduct_rate, uaoc2.overproduct_rate),
+           coalesce(uaoc1.fix_amount,uaoc2.fix_amount))  as overproduct_std_area,    -- 溢出量标准（平方）
+            greatest(qc_stockin_area-plan_area, 0 ) as overproduct_fact_area-- 实际溢出
+from tmp2 t
+left join sdi.sdi_aps_overproduct_type1_cfg_1037 uaoc1 
+on t.PLAN_AREA>=uaoc1.min_schedule_area and t.PLAN_AREA<uaoc1.max_schedule_area and t.productover_type = '一类溢出' 
+left join sdi.sdi_aps_overproduct_type2_cfg_1037 uaoc2
+on t.CATEGORY= uaoc2.prodoct_cate and t.tech_name = uaoc2.tech_name
+and t.PLAN_AREA>=uaoc2.min_schedule_area and t.PLAN_AREA<uaoc2.max_schedule_area
+and t.productover_type = '二类溢出' 
+)
+INSERT OVERWRITE TABLE dm.dm_product_overflow_base_t
+select t.factory, -- 基地
+       t.workshop_name, -- 车间
+       t.productover_type, -- 溢出类型
+       t.item_code,  -- 物料编码
+       t.item_name,
+       t.tech_name, -- 产品工艺
+       t.category, -- 品类
+       t.product_property,  -- 物料组1
+       t.plan_area,   -- 计划面积
+       t.stockin_area,
+       t.qc_stockin_area,   -- 按质量入库面积
+       t.overproduct_rate,  -- 溢出率（配置）
+       t.fix_amount,        -- 溢出率固定值（配置）
+       t.overproduct_std_area,  -- 溢出率标准面积
+       t.overproduct_fact_area,  -- 实际溢出
+       least  (overproduct_fact_area ,overproduct_std_area ) as normal_overproduct,  -- 正常溢出
+       greatest  (overproduct_fact_area-overproduct_std_area, 0 ) as abnormal_overproduct,   -- 非正常溢出
+       t.close_time --关单时间
+from tmp3 t;

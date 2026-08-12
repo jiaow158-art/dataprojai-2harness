@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SFA_DATA_DICT_T",
+    "type": "DWSSQL",
+    "directory": "/DM/SFA",
+    "description": "sfa数据字典表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

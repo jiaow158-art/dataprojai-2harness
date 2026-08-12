@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_QMS_EXPNC_ORDER_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/QMS",
+    "description": "经验总结单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

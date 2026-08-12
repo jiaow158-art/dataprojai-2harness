@@ -1,0 +1,795 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: linwei
+-- create time: 2023/02/23 16:10:31 GMT+08:00
+-- desc：瓷砖收入成本
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_CT_INCOME_COST_T;
+INSERT INTO DM.DM_CT_INCOME_COST_T(
+"calmonth"	,
+"calday"	,
+"doc_number"	,
+"doc_number___t"	,
+"s_ord_item"	,
+"ac_doc_nr"	,
+"ac_doc_ln"	,
+"zasd_p001_zuonr"	,
+"bill_num"	,
+"bill_item"	,
+"bill_type"	,
+"bill_type___t"	,
+"salesemply"	,
+"salesemply___t"	,
+"customer"	,
+"customer___t"	,
+"sales_grp"	,
+"sales_grp___t"	,
+"distr_chan"	,
+"distr_chan___t"	,
+"zasd_p001_0sales_grp_0"	,
+"zasd_p001_0sales_grp_0___t"	,
+"wbs_elemt"	,
+"wbs_elemt___t"	,
+"country"	,
+"country___t"	,
+"sales_dist"	,
+"sales_dist___t"	,
+"salesorg"	,
+"salesorg___t"	,
+"sales_off"	,
+"sales_off___t"	,
+"material"	,
+"material___t"	,
+"prod_hier"	,
+"prod_hier___t"	,
+"matl_group"	,
+"matl_group___t"	,
+"matl_grp_1"	,
+"matl_grp_1___t"	,
+"matl_grp_2"	,
+"matl_grp_2___t"	,
+"matl_grp_3"	,
+"matl_grp_3___t"	,
+"matl_grp_4"	,
+"matl_grp_4___t"	,
+"matl_grp_5"	,
+"matl_grp_5___t"	,
+"comp_code"	,
+"comp_code___t"	,
+"extmatlgrp"	,
+"extmatlgrp___t"	,
+"batch"	,
+"plant"	,
+"plant___t"	,
+"stor_loc"	,
+"stor_loc___t"	,
+"doc_currcy"	,
+"doc_currcy___t"	,
+"loc_currc2"	,
+"loc_currc2___t"	,
+"z_gcbbh"	,
+"zsjbm"	,
+"zsjyxq"	,
+"zsjms"	,
+"zossbjdh"	,
+"zgcbbh"	,
+"ztmswldh"	,
+"zddms"	,
+"division"	,
+"division___t"	,
+"zqdzh"	,
+"zqdzh___t"	,
+"size_dim"	,
+"zsfqc"	,
+"bus_area"	,
+"bus_area___t"	,
+"cust_grp1"	,
+"cust_grp1___t"	,
+"cust_grp2"	,
+"cust_grp2___t"	,
+"cust_grp3"	,
+"cust_grp3___t"	,
+"zfsjbm"	,
+"infoprov"	,
+"inco1"	,
+"inco1_t"	,
+"bstnk_vf"	,
+"bstnk_vf_t"	,
+"ktgrd"	,
+"ktgrd_t"	,
+"konda"	,
+"konda_t"	,
+"kalsm"	,
+"kalsm_t"	,
+"taxk1"	,
+"taxk1_t"	,
+"/bic/zscdh"	,
+"zhsje"	,
+"zbhsje"	,
+"zhwjz"	,
+"zyywsr_zyck"	,
+"zzyywsr_gn"	,
+"zyywsr_wm"	,
+"zyywsr_gsj"	,
+"zyywsr_jtj"	,
+"zzxcyf"	,
+"zhwjzjgtz"	,
+"zsj"	,
+"zzxcyfsj"	,
+"zhwjzjgtzsj"	,
+"zhwjzsj"	,
+"zzyywsr_qt"	,
+"zsyjf"	,
+"zytjf_sg"	,
+"zytjf_xt"	,
+"zyywcb"	,
+"zyywcb_gsj"	,
+"zyywcb_jtj"	,
+"zyywcb_dsf"	,
+"zyywcb_yf"	,
+"ztms_yf"	,
+"zsgrz_yf"	,
+"zyywcb_zxf"	,
+"ztms_zxf"	,
+"zsgrz_zxf"	,
+"zzyywcb_clcbcy"	,
+"zzyywcb_cbcbcy"	,
+"zzyywcb_cpjjss"	,
+"zzyywcb_qt"	,
+"zxsmj"	,
+"zxssl"	,
+"zcbkm"	,
+"zsrkm"	,
+"zsrkm___t"	,
+"zasd_p001_zsrpz"	,
+"zasd_p001_zcbpz"	,
+"zasd_p001_zgsjfp"	,
+"zasd_p001_zgsjfph"	,
+"zkpzt"	,
+"zkpzt___t"	,
+"zzyywcb_zz"	,
+"cust_group"	,
+"cust_group___t"	,
+"zsalesgrp"	,
+"zsalesgrp___t"	,
+"z_zcck"	,
+"zzqj"	,
+"zsrtzz"	,
+"zcbtzz"	,
+"zprodh1"	,
+"zprodh1___t"	,
+"zprodh2"	,
+"zprodh2___t"	,
+"zprodh3"	,
+"zprodh3___t"	,
+"zprodh4"	,
+"zprodh4___t"	,
+"zprodh5"	,
+"zprodh5___t"	,
+"zgg01"	,
+"zgg01___t"	,
+"zyl01"	,
+"zyl01___t"	,
+"zyl05"	,
+"zyl05___t"	,
+"zpl"	,
+"zpl___t"	,
+"calquarter"	,
+"zdw01"	,
+"zdw01___t"	,
+"zyl08"	,
+"zyl08___t"	,
+"zyl03"	,
+"zyl03___t"	,
+"zmx01"	,
+"zmx01___t"	,
+"zwl01"	,
+"zwl01___t"	,
+"zwlmc"	,
+"zwlmc___t"	,
+"zsx01"	,
+"zsx01___t"	,
+"zwl02"	,
+"zwl02___t"	,
+"zzkunnr"	,
+"zzkunnr___t"	,
+"zzvkorg"	,
+"zzvkorg___t"	,
+"zferth"	,
+"zferth___t"	,
+"zpcrkrq"	,
+"zchanqbd"	,
+"zchanq"	,
+"zxsmj_unit"	,
+"zxssl_unit"	,
+"doc_type"	,
+"doc_type___t"	,
+"zfdje"	,
+"z_yjsgtzz"	,
+"val_type"	,
+"zyywsr_zyck_pzhb"	,
+"zjymsflag"	,
+"zjymsflag___t"	,
+"zxssyb"	,
+"zxssyb___t"	,
+"zcpsyb"	,
+"zcpsyb___t"	,
+"zscsyb"	,
+"zscsyb___t"	,
+"zfhsyb"	,
+"zfhsyb___t"	,
+"zbsyb"	,
+"zxscb_amb"	,
+"zhsxse"	,
+"refer_doc"	,
+"refer_itm"	,
+"matl_type"	,
+"ihrez"	,
+"zbismt"	,
+"vsort"	,
+"ctlpc"	,
+"lzone"	,
+"zcmc"	,
+"aeskd"	,
+"zzyywcb_azf"	,
+"adjustment_amt" 	,
+"prod_property"	,
+"prod_property_name"	,
+zqdzh_1_2023	,
+zqdzh_2_2023	,
+prod_code3	,
+node_name1	,
+node_desc1	,
+node_name2	,
+node_desc2	,
+node_name3	,
+node_desc3	,
+node_name4	,
+node_desc4	,
+node_name5	,
+node_desc5	,
+node_name6	,
+node_desc6	,
+node_name7	,
+node_desc7	,
+node_name8	,
+node_desc8	,
+node_name9	,
+node_desc9	,
+dw_last_update_date	
+)
+
+SELECT 
+ "calmonth"	-- 日历年/月
+,"calday"	-- 日历日
+,"doc_number"	-- 订单抬头
+,"doc_number___t"	-- 订单抬头的文本
+,"s_ord_item"	-- 订单行
+,"ac_doc_nr"	-- 财务凭证号
+,"ac_doc_ln"	-- 财务凭证行
+,"zasd_p001_zuonr"	-- 汇票短号（分配） 
+,"bill_num"	-- 开票抬头
+,"bill_item"	-- 开票项目
+,"bill_type"	-- 发票类型
+,"bill_type___t"	-- 发票类型的文本
+,"salesemply"	-- 销售人员
+,"salesemply___t"	-- 销售人员的文本
+,"customer"	-- 客户编码
+,"customer___t"	-- 客户编码的文本
+,"sales_grp"	-- 销售组
+,"sales_grp___t"	-- 销售组的文本
+,"distr_chan"	-- 分销渠道
+,"distr_chan___t"	-- 分销渠道的文本
+,"zasd_p001_0sales_grp_0"	-- WBS-销售组
+,"zasd_p001_0sales_grp_0___t"	-- WBS-销售组的文本
+,"wbs_elemt"	-- WBS编码
+,"wbs_elemt___t"	-- WBS编码的文本
+,"country"	-- 国家
+,"country___t"	-- 国家的文本
+,"sales_dist"	-- 销售地区
+,"sales_dist___t"	-- 销售地区的文本
+,"salesorg"	-- 销售组织
+,"salesorg___t"	-- 销售组织的文本
+,"sales_off"	-- 销售办公室
+,"sales_off___t"	-- 销售办公室的文本
+,"material"	-- 物料编码
+,"material___t"	-- 物料编码的文本
+,"prod_hier"	-- 产品层次
+,"prod_hier___t"	-- 产品层次的文本
+,"matl_group"	-- 物料组
+,"matl_group___t"	-- 物料组的文本
+,"matl_grp_1"	-- 物料组1
+,"matl_grp_1___t"	-- 物料组1的文本
+,"matl_grp_2"	-- 物料组2
+,"matl_grp_2___t"	-- 物料组2的文本
+,"matl_grp_3"	-- 物料组3
+,"matl_grp_3___t"	-- 物料组3的文本
+,"matl_grp_4"	-- 物料组4
+,"matl_grp_4___t"	-- 物料组4的文本
+,"matl_grp_5"	-- 物料组5
+,"matl_grp_5___t"	-- 物料组5的文本
+,"comp_code"	-- 公司代码
+,"comp_code___t"	-- 公司代码的文本
+,"extmatlgrp"	-- 外部物料组
+,"extmatlgrp___t"	-- 外部物料组的文本
+,"batch"	-- 批次
+,"plant"	-- 工厂
+,"plant___t"	-- 工厂的文本
+,"stor_loc"	-- 库存地点
+,"stor_loc___t"	-- 库存地点的文本
+,"doc_currcy"	-- 凭证货币
+,"doc_currcy___t"	-- 凭证货币的文本
+,"loc_currc2"	-- 本位币
+,"loc_currc2___t"	-- 本位币的文本
+,"z_gcbbh"	-- 工程报备号
+,"zsjbm"	-- 商机编码
+,"zsjyxq"	-- 商机有效期
+,"zsjms"	-- 商机描述
+,"zossbjdh"	-- OSS报价单号
+,"zgcbbh"	-- OSS订单号
+,"ztmswldh"	-- TMS物料单号
+,"zddms"	-- 订单描述
+,"division"	-- 产品组
+,"division___t"	-- 产品组的文本
+,"zqdzh"	-- 渠道整合
+,"zqdzh___t"	-- 渠道整合的文本
+,"size_dim"	-- 大小/量纲
+,"zsfqc"	-- 是否清仓
+,"bus_area"	-- 业务范围
+,"bus_area___t"	-- 业务范围的文本
+,"cust_grp1"	-- 客户组1
+,"cust_grp1___t"	-- 客户组1的文本
+,"cust_grp2"	-- 客户组2
+,"cust_grp2___t"	-- 客户组2的文本
+,"cust_grp3"	-- 客户组3
+,"cust_grp3___t"	-- 客户组3的文本
+,"zfsjbm"	-- 父商机编码
+,"infoprov"	-- 信息提供者
+,"inco1"	-- 国际贸易条款
+,"inco1_t"	-- 国际贸易条款的文本
+,"bstnk_vf"	-- 销售政策
+,"bstnk_vf_t"	-- 销售政策的文本
+,"ktgrd"	-- 科目设置组
+,"ktgrd_t"	-- 科目设置组的文本
+,"konda"	-- 价格组
+,"konda_t"	-- 价格组的文本
+,"kalsm"	-- 客户定价过程
+,"kalsm_t"	-- 客户定价过程的文本
+,"taxk1"	-- 税分类
+,"taxk1_t"	-- 税分类的文本
+,"/BIC/ZSCDH"	-- 生产订单号
+,"zhsje"	-- 含税金额
+,"zbhsje"	-- 不含税金额
+,"zhwjz"	-- 货物净值( 不含税)
+,"zyywsr_zyck"	-- 主营业务收入-自营出口
+,"zzyywsr_gn"	-- 主营业务收入-国内销售
+,"zyywsr_wm"	-- 主营业务收入-国内销售(外贸公司)
+,"zyywsr_gsj"	-- 主营业务收入-公司间
+,"zyywsr_jtj"	-- 主营业务收入-集团间
+,"zzxcyf"	-- 中心仓运费
+,"zhwjzjgtz"	-- 货物价值-价格调整
+,"zsj"	-- 税金
+,"zzxcyfsj"	-- 中心仓运费税金
+,"zhwjzjgtzsj"	-- 货物价值-价格调整税金
+,"zhwjzsj"	-- 税金-(货物净值+价格调整）
+,"zzyywsr_qt"	-- 主营业务收入-其它
+,"zsyjf"	-- 使用积分
+,"zytjf_sg"	-- 预提积分-手工
+,"zytjf_xt"	-- 预提积分-系统
+,"zyywcb"	-- 主营业务成本
+,"zyywcb_gsj"	-- 主营业务成本-公司间
+,"zyywcb_jtj"	-- 主营业务成本-集团间
+,"zyywcb_dsf"	-- 主营业务成本-第三方
+,"zyywcb_yf"	-- 主营业务成本-运费
+,"ztms_yf"	-- TMS运费_计费
+,"zsgrz_yf"	-- 主营业务成本-运费（SAP手工）
+,"zyywcb_zxf"	-- 主营业务成本-装卸费
+,"ztms_zxf"	-- TMS装卸费_计费
+,"zsgrz_zxf"	-- 主营业务成本-装卸费（SAP手工）
+,"zzyywcb_clcbcy"	-- 主营业务成本-材料成本差异
+,"zzyywcb_cbcbcy"	-- 主营业务成本-产品成本差异
+,"zzyywcb_cpjjss"	-- 主营业务成本-产品降级损失
+,"zzyywcb_qt"	-- 主营业务成本-其他
+,"zxsmj"	-- 销售面积
+,"zxssl"	-- 销售数量
+,"zcbkm"	-- 成本科目
+,"zsrkm"	-- 收入科目
+,"zsrkm___t"	-- 收入科目的文本
+,"zasd_p001_zsrpz"	-- 收入凭证
+,"zasd_p001_zcbpz"	-- 成本凭证
+,"zasd_p001_zgsjfp"	-- 公司发票
+,"zasd_p001_zgsjfph"	-- 公司间行
+,"zkpzt"	-- 开票状态
+,"zkpzt___t"	-- 开票状态的文本
+,"zzyywcb_zz"	-- 主营业务成本_总账
+,"cust_group"	-- 客户组
+,"cust_group___t"	-- 客户组的文本
+,"zsalesgrp"	-- 销售组（实际）
+,"zsalesgrp___t"	-- 销售组（实际）的文本
+,"z_zcck"	-- 政策参考
+,"zzqj"	-- 周期价
+,"zsrtzz"	-- 收入调整值
+,"zcbtzz"	-- 成本调整值
+,"zprodh1"	-- 产品层次1
+,"zprodh1___t"	-- 产品层次1描述
+,"zprodh2"	-- 产品层次2
+,"zprodh2___t"	-- 产品层次2描述
+,"zprodh3"	-- 产品层次3
+,"zprodh3___t"	-- 产品层次3描述
+,"zprodh4"	-- 产品层次4
+,"zprodh4___t"	-- 产品层次4描述
+,"zprodh5"	-- 产品层次5
+,"zprodh5___t"	-- 产品层次5描述
+,"zgg01"	-- 产品规格
+,"zgg01___t"	-- 产品规格描述
+,"zyl01"	-- 产品渠道
+,"zyl01___t"	-- 产品渠道描述
+,"zyl05"	-- 新品说明
+,"zyl05___t"	-- 新品说明描述
+,"zpl"	-- 品类
+,"zpl___t"	-- 品类描述
+,"calquarter"	-- 日历年/季度
+,"zdw01"	-- 产品定位
+,"zdw01___t"	-- 产品定位描述
+,"zyl08"	-- 产品功能
+,"zyl08___t"	-- 产品功能描述
+,"zyl03"	-- 盈利分析
+,"zyl03___t"	-- 盈利分析描述
+,"zmx01"	-- 面相
+,"zmx01___t"	-- 面相描述
+,"zwl01"	-- 产品材质
+,"zwl01___t"	-- 产品材质描述
+,"zwlmc"	-- 工艺新品
+,"zwlmc___t"	-- 工艺新品描述
+,"zsx01"	-- 色系
+,"zsx01___t"	-- 色系描述
+,"zwl02"	-- 纹路
+,"zwl02___t"	-- 纹路描述
+,"zzkunnr"	-- 母客编
+,"zzkunnr___t"	-- 母客编描述
+,"zzvkorg"	-- 母销售组织
+,"zzvkorg___t"	-- 母销售组织描述
+,"zferth"	-- 产品上市时间
+,"zferth___t"	-- 产品上市时间描述
+,"zpcrkrq"	-- 批次入库日期
+,"zchanqbd"	-- 产区(变动)
+,"zchanq"	-- 产区
+,"zxsmj_unit"	-- Unit(销售面积)
+,"zxssl_unit"	-- Unit(销售数量)
+,"doc_type"	-- 订单类型
+,"doc_type___t"	-- 订单类型描述
+,"zfdje"	-- 返点金额
+,"z_yjsgtzz"	-- 业绩手工调整值
+,"val_type"	-- 评估类型
+,"zyywsr_zyck_pzhb"	-- 主营业务收入-自营出口-凭证货币
+,"zjymsflag"	-- 交易模式
+,"zjymsflag___t"	-- 交易模式描述
+,"zxssyb"	-- 销售事业部
+,"zxssyb___t"	-- 销售事业部描述
+,"zcpsyb"	-- 产品事业部
+,"zcpsyb___t"	-- 产品事业部描述
+,"zscsyb"	-- 生产事业部
+,"zscsyb___t"	-- 生产事业部描述
+,"zfhsyb"	-- 发货事业部
+,"zfhsyb___t"	-- 发货事业部描述
+,"zbsyb"	-- b事业部
+,"zxscb_amb"	-- a事业部成本
+,"zhsxse"	-- 含税销售额（业绩（不含调整值）+使用积分）
+,"refer_doc"	-- 参考凭证编号
+,"refer_itm"	-- 参考凭证项目号
+,"matl_type"	-- 产品类型
+,"ihrez"	-- 合同号
+,"zbismt"	-- 旧物料号
+,"vsort"	-- 项目建议
+,"ctlpc"	-- 信用检查的规则
+,"lzone"	-- 运输地区
+,"zcmc"	-- 政策名称
+,"aeskd"	-- bom母件号
+,"zzyywcb_azf"	-- 主营业务成本-安装费
+,0 "adjustment_amt" -- 调整金额
+,"prod_property"	-- 产品所有权
+,"prod_property_name"	-- 产品所有权名称
+,case when "distr_chan" ='06' then '工程渠道'
+	  when ("distr_chan" <> '06' or "distr_chan" is null )  and ( "doc_type" = 'ZA02' or substr(plant,-2) ='80') then '特惠品'
+	  when ("distr_chan" not in ('08','06') or "distr_chan" is null  )  and (("doc_type" <> 'ZA02' or "doc_type"  is null  ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null))  then '大零售渠道'
+	  when "distr_chan" = '08' and (("doc_type" <> 'ZA02' or "doc_type"  is null  ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null))  then '整装头部'
+	  end zqdzh_1_2023
+	 
+,case when "distr_chan" ='06' and ("zyl01" <>'G105' or "zyl01" is null ) then  '非设计师产品'
+	  when "distr_chan" ='06' and "zyl01" = 'G105' then  '设计师产品'
+	  when ("distr_chan" <> '06' or "distr_chan" is null ) and  "doc_type" = 'ZA02' and (substr(plant,-2) <>'80' or substr(plant,-2) is null )   and "doc_type" = 'ZA02' then  '定向促销'
+	  when ("distr_chan" <> '06' or "distr_chan" is null ) and  substr(plant,-2) ='80'     then '清仓产品'
+	  when ("distr_chan" not in ('08','06') or "distr_chan" is null  ) and (("doc_type" <> 'ZA02' or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) <> '80' is null )) and ( "zyl01" <> 'G105' or  "zyl01" is null )
+	  		and ( "zyl03" <> 'A9' or "zyl03" is null ) and ((substr(t4.prod_code3,1,4) <> '1016' or substr(t4.prod_code3,1,4) is null ) or (substr(t4.prod_code3,1,1) = '1' or substr(t4.prod_code3,1,1) is null) ) then '零售产品'
+	  when ("distr_chan" not in ('08','06')  or "distr_chan" is null  )and (("doc_type" <> 'ZA02' or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null )) and  "zyl01" = 'G105' 
+	  		 then '设计师专供产品'
+	  when ("distr_chan" not in ('08','06')  or "distr_chan" is null  ) and (("doc_type" <> 'ZA02' or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null ) ) and   "zyl03" = 'A9'
+	  		 then '大包专供产品'
+	  when ("distr_chan" not in ('08','06')  or "distr_chan" is null  ) and (("doc_type" <> 'ZA02' or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null ) ) and  
+	  		(substr(t4.prod_code3,1,4) = '1016' or (substr(t4.prod_code3,1,1) <> '1' or substr(t4.prod_code3,1,1) is null ))
+	  		 then 'N品类产品'
+	  when "distr_chan" = '08' and (("doc_type" <> 'ZA02'  or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null )) and  ((substr(t4.prod_code3,1,4) <> '1016' or substr(t4.prod_code3,1,4) is null ) or substr(t4.prod_code3,1,1) = '1') 
+	         then '瓷砖产品'
+	  when "distr_chan" = '08' and (("doc_type" <> 'ZA02'  or "doc_type" is null ) or (substr(plant,-2) <> '80' or substr(plant,-2) is null )) and  (substr(t4.prod_code3,1,4) = '1016' or (substr(t4.prod_code3,1,1) <> '1' or substr(t4.prod_code3,1,1) is null)) 
+	         then  'N品类产品'
+	  		end zqdzh_2_2023
+,t4.prod_code3   -- 产品层次3 
+,t3.node_name1
+,t3.node_desc1
+,t3.node_name2
+,t3.node_desc2 
+,t3.node_name3
+,t3.node_desc3 
+,t3.node_name4
+,t3.node_desc4 
+,t3.node_name5
+,t3.node_desc5 
+,t3.node_name6
+,t3.node_desc6 
+,t3.node_name7
+,t3.node_desc7 
+,t3.node_name8
+,t3.node_desc8 
+,t3.node_name9
+,t3.node_desc9
+,current_timestamp() as dw_last_update_date
+FROM DM.DM_ZZT_XSSR_T t1 
+left join dwimd.dwi_md_data_material_general_t t2 on t1.material =t2.material_num 
+left join DM.DM_RPT_SALES_GROUP_T   t3 on t1.sales_grp  =t3.node_name9 
+left join DM.DM_RPT_PROD_LEVEL_T t4 on coalesce(t2.product_level3_code,t2.product_level2_code,'其他杂类'  )  = coalesce(t4.prod_code3,t4.lve4_code,'其他杂类') 
+union all 
+select 	
+  "CALMONTH"  "calmonth"	-- 日历年/月
+,concat( "CALMONTH" ,'01') "calday"	-- 日历日
+,"AC_DOC_NO" "doc_number"	-- 订单抬头
+,NULL "doc_number___t"	-- 订单抬头的文本
+,NULL "s_ord_item"	-- 订单行
+,NULL "ac_doc_nr"	-- 财务凭证号
+,NULL "ac_doc_ln"	-- 财务凭证行
+,NULL "zasd_p001_zuonr"	-- 汇票短号（分配）
+,NULL "bill_num"	-- 开票抬头
+,NULL "bill_item"	-- 开票项目
+,NULL "bill_type"	-- 发票类型
+,NULL  "bill_type___t"	-- 发票类型的文本
+,NULL  "salesemply"	-- 销售人员
+,NULL  "salesemply___t"	-- 销售人员的文本
+,NULL  "customer"	-- 客户编码
+,NULL  "customer___t"	-- 客户编码的文本
+,"SALES_GRP" "sales_grp"	-- 销售组
+,NULL  "sales_grp___t"	-- 销售组的文本
+,NULL  "distr_chan"	-- 分销渠道
+,NULL  "distr_chan___t"	-- 分销渠道的文本
+,NULL  "zasd_p001_0sales_grp_0"	-- WBS-销售组
+,NULL  "zasd_p001_0sales_grp_0___t"	-- WBS-销售组的文本
+,NULL  "wbs_elemt"	-- WBS编码
+,NULL  "wbs_elemt___t"	-- WBS编码的文本
+,NULL  "country"	-- 国家
+,NULL  "country___t"	-- 国家的文本
+,NULL  "sales_dist"	-- 销售地区
+,NULL  "sales_dist___t"	-- 销售地区的文本
+,NULL  "salesorg"	-- 销售组织
+,NULL  "salesorg___t"	-- 销售组织的文本
+,NULL  "sales_off"	-- 销售办公室
+,NULL  "sales_off___t"	-- 销售办公室的文本
+,NULL  "material"	-- 物料编码
+,NULL  "material___t"	-- 物料编码的文本
+,NULL  "prod_hier"	-- 产品层次
+,NULL  "prod_hier___t"	-- 产品层次的文本
+,NULL  "matl_group"	-- 物料组
+,NULL  "matl_group___t"	-- 物料组的文本
+,NULL  "matl_grp_1"	-- 物料组1
+,NULL  "matl_grp_1___t"	-- 物料组1的文本
+,NULL  "matl_grp_2"	-- 物料组2
+,NULL  "matl_grp_2___t"	-- 物料组2的文本
+,NULL  "matl_grp_3"	-- 物料组3
+,NULL  "matl_grp_3___t"	-- 物料组3的文本
+,NULL  "matl_grp_4"	-- 物料组4
+,NULL  "matl_grp_4___t"	-- 物料组4的文本
+,NULL  "matl_grp_5"	-- 物料组5
+,NULL  "matl_grp_5___t"	-- 物料组5的文本
+,"COMP_CODE" "comp_code"	-- 公司代码
+,NULL  "comp_code___t"	-- 公司代码的文本
+,NULL  "extmatlgrp"	-- 外部物料组
+,NULL  "extmatlgrp___t"	-- 外部物料组的文本
+,NULL  "batch"	-- 批次
+,NULL  "plant"	-- 工厂
+,NULL  "plant___t"	-- 工厂的文本
+,NULL  "stor_loc"	-- 库存地点
+,NULL  "stor_loc___t"	-- 库存地点的文本
+,NULL  "doc_currcy"	-- 凭证货币
+,NULL  "doc_currcy___t"	-- 凭证货币的文本
+,NULL  "loc_currc2"	-- 本位币
+,NULL  "loc_currc2___t"	-- 本位币的文本
+,NULL  "z_gcbbh"	-- 工程报备号
+,NULL  "zsjbm"	-- 商机编码
+,NULL  "zsjyxq"	-- 商机有效期
+,NULL  "zsjms"	-- 商机描述
+,NULL  "zossbjdh"	-- OSS报价单号
+,NULL  "zgcbbh"	-- OSS订单号
+,NULL  "ztmswldh"	-- TMS物料单号
+,NULL  "zddms"	-- 订单描述
+,NULL  "division"	-- 产品组
+,NULL  "division___t"	-- 产品组的文本
+,NULL  "zqdzh"	-- 渠道整合
+,NULL  "zqdzh___t"	-- 渠道整合的文本
+,NULL  "size_dim"	-- 大小/量纲
+,NULL  "zsfqc"	-- 是否清仓
+,NULL  "bus_area"	-- 业务范围
+,NULL  "bus_area___t"	-- 业务范围的文本
+,NULL  "cust_grp1"	-- 客户组1
+,NULL  "cust_grp1___t"	-- 客户组1的文本
+,NULL  "cust_grp2"	-- 客户组2
+,NULL  "cust_grp2___t"	-- 客户组2的文本
+,NULL  "cust_grp3"	-- 客户组3
+,NULL  "cust_grp3___t"	-- 客户组3的文本
+,NULL  "zfsjbm"	-- 父商机编码
+,NULL  "infoprov"	-- 信息提供者
+,NULL  "inco1"	-- 国际贸易条款
+,NULL  "inco1_t"	-- 国际贸易条款的文本
+,NULL  "bstnk_vf"	-- 销售政策
+,NULL  "bstnk_vf_t"	-- 销售政策的文本
+,NULL  "ktgrd"	-- 科目设置组
+,NULL  "ktgrd_t"	-- 科目设置组的文本
+,NULL  "konda"	-- 价格组
+,NULL  "konda_t"	-- 价格组的文本
+,NULL  "kalsm"	-- 客户定价过程
+,NULL  "kalsm_t"	-- 客户定价过程的文本
+,NULL  "taxk1"	-- 税分类
+,NULL  "taxk1_t"	-- 税分类的文本
+,NULL  "/BIC/ZSCDH"	-- 生产订单号
+,NULL  "zhsje"	-- 含税金额
+,NULL  "zbhsje"	-- 不含税金额
+,NULL  "zhwjz"	-- 货物净值( 不含税)
+,NULL  "zyywsr_zyck"	-- 主营业务收入-自营出口
+,NULL  "zzyywsr_gn"	-- 主营业务收入-国内销售
+,NULL  "zyywsr_wm"	-- 主营业务收入-国内销售(外贸公司)
+,NULL  "zyywsr_gsj"	-- 主营业务收入-公司间
+,NULL  "zyywsr_jtj"	-- 主营业务收入-集团间
+,NULL  "zzxcyf"	-- 中心仓运费
+,NULL  "zhwjzjgtz"	-- 货物价值-价格调整
+,NULL  "zsj"	-- 税金
+,NULL  "zzxcyfsj"	-- 中心仓运费税金
+,NULL  "zhwjzjgtzsj"	-- 货物价值-价格调整税金
+,NULL  "zhwjzsj"	-- 税金-(货物净值+价格调整）
+,NULL  "zzyywsr_qt"	-- 主营业务收入-其它
+,NULL  "zsyjf"	-- 使用积分
+,NULL  "zytjf_sg"	-- 预提积分-手工
+,NULL  "zytjf_xt"	-- 预提积分-系统
+,NULL  "zyywcb"	-- 主营业务成本
+,NULL  "zyywcb_gsj"	-- 主营业务成本-公司间
+,NULL  "zyywcb_jtj"	-- 主营业务成本-集团间
+,NULL  "zyywcb_dsf"	-- 主营业务成本-第三方
+,NULL  "zyywcb_yf"	-- 主营业务成本-运费
+,NULL  "ztms_yf"	-- TMS运费_计费
+,NULL  "zsgrz_yf"	-- 主营业务成本-运费（SAP手工）
+,NULL  "zyywcb_zxf"	-- 主营业务成本-装卸费
+,NULL  "ztms_zxf"	-- TMS装卸费_计费
+,NULL  "zsgrz_zxf"	-- 主营业务成本-装卸费（SAP手工）
+,NULL  "zzyywcb_clcbcy"	-- 主营业务成本-材料成本差异
+,NULL  "zzyywcb_cbcbcy"	-- 主营业务成本-产品成本差异
+,NULL  "zzyywcb_cpjjss"	-- 主营业务成本-产品降级损失
+,NULL  "zzyywcb_qt"	-- 主营业务成本-其他
+,NULL  "zxsmj"	-- 销售面积
+,NULL  "zxssl"	-- 销售数量
+,NULL  "zcbkm"	-- 成本科目
+,NULL  "zsrkm"	-- 收入科目
+,NULL  "zsrkm___t"	-- 收入科目的文本
+,NULL  "zasd_p001_zsrpz"	-- 收入凭证
+,NULL  "zasd_p001_zcbpz"	-- 成本凭证
+,NULL  "zasd_p001_zgsjfp"	-- 公司发票
+,NULL  "zasd_p001_zgsjfph"	-- 公司间行
+,NULL  "zkpzt"	-- 开票状态
+,NULL  "zkpzt___t"	-- 开票状态的文本
+,NULL  "zzyywcb_zz"	-- 主营业务成本_总账
+,NULL  "cust_group"	-- 客户组
+,NULL  "cust_group___t"	-- 客户组的文本
+,NULL  "zsalesgrp"	-- 销售组（实际）
+,NULL  "zsalesgrp___t"	-- 销售组（实际）的文本
+,NULL  "z_zcck"	-- 政策参考
+,NULL  "zzqj"	-- 周期价
+,NULL  "zsrtzz"	-- 收入调整值
+,NULL  "zcbtzz"	-- 成本调整值
+,NULL  "zprodh1"	-- 产品层次1
+,NULL  "zprodh1___t"	-- 产品层次1描述
+,NULL  "zprodh2"	-- 产品层次2
+,NULL  "zprodh2___t"	-- 产品层次2描述
+,NULL  "zprodh3"	-- 产品层次3
+,NULL  "zprodh3___t"	-- 产品层次3描述
+,NULL  "zprodh4"	-- 产品层次4
+,NULL  "zprodh4___t"	-- 产品层次4描述
+,NULL  "zprodh5"	-- 产品层次5
+,NULL  "zprodh5___t"	-- 产品层次5描述
+,NULL  "zgg01"	-- 产品规格
+,NULL  "zgg01___t"	-- 产品规格描述
+,NULL  "zyl01"	-- 产品渠道
+,NULL  "zyl01___t"	-- 产品渠道描述
+,NULL  "zyl05"	-- 新品说明
+,NULL  "zyl05___t"	-- 新品说明描述
+,NULL  "zpl"	-- 品类
+,NULL  "zpl___t"	-- 品类描述
+,NULL  "calquarter"	-- 日历年/季度
+,NULL  "zdw01"	-- 产品定位
+,NULL  "zdw01___t"	-- 产品定位描述
+,NULL  "zyl08"	-- 产品功能
+,NULL  "zyl08___t"	-- 产品功能描述
+,NULL  "zyl03"	-- 盈利分析
+,NULL  "zyl03___t"	-- 盈利分析描述
+,NULL  "zmx01"	-- 面相
+,NULL  "zmx01___t"	-- 面相描述
+,NULL  "zwl01"	-- 产品材质
+,NULL  "zwl01___t"	-- 产品材质描述
+,NULL  "zwlmc"	-- 工艺新品
+,NULL  "zwlmc___t"	-- 工艺新品描述
+,NULL  "zsx01"	-- 色系
+,NULL  "zsx01___t"	-- 色系描述
+,NULL  "zwl02"	-- 纹路
+,NULL  "zwl02___t"	-- 纹路描述
+,NULL  "zzkunnr"	-- 母客编
+,NULL  "zzkunnr___t"	-- 母客编描述
+,NULL  "zzvkorg"	-- 母销售组织
+,NULL  "zzvkorg___t"	-- 母销售组织描述
+,NULL  "zferth"	-- 产品上市时间
+,NULL  "zferth___t"	-- 产品上市时间描述
+,NULL  "zpcrkrq"	-- 批次入库日期
+,NULL  "zchanqbd"	-- 产区(变动)
+,NULL  "zchanq"	-- 产区
+,NULL  "zxsmj_unit"	-- Unit(销售面积)
+,NULL  "zxssl_unit"	-- Unit(销售数量)
+,NULL  "doc_type"	-- 订单类型
+,NULL  "doc_type___t"	-- 订单类型描述
+,NULL  "zfdje"	-- 返点金额
+,NULL  "z_yjsgtzz"	-- 业绩手工调整值
+,NULL  "val_type"	-- 评估类型
+,NULL  "zyywsr_zyck_pzhb"	-- 主营业务收入-自营出口-凭证货币
+,NULL  "zjymsflag"	-- 交易模式
+,NULL  "zjymsflag___t"	-- 交易模式描述
+,NULL  "zxssyb"	-- 销售事业部
+,NULL  "zxssyb___t"	-- 销售事业部描述
+,NULL  "zcpsyb"	-- 产品事业部
+,NULL  "zcpsyb___t"	-- 产品事业部描述
+,NULL  "zscsyb"	-- 生产事业部
+,NULL  "zscsyb___t"	-- 生产事业部描述
+,NULL  "zfhsyb"	-- 发货事业部
+,NULL  "zfhsyb___t"	-- 发货事业部描述
+,NULL  "zbsyb"	-- b事业部
+,NULL  "zxscb_amb"	-- a事业部成本
+,NULL  "zhsxse"	-- 含税销售额（业绩（不含调整值）+使用积分）
+,NULL  "refer_doc"	-- 参考凭证编号
+,NULL  "refer_itm"	-- 参考凭证项目号
+,NULL  "matl_type"	-- 产品类型
+,NULL  "ihrez"	-- 合同号
+,NULL  "zbismt"	-- 旧物料号
+,NULL  "vsort"	-- 项目建议
+,NULL  "ctlpc"	-- 信用检查的规则
+,NULL  "lzone"	-- 运输地区
+,NULL  "zcmc"	-- 政策名称
+,NULL  "aeskd"	-- bom母件号
+,NULL  "zzyywcb_azf"	-- 主营业务成本-安装费
+,"/BIC/ZVV055" "adjustment_amt"
+,NULL  "prod_property"	-- 产品所有权
+,NULL  "prod_property_name"	-- 产品所有权名称
+,null zqdzh_1_2023
+,null zqdzh_2_2023
+,null prod_code3   -- 产品层次3 
+,t3.node_name1
+,t3.node_desc1
+,t3.node_name2
+,t3.node_desc2 
+,t3.node_name3
+,t3.node_desc3 
+,t3.node_name4
+,t3.node_desc4 
+,t3.node_name5
+,t3.node_desc5 
+,t3.node_name6
+,t3.node_desc6 
+,t3.node_name7
+,t3.node_desc7 
+,t3.node_name8
+,t3.node_desc8 
+,t3.node_name9
+,t3.node_desc9 
+,null dw_last_update_date
+FROM (SELECT "CALMONTH" ,t1."SALES_GRP","COMP_CODE","BILL_TYPE","AC_DOC_NO"  ,sum("/BIC/ZVV055") "/BIC/ZVV055"  from dm.dm_rpt_bic_azcopad032_t t1 
+  group by "CALMONTH" ,t1."SALES_GRP","COMP_CODE" ,"BILL_TYPE" ,"AC_DOC_NO"  ) t1 
+left join DM.DM_RPT_SALES_GROUP_T   t3 on t1."SALES_GRP"  =t3.node_name9 ;

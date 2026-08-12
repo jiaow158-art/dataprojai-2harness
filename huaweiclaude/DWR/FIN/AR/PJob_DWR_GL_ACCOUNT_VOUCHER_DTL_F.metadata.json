@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_GL_ACCOUNT_VOUCHER_DTL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "会计凭证明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

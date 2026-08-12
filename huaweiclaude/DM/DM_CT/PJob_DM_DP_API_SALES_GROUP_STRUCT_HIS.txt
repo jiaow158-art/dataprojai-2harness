@@ -1,0 +1,93 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/01/09 16:15:19 GMT+08:00
+-- description:瓷砖DP 预测组织的拉链表
+-- history list:
+-- UPDATE FROM 10004701 2024/01/10 生效时间是左闭右开，传入时间是昨天
+-- ******************************************************************** --
+with if_update as 
+(
+select 
+	t1.sales_grp
+	,case when
+		t1.sales_center_code = t2.sales_center_code 
+		and coalesce(t1.sales_center,'NAL') = coalesce(t2.sales_center,'NAL')
+		and coalesce(t1.sales_dep_code,'NAL') = coalesce(t2.sales_dep_code,'NAL')
+		and coalesce(t1.sales_dep,'NAL') = coalesce(t2.sales_dep,'NAL')
+		and coalesce(t1.sales_region_code,'NAL') = coalesce(t2.sales_region_code ,'NAL')
+		and coalesce(t1.sales_region,'NAL') = coalesce(t2.sales_region ,'NAL')
+		then 0 else 1 end as is_update -- 0无修改，1有修改（修改/删除）
+from dm.dm_dp_api_sales_group_struct_his t1
+left join dm.dm_dp_api_sales_group_struct t2 on t1.sales_grp = t2.sales_grp
+where t1.end_date = '4712-12-31'
+)
+
+,tem_his as 
+(
+-- 新增/修改
+select 
+	t1.sales_grp
+	,t1.sales_center_code
+	,t1.sales_center
+	,t1.sales_dep_code
+	,t1.sales_dep
+	,t1.sales_region_code
+	,t1.sales_region
+	,substr(date_sub(FROM_UNIXTIME(UNIX_TIMESTAMP()),1),1,10) as start_date
+	,'4712-12-31' as end_date
+from dm.dm_dp_api_sales_group_struct t1
+left join if_update t2 on t1.sales_grp = t2.sales_grp
+where t2.sales_grp is null  or t2.is_update = 1
+
+union all
+
+-- 修改/删除的结束日期变为今天
+select 
+	t1.sales_grp
+	,t1.sales_center_code
+	,t1.sales_center
+	,t1.sales_dep_code
+	,t1.sales_dep
+	,t1.sales_region_code
+	,t1.sales_region
+	,t1.start_date 
+	,substr(date_sub(FROM_UNIXTIME(UNIX_TIMESTAMP()),1),1,10) as end_date
+from dm.dm_dp_api_sales_group_struct_his t1
+left join if_update t2 on t1.sales_grp = t2.sales_grp
+where 1=1
+and t2.is_update = 1
+and t1.end_date = '4712-12-31'
+
+union all
+
+-- 原数据，不发生任何变化
+select 
+	t1.sales_grp
+	,t1.sales_center_code
+	,t1.sales_center
+	,t1.sales_dep_code
+	,t1.sales_dep
+	,t1.sales_region_code
+	,t1.sales_region
+	,t1.start_date 
+	,t1.end_date
+from dm.dm_dp_api_sales_group_struct_his t1
+left join if_update t2 on t1.sales_grp = t2.sales_grp
+where 1=1
+and t2.is_update = 0
+)
+
+INSERT OVERWRITE TABLE dm.dm_dp_api_sales_group_struct_his
+select 
+	t1.sales_grp
+	,t1.sales_center_code
+	,t1.sales_center
+	,t1.sales_dep_code
+	,t1.sales_dep
+	,t1.sales_region_code
+	,t1.sales_region
+	,current_timestamp() as dw_last_update_date
+	,t1.start_date 
+	,t1.end_date
+from tem_his t1

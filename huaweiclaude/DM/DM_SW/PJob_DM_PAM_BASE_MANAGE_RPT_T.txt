@@ -1,0 +1,602 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/11/29 14:49:19 GMT+08:00
+-- update from chenzhiyong 20230425 根据江门财务提供逻辑修改
+-- update from chenzhiyong 20230508 江门基地调整逻辑
+-- update from chenzhiyong 20230509 当天数据不取
+-- update from chenzhiyong 20230617 江西基地收坯数取值有误
+-- update from 15000571 20240420 指标一烧分级优等数 = 江门升优降级数+一烧分级优等数
+-- ******************************************************************** --
+WITH  JX_GROUTING_DATA as( -- 江西基地 注浆数  
+	SELECT t.prod_date,  -- 生产日期
+	       sum(t.actual_Grouting_qty) as actual_Grouting_qty  -- 实际注浆数量
+	FROM(
+		select gp.proddate as prod_date,    -- 生产日期
+		       gp.monitorname as monitor_name, -- 带班班长名称
+		       gp.lineno as GROUTING_lineno,    -- 注浆线号
+		       gpd.moldsid as mould_code,   -- 模具编号
+		       sum(gpd.usenum)  actual_Grouting_qty-- 实际注浆数量
+		from SDI.SDI_qis_groutingplan_1011 gp  -- 注浆计划
+		left join SDI.SDI_qis_groutingplandel_1011 gpd -- 注浆计划子表
+		on gp.uuid = gpd.planno  
+		left join SDI.SDI_qis_mud_1011 b  -- 泥坯
+		on gpd.moldsid =b.mudid 
+		and b.status<>'9'
+		where gp.status <> '9' 
+		and gp.Prodstatus='0' 
+		AND gp.FACTORY IN ('3200','3202') 
+		--AND gpd.attribute = '正常'  
+		AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15')  
+		group by gp.proddate,
+		         gp.monitorname,
+				 gp.lineno,
+				 gpd.moldsid 
+	) t
+	group by t.prod_date
+)
+-- 实收数
+-- 实收数 4
+,actual_data_01 as(
+	SELECT t.in_stock_date,  -- 入库日期
+	       SUM(t.in_stock_qty)  as in_stock_qty-- 入库数量
+	FROM (
+		select a.indate as in_stock_date , -- 入库日期
+		       case when c.monitorname is not null then c.monitorname else gl.MONITORNAME end  as MONITOR_NAME, -- 带班班长名称
+		       a.produceline as GROUTING_lineno,  -- 注浆线号
+		       a.producttype as mud_model_code,  -- 泥坯型号
+		       sum(a.innum) as in_stock_qty   -- 入库数量
+		from SDI.SDI_qis_modifyoffline_1011 a   -- 改洗下线记录表（即入库条码）
+		left join SDI.SDI_QIS_GROUTINGPLAN_BARCODE_1011 c   -- 注浆条码列表
+		on a.barcode=c.barcode 
+		and c.status<>'9'
+		left join sdi.sdi_qis_mud_1011 b  -- 泥坯
+		on a.producttype =b.mudid 
+		and b.status<>'9'
+		left join SDI.SDI_QIS_GROUTINGLINE_1011 gl   -- 注浆线
+		on a.produceline=gl.LINENO 
+		and gl.status <> '9' 
+		and gl.factoryid = a.factory
+		where a.status<>'9' 
+		and (a.isabnormal='00000' or (a.gbgrade='1' and a.is_gb='0') )
+		and not exists (
+		  select 1 from SDI.SDI_QIS_REPEATCODE_1011 re  -- 重贴条码
+		  where re.code= a.barcode and re.status <>'9' 
+		  )
+		AND a.FACTORY IN ('3200')   
+		AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15') 
+		group by a.indate,
+		         case when c.monitorname is not null then c.monitorname else gl.MONITORNAME end,
+		         a.produceline,
+		         a.producttype 
+		 ) t
+		 group by T.in_stock_date
+)
+-- 实收数 5                         
+,actual_data_02 as(
+	SELECT
+	      T.IN_STOCK_DATE, -- 入库日期
+	      SUM(T.in_stock_qty)  AS in_stock_qty -- 入库数量
+	FROM(
+		select d.cjdate AS IN_STOCK_DATE, -- 入库日期
+		       c.monitorname as MONITOR_NAME, -- 带班班长名称
+		       a.produceline as GROUTING_lineno,  -- 注浆线号
+		       a.producttype as mud_model_code,  -- 泥坯型号
+		       sum(case when d.uuid is not null then 1 else 0 end) as in_stock_qty   -- 入库数量
+		from SDI.SDI_QIS_REBACKLINK_1011 d    -- 跨部门报废
+		left join SDI.SDI_qis_modifyoffline_1011 a   -- 改洗下线记录表（即入库条码）
+		on d.code=a.barcode 
+		and a.status<>'9'
+		left join SDI.SDI_qis_mud_1011 b       -- 泥坯
+		on a.producttype =b.mudid 
+		and b.status<>'9'
+		left join SDI.SDI_qis_groutingplan_barcode_1011 c   -- 注浆条码列表
+		on a.barcode=c.barcode 
+		and c.status<>'9'
+		where   d.status<>'9' 
+		and d.acceptid like 'ZJ%'
+		and d.STATUS ='2'
+		and d.link in ('010203','010204','釉坯装车','装车')
+		AND a.FACTORY IN ('3200')   
+		--AND d.cjdate >=  '2022-11-10'   AND d.cjdate <=  '2022-11-10' 
+		--AND a.productproperty = 'AAAAA'
+		   --  and exists (  select 1 from table(splitstr('2022-11',',')) where ( column_value=c.monitorid ) )
+		 AND b.CATEGORY NOT IN ('lb05','lb08','lb09','lb11','lb13l','lb15') 
+		 group by d.cjdate,
+		          c.monitorname,
+		          a.produceline,
+		          a.producttype  
+		) T
+		GROUP BY T.IN_STOCK_DATE
+),
+jx_actual_data as(  -- 实际数
+select t.in_stock_date,
+       sum(t.in_stock_qty) as in_stock_qty
+from(
+   select t1.in_stock_date,T1.in_stock_qty as in_stock_qty from actual_data_01 t1
+   union all
+   select t2.in_stock_date,-T2.in_stock_qty as in_stock_qty from actual_data_02 t2
+   ) t
+   group by t.in_stock_date
+/*
+	SELECT T1.in_stock_date, -- 入库日期
+	       NVL(T1.in_stock_qty,0) - NVL(T2.in_stock_qty,0) AS in_stock_qty  -- 入库数量
+	FROM actual_data_01 T1
+	LEFT JOIN actual_data_02 T2
+	ON T1.in_stock_date = T2.in_stock_date
+*/
+),
+JX_Grouting_actual_DATA as(  -- 江西注浆&实收数据
+    SELECT nvl(T1.prod_date,in_stock_date) as prod_date, -- 生产日期
+           nvl(T1.actual_Grouting_qty,0) as actual_Grouting_qty,  -- 注浆数
+           nvl(T2.in_stock_qty,0) AS  actual_receipt_qty -- 收坯数
+    FROM JX_GROUTING_DATA T1   -- 注浆数
+    full outer JOIN jx_actual_data T2
+    ON nvl(T1.prod_date,'NULL') = nvl(T2.in_stock_date,'NULL')
+),
+DWR_PAM_BASE_MANAGE_ONE_JX_F_01_DATA AS(   -- 江西一烧分级&优等数
+select t.GRADE_DATE, -- 分级日期
+	  SUM(T.ONE_GRADE_QTY) AS ONE_GRADE_QTY, --分级数
+	  SUM(T.ONE_FINE_QTY)  AS ONE_FINE_QTY -- 优等数
+from DWROTD.DWR_PAM_BASE_MANAGE_ONE_JX_F T  -- 江西一烧分级&优等数
+group by t.GRADE_DATE
+),
+DWR_PAM_BASE_MANAGE_RETURN_JX_F_01_DATA AS(  -- 江西重烧分级&优等数
+	SELECT T.grand_date as GRADE_DATE,
+	       SUM(grade_qty) as grade_qty, -- 重烧分级数
+	       SUM(goods_qty) as goods_qty -- 重烧优等数
+	FROM DWROTD.DWR_PAM_BASE_MANAGE_RETURN_JX_F T -- 江西重烧分级&优等数
+	GROUP BY T.grand_date 
+),
+JX_PRODUCT_BASE_DATA as(
+select '江西基地' AS PICK_UP_BASE_NAME, -- 提取基地
+	   T.day_dt as PICK_UP_DATE, -- 分级日期
+       NVL(T2.actual_Grouting_qty,0) AS actual_Grouting_qty,  -- 注浆数
+       NVL(T2.actual_receipt_qty,0) AS actual_receipt_qty,-- 收坯数
+       NVL(T1.ONE_GRADE_QTY,0) AS ONE_GRADE_QTY,  -- 一烧分级数
+       NVL(T1.ONE_FINE_QTY,0) AS ONE_FINE_QTY, -- 一烧优等数
+       NVL(t3.grade_qty,0) AS RETURN_GRADE_QTY, -- 重烧分级数
+       NVL(t3.goods_qty,0) AS RETURN_FINE_QTY, --重烧优等数
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   0 as jm_sy_jj_qty -- 江门升优降级数
+from DM.dm_dim_date_d T -- 日期维表
+LEFT JOIN DWR_PAM_BASE_MANAGE_ONE_JX_F_01_DATA T1 
+ON T.day_dt = T1.GRADE_DATE
+LEFT JOIN JX_Grouting_actual_DATA t2
+on t.day_dt = t2.prod_date
+left join DWR_PAM_BASE_MANAGE_RETURN_JX_F_01_DATA t3
+on t.day_dt = t3.GRADE_DATE
+where T.day_dt >= '2022-06-01'
+AND T.day_dt <= date_sub(CURRENT_DATE() ,1) --CURRENT_DATE()--date_sub(CURRENT_DATE() ,1)
+)
+-- 江门的逻辑前一天7点30到当天7点30分为一整天，大于等于/小于
+,jm_zj_data_detail as( -- 注浆明细数据(jm_np_fact_num) 
+select t.stat_date,   -- 生产日期
+       sum(t.jm_zj_qty) as jm_zj_qty  -- 注浆数 
+from(
+	select substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date,  -- 生产日期
+			  a.jm_np_code,   -- 泥坯编码
+			  b.JM_LINENO_CODE , -- 生产线号编码
+			  b.jm_lineno_name,  -- 生产线号名称 
+			  b.jm_zj_class_name,  -- 注浆班组
+			  a.jm_main_id,     -- 主表ID
+			  sum(a.jm_np_num) jm_np_num, -- 模具数量
+			  sum(a.jm_np_fact_num) as jm_zj_qty, -- 模具实际数量     注浆数量
+			  sum(case when b.JM_IS_COMPLEMENT=1 then a.jm_np_fact_num else 0 end ) jm_num1 -- JM_IS_COMPLEMENT 是否补码
+		 from SDI.SDI_jm_t_wy_zj_plan_detail_1038 a -- 注浆计划产品明细
+		join SDI.SDI_jm_t_wy_zj_plan_1038 b -- 注浆计划
+		on b.jm_uuid=a.jm_main_id   
+		where a.jm_is_del=0 
+		and b.jm_is_del=0
+		and substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+		group by substring(from_unixtime(unix_timestamp(b.jm_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) ,
+				 a.jm_np_code,
+				 b.JM_LINENO_CODE ,
+				 b.jm_lineno_name,
+				 b.jm_zj_class_code,
+				 b.jm_zj_class_name, 
+				 a.jm_main_id 
+    ) t
+    group by t.stat_date
+)
+,jm_zj_data as(  -- -- 注浆数
+	select t1.day_dt as stat_date,
+		   nvl(t2.jm_zj_qty,0) as jm_zj_qty
+	from dm.dm_dim_date_d t1
+	left join jm_zj_data_detail t2
+	on t1.day_dt = t2.stat_date
+	where t1.day_dt >= '2022-06-01'
+	and t1.day_dt <= date_sub(CURRENT_DATE() ,1)--current_date()
+),
+jm_actual_receipt_01 as(  -- 收呸数  
+	SELECT STAT_DATE,
+		   SUM(jm_hg_qty) AS jm_hg_qty
+	FROM(
+		SELECT t.STAT_DATE, -- 普通半检
+			   sum(t.jm_hg_qty) as jm_hg_qty
+		FROM(
+			select substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS STAT_DATE, -- 评级日期
+				   a.jm_np_code,  -- JM_NP_CODE
+				   sum(case when a.jm_uuid is not null then 1 else 0 end ) jm_num,  -- jm_uuid 唯一标识
+				   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty,  -- 是否合格('1:合格 2:返修') JM_GX_HG
+				   sum(case when   a.jm_is_standard=2 then 1 else 0 end ) jm_gb_num,
+				   sum(case when   a.JM_IS_AL_GB=1 then 1 else 0 end ) jm_num1  -- 是否已干补
+			from SDI.SDI_jm_t_gx_online_1038 a -- 改洗上线检验
+			where a.jm_is_del=0   
+			and a.jm_is_judge=1  
+			and a.JM_IS_COMPLEMENT =0 
+			and substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+			group by a.jm_np_code,
+					 substring(from_unixtime(unix_timestamp(a.jm_gx_pj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10)--SUBSTRING(CAST(a.jm_gx_pj_date AS STRING),1,10)
+			) t
+		GROUP BY t.STAT_DATE
+		union all   -- 高压半检
+		select stat_date,
+		   sum(jm_hg_num) as jm_hg_qty
+		from(
+			select  substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS STAT_DATE,
+					a.jm_np_code,
+					a.jm_lineno_code,
+					a.jm_lineno_name,
+					a.jm_zj_class_code,
+					b.jm_main_id,
+					a.jm_is_gy,
+					sum(case when a.jm_uuid is not null then 1 else 0 end ) jm_num,
+					sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_num,
+					sum(case when   a.jm_is_standard=2 then 1 else 0 end ) jm_gb_num
+			 from SDI.SDI_JM_T_GY_PJ_1038 a --STG.STG_jm_t_gy_pj_1038 a
+			 left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 b -- STG.STG_jm_t_wy_zj_plan_barcode_1038 b
+			 on a.jm_uuid=b.jm_gx_id
+			where a.jm_is_del=0
+			 group by substring(from_unixtime(unix_timestamp(a.JM_GY_PJ_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) ,
+					  a.jm_np_code,
+					  a.jm_lineno_code,
+					  a.jm_lineno_name,
+					  a.jm_zj_class_code,
+					  b.jm_main_id,
+					  a.jm_is_gy 
+			) t
+			group by stat_date
+			union all    -- 半检报废数
+			select stat_date,
+			   -sum(jm_num1) as jm_hg_qty
+			from(
+				select  substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) stat_date  ,
+						a.jm_np_code   ,
+						a.jm_lineno_code,
+						a.jm_lineno_name,
+						a.jm_zj_class_code,
+						a.jm_zj_main_id,
+						a.JM_IS_GY   ,
+						sum(case when a.jm_uuid is not null then 1 else 0 end )   ,
+						sum(case when a.jm_is_standard=1 and a.JM_IS_CQ=0  then 1 else 0 end ) as jm_num1
+					 from sdi.sdi_jm_t_gx_online_dumping_1038 a
+					 left join SDI.SDI_JM_T_GX_ONLINE_1038 b --stg.stg_jm_t_gx_online_1038 b
+					 on a.jm_barcode =b.jm_barcode and b.jm_is_del=0
+					where a.jm_is_del=0 and a.jm_is_flow=2
+					 and b.JM_IS_COMPLEMENT =0  
+					 --and exists (  select 1 from table(splitstr('',',')) where column_value=a.jm_factory_id  ) 
+					 --and a.JM_DUMPINGER_DATE between :1 and :2   
+					 group by substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10)  ,
+								a.jm_np_code,
+								a.jm_lineno_code,
+								a.jm_lineno_name,
+								a.jm_zj_class_code,
+								a.jm_zj_main_id,
+								a.JM_IS_GY  
+			  ) t
+			  group by stat_date
+		)t
+		group by stat_date
+),
+jm_actual_receipt_02 as( -- 收呸数
+	select STAT_DATE,
+		   sum(jm_hg_qty) as jm_hg_qty
+	from(
+		select t.STAT_DATE,
+			   sum(t.jm_hg_qty) as jm_hg_qty
+		from(
+			select substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS STAT_DATE,  -- 干补日期
+			   a.jm_np_code, -- 泥坯编码
+			   sum(case when a.jm_uuid is not null then 1 else 0 end ) jm_num,   -- 唯一标识
+			   sum(case when   a.jm_is_standard=1 then 1 else 0 end ) jm_hg_qty,  -- 是否合格(1:合格 2:废品) JM_GX_HG
+			   sum(case when   a.jm_is_standard=2 then 1 else 0 end ) jm_gb_num
+			from SDI.SDI_jm_t_gx_dryfilling_1038 a  -- 干补检验
+			LEFT JOIN SDI.sdi_jm_t_gx_online_1038 b
+			on a.jm_uuid = b.jm_gb_id 
+			where a.jm_is_del=0  
+			and b.jm_is_complement = 0
+			and substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+			group by substring(from_unixtime(unix_timestamp(a.JM_GB_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+					 a.jm_np_code
+			)t
+			group by t.STAT_DATE
+			union all
+			select stat_date,
+			   -sum(jm_num1) as jm_hg_qty
+		from(
+		 select  substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) stat_date,
+			   a.jm_np_code,
+			   a.jm_lineno_code,
+			   a.jm_lineno_name,
+			   a.jm_zj_class_code,
+			   c.jm_main_id,
+					 a.jm_is_gy,
+					sum(case when a.jm_uuid is not null then 1 else 0 end ) jm_num
+				   ,sum(case when  a.jm_is_standard_gb = 1 then 1 else 0 end ) jm_num1
+			 from SDI.SDI_jm_t_gx_online_dumping_1038 a
+			 left join SDI.SDI_jm_t_gx_online_1038 b 
+			 on a.JM_BARCODE=b.JM_BARCODE
+			 left join SDI.SDI_JM_T_WY_ZJ_PLAN_BARCODE_1038 c --STG.STG_jm_t_wy_zj_plan_barcode_1038 c
+			 on c.jm_gx_id=b.jm_uuid
+			 where a.jm_is_del=0 and a.JM_IS_CQ=0
+			 group by  substring(from_unixtime(unix_timestamp(a.JM_DUMPINGER_DATE) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) ,
+				 a.jm_np_code,
+				 a.jm_lineno_code,
+				 a.jm_lineno_name,
+				 a.jm_zj_class_code,
+				 c.jm_main_id,
+				  a.jm_is_gy 
+		  ) t
+		  group by t.stat_date
+	 )t
+	 group by STAT_DATE
+)
+,jm_first_data_01 as(  -- 一烧分级数&优等数		 fjnum、ydnum
+  select t.stat_date,
+       sum(fj_qty) as jm_first_fj_qty,  
+       sum(yd_qty) as jm_first_yd_qty
+  from (
+	select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date,  -- 分级时间
+			a.jm_gc_code,  -- 光瓷型号编码
+			a.jm_np_code,  -- 泥坯编码
+			b.jm_category_name,
+			b.jm_weight,
+			sum(case when a.jm_uuid is not null then 1 else 0 end ) fj_qty, -- 分级数  -- JM_FJ_NUM
+			sum(case when a.jm_fj_grade_frist=1    then 1 else 0 end ) yd_qty -- 优等数  -- JM_YD_NUM  jm_fj_grade_frist 一烧分级等级
+	   from SDI.SDI_jm_t_fj_first_1038 a  -- 一烧分级
+	   left join sdi.sdi_jm_t_wy_base_gc_1038 b  -- 光瓷信息
+	   on a.jm_gc_id=b.jm_uuid
+	   where a.jm_is_del=0 
+	   and a.JM_IS_BL_COMPLEMENT=0 
+	   and a.JM_IS_BM=0   
+	   and substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	   group by --substring(cast(a.jm_fj_date as string),1,10),
+	            substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+	            a.jm_gc_code,
+				a.jm_np_code,
+				b.jm_category_name,
+				b.jm_weight
+   ) t
+   group by t.stat_date
+)
+,jm_first_data as(
+	select t1.day_dt as stat_date,
+		   nvl(t2.jm_first_fj_qty,0) as jm_first_fj_qty,
+		   nvl(t2.jm_first_yd_qty,0) as jm_first_yd_qty
+	from dm.dm_dim_date_d t1
+	left join jm_first_data_01 t2
+	on t1.day_dt = t2.stat_date
+	where t1.day_dt >= '2022-06-01'
+	and t1.day_dt <= date_sub(CURRENT_DATE() ,1)--current_date()
+),
+jm_retrun_result_data as ( -- 重烧数据
+	select t.stat_date,
+	       sum(t.return_fj_qty) as return_fj_qty,-- 重烧分级数
+	       sum(t.return_yd_qty) as return_yd_qty -- 重烧优等数
+	from(
+		select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date, -- 返烧分级时间 jm_fs_fj_date
+			  a.jm_gc_code,  -- 光瓷型号编码
+			  a.jm_np_code,  -- 泥坯编码
+			  b.jm_category_name,
+		      b.jm_weight,
+		      sum(case when a.jm_uuid is not null then 1 else 0 end ) return_fj_qty,   -- 分级总数  -- JM_FJ_NUM
+		      sum(case when a.jm_fj_grade=1    then 1 else 0 end ) return_yd_qty,     -- 优等品  -- JM_YD_NUM
+		      a.JM_FS_BURNING_CAR_NAME
+		from SDI.SDI_jm_t_fj_fs_1038 a    -- 返烧分级
+		left join sdi.sdi_jm_t_wy_base_gc_1038 b  -- 光瓷信息
+		on a.jm_gc_id=b.jm_uuid
+		where a.jm_is_del=0   
+		and substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+		  group by a.jm_gc_code,
+				   a.jm_np_code,
+				   b.jm_category_name,
+				   b.jm_weight,
+				   a.JM_FS_BURNING_CAR_NAME,
+				   --substring(cast(a.jm_fs_fj_date as string),1,10)
+				   substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10)
+	)t
+	group by t.stat_date
+),
+two_grade_dm_data as( -- 二次分级日报表  优等品  -- JM_YD_NUM
+	select t.stat_date,
+	       sum(t.jm_dm_two_yd_qty) as jm_two_yd_qty --jm_dm_two_yd_qty
+	from(
+	 select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date, -- 分级时间
+	         a.jm_gc_code,   -- 光瓷型号编码
+		     a.jm_np_code,  -- 泥坯编码
+			 b.jm_category_name,
+	         b.jm_weight,
+	          sum(case when a.jm_uuid is not null then 1 else 0 end ) fjnum,
+	          sum(case when a.jm_fj_grade=1    then 1 else 0 end ) jm_dm_two_yd_qty -- 优等品  -- JM_YD_NUM
+	  from SDI.SDI_jm_t_fj_dm_1038 a -- 打磨分级
+	  left join SDI.SDI_jm_t_wy_base_gc_1038 b -- 光瓷信息
+	  on a.jm_gc_id=b.jm_uuid
+	  where a.jm_is_del=0   
+	  AND substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	  group by -- substring(cast(a.jm_fj_date as string),1,10),
+	           substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+	  		   a.jm_gc_code,
+	  		   a.jm_np_code,
+	  		   b.jm_category_name,
+	  		   b.jm_weight,
+	  		   a.jm_pre_flow
+	)t
+	group by t.stat_date
+)
+,two_grade_pb_data as(
+ select t.stat_date,
+       sum(jm_pb_two_yd_qty) as jm_two_yd_qty -- jm_pb_two_yd_qty
+	from(
+	select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date,  -- 分级时间
+		   a.jm_gc_code,   -- 光瓷型号编码
+		   a.jm_np_code,   -- 泥坯编码
+		   b.jm_category_name,
+	       b.jm_weight,
+	       sum(case when a.jm_uuid is not null then 1 else 0 end ) fjnum,
+	       sum(case when a.jm_fj_grade=1    then 1 else 0 end ) jm_pb_two_yd_qty -- 优等品  -- JM_YD_NUM
+	from sdi.sdi_jm_t_fj_pb_1038 a -- 喷补分级
+	left join sdi.sdi_jm_t_wy_base_gc_1038 b 
+	on a.jm_gc_id=b.jm_uuid
+	  where a.jm_is_del=0    
+	  AND substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	  group by --substring(cast(a.jm_fj_date as string),1,10),
+			   substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+	  		   a.jm_gc_code,
+	  		   a.jm_np_code,
+	  		   b.jm_category_name,
+	  		   b.jm_weight,
+	  		   a.jm_pre_flow
+	) t
+	group by t.stat_date
+)
+,two_grade_lq_data as(
+	select t.stat_date,
+	       sum(t.jm_lq_two_yd_qty) as jm_two_yd_qty -- jm_lq_two_yd_qty
+	from(
+	select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date, -- 分级时间
+		   a.jm_gc_code,    -- 光瓷型号编码
+	       a.jm_np_code,    -- 泥坯编码
+	       b.jm_category_name,
+	       b.jm_weight,
+	       sum(case when a.jm_uuid is not null then 1 else 0 end ) fjnum,
+	       sum(case when a.jm_fj_grade=1    then 1 else 0 end ) jm_lq_two_yd_qty  -- 优等品  -- JM_YD_NUM
+	from sdi.sdi_jm_t_fj_lq_1038 a    -- 漏气分级
+	left join sdi.sdi_jm_t_wy_base_gc_1038 b 
+	on a.jm_gc_id=b.jm_uuid
+	where a.jm_is_del=0   
+	and substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	group by --substring(cast(a.jm_fj_date as string),1,10),
+			 substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+			 a.jm_gc_code,
+			 a.jm_np_code,
+			 b.jm_category_name,
+			 b.jm_weight ,
+			 a.jm_pre_flow
+	) t
+	group by t.stat_date
+),
+jm_sj_data as(   -- 升降级日报表 升级数据		  -- 1 合格/优等品  2 不良品  3  废品
+	SELECT T.stat_date,
+	       SUM(T.JM_SJ_QTY) AS JM_SJ_QTY
+	FROM(
+	select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS stat_date,  -- 分级时间
+		   a.jm_fj_worker_code,    -- 分级工编码
+		   a.jm_gc_code,    -- 光瓷型号编码
+		   a.jm_np_code,    -- 泥坯编码
+		   b.Jm_Category_Name,
+		   b.jm_weight,
+		   a.jm_zj_class_code,  -- 注浆班组编码
+	       3 as jm_bf_grade,  -- 分级前等级
+		   A.JM_FJ_GRADE ,   -- 分级等级
+		   SUM(CASE WHEN A.JM_UUID IS NOT NULL THEN 1 ELSE 0 END ) JM_SJ_QTY,  -- JM_UUID 唯一标识  数量
+		   a.JM_PRE_FJ_FLOW    -- 前一环节分级环节
+	   from SDI.SDI_jm_t_fj_sy_1038 a   -- 升优分级
+	  left join SDI.SDI_jm_t_wy_base_gc_1038 b -- 光瓷信息
+	  on  a.jm_gc_id=b.jm_uuid
+	  WHERE A.JM_IS_DEL=0  
+	  and substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	  group by --substring(cast(a.jm_fj_date as string),1,10),
+			   substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+			   a.jm_fj_worker_code,
+			   a.jm_gc_code,
+			   a.jm_np_code,
+			   b.Jm_Category_Name,
+			   b.jm_weight,
+			   a.jm_zj_class_code,
+			   A.JM_FJ_GRADE,
+			   a.JM_PRE_FJ_FLOW 
+	) T
+	GROUP BY T.stat_date
+),
+jm_jj_data as ( -- 升降级日报表 降级数据	
+	SELECT T.STAT_DATE,
+	       -SUM(T.JM_JJ_QTY) AS JM_JJ_QTY
+	FROM(
+	select substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10) AS STAT_DATE,  -- 分级时间
+		   a.jm_fj_worker_code,   -- 分级工编码
+		   a.jm_gc_code,     -- 光瓷型号编码
+		   a.jm_np_code,     -- 泥坯编码
+		   b.Jm_Category_Name,
+		   b.jm_weight,
+		   a.jm_zj_class_code,  -- 注浆班组编码
+	       1 as jm_bf_grade,   -- 分级原等级
+	       A.JM_FJ_GRADE ,     -- 分级等级
+	       SUM(CASE WHEN A.JM_UUID IS NOT NULL THEN 1 ELSE 0 END ) JM_JJ_QTY,  -- 数量
+	       sum(case when a.jm_fj_flow=22 then 1 else 0 end) JM_NUM1,
+	       sum(case when a.jm_fj_flow=23 then 1 else 0 end) JM_NUM2,
+	       sum(case when a.jm_fj_flow=24 then 1 else 0 end) JM_NUM3,
+	       sum(case when a.jm_fj_flow=25 then 1 else 0 end) JM_NUM4,
+	       a.JM_PRE_FJ_FLOW
+	from SDI.SDI_jm_t_fj_jj_1038 a   -- 降级分级
+	left join SDI.SDI_jm_t_wy_base_gc_1038 b 
+	on  a.jm_gc_id=b.jm_uuid
+	WHERE A.JM_IS_DEL=0  
+	AND substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,7) >= '2022-06'
+	group by --substring(cast(a.jm_fj_date as string),1,10),
+			 substring(from_unixtime(unix_timestamp(a.jm_fj_date) - 60*60*7.5,'yyyy-MM-dd HH:mm:ss'),1,10),
+			 a.jm_fj_worker_code,
+			 a.jm_gc_code,
+			 a.jm_np_code,
+			 b.Jm_Category_Name,
+			 b.jm_weight,
+			 a.jm_zj_class_code,
+			 A.JM_FJ_GRADE,
+			 a.JM_PRE_FJ_FLOW
+	)T
+	GROUP BY T.STAT_DATE
+),
+jm_sy_jj_data as(   -- 江门升优降级数据
+	select stat_date,sum(jm_sy_jj_qty) as jm_sy_jj_qty
+	from(
+		select stat_date,jm_two_yd_qty as jm_sy_jj_qty from two_grade_dm_data    -- 打磨
+		union all
+		select stat_date,jm_two_yd_qty as jm_sy_jj_qty from two_grade_pb_data    -- 喷补
+		union all
+		select stat_date,jm_two_yd_qty as jm_sy_jj_qty from two_grade_lq_data    -- 漏气
+		union all
+		select stat_date,JM_SJ_QTY as jm_sy_jj_qty from jm_sj_data   -- 升优数据
+		union all
+		select stat_date,JM_JJ_QTY as jm_sy_jj_qty from jm_jj_data  -- 降级数据
+	) t
+	group by t.stat_date
+),
+JM_PRODUCT_BASE_DATA AS(
+	SELECT '江门基地' AS PICK_UP_BASE_NAME, -- 提取基地
+	       T.stat_date as PICK_UP_DATE,  -- 日期
+	       T.jm_zj_qty as actual_Grouting_qty,    -- 注浆数
+	       NVL(T1.jm_hg_qty+T2.jm_hg_qty,0) AS actual_receipt_qty,  -- 收呸数
+	       nvl(t3.jm_first_fj_qty,0) as ONE_GRADE_QTY, -- 一烧分级数
+	       nvl(t3.jm_first_yd_qty,0)+ nvl(t5.jm_sy_jj_qty,0) as ONE_FINE_QTY, -- 一烧分级优等数 jm_first_yds_qty
+	       nvl(t4.return_fj_qty,0) as RETURN_GRADE_QTY,  -- 重烧分级数
+	       nvl(t4.return_yd_qty,0) as RETURN_FINE_QTY,   -- 重烧优等数
+	       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+		   nvl(t5.jm_sy_jj_qty,0) as jm_sy_jj_qty  -- 江门升优降级数
+	FROM jm_zj_data T   -- 注浆数
+	LEFT JOIN jm_actual_receipt_01 T1  -- 收呸数
+	ON T.stat_date =  T1.STAT_DATE
+	LEFT JOIN jm_actual_receipt_02 T2 -- 收呸数
+	ON T.stat_date =  T2.STAT_DATE
+	LEFT JOIN jm_first_data T3 -- 一烧数据  jm_first_result_data 根据江门财务提供逻辑修改
+	ON T.stat_date = t3.stat_date
+	LEFT JOIN jm_retrun_result_data T4  -- 重烧数据
+	on T.stat_date = t4.stat_date
+	LEFT JOIN jm_sy_jj_data T5 -- 江门升优降级数据
+	on T.stat_date = t5.stat_date
+)
+INSERT OVERWRITE TABLE DM_SW.DM_PAM_BASE_MANAGE_RPT_T
+select t1.*
+from JX_PRODUCT_BASE_DATA t1  -- 江西基地数据
+union all
+select t2.*
+from JM_PRODUCT_BASE_DATA t2; -- 江门基地数据

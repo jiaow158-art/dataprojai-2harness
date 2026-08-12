@@ -1,0 +1,48 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2023/03/03 10:52:23 GMT+08:00
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE  dm_sw.dm_otd_inner_purchase_det 
+SELECT A.purchase_order_num ,
+	  A.purchase_order_item_num ,
+	  A.cust_num ,
+	  A.cust_name ,
+	  A.material_num ,
+	  mat.material_name ,
+	  A.sales_org_code ,
+	  A.stockin_factory_code ,
+	  A.inv_location ,
+	  A.res_stock_date,
+	  A.res_stock_qty,--转态值
+	  mat.busi_volume ,
+	  case when matext.dz_flag>0 then '是' else '否' end dz_flag,
+	  A.res_stock_qty*mat.busi_volume AS total_res_stock_volume,
+	  A.stockout_date,
+	  date_add(A.res_stock_date,19) as promise_stockout_date,
+      org.short_objid_name_t3 as org_lev2_name,
+      org.short_objid_name_t4 as org_lev3_name,
+      org.short_objid_name_t5 as org_lev4_name,
+      org.short_objid_name_t6 as org_lev5_name,
+      A.creator_id,
+      A.purchase_qty,--订单下单数量
+      A.stockout_qty
+FROM dwrotd.dwr_wm_stock_res_from_purchase A 
+JOIN  dwimd.dwi_md_data_material_general_t mat on  A.material_num = mat.material_num 
+left join (select t.material_num,t.start_date,t.end_date, 
+    count(case when t.matl_group4_code ='ZY' then 1 end ) as zy_flag,
+     count(case when t.matl_group2_code ='J9' then 1 end ) as j9_flag,
+     count(case when t.matl_group2_code ='J2' then 1 end ) as j2_flag,
+      count(case when t.matl_group2_code ='J10' then 1 end ) as j10_flag,
+      count(case when  t.matl_group4_code in('DZ','DJ') then 1 end) as dz_flag
+from dwimd.dwi_md_data_material_sales_t_his  t
+where 
+t.distribution_channel_code = '01' 
+group by t.material_num,t.start_date,t.end_date 
+) matext ON A.material_num = matext.material_num 
+and A.res_stock_date>=matext.start_date 
+and A.res_stock_date<matext.end_date 
+left join DWIMD.DWI_ORG_PERNR_STRUCTURE_INFO_T org On A.creator_id  = org.employee_code
+  WHERE A.stockout_factory_code LIKE '3%'
+AND mat.matl_group_code  in('3000010','4000010');

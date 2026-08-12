@@ -1,0 +1,50 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- desc：基地与OEM单位成本对比
+-- create time: 2022/09/18 18:43:29 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_OWN_VS_OEM_COST_T
+select 
+  a.months  as `年月`
+ ,a.material_num as `物料`
+ ,a.material_name as `物料描述`
+ ,a.product_level2_name as `品类`
+ ,a.base_name as `基地`
+ ,a.order_area as `基地订单面积`
+ ,a.COST_TOTAL as `基地订单总价`
+ ,'0.00' as `OEM采购订单面积`
+ ,'0.00' as  `OEM采购总价成本`
+ from DM.DM_FIN_COST_RETURN_T a
+ where (base_name <> '' or base_name is not null ) and months >= '202201' and product_level2_name is not null 
+-- group by 
+--  a.months 
+-- ,a.material_num 
+-- ,a.material_name 
+-- ,a.product_level2_name 
+-- ,a.base_name 
+ union all 
+ SELECT 
+  b.calmonth  as `年月`
+ ,b.material as `物料`
+ ,t.material_name as `物料描述`
+ ,t.product_level2_name as `品类`
+ ,case when  substr(b.plant ,1,2) ='13' then '清远基地'
+         when  substr(b.plant,1,2) ='15' then '江西基地'
+         when  substr(b.plant,1,2) ='17' then '佛山基地'
+         when  substr(b.plant,1,2) ='16' then '湖南基地'
+         when  substr(b.plant,1,2) ='12' then '山东基地'
+         when  substr(b.plant,1,2) ='18' then '重庆基地'
+         when  substr(b.plant,1,2) ='19' then '山西基地'
+         else  'OEM'
+         end as `基地`
+ ,'0.00' as `基地订单面积`
+ ,'0.00' as `基地订单总价`
+ ,ZSHSL_HJS * t.width * t.length_1/1000/1000 as `OEM采购订单面积`
+ ,ZSHJE_HJS as `OEM采购总价成本`
+ from sdi.SDI_BIC_AZMMPOD121_1009 b	 
+ join dwimd.dwi_md_data_material_general_t t on b.material = t.material_num 
+ left join sdi.sdi_but000_1001 c on c.partner = b.vendor and c.`type` in ('10')
+ where b.plant not in ('1200','1220','1260','1280','1300','1310','1320','1350','1360','1380','1500'
+,'1510','1520','1560','1580','1600','1610','1620','1650','1660','1680','1700','1710','1720','1750','1780','1800','1820','1850','1860','1880','1900','1920','1960','1980')
+and t.matl_group_code ='1000010' and b.calmonth >= '202201'

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_MOS_CUST_ORDER_ITEM_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "MOS客户订单行表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

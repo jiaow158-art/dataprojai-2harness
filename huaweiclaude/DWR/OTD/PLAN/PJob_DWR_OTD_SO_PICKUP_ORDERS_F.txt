@@ -1,0 +1,123 @@
+
+insert overwrite table DWROTD.DWR_OTD_SO_PICKUP_ORDERS_F
+select
+ t1.pick_header_no   	-- 提货单
+,t2.pick_item_number    -- 提货单行
+,t3.SAP_ORDER_NUMBER    -- sap订单
+,case when length(t3.SAP_ORDER_ITEM_NUMBER)=6 then t3.SAP_ORDER_ITEM_NUMBER else substr(t3.SAP_ORDER_ITEM_NUMBER,11,6) end SAP_ORDER_ITEM_NUMBER    -- sap 行
+,t2.load_plan_number    -- 装载计划单
+,t2.project_plan_number -- 装载计划行
+,t1.reservation_num	  	-- 预约单编码
+,t2.pick_type 			-- 提货类型
+,t2.creation_date   	-- 提货时间
+,t2.apply_personnel 	-- 申请人
+,t2.shipping_status 	-- 发货状态
+,t2.oa_appro_num 		-- oa流水
+,t2.oa_refuse_reason	-- oa拒绝原因
+,t2.status 				-- 审批状态
+,t2.consignee_name 		-- 收货人
+,t2.consignee_phone 	-- 收货人电话
+,t2.hope_delivery_date 	-- 期望发货日期
+,t2.hope_receiving_date -- 期望收货日期
+,t2.delivere_date 		-- 发货日期
+,t2.tray_deli_flag 		-- 是否带托
+,t2.province 			-- 省
+,t2.city 				-- 市
+,t2.county 				-- 区
+,t2.address 			-- 详细地址
+,t2.pick_driver 		-- 提货司机
+,t2.driver_phone 		-- 司机电话
+,t2.driver_no 			-- 司机证件
+,t2.car_no 				-- 车牌号
+,t2.cabinet_num 		-- 柜号
+,t2.site_code			-- 站点编码
+,t2.site_name			-- 站点名称
+,t2.site_description 	-- 站点备注
+,t2.prebook_type		-- 预约类型
+,t2.prebook_date		-- 预约日期
+,t2.start_time			-- 预约开始时间
+,t2.end_time			-- 预约结束时间
+,t2.prebook_name		-- 预约人
+,t2.prebook_name_phone	-- 预约电话
+,t2.unloading           -- 是否卸货
+,s1.meaning             -- 是否卸货描述
+,t2.backingup           -- 是否倒车
+,s2.meaning             -- 是否倒车描述
+,t3.material_number     -- 物料编码
+,t3.material_name       -- 物料描述
+,t3.batch               -- 批次
+,t3.stock_location_code -- 库存地点
+,t3.quantity            -- 下单数量
+,t2.pick_qty            -- 提货数量
+,t2.machining           -- 是否加工
+,s3.meaning             -- 是否加工描述
+,t2.supplier_code		-- 供应商编码
+-- ,t2.tms_code
+-- ,t1.tms_flag
+-- ,t1.sap_error_msg
+,`current_timestamp`()
+from sdi.sdi_pickup_order_header_cz_1034 t1
+join sdi.sdi_pickup_order_cz_1034  t2 on t1.id  = t2.head_id
+left join sdi.sdi_s_engineering_plan_order_line_1029   t3 on t2.order_item_id = t3.id
+left join sdi.sdi_base_lookup_values_1029 s1 on t2.unloading = s1.lookup_code and s1.lookup_type='DISCHARGE_FLAG' and s1.system_code='LTC' and s1.enabled_flag='Y'
+left join sdi.sdi_base_lookup_values_1029 s2 on t2.backingup = s2.lookup_code and s2.lookup_type='DISCHARGE_FLAG' and s2.system_code='LTC' and s2.enabled_flag='Y'
+left join sdi.sdi_base_lookup_values_1029 s3 on t2.machining = s3.lookup_code and s3.lookup_type='DISCHARGE_FLAG' and s3.system_code='LTC' and s3.enabled_flag='Y'
+
+
+
+--
+-- CREATE TABLE DWROTD.DWR_OTD_SO_PICKUP_ORDERS_F(
+--   pickup_order_number STRING COMMENT '提货单',
+--   pickup_order_item_number STRING COMMENT '提货单行',
+--   sap_order_number STRING COMMENT 'sap订单',
+--   sap_order_item_number STRING COMMENT 'sap行',
+--   loading_plan_number STRING COMMENT '装载计划单',
+--   loading_plan_number_item STRING COMMENT '装载计划行',
+--   reservation_number STRING COMMENT '预约单编码',
+--   pickup_type STRING COMMENT '提货类型',
+--   pickup_date TIMESTAMP COMMENT '提货时间',
+--   applicant STRING COMMENT '申请人',
+--   shipping_status STRING COMMENT '发货状态',
+--   oa_approval_number STRING COMMENT 'oa流水',
+--   oa_rejection_reason STRING COMMENT 'oa拒绝原因',
+--   approval_status STRING COMMENT '审批状态',
+--   consignee_name STRING COMMENT '收货人',
+--   consignee_phone_number STRING COMMENT '收货人电话',
+--   expected_delivery_date TIMESTAMP COMMENT '期望发货日期',
+--   expected_receiving_date TIMESTAMP COMMENT '期望收货日期',
+--   delivery_date TIMESTAMP COMMENT '发货日期',
+--   is_with_tray BOOLEAN COMMENT '是否带托',
+--   province STRING COMMENT '省',
+--   city STRING COMMENT '市',
+--   county STRING COMMENT '区',
+--   address STRING COMMENT '详细地址',
+--   pickup_driver STRING COMMENT '提货司机',
+--   driver_phone_number STRING COMMENT '司机电话',
+--   driver_id_number STRING COMMENT '司机证件',
+--   vehicle_number STRING COMMENT '车牌号',
+--   cabinet_number STRING COMMENT '柜号',
+--   site_code STRING COMMENT '站点信息',
+--   site_name STRING COMMENT '站点名称',
+--   site_description STRING COMMENT '站点备注',
+--   booking_type STRING COMMENT '预约类型',
+--   booking_date TIMESTAMP COMMENT '预约日期',
+--   booking_start_time TIMESTAMP COMMENT '预约开始时间',
+--   booking_end_time TIMESTAMP COMMENT '预约结束时间',
+--   booker_name STRING COMMENT '预约人',
+--   booker_phone_number STRING COMMENT '预约电话',
+--   is_unloading BOOLEAN COMMENT '是否卸货',
+--   unloading_desc STRING COMMENT '是否卸货描述',
+--   is_backingup BOOLEAN COMMENT '是否倒车',
+--   backingup_desc STRING COMMENT '是否倒车描述',
+--   material_number STRING COMMENT '物料编码',
+--   material_desc STRING COMMENT '物料描述',
+--   batch_number STRING COMMENT '批次',
+--   stock_location_code STRING COMMENT '库存地点',
+--   ordered_quantity DOUBLE COMMENT '下单数量',
+--   pickup_quantity DOUBLE COMMENT '提货数量',
+--   is_machining BOOLEAN COMMENT '是否加工',
+--   machining_descr STRING COMMENT '是否加工描述',
+--   supplier_code STRING COMMENT '供应商编码',
+--   dw_last_update_time string
+-- )
+-- COMMENT '提货订单表';

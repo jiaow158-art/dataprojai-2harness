@@ -1,0 +1,39 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- 采购订单暂估报表
+-- create time: 2022/09/17 11:14:04 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_PUR_ORDER_ESTIMATION_REPORT_T
+SELECT
+reqtsn ,
+datapakid ,
+record ,
+recordmode ,
+vendor ,
+material ,
+batch ,
+plant ,
+pur_group ,
+comp_code ,
+purch_org ,
+calmonth ,
+industry ,
+matl_type ,
+val_class ,
+`/bic/zprodh1`,
+`/bic/zprodh2` ,
+`/bic/zprodh3` ,
+`/bic/zprodh4`,
+`/bic/zprodh5` ,
+gl_account ,
+chrt_accts ,
+zshje_hjs ,
+zshsl_hjs ,
+zfpjyje_hjs ,
+zfpjysl ,
+zzgje ,
+zzgsl ,
+'N' AS DEL_FLAG ,
+current_timestamp() AS DW_LAST_UPDATE_DATE
+FROM SDI.SDI_BIC_AZMMPOD121_1009

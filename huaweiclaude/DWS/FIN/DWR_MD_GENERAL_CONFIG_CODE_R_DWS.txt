@@ -1,0 +1,29 @@
+---配置表
+DROP TABLE IF  EXISTS  DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R_TMP;
+CREATE TABLE IF NOT EXISTS  DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R_TMP
+(GROUP_NUM                                    VARCHAR(500),           
+LANG_CODE                                     VARCHAR(500),           
+SRC_SYS_CONFIG_CODE                           VARCHAR(500),           
+CONFIG_CODE                                   VARCHAR(500),           
+CONFIG_NAME                                   VARCHAR(500),           
+SOURCE_CODE                                   VARCHAR(500),           
+SOURCE_DESC                                   VARCHAR(500),           
+EXTENDED_ATTRIBUTES1                          VARCHAR(500),           
+EXTENDED_ATTRIBUTES2                          VARCHAR(500),           
+EXTENDED_ATTRIBUTES3                          VARCHAR(500),           
+DEL_FLAG                                      VARCHAR(500),           
+DW_LAST_UPDATE_DATE                           TIMESTAMP);             
+
+COMMENT   ON TABLE    DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R                        IS   '配置表';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.GROUP_NUM              IS   '集团';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.LANG_CODE              IS   '语言编码';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.SRC_SYS_CONFIG_CODE    IS   '源系统配置编码';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.CONFIG_CODE            IS   '配置编码';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.CONFIG_NAME            IS   '配置名称';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.SOURCE_CODE            IS   '来源';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.SOURCE_DESC            IS   '来源描述';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.EXTENDED_ATTRIBUTES1   IS   '扩展字段1';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.EXTENDED_ATTRIBUTES2   IS   '扩展字段2';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.EXTENDED_ATTRIBUTES3   IS   '扩展字段2';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.DEL_FLAG               IS   '删除标识';
+COMMENT   ON COLUMN   DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R.DW_LAST_UPDATE_DATE    IS   '最后更新时间';

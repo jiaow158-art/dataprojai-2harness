@@ -1,0 +1,79 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- update from huangwenbin 2024-05-27 新增字段：关单原因描述
+-- update from huangwenbin 2024-08-29 新增字段
+-- update from huangwenbin 2025-08-21 新增字段
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE SDI.SDI_APS_OEM_PO_SUM_1007
+SELECT       ID
+     ,ACCEPTANCE_CRITERIA
+     ,ADOBE_BODY
+     ,ALREADY_LEVITE_QTY
+     ,APS_PLAN_TASK_DTL_ID
+     ,APS_PLAN_TASK_ID
+     ,APS_PROTECH_ORDER_ID
+     ,BIBULOUS_RATE
+     ,CREATE_BY
+     ,CREATE_DATE
+     ,INV_ORG_ID
+     ,ITEM_ID
+     ,NOT_LEVITE_QTY
+     ,OA_NO
+     ,ORDER_CONTACTS
+     ,PACKAGE_WAY
+     ,PRODUCT_ORDER_ID
+     ,PURCHASE_ORDER_NO
+     ,PURCHASE_ORDER_PROJ_NO
+     ,PURCHASING_AREA
+     ,REMARK
+     ,REPLY_DELIVERY
+     ,REQUIRE_DELIVERY
+     ,RES_WIP_SCHE_ID
+     ,SEC_NO
+     ,STATUS
+     ,SUPPLIER_ID
+     ,SYNC_ID
+     ,UNIT_ID
+     ,UPDATE_BY
+     ,UPDATE_DATE
+     ,IS_PHANTOM
+     ,APS_INVENTORY_LOCATION_ID
+     ,PURCHASE_GROUP_ID
+     ,PURCHASE_ORG_ID
+     ,SAP_COMPANY_ID
+     ,STOCK_AREA_ID
+     ,PURCHASE_VOUCHER_TYPE
+     ,PURCHASE_VOUCHER
+     ,SAP_STOCK_AREA_ID
+     ,TMS_REMARK
+     ,SAP_CONFIRM_REMARK
+     ,IS_TMS
+     ,FLOW_STATUS
+     ,OA_ID
+     ,OA_NODE
+     ,PURCHASE_REQUISITION_NO
+     ,OA_DATE
+     ,SECOND_REPLY_DELIVERY_STATE
+     ,SECOND_REPLY_DELIVERY
+     ,DELIVERY_CHANGE_STATE
+     ,BOTTOM_LABEL
+     ,CLOSE_BILL_REASON
+     ,CLOSE_BILL_REASON_TXT
+     ,ASSIGN_REASON
+     ,SPLIT_ALERT_MSG
+     ,BASE_CODE
+     ,CLOSE_BILL_TIME
+     ,LAST_OA_ID
+     ,LAST_OA_NO
+     ,LAST_OA_NODE
+     ,LAST_OA_DATE
+     ,FOLLOW_PERSON
+     ,CALCULATE_PROPORTION
+     ,PRODUCT_CATEGORY
+     ,PROCESS_NAME
+     ,THICKNESS
+     ,COLOR_CLASS
+     ,'N' AS DEL_FLAG
+     ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM STG.STG_APS_OEM_PO_SUM_1007
+;  

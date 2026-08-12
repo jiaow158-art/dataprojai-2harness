@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_TMS_SHR_PER_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/PAM",
+    "description": "TMS共享仓运输周期",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

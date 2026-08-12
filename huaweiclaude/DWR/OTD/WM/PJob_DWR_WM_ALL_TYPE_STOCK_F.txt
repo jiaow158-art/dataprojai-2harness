@@ -1,0 +1,69 @@
+---SAP所有库存类型总库存表
+set hive.cbo.enable=true;				--性能优化SQL
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_ALL_TYPE_STOCK_F  	--DWR-SAP所有库存类型总库存表
+SELECT
+	 DWATS.GROUP_NUM					  AS	GROUP_NUM		--集团
+	,DWATS.MATERIAL_ID                    AS	MATERIAL_ID		--物料ID
+	,DWATS.MATERIAL_NUM                   AS	MATERIAL_NUM	--物料编号
+	,T.MATERIAL_NAME                  	  AS	MATERIAL_NAME	--物料名称
+	,DWATS.FACTORY_ID                     AS	FACTORY_ID		--工厂ID
+	,DWATS.FACTORY_CODE                   AS	FACTORY_CODE	--工厂编码
+	,T1.FACTORY_NAME                   	  AS	FACTORY_NAME	--工厂名称
+	,DWATS.STOCK_PLACE                    AS	STOCK_PLACE		--库存地点
+	,DWATS.BATCH_NUM                      AS	BATCH_NUM		--批号
+	,DWATS.COMPANY_ID                     AS	COMPANY_ID		--公司ID
+	,DWATS.COMPANY_CODE                    AS	COMPANY_CODE		--公司编码
+	,T2.COMPANY_NAME                   	  AS	COMPANY_NAME	--公司名称
+	,DWATS.SPECIAL_STOCK_FLAG             AS	SPECIAL_STOCK_FLAG	--特殊库存标识
+	,T3.CONFIG_NAME                    	  AS	SPECIAL_STOCK_FLAG_NAME		--特殊库存标识名称
+	,DWATS.RETAIL_VOUCHER_NO              AS	RETAIL_VOUCHER_NO	--销售和分销凭证号
+	,DWATS.RETAIL_VOUCHER_PROJECT_NO      AS	RETAIL_VOUCHER_PROJECT_NO	--销售和分销凭证的项目号
+	,DWATS.SUPPLIER_OR_CREDITOR_ID        AS	SUPPLIER_OR_CREDITOR_ID		--供应商帐户ID
+	,DWATS.SUPPLIER_OR_CREDITOR_NUM           AS	SUPPLIER_OR_CREDITOR_NUM	--供应商编码
+	,T4.SUPPLIER_OR_CREDITOR_NAME      	  AS	SUPPLIER_OR_CREDITOR_NAME	--供应商帐户名称
+	,DWATS.CUST_ID                        AS	CUST_ID		--客户ID
+	,DWATS.CUST_NUM                      AS	CUST_NUM		--客户编码
+	,T5.CUST_NAME                      	  AS	CUST_NAME	--客户名称
+	,DWATS.WBS_ELEMENT                    AS	WBS_ELEMENT	--WBS要素
+	,DWATS.STOCK_TYPE                     AS	STOCK_TYPE	--库存类型
+	,T6.DOMAIN_VALUE_NAME				  AS    STOCK_TYPE_NAME	--库存类型名称
+	,DWATS.STOCK_QTY                      AS	STOCK_QTY	--库存数量
+    ,DWATS.DEL_FLAG                       AS    DEL_FLAG	--删除标识
+    ,CURRENT_TIMESTAMP()                  AS  	DW_LAST_UPDATE_DATE	--DW最后更新时间
+FROM DWIOTD.DWI_WM_ALL_TYPE_STOCK_T DWATS		--DWI-SAP所有库存类型总库存表
+INNER JOIN DWIMD.DWI_MD_MATERIAL_GENERAL_T T	--关联物料主数据表,取MATERIAL_NAME
+	 ON T.MATERIAL_ID = DWATS.MATERIAL_ID		--物料ID
+	 AND T.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+	 AND DWATS.DEL_FLAG = 'N'					--删除标识'N'
+INNER JOIN DWIMD.DWI_MD_FACTORY_T T1			--关联工厂主数据表,取FACTORY_NAME
+	 ON  T1.FACTORY_ID = DWATS.FACTORY_ID		--工厂ID
+	 AND T1.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T1.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+	 AND DWATS.DEL_FLAG = 'N'					--删除标识'N'
+INNER JOIN DWIMD.DWI_MD_COMPANY_T T2			--关联公司主数据表,取COMPANY_NAME
+	 ON T2.COMPANY_ID = DWATS.COMPANY_ID		--公司ID
+	 AND T2.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T2.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+	 AND DWATS.DEL_FLAG = 'N'					--删除标识'N'
+LEFT JOIN DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R T3	--关联通用配置表,取特殊库存标识名称中文名称
+	 ON T3.CONFIG_CODE = DWATS.SPECIAL_STOCK_FLAG	--特殊库存标识名称
+	 AND T3.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T3.LANG_CODE = '1'						
+INNER JOIN DWIMD.DWI_MD_SUPPLIER_GENERAL_T T4	--关联供应商主数据表,取SUPPLIER_OR_CREDITOR_NAME
+	 ON T4.SUPPLIER_OR_CREDITOR_ID = DWATS.SUPPLIER_OR_CREDITOR_ID	--供应商ID
+	 AND T4.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T4.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+	 AND DWATS.DEL_FLAG = 'N'					--删除标识'N'
+INNER JOIN DWIMD.DWI_MD_CUST_GENERAL_T T5		--关联客户主数据表,取CUST_NAME
+	 ON T5.CUST_ID = DWATS.CUST_ID				--客户ID
+	 AND T5.GROUP_NUM = DWATS.GROUP_NUM			--集团
+	 AND T5.END_DATE ='4712-12-31'				--结束时间'4712-12-31'
+	 AND DWATS.DEL_FLAG = 'N'					--删除标识'N'
+LEFT JOIN DWIMD.DWI_MD_DOMAIN_CONFIG_CODE_R T6	--关联DD07T配置表,取库存类型名称中文名称
+	 ON T6.domain_value_code = DWATS.STOCK_TYPE	--库存类型
+	 AND T6.LANG_CODE = '1'
+WHERE DWATS.DEL_FLAG = 'N'

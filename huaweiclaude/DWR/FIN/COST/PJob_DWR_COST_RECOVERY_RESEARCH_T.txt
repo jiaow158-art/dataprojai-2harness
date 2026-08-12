@@ -1,0 +1,313 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/09/24 13:52:35 GMT+08:00
+-- description:分段成本还原本期结存-研发费用（已分段，注意汇总时部分字段合计翻倍）
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--  drop table DWRFIN.DWR_COST_RECOVERY_RESEARCH_T ;
+--  create table DWRFIN.DWR_COST_RECOVERY_RESEARCH_T (
+--  FLAG STRING comment '分类标识(A原料段,B釉料段,C成型段)'
+-- ,STAT_MONTH STRING comment '年月'
+-- ,ORD_NUM STRING comment '订单号'
+-- ,PLANT STRING comment '工厂'
+-- ,PROD_LEV STRING comment '产品等级'
+-- ,WORK_NAME STRING comment '描述(车间、产线)'
+-- ,PROD_VERSION STRING comment '生产版本'
+-- ,WORK_NO STRING comment '工序段'
+-- ,CATEGORY STRING comment '品类'
+-- ,SERIES STRING comment '系列'
+-- ,SPECIFICATION STRING comment '规格+厚度'
+-- ,DIMENSION STRING comment '大小/量纲'
+-- ,UNIT_AREA DECIMAL(38,10) comment '单位面积'
+-- ,SUM_AREA DECIMAL(38,10) comment '面积(注意汇总翻3倍)'
+-- ,MATERIAL_NUM STRING comment '物料编号'
+-- ,MATERIAL_NAME STRING comment '物料描述'
+-- ,ORD_PROD_QTY DECIMAL(38,10) comment '订单产量(注意汇总翻3倍)'
+-- ,ORD_PROD_QTY1 DECIMAL(38,10) comment '订单产量1(注意汇总翻3倍)'
+-- ,ORD_PROD_QTY2 DECIMAL(38,10) comment '订单产量2(注意汇总翻3倍)'
+-- ,ORD_PROD_QTY3 DECIMAL(38,10) comment '订单产量3(注意汇总翻3倍)'
+-- ,UNIT STRING comment '基本计量单位'
+-- ,COST_TOTAL_AMT DECIMAL(38,10) comment '成本合计'
+-- ,UNIT_PRICE_AMT DECIMAL(38,10) comment '成本单价'
+-- ,MAT_SAND_AMT DECIMAL(38,10) comment '材料-沙泥价格'
+-- ,MAT_SAND_QTY DECIMAL(38,10) comment '材料-沙泥数量'
+-- ,AVG_SAND_AMT DECIMAL(38,10) comment '泥沙-单位耗用'
+-- ,MAT_CML_AMT DECIMAL(38,10) comment '材料-化工价格'
+-- ,MAT_CML_QTY DECIMAL(38,10) comment '材料-化工数量'
+-- ,AVG_CML_AMT DECIMAL(38,10) comment '化工-单位耗用'
+-- ,MAT_ACS_AMT DECIMAL(38,10) comment '材料-配件价格'
+-- ,MAT_ACS_QTY DECIMAL(38,10) comment '材料-配件数量'
+-- ,MAT_PAC_AMT DECIMAL(38,10) comment '材料-包装价格'
+-- ,MAT_PAC_QTY DECIMAL(38,10) comment '材料-包装数量'
+-- ,MAT_OHR_AMT DECIMAL(38,10) comment '材料-其他材料价格'
+-- ,MAT_OHR_QTY DECIMAL(38,10) comment '材料-其他材料数量'
+-- ,HALF_PROD_AMT DECIMAL(38,10) comment '半成品价格'
+-- ,HALF_PROD_QTY DECIMAL(38,10) comment '半成品数量'
+-- ,FIN_PROD_AMT DECIMAL(38,10) comment '产成品价格'
+-- ,FIN_PROD_QTY DECIMAL(38,10) comment '产成品数量'
+-- -- ,BY_PROD_AMT DECIMAL(38,10) comment '副产品价格'
+-- -- ,BY_PROD_QTY DECIMAL(38,10) comment '副产品数量'
+-- -- ,REWORK_AMT DECIMAL(38,10) comment '返工耗用价格'
+-- -- ,REWORK_QTY DECIMAL(38,10) comment '返工耗用数量'
+-- ,LABOR_AMT DECIMAL(38,10) comment '人工费价格'
+-- ,LABOR_QTY DECIMAL(38,10) comment '人工费数量'
+-- ,COAL_AMT DECIMAL(38,10) comment '燃料-煤价格'
+-- ,COAL_QTY DECIMAL(38,10) comment '燃料-煤数量'
+-- ,AVG_COAL_AMT DECIMAL(38,10) comment '煤-单位耗用'
+-- ,GAS_AMT DECIMAL(38,10) comment '燃料-气价格'
+-- ,GAS_QTY DECIMAL(38,10) comment '燃料-气数量'
+-- ,AVG_GAS_AMT DECIMAL(38,10) comment '天然气-单位耗用'
+-- ,ELEC_AMT DECIMAL(38,10) comment '电费'
+-- ,ELEC_QTY DECIMAL(38,10) comment '电费数量'
+-- ,AVG_ELEC_AMT DECIMAL(38,10) comment '电费-单位耗用'
+-- ,DAA_AMT DECIMAL(38,10) comment '折旧及摊销价格'
+-- ,DAA_QTY DECIMAL(38,10) comment '折旧及摊销数量'
+-- ,OPF_AMT DECIMAL(38,10) comment '委外加工/抛光费'
+-- ,OPF_QTY DECIMAL(38,10) comment '委外加工/抛光费数量'
+-- ,WATER_AMT DECIMAL(38,10) comment '水费'
+-- ,WATER_QTY DECIMAL(38,10) comment '水费数量'
+-- ,MAT_LOSS_AMT DECIMAL(38,10) comment '物料消耗价格'
+-- ,MAT_LOSS_QTY DECIMAL(38,10) comment '物料消耗数量'
+-- ,REPAIR_AMT DECIMAL(38,10) comment '维修费'
+-- ,REPAIR_QTY DECIMAL(38,10) comment '维修费数量'
+-- ,DERV_AMT DECIMAL(38,10) comment '柴油价格'
+-- ,DERV_QTY DECIMAL(38,10) comment '柴油数量'
+-- -- ,DWD_AMT DECIMAL(38,10) comment '污水处理价格'
+-- -- ,DWD_QTY DECIMAL(38,10) comment '污水处理数量'
+-- ,OTHER_AMT DECIMAL(38,10) comment '其他费用'
+-- ,COST_DIFF DECIMAL(38,10) comment '成本差异'
+-- ,SM_DIFF_AMT DECIMAL(38,10) comment '原料段-水煤浆差异金额'
+-- ,SM_DIFF_QTY DECIMAL(38,10) comment '原料段-水煤浆差异数量'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+
+INSERT OVERWRITE TABLE DWRFIN.DWR_COST_RECOVERY_RESEARCH_T
+SELECT 
+ 'A' AS FLAG --分类标识-原料段
+,LFGJA||'-'||LFMON AS STAT_MONTH  --年月
+,AUFNR AS ORD_NUM --订单号
+,WERKS AS PLANT -- 工厂
+,ZCPDJ AS PROD_LEV --产品等级
+,KTEXT AS WORK_NAME --描述(车间、产线)
+,VERID AS PROD_VERSION --生产版本
+,ZGXD AS WORK_NO --工序段
+,ZCLASS AS CATEGORY --品类
+,ZSERIAL AS SERIES --系列
+,ZHOUDU AS SPECIFICATION -- 规格+厚度
+,GROES AS DIMENSION --大小/量纲
+,ZDWMJ AS UNIT_AREA --单位面积
+,ZAREA  AS SUM_AREA --面积
+,PLNBEZ AS MATERIAL_NUM --物料编号
+,MAKTX AS MATERIAL_NAME --物料描述
+,BSTMG  AS ORD_PROD_QTY --订单产量
+,BSTMGA  AS ORD_PROD_QTY1 --订单产量 
+,BSTMG1  AS ORD_PROD_QTY2 --订单产量
+,BSTMG2  AS ORD_PROD_QTY3 --订单产量
+,MEINS AS UNIT --基本计量单位
+,ZCB_SUM1 AS COST_TOTAL_AMT--成本合计
+,ZCB_PEINH1 AS UNIT_PRICE_AMT --成本单价
+,ZCL_SN1 AS MAT_SAND_AMT -- 材料-沙泥价格
+,ZSN_SL1 AS MAT_SAND_QTY -- 材料-沙泥数量
+,ZSN_DW1 AS AVG_SAND_AMT -- 泥沙-单位耗用
+,ZCL_HG1 AS MAT_CML_AMT -- 材料-化工价格
+,ZHG_SL1 AS MAT_CML_QTY -- 材料-化工数量
+,ZHG_DW1 AS AVG_CML_AMT -- 化工-单位耗用
+,ZCL_PJ1 AS MAT_ACS_AMT -- 材料-配件价格
+,ZPJ_SL1 AS MAT_ACS_QTY -- 材料-配件数量
+,ZCL_BZ1 AS MAT_PAC_AMT -- 材料-包装价格
+,ZBZ_SL1 AS MAT_PAC_QTY -- 材料-包装数量
+,ZCL_QT1 AS MAT_OHR_AMT -- 材料-其他材料价格
+,ZQT_SL1 AS MAT_OHR_QTY -- 材料-其他材料数量
+,ZBCP1 AS HALF_PROD_AMT --半成品价格
+,ZBCP_SL1 AS HALF_PROD_QTY --半成品数量
+,ZCCP1 AS FIN_PROD_AMT --产成品价格
+,ZCCP_SL1 AS FIN_PROD_QTY --产成品数量
+-- ,ZFCP1 AS BY_PROD_AMT --副产品价格
+-- ,ZFCP_SL1 AS BY_PROD_QTY --副产品数量
+-- ,ZFGHY1 AS REWORK_AMT --返工耗用价格
+-- ,ZFGHY_SL1 AS REWORK_QTY --返工耗用数量
+,ZRGF1 AS LABOR_AMT --人工费价格
+,ZRGF_SL1 AS LABOR_QTY --人工费数量
+,ZRL_M1 AS COAL_AMT --燃料-煤价格
+,ZM_SL1 AS COAL_QTY --燃料-煤数量
+,ZM_DW1 AS AVG_COAL_AMT --煤-单位耗用
+,ZRL_Q1 AS GAS_AMT --燃料-气价格
+,ZQ_SL1 AS GAS_QTY --燃料-气数量
+,ZQ_DW1 AS AVG_GAS_AMT --天然气-单位耗用
+,ZDF1 AS ELEC_AMT --电费
+,ZDF_SL1 AS ELEC_QTY --电费数量
+,ZDF_DW1 AS AVG_ELEC_AMT --电费-单位耗用
+,ZZJFX1 AS DAA_AMT -- 折旧及摊销价格
+,ZZJFX_SL1 AS DAA_QTY -- 折旧及摊销数量
+,ZWW_PG1 AS OPF_AMT --委外加工/抛光费
+,ZWW_SL1 AS OPF_QTY --委外加工/抛光费数量
+,ZSF1 AS WATER_AMT --水费
+,ZSF_SL1 AS WATER_QTY --水费数量
+,ZWLXH1 AS MAT_LOSS_AMT --物料消耗价格
+,ZWLXH_SL1 AS MAT_LOSS_QTY --物料消耗数量
+,ZWXF1 AS REPAIR_AMT --维修费
+,ZWXF_SL1 AS REPAIR_QTY --维修费数量
+,ZCY1 AS DERV_AMT --柴油价格
+,ZCY_SL1 AS DERV_QTY --柴油数量
+-- ,ZWSCL1 AS DWD_AMT--污水处理价格
+-- ,ZWSCL_SL1 AS DWD_QTY--污水处理数量
+,ZQTFY1 AS OTHER_AMT --其他费用
+,ZCBCY1 AS COST_DIFF --成本差异
+,ZSMCY1 AS SM_DIFF_AMT --原料段-水煤浆差异金额
+,ZSMCY1_SL AS SM_DIFF_QTY --原料段-水煤浆差异数量
+,current_timestamp() AS DW_LAST_UPDATE_DATE
+from sdi.sdi_ztcodg007_intyf_1001 
+UNION ALL 
+SELECT 
+ 'B' AS FLAG --分类标识-釉料段
+,LFGJA||'-'||LFMON AS STAT_MONTH  --年月
+,AUFNR AS ORD_NUM --订单号
+,WERKS AS PLANT -- 工厂
+,ZCPDJ AS PROD_LEV --产品等级
+,KTEXT AS WORK_NAME --描述(车间、产线)
+,VERID AS PROD_VERSION --生产版本
+,ZGXD AS WORK_NO --工序段
+,ZCLASS AS CATEGORY --品类
+,ZSERIAL AS SERIES --系列
+,ZHOUDU AS SPECIFICATION -- 规格+厚度
+,GROES AS DIMENSION --大小/量纲
+,ZDWMJ AS UNIT_AREA --单位面积
+,ZAREA  AS SUM_AREA --面积
+,PLNBEZ AS MATERIAL_NUM --物料编号
+,MAKTX AS MATERIAL_NAME --物料描述
+,BSTMG  AS ORD_PROD_QTY --订单产量
+,BSTMGA   AS ORD_PROD_QTY1 --订单产量 
+,BSTMG1  AS ORD_PROD_QTY2 --订单产量
+,BSTMG2  AS ORD_PROD_QTY3 --订单产量
+,MEINS AS UNIT --基本计量单位
+,ZCB_SUM2 AS COST_TOTAL_AMT--成本合计
+,ZCB_PEINH2 AS UNIT_PRICE_AMT --成本单价
+,ZCL_SN2 AS MAT_SAND_AMT -- 材料-沙泥价格
+,ZSN_SL2 AS MAT_SAND_QTY -- 材料-沙泥数量
+,ZSN_DW2 AS AVG_SAND_AMT -- 泥沙-单位耗用
+,ZCL_HG2 AS MAT_CML_AMT -- 材料-化工价格
+,ZHG_SL2 AS MAT_CML_QTY -- 材料-化工数量
+,ZHG_DW2 AS AVG_CML_AMT -- 化工-单位耗用
+,ZCL_PJ2 AS MAT_ACS_AMT -- 材料-配件价格
+,ZPJ_SL2 AS MAT_ACS_QTY -- 材料-配件数量
+,ZCL_BZ2 AS MAT_PAC_AMT -- 材料-包装价格
+,ZBZ_SL2 AS MAT_PAC_QTY -- 材料-包装数量
+,ZCL_QT2 AS MAT_OHR_AMT -- 材料-其他材料价格
+,ZQT_SL2 AS MAT_OHR_QTY -- 材料-其他材料数量
+,ZBCP2 AS HALF_PROD_AMT --半成品价格
+,ZBCP_SL2 AS HALF_PROD_QTY --半成品数量
+,ZCCP2 AS FIN_PROD_AMT --产成品价格
+,ZCCP_SL2 AS FIN_PROD_QTY --产成品数量
+-- ,ZFCP1 AS BY_PROD_AMT --副产品价格
+-- ,ZFCP_SL1 AS BY_PROD_QTY --副产品数量
+-- ,ZFGHY1 AS REWORK_AMT --返工耗用价格
+-- ,ZFGHY_SL1 AS REWORK_QTY --返工耗用数量
+,ZRGF2 AS LABOR_AMT --人工费价格
+,ZRGF_SL2 AS LABOR_QTY --人工费数量
+,ZRL_M2 AS COAL_AMT --燃料-煤价格
+,ZM_SL2 AS COAL_QTY --燃料-煤数量
+,ZM_DW2 AS AVG_COAL_AMT --煤-单位耗用
+,ZRL_Q2 AS GAS_AMT --燃料-气价格
+,ZQ_SL2 AS GAS_QTY --燃料-气数量
+,ZQ_DW2 AS AVG_GAS_AMT --天然气-单位耗用
+,ZDF2 AS ELEC_AMT --电费
+,ZDF_SL2 AS ELEC_QTY --电费数量
+,ZDF_DW2 AS AVG_ELEC_AMT --电费-单位耗用
+,ZZJFX2 AS DAA_AMT -- 折旧及摊销价格
+,ZZJFX_SL2 AS DAA_QTY -- 折旧及摊销数量
+,ZWW_PG2 AS OPF_AMT --委外加工/抛光费
+,ZWW_SL2 AS OPF_QTY --委外加工/抛光费数量
+,ZSF2 AS WATER_AMT --水费
+,ZSF_SL2 AS WATER_QTY --水费数量
+,ZWLXH2 AS MAT_LOSS_AMT --物料消耗价格
+,ZWLXH_SL2 AS MAT_LOSS_QTY --物料消耗数量
+,ZWXF2 AS REPAIR_AMT --维修费
+,ZWXF_SL2 AS REPAIR_QTY --维修费数量
+,ZCY2 AS DERV_AMT --柴油价格
+,ZCY_SL2 AS DERV_QTY --柴油数量
+-- ,ZWSCL1 AS DWD_AMT--污水处理价格
+-- ,ZWSCL_SL1 AS DWD_QTY--污水处理数量
+,ZQTFY2 AS OTHER_AMT --其他费用
+,ZCBCY2 AS COST_DIFF --成本差异
+,0 AS SM_DIFF_AMT --原料段-水煤浆差异金额
+,0 AS SM_DIFF_QTY --原料段-水煤浆差异数量
+,current_timestamp() AS DW_LAST_UPDATE_DATE
+from sdi.sdi_ztcodg007_intyf_1001 
+UNION ALL 
+SELECT 
+ 'C' AS FLAG --分类标识-成型段
+,LFGJA||'-'||LFMON AS STAT_MONTH  --年月
+,AUFNR AS ORD_NUM --订单号
+,WERKS AS PLANT -- 工厂
+,ZCPDJ AS PROD_LEV --产品等级
+,KTEXT AS WORK_NAME --描述(车间、产线)
+,VERID AS PROD_VERSION --生产版本
+,ZGXD AS WORK_NO --工序段
+,ZCLASS AS CATEGORY --品类
+,ZSERIAL AS SERIES --系列
+,ZHOUDU AS SPECIFICATION -- 规格+厚度
+,GROES AS DIMENSION --大小/量纲
+,ZDWMJ AS UNIT_AREA --单位面积
+,ZAREA  AS SUM_AREA --面积
+,PLNBEZ AS MATERIAL_NUM --物料编号
+,MAKTX AS MATERIAL_NAME --物料描述
+,BSTMG  AS ORD_PROD_QTY --订单产量
+,BSTMGA  AS ORD_PROD_QTY1 --订单产量 
+,BSTMG1  AS ORD_PROD_QTY2 --订单产量
+,BSTMG2 /3  AS ORD_PROD_QTY3 --订单产量
+,MEINS AS UNIT --基本计量单位
+,ZCB_SUM3 AS COST_TOTAL_AMT--成本合计
+,ZCB_PEINH3 AS UNIT_PRICE_AMT --成本单价
+,ZCL_SN3 AS MAT_SAND_AMT -- 材料-沙泥价格
+,ZSN_SL3 AS MAT_SAND_QTY -- 材料-沙泥数量
+,ZSN_DW3 AS AVG_SAND_AMT -- 泥沙-单位耗用
+,ZCL_HG3 AS MAT_CML_AMT -- 材料-化工价格
+,ZHG_SL3 AS MAT_CML_QTY -- 材料-化工数量
+,ZHG_DW3 AS AVG_CML_AMT -- 化工-单位耗用
+,ZCL_PJ3 AS MAT_ACS_AMT -- 材料-配件价格
+,ZPJ_SL3 AS MAT_ACS_QTY -- 材料-配件数量
+,ZCL_BZ3 AS MAT_PAC_AMT -- 材料-包装价格
+,ZBZ_SL3 AS MAT_PAC_QTY -- 材料-包装数量
+,ZCL_QT3 AS MAT_OHR_AMT -- 材料-其他材料价格
+,ZQT_SL3 AS MAT_OHR_QTY -- 材料-其他材料数量
+,ZBCP3 AS HALF_PROD_AMT --半成品价格
+,ZBCP_SL3 AS HALF_PROD_QTY --半成品数量
+,ZCCP3 AS FIN_PROD_AMT --产成品价格
+,ZCCP_SL3 AS FIN_PROD_QTY --产成品数量
+-- ,ZFCP1 AS BY_PROD_AMT --副产品价格
+-- ,ZFCP_SL1 AS BY_PROD_QTY --副产品数量
+-- ,ZFGHY1 AS REWORK_AMT --返工耗用价格
+-- ,ZFGHY_SL1 AS REWORK_QTY --返工耗用数量
+,ZRGF3 AS LABOR_AMT --人工费价格
+,ZRGF_SL3 AS LABOR_QTY --人工费数量
+,ZRL_M3 AS COAL_AMT --燃料-煤价格
+,ZM_SL3 AS COAL_QTY --燃料-煤数量
+,ZM_DW3 AS AVG_COAL_AMT --煤-单位耗用
+,ZRL_Q3 AS GAS_AMT --燃料-气价格
+,ZQ_SL3 AS GAS_QTY --燃料-气数量
+,ZQ_DW3 AS AVG_GAS_AMT --天然气-单位耗用
+,ZDF3 AS ELEC_AMT --电费
+,ZDF_SL3 AS ELEC_QTY --电费数量
+,ZDF_DW3 AS AVG_ELEC_AMT --电费-单位耗用
+,ZZJFX3 AS DAA_AMT -- 折旧及摊销价格
+,ZZJFX_SL3 AS DAA_QTY -- 折旧及摊销数量
+,ZWW_PG3 AS OPF_AMT --委外加工/抛光费
+,ZWW_SL3 AS OPF_QTY --委外加工/抛光费数量
+,ZSF3 AS WATER_AMT --水费
+,ZSF_SL3 AS WATER_QTY --水费数量
+,ZWLXH3 AS MAT_LOSS_AMT --物料消耗价格
+,ZWLXH_SL3 AS MAT_LOSS_QTY --物料消耗数量
+,ZWXF3 AS REPAIR_AMT --维修费
+,ZWXF_SL3 AS REPAIR_QTY --维修费数量
+,ZCY3 AS DERV_AMT --柴油价格
+,ZCY_SL3 AS DERV_QTY --柴油数量
+-- ,ZWSCL1 AS DWD_AMT--污水处理价格
+-- ,ZWSCL_SL1 AS DWD_QTY--污水处理数量
+,ZQTFY3 AS OTHER_AMT --其他费用
+,ZCBCY3 AS COST_DIFF --成本差异
+,0 AS SM_DIFF_AMT --原料段-水煤浆差异金额
+,0 AS SM_DIFF_QTY --原料段-水煤浆差异数量
+,current_timestamp() AS DW_LAST_UPDATE_DATE
+from sdi.sdi_ztcodg007_intyf_1001 

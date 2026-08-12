@@ -1,0 +1,703 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/10 10:49:57 GMT+08:00
+-- 新增JXSLBLXFS等18个字段 黄文彬 2024-01-08
+-- 增加字段描述，新增QYZJ_EMP_NUM等74个字段 黄文彬 2024-01-09
+-- 增加字段描述 SCYT_NAME 10004701 2024-02-26
+-- 增加字段SCDJCZ_NAME --市场等级-瓷砖、DMGS_NAME  --店面归属 10002375 2024-03-01
+-- update from huangwenbin 2024-03-26 针对省、市、区前后存在空字符串进行去空处理
+--update from zhz 20240413 更换店态、店面渠道成字典表
+--update from 15000571 20240710 MODEDATACREATEDATE日期格式清洗
+--update from 15000571 20240710 修改撤销日期逻辑：若状态为失效，撤销日期为空的，撤销日期补充为“1970-01-01
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_SHOP_INFO_OA_T
+  SELECT A.ID,
+         A.REQUESTID,
+         A.FORMMODEID,
+         A.MODEDATACREATER,
+         A.MODEDATACREATERTYPE,
+         --时间格式转换yyyy-mm-dd
+         case when A.MODEDATACREATEDATE like '%/%' then from_unixtime(unix_timestamp(A.MODEDATACREATEDATE, 'yyyy/M/d'), 'yyyy-MM-dd') else A.MODEDATACREATEDATE end as MODEDATACREATEDATE,
+         A.MODEDATACREATETIME,
+         A.MODEUUID,
+         A.CZXXYC, --瓷砖信息隐藏
+         A.DMZJ, --店面租金(万元/年)
+         A.SZSCWZPM, --所在市场位置排名
+         A.ZZZDSJSRS, --专职驻店设计师人数
+         A.SJSRS, --设计师人数
+         A.DMQD, --店面渠道C
+         A.FSFW, --辐射范围
+         A.ZZQYHDCHRYRS, --专职区域活动策划人员人数
+         A.DMZRS, --店面总人数
+         A.CZSFZZDP, --瓷砖是否只做东鹏
+         A.WLTDLXR, --物流团队联系人
+         A.XSZDR, --销售主导人
+         A.JXSNL, --经销商年龄
+         A.JGCDJRDH, --加工厂对接人联系方式
+         A.NZTXSE, --2020年整体销售额
+         A.PMDYCZPPDMMJ, --排名第一瓷砖品牌店面面积㎡
+         A.QYJHNTRGGJE, --区域计划年度投入广告金额
+         A.SCYT, --市场业态
+         A.XSZ, --销售组
+         A.DMCS2, --店面层数2
+         A.YDPHZQJYXH, --与东鹏合作前经营行业
+         A.ZXGSHZCGMC, --装修公司/合作工长联系人
+         A.SJSSL, --设计师数量
+         A.XSFXDWMC, --下属分销/加盟商单位名称(全称)
+         A.DMCS, --店面层数
+         A.SFYZZLSQDFZR, --是否有专职零售渠道负责人
+         A.YWRS, --业务人数
+         A.DPPPZSYJYJJLZB, --东鹏品牌在所有经营家居建材类的比重
+         A.KHLXXZ, --客户类型选择
+         A.ZJCDF, --租金承担方
+         A.MDLSXSDPCPSJ, --开始经营东鹏时间
+         A.ZLHTJZRQ, --租赁合同截止时间
+         A.SFYZZSJSQDFZR, --是否有专职设计师渠道负责人
+         A.YHFX, --优化方向
+         A.LSH, --流水号
+         A.CKMJ, --仓库面积(单位:平方米)
+         A.DMGS, --店面归属
+         A.MDMTZP, --门店门头照片
+         A.SCJGCG2, --首层结构层高
+         A.JYPL, --经营品类
+         A.ZXGSHZCGDH, --装修公司/合作工长联系电话
+         A.YWSL, --业务数量
+         TRIM(A.SHENG) AS SHENG, --门店所在省份
+         A.YW, --业务
+         A.SFYGZCPJLZC, --是否有高值产品激励政策
+         A.SFPJDDLSQD, --是否平价店的零售渠道
+         A.MDZZLMJ, --门店总租赁面积(㎡)
+         A.LCBT, --流程标题
+         A.YQBXJE, --一期报销金额
+         A.YQBXRQ, --一期报销日期
+         A.YQBXLC, --一期报销流程
+         A.SJBS, --设计标识
+         A.BXBS, --报销标识
+         A.SCJGCG, --首层结构层高(米)
+         A.SFYZZLSQDFZRRS, --专职零售渠道业务人数
+         A.SHRS, --售后人数
+         A.JXSDWMC, --经销商单位名称
+         A.SYFZZCPS, --是否有专职操盘手
+         A.FHXX, --返回信息
+         A.YYMS, --运营模式
+         A.ZJYCZGSJ, --最近一次整改时间
+         A.DMZJYCQMZXTRZJ, --店面最近一次全面装修投入资金(含硬装/软装)
+         A.WLMMJ, --外立面面积(㎡)
+         A.MQQXJJJCZRS, --目前旗下家居建材类所有员工总人数
+         A.SFYZZDBQDFZRRS, --专职大包渠道业务人数
+         A.KSHZNF, --合作开始时间年份
+         A.DPQYZZLMJ, --东鹏区域总租赁面积
+         A.YHYY, --优化原因
+         A.NDDPCPXSE, --2020年东鹏产品销售额
+         A.DSCJGCG, --三层结构层高(米)
+         A.SFYZZGCQDFZRRS, --专职工程渠道业务人数
+         A.DGZRS, --导购总人数
+         A.XXDZ, --详细地址
+         A.SCZBQK, --市场周边情况(多选)
+         A.ZZQYHDCHRY, --是否有专职区域活动策划人员-停用
+         A.DMFZRDH, --店面负责人电话
+         A.SFWSJKZR, --是否为实际控制人
+         A.SFYZYWLHWDHZWL, --是否有自营物流或稳定合作物流团队
+         A.DGSL, --导购数量
+         A.MDDPZSM, --门店东鹏展示面积(㎡)
+         A.ECJGCG, --二层结构层高(米)
+         A.SFYZZGCQDFZR, --是否有专职工程渠道负责人
+         A.QTRY2, --其他人员2
+         A.SFJYQTJCPL, --是否经营其他建材品类
+         A.SFYTJ, --申请节点是否提交过到下一节点
+         A.HZBH, --合作编号
+         A.QXZDYLNXSE, --旗下最大盈利规模的年销售额
+         A.ZMQK, --专卖情况
+         A.GDSL, --股东数量
+         A.ZJWYY, --租金（万元/月）
+         A.DZXM, --店长姓名
+         A.DG, --导购
+         A.SFKZDBFWSKT, --是否已开展大包服务商开拓(非大包公司合作)
+         A.YHSJ, --优化时间
+         A.MDGDDH, --门店固定电话
+         A.SHRYXM, --售后人员姓名
+         A.ZSGSZMJ, --装饰公司总面积
+         A.SCJCJDQYMC, --门店所在商圈/商场/卖场/街道/其他名称
+         A.ZBJPPP, --周边竞品品牌
+         A.ZZZDSJS, --是否有专职驻店设计师-停用
+         A.DCMDJLRS, --店长/门店经理人数
+         A.CLSKUZS, --陈列SKU总数
+         A.DMZXFG, --店面装修风格
+         A.SFYZZDBQDFZR, --是否有专职大包渠道负责人
+         A.SFXYYH, --是否需要优化
+         TRIM(A.SHI) AS SHI, --城市
+         A.SH, --售后
+         A.SFYDDJLZC, --是否有大单奖励政策
+         A.GZSMCZDDPM, --该装饰卖场在当地排名
+         A.MDGS, --门店归属
+         A.JXSKB, --经销商客编
+         A.SFSYCWXT, --是否使用财务/进销存系统
+         A.DHFLAG, --店号是否生成成功
+         A.DHHM, --电话号码
+         A.ZJYCQMZXSJ, --最近一次全面装修时间
+         A.JXSDWFRDH, --经销商单位法人电话
+         A.SFYHZJGC, --是否有合作加工厂
+         A.HZPPZPMDYDCZPP, --合作品牌中排名第一的瓷砖品牌
+         A.MDDZGJZ, --门店地址关键词
+         A.SCDDPM, --市场在当地排名
+         A.SFYZZCW, --是否有专职财务
+         A.DMFZRXM, --店面负责人姓名
+         A.SQRQ, --申请日期
+         A.MQDPTDZRS, --目前东鹏团队人数
+         A.CKSFGXS, --仓库是否为共享仓
+         A.DTSMWD, --店态说明文档
+         A.WZ1, --文字1
+         A.SFZXZQY, --是否在乡镇区域
+         A.YYZZQC, --营业执照全称
+         A.WLMMJ2, --外立面面积
+         A.JZSJSCZXWCSJ, --进驻时间-首次装修完成时间
+         A.DZDH, --店长电话
+         A.SJS, --设计师
+         A.JXSDWFRXM, --经销商单位法人姓名
+         A.SFTKZBPTFW, --是否已开展包铺贴服务
+         A.SHRYDH, --售后人员电话
+         A.CZQYZMJ, --瓷砖区域总面积
+         A.SFJXS, --是否经销商
+         TRIM(A.QU) AS QU, --区/县
+         A.CWJCG, --财务及采购
+         A.FWFZRXM, --服务负责人姓名
+         A.ZSMCSZWZ, --装饰卖场所在位置
+         A.DTSMWDZSD, --店态说明文档(装饰店)
+         A.DQHZGS, --大区/子公司
+         TRIM(A.SF) AS SF, --省份
+         A.CPSDH, --操盘手电话
+         A.THE2019, --2019提货额
+         A.QXZDGMJCPPMC, --旗下最大盈利规模的经营家居建材类品牌名称
+         A.KHLX, --客户类型
+         A.JCFWYN, --进场费（万元/年）
+         A.JXSFRXB, --经销商法人性别
+         A.JXSZGXL, --经销商最高学历
+         A.JGCMC, --加工厂名称
+         A.SFYHZPTZXGS, --是否有合作铺贴装修公司/合作工长
+         A.ZSGSMTZP, --装饰公司门头照片
+         A.ZSGSYGZS, --装饰公司员工总数
+         A.PMDYCZPPZJYCZXSJ, --排名第一瓷砖品牌最近一次装修时间
+         A.ZJYCQMZXWCSJ, --最近一次全面装修完成时间
+         A.DZDMJL, --店长/店面经理
+         A.SFYZZSJSQDFZRRS, --专职设计师渠道业务人数
+         A.YHXQJTQKMS, --优化需求具体情况描述
+         A.SQR, --申请人
+         A.CKZH, --仓库租金(万元/年)
+         A.SFDPDLMTXZ, --是否东鹏独立门头
+         A.WZ3, --文字3
+         A.ECJGCG2, --二层结构层高
+         A.SJBM, --上级部门
+         A.QTRY, --其他人员
+         A.MQSYDRJMC, --目前使用的软件名称
+         A.FWFZRDH, --服务负责人电话
+         A.WZ2, --文字2
+         A.FRXM, --法人姓名
+         A.JZPPZS, --进驻品牌总数
+         A.ZLHTJZSJ, --租赁合同截止时间1
+         A.TBR, --业务员
+         A.ZHEN, --乡镇区域名称
+         A.CPSXM, --操盘手姓名
+         A.CLSKUSL, --陈列SKU数量
+         A.DTSMWDXZZGB, --店态说明文档(乡镇专供版)
+         A.XJMDBH, --店面编码
+         A.XZQDM, --行政区划代码
+         A.ZZDZRS, --专职店长人数
+         A.MBTHE2021, --2021目标提货额
+         A.JXSDWFRSFZHM, --经销商单位法人身份证号码
+         A.JGCDJRXM, --加工厂对接人姓名
+         A.CLYSL, --材料员数量
+         A.YXB, --营销部
+         A.CZ, --操作
+         A.SFYZZDZ, --是否有专职店长-停用
+         A.THE2020, --2020提货额
+         A.DDPPPJYLX, --对东鹏品牌经营类型
+         A.WLTDLXFS, --物流团队联系电话
+         A.DPMDZZSMCDWZPM, --东鹏门店在装饰卖场的位置排名
+         A.SQBM, --申请部门
+         A.MQCKKCJE, --目前库存金额 (以对厂提货额为准)
+         A.LCTABLE, --流程table
+         A.WZ4, --文字4
+         A.DPMTZP, --东鹏门头照片
+         A.QTRYJRSM, --其他人员职务/人员兼任说明
+         A.DWGKFWH, --对外公开的服务号码
+         A.JZCZPPSL, --进驻瓷砖品牌数量
+         A.DMLX, --店面类型
+         A.JHDPCPZSMJ, --计划东鹏产品展示面积
+         A.MCMC, --卖场名称
+         A.MDXZLCWY, --门店选址流程（卫浴）
+         A.CZSQXXYC, --瓷砖商圈信息隐藏
+         A.DMMC, --店面名称
+         A.QSMCQK, --强势卖场情况
+         A.JPPP, --竞品品牌
+         A.CZYHXXYC, --瓷砖优化信息隐藏
+         A.DTLLK, --店态(弃)
+         A.NSRSBH, --纳税人识别号
+         A.ZCZB, --注册资本
+         A.ZCDZ, --注册地址
+         A.CZJXSFWDKXXYC, --瓷砖经销商服务端口消息隐藏
+         A.JMDBH, --旧门店编号
+         A.CZJXSXXYC, --瓷砖经销商信息隐藏
+         A.CZRYZZPDYC, --瓷砖人员组织盘点隐藏
+         A.JXSMC, --经销商名称
+         A.CZMX2YC, --瓷砖明细2隐藏
+         A.MDZP, --门店照片
+         A.MDLX, --门店类型
+         A.SCDJ, --市场等级
+         A.SFJPZDP, --是否竞品转东鹏
+         A.SFXYCZ, --是否需要重装
+         A.DMXZ, --店面性质
+         A.GSLX, --公司类型
+         A.XZSFCTTS, --选址是否冲突提示
+         A.DMLXQYZJTX, --店面类型(区域总监)
+         A.WYDWZZYC, --卫浴单位资质隐藏
+         A.SFXDYLY, --新店是否已领用
+         A.CZZXGSYC, --瓷砖装修公司隐藏
+         A.DMQDWY, --店面渠道W
+         A.MDZXLCWY, --门店装修流程（卫浴）
+         A.WYMX3YC, --卫浴明细3隐藏
+         A.MDZRLC, --门店转让流程
+         A.CZZXGSQTXXYC, --瓷砖装修公司其他信息隐藏
+         A.XSZZ, --销售组织
+         A.CZMDRYPZYC, --瓷砖门店人员配置隐藏
+         A.ZT, --状态
+         A.SJLY, --数据来源
+         A.CLSJ, --成立时间
+         A.FRLXDH, --法人联系电话
+         A.ZZWJSC, --资质文件
+         A.XZCTSRXYJDSM, --选址冲突时仍需要建店说明
+         A.DMJDSJ, --店面建档时间
+         A.FRLXDHG, --法人联系电话
+         A.CZZCZXYC, --瓷砖政策执行隐藏
+         A.CZZXMDXX, --瓷砖装修门店信息隐藏
+         A.CZMDXXYC, --瓷砖门店信息隐藏
+         A.CZMDYGXXYC, --瓷砖门店员工信息隐藏
+         A.DT, --店态
+         A.CZMX1YC, --瓷砖明细1隐藏
+         A.KHBM, --客户编码
+         A.MODEDATAMODIFIER,
+         A.MODEDATAMODIFYDATETIME,
+         A.QYZJ, --区域总监
+         A.YYZZMC, --营业执照名称
+         A.FRDB, --法人代表
+         A.JXSMCQX, --经销商名称（权限）
+         case when a.zt = 1 and (a.cxrq is null or a.cxrq = '') then '1970-01-01' else A.CXRQ end   as cxrq,  --撤销日期
+        --  A.CXRQ, --撤销日期
+         A.CXYY, --撤销原因
+         A.SJMJ, --设计面积
+         A.JYZT, --经营状态
+         A.CXYYCZ, --撤销原因-瓷砖
+         A.JYZ, --经营中
+         A.WGSJ, --完工时间
+         A.QXSGSQSJF, --取消施工收取设计费
+         A.FXSBM, --分销商编码
+         A.FXSMC, --分销商名称
+         A.SFZDPCZ, --是否做东鹏瓷砖
+         A.XSQY, --销售区域
+         A.DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,
+		 B.LASTNAME AS QYZJ_NAME, --区域总监名称
+-- 		 CASE WHEN A.DMQD = '0' THEN '零售渠道'
+-- 		      WHEN A.DMQD = '1' THEN '家装渠道'
+-- 			  WHEN A.DMQD = '2' THEN '工程经销渠道'
+-- 			  WHEN A.DMQD = '3' THEN '流通渠道'
+-- 			  WHEN A.DMQD = '4' THEN '公司直营'
+-- 			  ELSE ''
+-- 			   END AS CHANNEL_NAME --门店渠道名称
+         F.selectname AS CHANNEL_NAME --门店渠道名称
+		,A.JXSLBLXFS
+        ,A.DCXM
+        ,A.DCLXFS
+        ,A.GSYYZZMC
+        ,A.JXLBXM
+        ,A.QDBM
+        ,A.FZYSHUXING
+        ,A.WLMYSMJ
+        ,A.SQZXMJ
+        ,A.ZHYCWGRQ
+        ,A.CXYYFL
+        ,A.YYSJC
+        ,A.KHZTTX
+        ,A.DMYSDC
+        ,A.XJMD
+        ,A.KDLX
+        ,A.XJMDH
+        ,A.SFAKMD
+        ,A.SFADKDZ
+        ,A.MDZXRQ
+        ,A.MDYSRQ
+        ,A.MDZRRQ
+        ,A.MDCXGDRQ
+        ,A.MDXXBGRQ
+        ,A.NDPCPXSE
+        ,A.CDXXYY
+        ,A.CDHS
+        ,A.SFZDCXMD
+        ,A.FORM_BIZ_ID
+        ,A.BGDMQD
+        ,A.DSSQLTJ
+        ,A.SFTOP200SQ
+        ,A.SCDJCZ
+        ,A.JGYSRQ
+        ,A.JGYSMJ	  
+        ,CASE WHEN A.SFZXZQY = 0 THEN '是'
+              WHEN A.SFZXZQY = 1 THEN '否'
+               END AS SFZXZQY_NAME --是否在乡镇区域描述
+		,CASE WHEN A.QSMCQK = 0 THEN '强势卖场A位置'
+              WHEN A.QSMCQK = 1 THEN '强势卖场B位置'
+              WHEN A.QSMCQK = 2 THEN '强势卖场其他位置'
+              WHEN A.QSMCQK = 3 THEN '非强势卖场'
+               END AS QSMCQK_NAME --强势卖场情况描述
+		,CASE WHEN A.SFZDPCZ = 0 THEN '否' 
+              WHEN A.SFZDPCZ = 1 THEN '是'
+               END AS SFZDPCZ_NAME --是否做东鹏瓷砖描述
+		,CASE WHEN A.CXYYFL = 0 THEN '换址重装'
+              WHEN A.CXYYFL = 1 THEN '淘汰招商'
+              WHEN A.CXYYFL = 2 THEN '经营不善'
+              WHEN A.CXYYFL = 3 THEN '转投竞品/行业'
+              WHEN A.CXYYFL = 4 THEN '主档重复'
+              WHEN A.CXYYFL = 5 THEN '涉及违规行为'
+              WHEN A.CXYYFL = 6 THEN '业绩不达标'
+              WHEN A.CXYYFL = 7 THEN '位置原因'
+              WHEN A.CXYYFL = 8 THEN '门店原因'
+               END AS CXYYFL_NAME --撤销原因分类描述
+        ,CASE WHEN A.XJMD = 0 THEN '是'
+              WHEN A.XJMD = 1 THEN '否'
+               END AS XJMD_NAME --星级门店描述
+        ,B.SAPID AS QYZJ_EMP_NUM --区域总监工号
+    --     ,CASE WHEN A.DT = 0 THEN '旗舰店'
+    --           WHEN A.DT = 1 THEN '精品店'
+    --           WHEN A.DT = 2 THEN '综合店'
+    --           WHEN A.DT = 3 THEN '平价店'
+    --           WHEN A.DT = 4 THEN '平价店(乡镇专供产品)'
+    --           WHEN A.DT = 5 THEN '专卖区-零售产品'
+    --           WHEN A.DT = 6 THEN '专卖区-乡镇专供产品'
+    --           WHEN A.DT = 7 THEN '世界印象专卖店'
+			 -- WHEN A.DT = 8 THEN '世界印象专卖区'
+			 -- WHEN A.DT = 9 THEN '店中店'
+			 -- WHEN A.DT = 10 THEN '店中复合店'
+			 -- WHEN A.DT = 11 THEN '装饰专区/专板'
+			 -- WHEN A.DT = 12 THEN '工程店'
+			 -- WHEN A.DT = 13 THEN '工程专区'
+			 -- WHEN A.DT = 14 THEN '装饰专区'
+			 -- WHEN A.DT = 15 THEN '装饰专板'
+			 -- WHEN A.DT = 16 THEN '标准店'
+			 -- WHEN A.DT = 17 THEN '品类店'
+			 -- WHEN A.DT = 18 THEN '强势卖场'
+			 -- WHEN A.DT = 19 THEN '微店'
+			 -- WHEN A.DT = 20 THEN '钻石店'
+			 -- WHEN A.DT = 21 THEN '岩板店'
+			 -- WHEN A.DT = 22 THEN '专卖店'
+			 -- WHEN A.DT = 23 THEN '专营店'
+    --           END AS DT_NAME --店态描述
+        ,G.selectname AS DT_NAME --店态描述
+        ,CASE WHEN A.MDLX = 0 THEN '卫浴'
+		      WHEN A.MDLX = 1 THEN '瓷砖'
+			  WHEN A.MDLX = 2 THEN '新材'
+			   END AS MDLX_NAME --门店类型描述
+		,CASE WHEN A.SFPJDDLSQD = 0 THEN '否'
+              WHEN A.SFPJDDLSQD = 1 THEN '是'
+              WHEN A.SFPJDDLSQD = 2 THEN '装饰渠道店'
+              WHEN A.SFPJDDLSQD = 3 THEN '世界印象'
+			  WHEN A.SFPJDDLSQD = 4 THEN '经销工程渠道'
+               END AS SFPJDDLSQD_NAME --是否平价店的零售渠道描述
+        ,CASE WHEN A.SFJXS = 0 THEN '是'
+              WHEN A.SFJXS = 1 THEN '否'
+               END AS SFJXS_NAME --是否经销商描述
+		,CASE WHEN A.ZMQK = 0 THEN '东鹏专卖店'
+              WHEN A.ZMQK = 1 THEN '东鹏专卖区'
+               END AS ZMQK_NAME --专卖情况描述
+        ,CASE WHEN A.FSFW = 0 THEN '0-5公里'
+              WHEN A.FSFW = 1 THEN '5-10公里'
+              WHEN A.FSFW = 2 THEN '10-20公里'
+              WHEN A.FSFW = 3 THEN '20公里以上'
+			   END AS FSFW_NAME --辐射范围描述
+		,CASE WHEN A.JXSFRXB = 0 THEN '男'
+              WHEN A.JXSFRXB = 1 THEN '女'
+               END AS JXSFRXB_NAME --经销商法人性别
+        ,CASE WHEN A.SZSCWZPM = 0 THEN '第一'
+              WHEN A.SZSCWZPM = 1 THEN '前三'
+              WHEN A.SZSCWZPM = 2 THEN '非前三'
+               END AS SZSCWZPM_NAME --所在市场位置排名
+		,CASE WHEN A.DMCS = 0 THEN '1'
+              WHEN A.DMCS = 1 THEN '2'
+              WHEN A.DMCS = 2 THEN '3'
+               END AS DMCS_NAME --店面层数
+        ,CASE WHEN A.DMZXFG = 0 THEN '欧式风格'
+              WHEN A.DMZXFG = 1	THEN '轻奢风格'
+              WHEN A.DMZXFG = 2 THEN '现代时尚'
+			  WHEN A.DMZXFG = 3 THEN '其他'
+               END AS DMZXFG_NAME --店面装修风格
+		,CASE WHEN A.CZ = 0 THEN '填写专卖店/区信息'
+              WHEN A.CZ = 1 THEN '填写经销商信息'
+              WHEN A.CZ = 2 THEN '填写平价店（专供版）门店/区信息'
+              WHEN A.CZ = 3 THEN '填写装饰渠道门店信息'
+               END AS CZ_NAME --操作描述
+		,C.SAPID AS SQR_EMP_NUM --申请人工号
+        ,C.LASTNAME AS SQR_EMP_NAME --申请人名称
+        ,D.DEPT_NAME --申请部门名称
+        ,D.LEV1_DEPT_NAME --一级申请部门名称
+        ,D.LEV2_DEPT_NAME --二级申请部门名称
+        ,D.LEV3_DEPT_NAME --三级申请部门名称
+        ,D.LEV4_DEPT_NAME --四级申请部门名称
+        ,D.LEV5_DEPT_NAME --五级申请部门名称
+        ,D.LEV6_DEPT_NAME --六级申请部门名称
+        ,D.LEV7_DEPT_NAME --七级申请部门名称
+        ,D.LEV8_DEPT_NAME --八级申请部门名称
+        ,E.SAPID AS YWY_EMP_NUM --业务员工号
+        ,E.LASTNAME AS YWY_EMP_NAME --业务员名称	
+        ,CASE WHEN A.SCDDPM	= 0 THEN '第一'
+              WHEN A.SCDDPM = 1 THEN '前三'
+              WHEN A.SCDDPM = 2 THEN '非前三'
+               END AS SCDDPM_NAME --市场在当地排名
+		,CASE WHEN A.JXSZGXL = 0 THEN '无'
+              WHEN A.JXSZGXL = 1 THEN '小学'
+              WHEN A.JXSZGXL = 2 THEN '初中'
+              WHEN A.JXSZGXL = 3 THEN '中专'
+              WHEN A.JXSZGXL = 4 THEN '高中'
+              WHEN A.JXSZGXL = 5 THEN '大专'
+              WHEN A.JXSZGXL = 6 THEN '本科'
+              WHEN A.JXSZGXL = 7 THEN '硕士及硕士以上'
+               END AS JXSZGXL_NAME --经销商最高学历描述
+		,CASE WHEN A.YDPHZQJYXH = 0 THEN '是建材家居类'
+              WHEN A.YDPHZQJYXH = 1 THEN '非建材家具类'
+               END AS YDPHZQJYXH_NAME --与东鹏合作前经营行业
+		,CASE WHEN A.JYPL = 0 THEN '瓷砖'
+              WHEN A.JYPL = 1 THEN '木地板'
+              WHEN A.JYPL = 2 THEN '厨电'
+              WHEN A.JYPL = 3 THEN '家具'
+              WHEN A.JYPL = 4 THEN '家电'
+              WHEN A.JYPL = 5 THEN '五金'
+              WHEN A.JYPL = 6 THEN '灯饰'
+              WHEN A.JYPL = 7 THEN '油漆'
+              WHEN A.JYPL = 8 THEN '吊顶'	
+              WHEN A.JYPL = 9 THEN '窗帘'
+			  WHEN A.JYPL = 10 THEN '其他'	
+               END AS JYPL_NAME --经营品类描述
+        ,CASE WHEN A.SFWSJKZR = 0 THEN '是'
+              WHEN A.SFWSJKZR = 1 THEN '否'
+               END AS SFWSJKZR_NAME --是否为实际控制人描述
+		,CASE WHEN A.CZSFZZDP = 0 THEN '是'
+		      WHEN A.CZSFZZDP = 1 THEN '否'
+			   END AS CZSFZZDP_NAME --瓷砖是否只做东鹏描述
+	    ,CASE WHEN A.DDPPPJYLX = 0 THEN '自己操盘'
+		      WHEN A.DDPPPJYLX = 1 THEN '合作操盘'
+			  WHEN A.DDPPPJYLX = 2 THEN '其他'
+			   END AS DDPPPJYLX_NAME --对东鹏品牌经营类型描述
+		,CASE WHEN A.SFJYQTJCPL = 0 THEN '是'
+              WHEN A.SFJYQTJCPL = 1 THEN '否'
+  			   END AS SFJYQTJCPL_NAME --是否经营其他建材品类描述
+		,CASE WHEN A.CKSFGXS = 0 THEN '是'
+              WHEN A.CKSFGXS = 1 THEN '否'
+               END AS CKSFGXS_NAME --仓库是否为共享仓描述
+		,CASE WHEN A.SFSYCWXT = 0 THEN '是'
+              WHEN A.SFSYCWXT = 1 THEN '否'
+               END AS SFSYCWXT_NAME --是否使用财务/进销存系统描述
+		,CASE WHEN A.SYFZZCPS = 0 THEN '是'
+		      WHEN A.SYFZZCPS = 1 THEN '否'
+			   END AS SYFZZCPS_NAME --是否有专职操盘手描述
+		,CASE WHEN A.SFYZZCW = 0 THEN '是'
+		      WHEN A.SFYZZCW = 1 THEN '否'
+			   END AS SFYZZCW_NAME --是否有专职财务描述
+		,CASE WHEN A.SFYZZLSQDFZR = 0 THEN '是'
+		      WHEN A.SFYZZLSQDFZR = 1 THEN '否'
+		       END AS SFYZZLSQDFZR_NAME --是否有专职零售渠道负责人描述	   
+        ,CASE WHEN A.SFYZZGCQDFZR = 0 THEN '是'
+		      WHEN A.SFYZZGCQDFZR = 1 THEN '否'
+		       END AS SFYZZGCQDFZR_NAME --是否有专职工程渠道负责人描述
+	    ,CASE WHEN A.SFYZZDBQDFZR = 0 THEN '是'
+		      WHEN A.SFYZZDBQDFZR = 1 THEN '否'
+		       END AS SFYZZDBQDFZR_NAME --是否有专职大包渠道负责人描述
+	    ,CASE WHEN A.SFYZZSJSQDFZR = 0 THEN '是'
+              WHEN A.SFYZZSJSQDFZR = 1 THEN '否'
+		       END AS SFYZZSJSQDFZR_NAME --是否有专职设计师渠道负责人描述
+	    ,CASE WHEN A.SFKZDBFWSKT = 0 THEN '是'
+              WHEN A.SFKZDBFWSKT = 1 THEN '否'
+		       END AS SFKZDBFWSKT_NAME --是否已开展大包服务商开拓(非大包公司合作)描述
+		,CASE WHEN A.SFTKZBPTFW = 0 THEN '是'
+              WHEN A.SFTKZBPTFW = 1 THEN '否'
+		       END AS SFTKZBPTFW_NAME --是否已开展包铺贴服务描述
+        ,CASE WHEN A.SFYGZCPJLZC = 0 THEN '是'
+              WHEN A.SFYGZCPJLZC = 1 THEN '否'
+		       END AS SFYGZCPJLZC_NAME --是否有高值产品激励政策描述	
+        ,CASE WHEN A.SFYDDJLZC = 0 THEN '是'
+              WHEN A.SFYDDJLZC = 1 THEN '否'
+		       END AS SFYDDJLZC_NAME --是否有大单奖励政策描述			   
+		,CASE WHEN A.SFYHZJGC = 0 THEN '是'
+              WHEN A.SFYHZJGC = 1 THEN '否'
+		       END AS SFYHZJGC_NAME --是否有合作加工厂描述
+        ,CASE WHEN A.SFYHZPTZXGS = 0 THEN '是'
+              WHEN A.SFYHZPTZXGS = 1 THEN '否'
+		       END AS SFYHZPTZXGS_NAME --是否有合作铺贴装修公司/合作工长描述
+        ,CASE WHEN A.SFYZYWLHWDHZWL = 0 THEN '是'
+		      WHEN A.SFYZYWLHWDHZWL = 1 THEN '否'
+			   END AS SFYZYWLHWDHZWL_NAME --是否有自营物流或稳定合作物流团队描述
+		,CASE WHEN A.YYMS = 0 THEN '合资'
+		      WHEN A.YYMS = 1 THEN '独资'
+			   END AS YYMS_NAME --运营模式描述
+		,CASE WHEN A.GZSMCZDDPM = 0 THEN '第一'
+              WHEN A.GZSMCZDDPM = 1 THEN '前三'
+			  WHEN A.GZSMCZDDPM = 2 THEN '非前三'
+		       END AS GZSMCZDDPM_NAME --该装饰卖场在当地排名描述	   
+		,CASE WHEN A.ZSMCSZWZ = 0 THEN '写字楼'
+              WHEN A.ZSMCSZWZ = 1 THEN '临街店' 
+			  WHEN A.ZSMCSZWZ = 2 THEN '商场店' 
+		       END AS ZSMCSZWZ_NAME --装饰卖场所在位置描述   
+		,CASE WHEN A.XSZDR = 0 THEN '材料员'
+		      WHEN A.XSZDR = 1 THEN '设计师'
+		       END AS XSZDR_NAME --销售主导人描述
+        ,CASE WHEN A.DPMDZZSMCDWZPM = 0 THEN '第一'
+              WHEN A.DPMDZZSMCDWZPM = 1 THEN '前三'
+			  WHEN A.DPMDZZSMCDWZPM = 2 THEN '非前三'
+		       END AS DPMDZZSMCDWZPM_NAME --东鹏门店在装饰卖场的位置排名描述
+		,CASE WHEN A.ZJCDF = 0 THEN '一级A'
+		      WHEN A.ZJCDF = 1 THEN '子公司'
+			  WHEN A.ZJCDF = 2 THEN '市内分销商'
+			  WHEN A.ZJCDF = 3 THEN '市外分销商'
+			  WHEN A.ZJCDF = 4 THEN '省内经销商'
+			  WHEN A.ZJCDF = 5 THEN '装饰公司'
+		       END AS ZJCDF_NAME --租金承担方描述
+        ,CASE WHEN A.DMCS2 = 0 THEN 1
+		      WHEN A.DMCS2 = 1 THEN 2
+		       END AS DMCS2_NAME --店面层数2描述
+		,CASE WHEN A.SFXYYH = 0 THEN '是'
+              WHEN A.SFXYYH = 1 THEN '否'
+		       END AS SFXYYH_NAME --是否需要优化描述
+		,CASE WHEN A.YHFX = 0 THEN '1、撤销'
+		      WHEN A.YHFX = 1 THEN '2、位置调整'
+			  WHEN A.YHFX = 2 THEN '3、面积调整'
+			  WHEN A.YHFX = 3 THEN '4、其他'
+               END AS YHFX_NAME --优化方向描述
+		,CASE WHEN A.DMQDWY = 0 THEN '零售渠道'
+		      WHEN A.DMQDWY = 1 THEN '家装渠道'
+			  WHEN A.DMQDWY = 2 THEN '工程经销渠道'
+			  WHEN A.DMQDWY = 3 THEN '流通渠道'
+			  WHEN A.DMQDWY = 4 THEN '公司直营'
+               END AS DMQDWY_NAME --店面渠道W描述
+		,CASE WHEN A.DMLX = 0 THEN '旗舰店'
+              WHEN A.DMLX = 1 THEN '专卖店'
+			  WHEN A.DMLX = 2 THEN '专卖区'
+		       END AS DMLX_NAME --店面类型描述
+		,CASE WHEN A.SCDJ = 0 THEN '一级市场'
+              WHEN A.SCDJ = 1 THEN '二级市场'
+			  WHEN A.SCDJ = 2 THEN '三级市场'
+			  WHEN A.SCDJ = 3 THEN '省会、直辖市旗舰店'
+			  WHEN A.SCDJ = 4 THEN '特级市场'
+			   END SCDJ_NAME --市场等级描述
+        ,CASE WHEN A.SFJPZDP = 0 THEN '是'
+              WHEN A.SFJPZDP = 1 THEN '否'
+		       END AS SFJPZDP_NAME --是否竞品转东鹏描述
+        ,CASE WHEN A.SFXYCZ = 0 THEN '需要重装'
+              WHEN A.SFXYCZ = 1 THEN '不需要重装'
+			   END AS SFXYCZ_NAME --是否需要重装描述
+        ,CASE WHEN A.DMXZ = 0 THEN '直营店' 
+		      WHEN A.DMXZ = 1 THEN '分销店'
+		       END AS DMXZ_NAME --店面性质描述
+        ,CASE WHEN A.GSLX = 0 THEN '公司'
+		      WHEN A.GSLX = 1 THEN '合伙企业'
+			  WHEN A.GSLX = 2 THEN '个人独资企业'
+			  WHEN A.GSLX = 3 THEN '个人工商户'
+			  WHEN A.GSLX = 4 THEN '个人'
+		       END AS GSLX_NAME --公司类型描述
+		,CASE WHEN A.XZSFCTTS = 0 THEN '该区已有东鹏店面'
+		      WHEN A.XZSFCTTS = 1 THEN '无'
+		       END AS XZSFCTTS_NAME --选址是否冲突提示描述
+        ,CASE WHEN A.DMLXQYZJTX = 0 THEN '旗舰店' 
+		      WHEN A.DMLXQYZJTX = 1 THEN '专卖店' 
+			  WHEN A.DMLXQYZJTX = 2 THEN '专卖区' 
+			   END AS DMLXQYZJTX_NAME --店面类型(区域总监)描述
+        ,CASE WHEN A.SJBS = 0 THEN '已设计'
+		      WHEN A.SJBS = 1 THEN '未设计'
+			   END SJBS_NAME --设计标识描述
+        ,CASE WHEN A.BXBS = 0 THEN '已报销'
+              WHEN A.BXBS = 1 THEN '未报销'
+		       END AS BXBS_NAME --报销标识描述
+        ,CASE WHEN A.ZT = 0 THEN '生效'
+		      WHEN A.ZT = 1 THEN '失效'
+		       END AS ZT_NAME --状态描述
+        ,CASE WHEN A.SJLY = 0 THEN '初始化导入'
+              WHEN A.SJLY = 1 THEN '流程写入'
+		       END AS SJLY_NAME --数据来源描述
+        ,CASE WHEN A.SFXDYLY = 0 THEN '已领用'
+		      WHEN A.SFXDYLY = 1 THEN '未领用'
+		       END AS SFXDYLY_NAME --新店是否已领用描述
+        ,CASE WHEN A.JYZT = 0 THEN '经营中'
+              WHEN A.JYZT = 1 THEN '撤销' 
+		       END AS JYZT_NAME --经营状态描述
+        ,CASE WHEN A.CXYYCZ = 0 THEN '更换店面位置'
+              WHEN A.CXYYCZ = 1 THEN '卖场拆除'
+			  WHEN A.CXYYCZ = 2 THEN '市场/商场重新规划无瓷砖品类'
+			  WHEN A.CXYYCZ = 3 THEN '经销商业绩不达标淘汰'
+			  WHEN A.CXYYCZ = 4 THEN '经销商自行退出经营'
+			  WHEN A.CXYYCZ = 6 THEN '其他'
+               END AS CXYYCZ_NAME --撤销原因-瓷砖描述
+		,CASE WHEN A.JYZ = 0 THEN '否'  
+		      WHEN A.JYZ = 1 THEN '是'
+			   END AS JYZ_NAME --经营中描述		 
+		,case 
+		    when A.SCYT = 0 then '区域知名建材商圈-门店临街'
+		    when A.SCYT = 1 then '区域知名建材商圈-门店不临街'
+		    when A.SCYT = 2 then '无建材商圈-门店临街'
+		    when A.SCYT = 3 then '全国连锁卖场-门店临街'
+		    when A.SCYT = 4 then '全国连锁卖场-门店不临街'
+		    when A.SCYT = 5 then '区域普通建材卖场-门店临街'
+		    when A.SCYT = 6 then '区域普通建材卖场-门店不临街'
+		    when A.SCYT = 7 then '其他'
+		 end  as SCYT_NAME --市场业态
+		 ,case when A.SCDJCZ = 0 then '一级市场' 
+		       when A.SCDJCZ = 1 then '二级市场'
+		       when A.SCDJCZ = 2 then '三级市场'
+		       when A.SCDJCZ = 3 then '四级市场'
+		       when A.SCDJCZ = 4 then '五级市场'
+		       when A.SCDJCZ = 5 then '未列市场'
+		       end as SCDJCZ_NAME --市场等级-瓷砖
+		 ,case when A.DMGS = 0 then '自营' 
+		       when A.DMGS = 1 then '分销' 
+		       when A.DMGS = 2 then '合营' 
+		       end as DMGS_NAME  --店面归属
+         ,a.lszsmj --零售展示面积(㎡)
+         ,a.SQ -- 所属商圈
+         ,a.mdxqyf -- 门店续签月份
+         ,a.JD  --经度
+         ,a.WD  --纬度 
+         ,a.SFAID
+         ,a.SFXYZBSJ  --是否需要总部设计
+         ,a.sfzcq  --是否主城区
+         ,a.sjyxzsmj  --IW区域展示面积(㎡)
+         ,a.zzzsmj  --整装展示面积(㎡)
+         ,a.gczsmj  --工程展示面积(㎡)
+         ,a.DLSZSMJ --大零售展示面积(㎡)
+         ,e.mobile as ywy_phone_num --业务员电话号码
+         ,a.csxz -- 城市性质
+	FROM SDI.SDI_UF_MDXZ_1004 A
+	LEFT JOIN SDI.SDI_HRMRESOURCE_1004 B
+	  ON A.QYZJ = B.ID
+	 AND B.DEL_FLAG = 'N'
+	LEFT JOIN SDI.SDI_HRMRESOURCE_1004 C
+	  ON A.SQR = C.ID  
+	 AND C.DEL_FLAG = 'N'
+	LEFT JOIN DM.DM_WF_DEPT_INFO_T D
+      ON A.SQBM = D.DEPT_ID	
+	LEFT JOIN SDI.SDI_HRMRESOURCE_1004 E
+	  ON A.TBR = E.ID  
+	 AND E.DEL_FLAG = 'N'
+    LEFT JOIN (SELECT selectname,selectvalue
+    FROM sdi.sdi_workflow_selectitem_1004 ss
+    WHERE ss.fieldid IN (
+    SELECT id
+    FROM sdi.sdi_workflow_billfield_1004 t
+    WHERE t.billid = '-963'
+    AND fieldname = 'DMQD' )) F -- 店面渠道
+    ON A.DMQD = F.selectvalue
+    LEFT JOIN (SELECT selectname,selectvalue
+    FROM sdi.sdi_workflow_selectitem_1004 ss
+    WHERE ss.fieldid IN (
+    SELECT id
+    FROM sdi.sdi_workflow_billfield_1004 t
+    WHERE t.billid = '-963'
+    AND fieldname = 'DT' )) G -- 店态
+    ON A.DT = G.selectvalue
+    WHERE A.DEL_FLAG = 'N'
+   ;
+

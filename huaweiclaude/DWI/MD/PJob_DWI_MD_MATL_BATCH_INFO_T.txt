@@ -1,0 +1,71 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/07/21 15:58:50 GMT+08:00
+-- updateby yangjunhua 20230412 增加最早入库时间、批次入库时间(供应链口径)
+-- add by zhz 20231212新增字段	earliest_voucher_post_date_bw --最早入库时间(BW) earliest_voucher_post_date_fc --最早入库时间(辅材专用),product_area_code_bw --"产区" 
+-- ADD BY ZHZ 20240530 新增入库时间小于2019年，读取bw的批次入库时间
+-- update by zhz 20240606 限制取值小于2019年的入库数
+-- update by zhz 20240607 剔除入库时间为00000000的数
+-- update 20250311  yangjunhua alter table DWIMD.DWI_MD_MATL_BATCH_INFO_T add columns(BATCH_START_CZ string COMMENT '瓷砖批次首位');
+                               --alter table DWIMD.DWI_MD_MATL_BATCH_INFO_T add columns(FACTORY_TYPE string COMMENT '生产类型，自制/外协');
+                               --alter table DWIMD.DWI_MD_MATL_BATCH_INFO_T add columns(SUPPLIER_OR_CREDITOR_NUM string COMMENT '供应商编码');
+                                --alter table DWIMD.DWI_MD_MATL_BATCH_INFO_T add columns(SUPPLIER_OR_CREDITOR_NAME string COMMENT '供应商名称');
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_MATL_BATCH_INFO_T
+SELECT 
+	 ID									-- 代理主键
+	,BATCH_NUM 							-- 批次编号
+	,MATERIAL_NUM 						-- 物料编号			
+	,PROMOTE_REASON_CODE 				-- 促销原因编码
+	,CLEARANCE_REASON_CODE 				-- 清仓原因编码
+	,PROMOTE_REASON 					-- 促销原因
+	,CLEARANCE_REASON 					-- 清仓原因
+	,LENGTH_1 							-- 长度
+	,WIDTH 								-- 宽度
+	,THICK 								-- 厚度
+	,PACKING_PIECES 					-- 包装片数
+	,STOCK_PIECES 						-- 托盘片数
+	,SMALL_COLOR_CODE 					-- 小色号编码
+	,SMALL_COLOR_DESC					-- 小色号描述
+	,PRODUCE_DATE 						-- 生产日期
+	,CLEARANCE_TYPE_CODE				-- 清仓类型编码
+	,CLEARANCE_TYPE_DESC				-- 清仓类型描述
+	,WEIGHT 							-- 重量
+	,SHELF_END_DATE 					-- 货架寿命到期日
+	,RECENT_RECEIPT_DATE				-- 最近的收货日期  
+	,CUST_NUM 							-- 客户编号
+	,FIRST_PROMOTE_DATE 				-- 首次维护促销原因日期
+	,START_DATE 						-- 开始日期
+	,UPDATE_DATE						-- 更新日期
+	,END_DATE							-- 结束日期
+	,DATA_TYPE							-- 数据类型
+	,DEL_FLAG							-- 删除标识
+	,DW_LAST_UPDATE_DATE				-- 同步数据时间
+	,PRODUCT_AREA_CODE					-- 产区编码	
+	,PRODUCT_AREA_NAME					-- 产区名称
+	,FIVE_PRODUCT_AREA_NAME				-- 产区名称（五大产区）
+	,BATCH_AMB_IN_TIME                  -- 阿米巴批次入库时间
+	,EARLIEST_VOUCHER_POST_DATE         -- 最早入库时间
+	,BATCH_IN_TIME                      -- 批次入库时间(供应链口径)
+	,VOLUME
+	,case when substr(`/BIC/ZPCRKRQ`,1,4) < '2019' then from_unixtime(unix_timestamp(`/BIC/ZPCRKRQ`,'yyyyMMdd'),'yyyy-MM-dd') else earliest_voucher_post_date_bw end earliest_voucher_post_date_bw  ----最早入库时间(BW) 
+	,earliest_voucher_post_date_fc   --最早入库时间(辅材专用)
+	,product_area_code_bw --"产区"  
+	,BATCH_START_CZ 
+	,FACTORY_TYPE 
+	,SUPPLIER_OR_CREDITOR_NUM 
+	,SUPPLIER_OR_CREDITOR_NAME 
+FROM DWIMD.DWI_MD_MATL_BATCH_INFO_T_HIS  A
+LEFT JOIN (SELECT * FROM SDI.SDI_BIC_PZBATCHMD_1009 WHERE `/BIC/ZBATCHMD` <> '' and substr(`/BIC/ZPCRKRQ`,1,4) < '2019' and substr(`/BIC/ZPCRKRQ`,1,4) <> '0000') B  
+ON A.MATERIAL_NUM = B.material AND A.BATCH_NUM = B.`/BIC/ZBATCHMD`
+WHERE A.END_DATE = '4712-12-31' 
+ AND A.DEL_FLAG = 'N';
+ 
+ 
+
+ 

@@ -1,0 +1,105 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/06/03 10:18:50 GMT+08:00
+-- description:瓷砖各基地能源用量表(月)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_ENERGYCONSUME_M_F PARTITION(PERIOD_ID_M)
+SELECT period_id_m AS START_MONTH, -- 月份
+	   '4' AS BUSINESS_TYPE_CODE, -- 业务类型编码(1,2,3,4)
+	   '物耗' AS BUSINESS_TYPE_NAME, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+	   SITE_CODE, -- 基地编码
+	   WORK_SHOP_CODE, -- 车间编码
+	   PRODUCT_LINE_CODE, -- 产线编码
+	   WORK_NO_CODE, -- 工序编码
+	   COST_CENTER_CODE, -- 成本中心
+	   SUM(material_amt) AS USE_QTY, -- 用量(物耗)
+	   'N' AS DEL_FLAG, -- 删除数据标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   PERIOD_ID_M --  分区月
+FROM DWROTD.DWR_PAM_BASE_MATERIALCONSUME_M_F -- 瓷砖各基地物耗表(月)
+WHERE DEL_FLAG = 'N'
+AND PERIOD_ID_M >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+GROUP BY period_id_m,
+		 SITE_CODE,
+		 WORK_SHOP_CODE,
+		 PRODUCT_LINE_CODE,
+		 WORK_NO_CODE,
+		 COST_CENTER_CODE
+UNION ALL
+SELECT period_id_m AS START_MONTH, -- 月份
+	   '3' AS BUSINESS_TYPE_CODE, -- 业务类型编码(1,2,3,4)
+	   '煤' AS BUSINESS_TYPE_NAME, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+	   SITE_CODE, -- 基地编码
+	   WORK_SHOP_CODE, -- 车间编码
+	   PRODUCT_LINE_CODE, -- 产线编码
+	   WORK_NO_CODE, -- 工序编码
+	   COST_CENTER_CODE, -- 成本中心
+	   SUM(coal_qty) AS USE_QTY, -- 用量(煤)
+	   'N' AS DEL_FLAG, -- 删除数据标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+	   PERIOD_ID_M --  分区月
+FROM DWROTD.DWR_PAM_BASE_COAL_F -- 瓷砖各基地用煤表
+WHERE DEL_FLAG = 'N'
+AND PERIOD_ID_M >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+GROUP BY period_id_m,
+		 SITE_CODE,
+		 WORK_SHOP_CODE,
+		 PRODUCT_LINE_CODE,
+		 WORK_NO_CODE,
+		 COST_CENTER_CODE
+UNION ALL
+SELECT  PERIOD_ID_M AS START_MONTH, -- 月份
+		'2' AS BUSINESS_TYPE_CODE, -- 业务类型编码(1,2,3,4)
+	    '气' AS BUSINESS_TYPE_NAME, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		SITE_CODE,-- 基地编码
+		WORK_SHOP_CODE, -- 车间编码
+		PRODUCT_LINE_CODE, -- 产线编码
+		WORK_NO_CODE,  -- 工序编码
+		COST_CENTER_CODE, -- 成本中心
+		SUM(GAS_QTY) AS USE_QTY,-- 用量（气）
+		'N' AS DEL_FLAG, -- 删除数据标识
+		CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+		PERIOD_ID_M --  分区月
+FROM DWROTD.DWR_PAM_BASE_NATURALGAS_F -- 瓷砖各基地用气表
+WHERE DEL_FLAG = 'N'
+AND PERIOD_ID_M >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+GROUP BY period_id_m,
+		 SITE_CODE,
+		 WORK_SHOP_CODE,
+		 PRODUCT_LINE_CODE,
+		 WORK_NO_CODE,
+		 COST_CENTER_CODE
+UNION ALL
+SELECT  PERIOD_ID_M AS START_DATE, -- 月份
+		'1' AS BUSINESS_TYPE_CODE, -- 业务类型编码(1,2,3,4)
+	    '电' AS BUSINESS_TYPE_NAME, -- 业务类型名称(1:电(度) 2:气(立方米) 3:煤(吨) 4:物耗(元))
+		SITE_CODE,-- 基地编码
+		WORK_SHOP_CODE, -- 车间编码
+		PRODUCT_LINE_CODE, -- 产线编码
+		WORK_NO_CODE,  -- 工序编码
+		COST_CENTER_CODE, -- 成本中心
+		SUM(ELECTRICITY_QTY) AS USE_QTY,-- 用量（电）
+		'N' AS DEL_FLAG, -- 删除数据标识
+		CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 数据同步时间
+		PERIOD_ID_M --  分区月
+FROM DWROTD.DWR_PAM_BASE_ELECTRIC_F -- 瓷砖各基地用电表
+WHERE DEL_FLAG = 'N'
+AND PERIOD_ID_M >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7) -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+GROUP BY period_id_m,
+		 SITE_CODE,
+		 WORK_SHOP_CODE,
+		 PRODUCT_LINE_CODE,
+		 WORK_NO_CODE,
+		 COST_CENTER_CODE
+;

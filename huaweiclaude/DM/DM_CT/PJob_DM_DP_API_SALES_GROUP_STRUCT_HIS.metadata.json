@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_DP_API_SALES_GROUP_STRUCT_HIS",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

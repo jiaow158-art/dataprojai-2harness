@@ -1,0 +1,24 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2022/11/11 14:45:08 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_ITSM_USER_ROLE_D
+SELECT
+       A.USERROLEID AS USER_ROLE_ID --主键
+      ,A.USERID AS USER_ID --用户ID
+      ,A.ROLEID AS ROLE_ID --角色ID
+	  ,B.ROLENAME AS ROLE_NAME --角色名称
+	  ,B.REMARK AS ROLE_REMARK --角色备注
+      ,A.MODULEID AS MODULE_ID --模块ID
+      ,A.COMPANYID AS COMPANY_ID --所属公司
+      ,A.CREATETIME	AS CREATE_TIME --创建时间
+      ,A.CREATORID AS CREATOR_ID --创建人
+      ,A.LASTMODIFIED AS LAST_MODIFIY_ID --最后一次修改
+      ,A.MODIFIEDID AS MODIFIY_ID --修改人
+      ,A.ROLECODE AS ROLE_CODE --角色编码
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM SDI.SDI_ITSM_SYS_USER_ROLE_1013 A
+  LEFT JOIN SDI.SDI_ITSM_SYS_ROLE_1013 B
+    ON A.ROLEID = B.ROLEID
+;

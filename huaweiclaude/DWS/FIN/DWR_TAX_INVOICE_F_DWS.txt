@@ -1,0 +1,61 @@
+DROP TABLE IF  EXISTS  DWRFIN.DWR_TAX_INVOICE_TMP;
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_TAX_INVOICE_TMP
+(GROUP_NUM                            VARCHAR(500),                    
+COMPANY_ID                            VARCHAR(500),                    
+COMPANY_CODE                          VARCHAR(500),                    
+COMPANY_NAME                          VARCHAR(500),                    
+BILL_VOUCHER_NUM                      VARCHAR(500),                    
+TAX_NUM                               VARCHAR(500),                    
+ORDER_NUM                             VARCHAR(500),                    
+OCEAN_BILL_LADING_NUM                 VARCHAR(500),                    
+CUST_ID                               INT,                             
+CUST_NUM                              VARCHAR(500),                    
+CUST_NAME                             VARCHAR(500),                    
+DOC_CURRENCY_TAX_AMT                  VARCHAR(500),                    
+BILL_ITEM_NUM                         VARCHAR(500),                    
+CUSTOMS_DECLARATION_NUM               DECIMAL(38,10),                  
+PRINTING_DATE                         VARCHAR(500),                    
+DEMO_DESC                             TIMESTAMP,                       
+SAP_INVOICE_ISSUE_DATE2               VARCHAR(500),                    
+SAP_INVOICE_ISSUE_DATE                VARCHAR(500),                    
+INPUT_NAME                            VARCHAR(500),                    
+NET_VALUE_AMT                         TIMESTAMP,                       
+INVOICE_STATUS                        VARCHAR(500),                    
+TAX_TYPE                              VARCHAR(500),                    
+BILL_LADING_DATE                      TIMESTAMP,                       
+TAX_INVOICE_TEXT_NUM                  VARCHAR(500),                    
+PRINTING_TIME                         VARCHAR(500),                    
+TOTAL_NET_VALUE_AMT                   DECIMAL(38,10),                  
+DEL_FLAG                              VARCHAR(500),                    
+DW_LAST_UPDATE_DATE                   TIMESTAMP);                      
+
+
+COMMENT   ON TABLE   DWRFIN.DWR_TAX_INVOICE_TMP	                      IS   '税票表';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.GROUP_NUM               IS   '集团';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.COMPANY_ID              IS   '公司ID';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.COMPANY_CODE            IS   '公司代码';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.COMPANY_NAME            IS   '公司名称';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.BILL_VOUCHER_NUM        IS   '开票凭证';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.TAX_NUM                 IS   '税号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.ORDER_NUM               IS   '定单号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.OCEAN_BILL_LADING_NUM   IS   '海运提单号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.CUST_ID                 IS   '客户ID';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.CUST_NUM                IS   '客户编号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.CUST_NAME               IS   '客户名称';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.DOC_CURRENCY_TAX_AMT    IS   '以凭证货币计的税额';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.BILL_ITEM_NUM           IS   '开票项目';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.CUSTOMS_DECLARATION_NUM IS   '报关单号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.PRINTING_DATE           IS   '打印日期';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.DEMO_DESC               IS   '备注栏';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.SAP_INVOICE_ISSUE_DATE2 IS   'SAP发票日期';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.SAP_INVOICE_ISSUE_DATE  IS   'SAP发票日期';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.INPUT_NAME              IS   '输入人姓名';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.NET_VALUE_AMT           IS   '净价值(含税)';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.INVOICE_STATUS          IS   '发票状态';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.TAX_TYPE                IS   '税类型';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.BILL_LADING_DATE        IS   '提单时间';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.TAX_INVOICE_TEXT_NUM    IS   '税票文本号';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.PRINTING_TIME           IS   '打印时间';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.TOTAL_NET_VALUE_AMT     IS   '净价值合计';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.DEL_FLAG                IS   '删除标识';
+COMMENT   ON COLUMN  DWRFIN.DWR_TAX_INVOICE_TMP.DW_LAST_UPDATE_DATE     IS   'DW最后更新日期';

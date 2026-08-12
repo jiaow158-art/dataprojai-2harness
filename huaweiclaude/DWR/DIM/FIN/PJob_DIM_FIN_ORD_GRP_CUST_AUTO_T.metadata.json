@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DIM_FIN_ORD_GRP_CUST_AUTO_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/FIN",
+    "description": "国补客编分摊表(自动）",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

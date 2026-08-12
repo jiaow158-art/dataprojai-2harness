@@ -1,0 +1,66 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/08/31 11:03:25 GMT+08:00
+-- update from huangwenbin 2024-09-05 增加字段：最晚入库时间（申请单粒度）
+-- ******************************************************************** --
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/08/31 11:03:25 GMT+08:00
+-- ******************************************************************** --
+WITH T1 AS(
+SELECT AN.BANFN
+      ,KO.LIFNR
+	  ,PO.WERKS
+	  ,PO.LGORT
+	  ,BE.CHARG
+	  ,SUM(CASE WHEN BE.SHKZG = 'S' THEN BE.MENGE ELSE 0 - BE.MENGE END) AS MENGE 
+      ,MAX(BE.BUDAT) AS BUDAT
+  FROM SDI.SDI_EBAN_1001 AN
+  LEFT JOIN SDI.SDI_EKPO_1001 AS PO
+    ON PO.BANFN = AN.BANFN AND PO.BNFPO = AN.BNFPO
+ INNER JOIN SDI.SDI_EKKO_1001 AS KO ON KO.EBELN = PO.EBELN
+  LEFT JOIN SDI.SDI_EKBE_1001 AS BE ON PO.EBELN = BE.EBELN AND PO.EBELP = BE.EBELP
+ WHERE AN.BNFPO = '00010'
+   AND AN.BSART = 'ZNB1'
+   AND BE.BEWTP = 'E'
+ GROUP BY AN.BANFN
+      ,KO.LIFNR
+	  ,PO.WERKS
+	  ,PO.LGORT
+	  ,BE.CHARG  
+),T AS(
+SELECT T1.BANFN
+      ,T1.LIFNR
+	  ,T1.WERKS
+	  ,T1.LGORT
+	  ,T1.CHARG
+	  ,T1.MENGE 
+      ,MAX(T1.BUDAT) OVER(PARTITION BY T1.BANFN) AS BUDAT
+  FROM T1	  
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PS_PROD_SCHED_F
+SELECT A.ID
+      ,A.PLAN_TASK_ID --计划单ID
+	  ,A.PROCESS_TECH_ORDER_ID AS PRCS_TASK_ID --制程工艺ID
+	  ,A.PRODUCTION_DATE AS PROD_DATE --生产日期
+	  ,A.WIP_RESOURCE_ID AS PROD_LINE_ID --生产资源ID
+	  ,H.CODE AS PROD_LINE_CODE --生产资源编码
+	  ,H.NAME AS PROD_LINE_NAME --生产资源名称
+      ,COALESCE(A.BATCH,T.CHARG) AS BATCH_NUM --批次
+      ,COALESCE(A.PLANT,T.WERKS) AS FACTORY_CODE --工厂编码
+	  ,COALESCE(A.INVENTORY_LOCATION,T.LGORT) AS WH_CODE --仓库编码
+	  ,COALESCE(A.QTY,T.MENGE) AS PROD_QTY --生产数量（入库数量）
+	  ,B.PURCHASE_REQUISITION_NO AS APLY_NUM --申请单号
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,SUBSTR(T.BUDAT,1,4)||'-'||SUBSTR(T.BUDAT,5,2)||'-'||SUBSTR(T.BUDAT,7,2) AS LAST_IN_DATE --最晚入库时间（申请单粒度）
+  FROM SDI.SDI_APS_DAILY_SCHEDULE_1007 A
+  LEFT JOIN SDI.SDI_RES_WIP_SCHE_1007 H
+    ON A.WIP_RESOURCE_ID = H.ID
+  LEFT JOIN SDI.SDI_APS_OEM_PO_SUM_1007 B
+    ON A.PLAN_TASK_ID = B.APS_PLAN_TASK_ID
+  LEFT JOIN T
+    ON B.PURCHASE_REQUISITION_NO = T.BANFN
+;
+

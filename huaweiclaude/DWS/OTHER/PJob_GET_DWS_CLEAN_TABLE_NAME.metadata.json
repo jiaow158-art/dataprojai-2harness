@@ -1,0 +1,8 @@
+{
+    "name": "PJob_GET_DWS_CLEAN_TABLE_NAME",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTHER",
+    "description": "获取DWS脏数据率较高的表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

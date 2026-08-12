@@ -1,0 +1,130 @@
+-- HIVE sql  -- 最新
+-- ******************************************************************** --
+-- author: DP_10004701
+-- 卫浴库存质量检查报表
+-- create time: 2022/11/28 18:22:04 GMT+08:00
+-- ******************************************************************** --
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+-- 价格 --
+with price as 
+(
+	select 
+	 MATNR,
+	 BWKEY,
+	 BWTAR,  -- 价格多带出来一个东西,批次条件限定
+	 case when VMVER <> 0 or VMVER is null  then VMVER/peinh else VMSTP/peinh end kbetr
+	from sdi.sdi_mbew_1001
+	where VPRSV = 'S'
+),
+-- 主数据物料名称配对 --
+material_num_to_name as 
+(
+	select material_num,
+		material_name 
+	from dwimd.dwi_md_data_material_general_t
+	where matl_group_code in ('3000010','4000010') and external_matl_group_code <> '10050'
+),
+-- 冻结库存 --
+storeNumber as 
+(
+	select
+		t3.batch_num,
+		t3.material_num,
+		t2.material_name,
+		t3.store_location_sid,
+		t3.factory_werks_code,
+		sum(case when t3.dr_cr_id = 'H_SHKZG' then -1*t3.quantity else t3.quantity end) as quantity,
+		'0' as freeze_qty  -- 这里多了点啥
+	from DWROTD.DWR_WM_PRODSTOCK_OUT_IN_F t3 
+	join material_num_to_name t2
+	on t3.material_num  = t2.material_num
+	where t3.factory_werks_code like '3%20'  and t3.store_location_sid = 'GG20' --AND material_num = 'JJH00000'
+	group by t3.batch_num,t3.material_num,t2.material_name,t3.store_location_sid,t3.factory_werks_code
+	UNION ALL 
+	select 
+		t1.batch_num,
+		t1.material_num,
+		t2.material_name,
+		t1.stock_place as store_location_sid,
+		t1.factory_code as factory_werks_code,
+		(case when stock_type = '02'  then t1.stock_qty else 0 end ) as quantity, --这里进行了修改
+		(case when stock_type = '07'  then t1.stock_qty else 0 end ) as freeze_qty --多了这个 -- 2,7的类型进行了分列
+	from DWIOTD.DWI_WM_ALL_TYPE_STOCK_T t1 
+	join material_num_to_name t2
+	on t1.material_num  = t2.material_num
+	where (stock_type in ('02','07') AND stock_qty <> 0 and  t1.stock_place like 'G%') and (t1.factory_code like '3%20' or t1.factory_code in ('3610','3660')) and t1.special_stock_flag is null
+) 
+,
+-- 冻结时间和原因 -- 
+txtinformation as 
+(
+SELECT
+		batch_num,
+		material_num,
+		store_location_sid,
+		factory_werks_code,
+		voucher_post_date,
+		voucher_header_text,
+		reference_voucher_num,
+		ROW_NUMBER() OVER(PARTITION BY batch_num,material_num,store_location_sid,factory_werks_code ORDER BY voucher_post_date DESC) AS rn
+	FROM
+		DWROTD.DWR_WM_PRODSTOCK_OUT_IN_F
+	WHERE
+		move_type in ('322','344') or (factory_werks_code like '3%20' and store_location_sid = 'GG20' and move_type = '301') -- 移动类型多了344
+),
+-- 汇总 --
+tem as 
+(
+	select
+		t1.batch_num,
+		t1.material_num, -- 物料编码
+		t1.material_name,
+		t1.store_location_sid, -- 库存地点
+		t1.factory_werks_code, -- 工厂编号
+		sum(t1.quantity) as quantity, -- 质量检查库存数量
+		sum(t1.freeze_qty) as freeze_qty, -- 质量冻结库存数量 -- 多了这个
+		t3.voucher_post_date,-- 凭证中的过帐日期
+		t3.voucher_header_text, -- 凭证中的抬头文本
+		t3.reference_voucher_num, -- 第二种的原因
+		sum(COALESCE(t2.kbetr,t22.kbetr)) as kbetr, -- 这里有点小差异，具体是两个价格选一个
+		sum(COALESCE(t2.kbetr,t22.kbetr)) * sum(t1.quantity) as totalprice, -- 这里有点小差异
+		sum(COALESCE(t2.kbetr,t22.kbetr)) * sum(t1.freeze_qty) as total_freeze_price		-- 另外的价格合计
+	from storeNumber t1 
+	left join price t2 on t1.material_num = t2.matnr and t1.factory_werks_code = t2.BWKEY and t1.batch_num = t2.BWTAR 
+	left join price t22 on t1.material_num = t22.matnr and t1.factory_werks_code = t22.BWKEY and t22.BWTAR = ''
+	left join (SELECT batch_num,material_num,store_location_sid,factory_werks_code,voucher_post_date,voucher_header_text,reference_voucher_num FROM txtinformation WHERE rn = 1) t3 
+	on t1.batch_num = t3.batch_num and t1.material_num = t3.material_num and t1.store_location_sid = t3.store_location_sid and t1.factory_werks_code = t3.factory_werks_code
+	group by 
+		t1.batch_num,
+		t1.material_num, -- 物料编码
+		t1.material_name,
+		t1.store_location_sid, -- 库存地点
+		t1.factory_werks_code, -- 工厂编号
+		t3.voucher_post_date,-- 凭证中的过帐日期
+		t3.voucher_header_text,-- 凭证中的抬头文本
+		t3.reference_voucher_num
+)
+
+insert overwrite table dm_sw.dm_stock_quality_problem_check_t partition(partition_ym)
+select SUBSTR(date_format('${PERIOD_ID_D}','yyyy-MM-dd'),1,7) as date_ym,
+		q1.batch_num,
+		q1.material_num, -- 物料编码
+		q1.material_name,
+		q1.store_location_sid, -- 库存地点
+		q1.factory_werks_code, -- 工厂编号
+		q1.quantity, -- 质量检查库存数量
+		q1.voucher_post_date,-- 凭证中的过帐日期
+		q1.voucher_header_text, -- 凭证中的抬头文本
+		q1.reference_voucher_num, -- 第二种的原因
+		q1.kbetr,
+	    q1.totalprice,
+	    CURRENT_TIMESTAMP()	as last_update_date,	-- 数据同步时间
+	    q2.pur_type_name,
+	    q1.freeze_qty, --冻结库存数量
+	    q1.total_freeze_price,
+	    SUBSTR(date_format('${PERIOD_ID_D}','yyyy-MM-dd'),1,7) partition_ym
+from tem q1 left join DWIMD.DWI_MD_DATA_MATERIAL_FACTORY_T q2
+on q1.material_num = q2.material_num and q1.factory_werks_code = q2.factory_code and q1.store_location_sid = q2.warehouse_code
+where q1.quantity <> 0 or q1.freeze_qty <> 0

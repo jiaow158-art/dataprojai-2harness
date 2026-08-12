@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_MD_FR_MONTH_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "数据中心报表生命周期汇总表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_AR_BILL_AGING_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "应收票据账龄",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_GROUP_DAILY_PAPER_2023_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "2023集团日报",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

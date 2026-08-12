@@ -1,0 +1,48 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/10/23 13:38:16 GMT+08:00
+-- description:需求预测项目：经销商
+-- history list:
+-- UPDATE FROM 10004701 2023.11.16 新增子母客编字段（DP项目中针对字段进行去重-ROMA接口）
+-- ******************************************************************** --
+with A as (
+select distinct customer from dm.dm_order_deliver_day_report
+where time_type = 'CM6'
+)
+,B as
+(
+select 
+	t1.cust_num,-- 子客编
+	t2.sales_center_code,
+	t2.sales_center,sales_group_code,
+	t2.sales_dep_code,
+    t2.sales_dep,
+    t2.sales_region_code,	
+    t2.sales_region,
+	row_number() over(partition by cust_num order by sales_group_code) as RN,
+	lpad(t3.ZZKUNNR,10,0) as m_cust_num  -- 母客编
+from  DWIMD.DWI_MD_CUST_SALES_AREA_T t1
+join dm.dm_dp_api_sales_group_struct t2 on t1.sales_group_code = t2.sales_grp
+left join sdi.sdi_knvv_1001  t3 on t1.sales_org_code = t3.vkorg  and t1.distribution_chnl_code = t3.vtweg and t1.cust_num = t3.KUNNR
+where distribution_chnl_code = '01'
+)
+
+INSERT OVERWRITE TABLE dm.dm_dp_api_cust_general
+
+select 
+    if(t2.m_cust_num is null or t2.m_cust_num in ('0000000000','000000000无'),t.customer,t2.m_cust_num) as cust_num,
+    t4.cust_name as cust_name,
+    t2.sales_center_code,
+	t2.sales_center,
+    current_timestamp() as dw_last_update_date,
+    t2.sales_dep_code,
+    t2.sales_dep,
+    t2.sales_region_code,	
+    t2.sales_region,
+    t.customer as z_cust_num,-- 子客编
+    t2.m_cust_num -- 母客编
+from A t
+join B t2 On t.customer = t2.cust_num and t2.rn = 1
+left join dwrdim.dwr_dim_cust_general_d  t4 on 
+	if(t2.m_cust_num is null or t2.m_cust_num in ('0000000000','000000000无'),t.customer,t2.m_cust_num) = t4.cust_num and t4.end_date = '4712-12-31'

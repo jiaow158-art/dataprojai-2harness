@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_FIN_TAX_RPT_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "公司税金报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

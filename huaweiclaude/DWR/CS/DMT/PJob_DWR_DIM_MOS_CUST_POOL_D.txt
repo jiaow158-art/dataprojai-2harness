@@ -1,0 +1,43 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/11 10:45:08 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_MOS_CUST_POOL_D
+SELECT  A.ID AS POOL_ID --ID
+       ,A.CREATE_TIME --创建时间
+       ,A.CREATER_ID AS CREATE_EMP_ID --创建人ID
+       ,A.CREATER_NAME AS CREATE_EMP_NAME --创建人名称
+       ,A.MODIFY_TIME AS UPDATE_TIME --修改时间	   
+       ,A.MODIFIER_ID AS UPDATE_EMP_ID --修改人ID
+       ,A.MODIFIER_NAME AS UPDATE_EMP_NAME --修改人名称
+       ,A.`VERSION` AS VERS_NUM --数据版本号
+       ,A.CLIENT_ID AS CUST_ID --客户ID
+       ,A.INTENTION_ORDER_ID AS ORDER_ID --意向订单ID
+       ,CAST(STORE_FLAG AS STRING) AS IS_STR_CODE --是否门店客户池编码
+	   ,CASE WHEN CAST(A.STORE_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.STORE_FLAG AS STRING) = 'FALSE' THEN '否'
+			  END AS IS_STR_NAME --是否门店客户池描述
+       ,CAST(A.AREA_FLAG AS STRING) AS IS_AREA_CODE --是否区域客户池编码
+	   ,CASE WHEN CAST(A.AREA_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.AREA_FLAG AS STRING) = 'FALSE' THEN '否'
+			  END AS IS_AREA_NAME --是否区域客户池描述
+       ,CAST(A.SHARE_FLAG AS STRING) AS IS_SHR_CODE --是否分享客户池编码
+	   ,CASE WHEN CAST(A.SHARE_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.SHARE_FLAG AS STRING) = 'FALSE' THEN '否'
+			  END AS IS_SHR_NAME --是否分享客户池描述
+       ,CAST(A.PROTECT_FLAG AS STRING) AS IS_PRTCT_CODE --是否已被保护编码
+	   ,CASE WHEN CAST(A.PROTECT_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.PROTECT_FLAG AS STRING) = 'FALSE' THEN '否'
+			  END AS IS_PRTCT_NAME --是否已被保护描述
+       ,A.OLD_EMPLOYEE_ID AS OLD_EMP_ID --原跟进人ID
+       ,A.OLD_STORE_ID AS OLD_STR_ID --原跟进门店ID
+       ,A.OLD_STAGE_CODE --原跟进阶段编码
+       ,CAST(A.DISPATCH_FLAG AS STRING) AS IS_DSPCH_CODE --是否派单标识编码
+	   ,CASE WHEN CAST(A.DISPATCH_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.DISPATCH_FLAG AS STRING) = 'FALSE' THEN '否'
+			  END AS IS_DSPCH_NAME --是否派单标识描述
+       ,A.DISPATCH_DEPT_ID AS DSPCH_DEPT_ID --派单经销商部门ID
+       ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_SAL_CLIENT_FOLLOW_POOL_1012 A
+ WHERE A.DELETE_FLAG = 0

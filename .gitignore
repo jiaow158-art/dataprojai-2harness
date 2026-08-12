@@ -1,0 +1,39 @@
+# Generated HTML reports
+reports/
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# MCP stderr logs
+_mcp_stderr.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+~$*
+
+# Test outputs
+test_report_output.html
+
+# Generated domain catalog
+domain_categories.json
+
+# Backup / test tables (database exports)
+*_bak*
+*_wjh_*
+*_tmp*
+*_test_t*
+*_2024*

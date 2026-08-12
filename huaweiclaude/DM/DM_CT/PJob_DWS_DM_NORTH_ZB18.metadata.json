@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB18",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标-税后净利润（高端品牌营销中心）ZB18",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

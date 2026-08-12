@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB03",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标应收周转天数（自营工程），编码ZB03数据",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

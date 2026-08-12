@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_EXPENSE_TYPE_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "费用类别维度表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

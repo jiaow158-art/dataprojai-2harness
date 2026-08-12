@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_AR_RCVBL_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "数据中心FI295报表落地汇总表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_WM_B1_INVENTORY_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "B1库存",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

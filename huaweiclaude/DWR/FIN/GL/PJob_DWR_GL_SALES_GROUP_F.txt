@@ -1,0 +1,27 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:销售组(DWR)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWRFIN.DWR_GL_SALES_GROUP_F
+SELECT
+  SALES_GROUP ,    -- 销售组 sales_grp
+  OBJECT_VERSIONS ,       -- 对象版本  objvers
+  UPDATE_FLAG ,            -- 更改标志(I 已插入/ D 已删除)  changed
+  COST_CONTROL_FIELD ,        -- 成本控制域  co_area
+  SALES_GROUP_IN_COST ,      -- 阿米巴销售组收入成本中心   `/bic/zamb_inco`
+  REVENUE_ACCOUNT ,        -- 阿米巴收入科目   `/bic/zamb_acsr`
+  COST_ACCOUNT ,       -- 阿米巴成本科目   `/bic/zamb_accb`
+  ACCOUNTING_UNIT ,   -- 阿米巴核算单元  `/bic/zamb_cell`
+  SALES_DEPT ,    -- 销售部门  sales_off
+  GROUP_NUM ,  -- 集团   `/BIc/zdpjt`
+  UTILITIES_DEPT ,   -- 事业部  `/bic/zdpsyb`
+  SYSTEM ,   -- 系统  `/BIC/zdpxt`
+  SUBCOMPANY_BIG_AREA ,   -- 子公司大区   `/bic/zdpzgsdq`
+  'N' AS DEL_FLAG , 
+  current_timestamp() AS DW_LAST_UPDATE_DATE
+FROM DWIFIN.DWI_GL_SALES_GROUP_T 
+WHERE DEL_FLAG = 'N';

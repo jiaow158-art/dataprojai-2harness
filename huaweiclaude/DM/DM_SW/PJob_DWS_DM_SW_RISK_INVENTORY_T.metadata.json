@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_SW_RISK_INVENTORY_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_SW",
+    "description": "卫浴风险库存报表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

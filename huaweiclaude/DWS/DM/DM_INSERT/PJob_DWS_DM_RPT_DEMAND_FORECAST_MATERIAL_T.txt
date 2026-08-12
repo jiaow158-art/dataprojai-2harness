@@ -1,0 +1,70 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/01 09:29:11 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_RPT_DEMAND_FORECAST_MATERIAL_T
+--每月的6号定版，自动化运行：7：45
+WHERE stat_month >=
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END
+          ;
+INSERT INTO DM.DM_RPT_DEMAND_FORECAST_MATERIAL_T 
+--业绩
+with t1 as (
+select 
+	calmonth,
+	level1,
+	level2,
+	material,
+	sum(amount) as amount,
+	sum(area) as area
+from DM.DM_RPT_SALE_FORECAST_2023_T
+group by calmonth,level1,level2,material
+)
+
+--填报表sku+预测
+,t2 as(
+select trim(stat_month) as stat_month
+      ,sales_department
+      ,material_num 
+      ,category_name as prod_name
+	  ,specifications_code as dimension
+	  ,sales__channel as channel_name	  --- 这里业务填的是产品渠道，非销售渠道；不需要这个字段了
+	  ,cast(estimated_pickup_area as numeric(38,10)) as yc_area --X月预测面积单位：万方
+  from upload.upload_sd_forecast_material_aroam_t
+ where 1=1
+)
+
+select t2.stat_month
+      ,t2.material_num
+      ,t3.material_name
+      ,t2.prod_name
+	  ,t2.dimension
+	  ,coalesce(t1.area,0) as zxsmj_dy --X月实际提货面积单位：方
+	  ,t2.yc_area --X月预测面积单位：方
+	  ,case when t2.sales_department  like '%运营中%' then '运营中心'
+            when t2.sales_department  like '%子公司'   then '子公司'
+            when t2.sales_department  like '%运营部'   then '运营部'
+            when t2.sales_department  = '战略工程中心'   then '运营部'
+            end  sub_name
+      ,t2.sales_department as sub_grp_name
+      ,t2.channel_name  
+      ,current_timestamp as dw_last_update_date -- 数据同步时间
+      ,t4.matl_group1_name
+from t2 
+left join t1  
+	on t2.stat_month = t1.calmonth and t1.level2 = t2.sales_department and t2.material_num = t1.material
+left join DM.DM_RPT_SALE_FORECAST_T_MID t3 on t3.material_num = t2.material_num
+left join (select material_num,max(matl_group1_name) as matl_group1_name from dwimd.dwi_md_data_material_sales_t group by material_num) t4 
+	on t2.material_num = t4.material_num
+--每月的6号定版
+where 
+      t2.stat_month >=
+      CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+      THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+      ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+      END
+       ;

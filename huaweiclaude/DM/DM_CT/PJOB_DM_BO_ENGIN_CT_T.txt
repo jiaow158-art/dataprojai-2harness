@@ -1,0 +1,30 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/10/25 09:47:15 GMT+08:00
+-- description:瓷砖商机报表 dm.dm_bo_engin_ct_t
+-- history list:区嘉明
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert overwrite table dm.dm_bo_engin_ct_t
+SELECT
+	`sjh`		as bo_code 			-- 商机号
+	,`bzirk`	as area				-- 区域
+	,`bztxt`	as area_desc		-- 区域描述
+	,to_date(from_unixtime(unix_timestamp(`sjyxq`,'yyyyMMdd')))
+				as bo_valid_date	-- 商机有效期
+	,`sjjd`		as bo_period		-- 商机阶段
+	,`xmmc`		as item_name		-- 项目名称
+	,to_date(from_unixtime(unix_timestamp(`sqrq`,'yyyyMMdd')))
+				as apply_date		-- 申请日期
+	,`gclb`		as engin_type		-- 工程类别
+	,`mianji`	as total_ship_area	-- 发货总面积
+	,`khbm`		as cust_code		-- 客户编码
+	,`khmc`		as dealer_name		-- 经销商名称
+--	,''			as cust_level		-- 客户等级
+	,`sjlx`		as bo_type			-- 商机类型/工程大类
+	,`czyjyl` + `bbyjyl` + `ggyjyl` + `mdbyjyl` + `ynyjyl` + `ljyjyl` + `fcyjyl` + `jjyjyl` + `fsjgzyjyl` 
+				as expect_dosage	-- 预计用量
+	,current_timestamp()			-- 数据同步时间
+FROM SDI.SDI_ZTSD_SJKF_LOG_1001
+;

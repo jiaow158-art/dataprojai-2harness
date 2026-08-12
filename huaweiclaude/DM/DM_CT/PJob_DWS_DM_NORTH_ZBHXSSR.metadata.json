@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZBHXSSR",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "北极星指标-与销售收入相关指标作业",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

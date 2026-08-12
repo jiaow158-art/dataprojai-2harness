@@ -1,0 +1,8 @@
+{
+    "name": "PJob_MD_GENERAL_CONFIG_CODE_R_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

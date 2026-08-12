@@ -1,0 +1,214 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2024/09/14 01:07:44 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE dwrfin.dwr_fin_amortization_ledger_f
+SELECT
+  CASE
+    WHEN a.input_type = 'Manual' THEN '手工录入'
+    ELSE a.input_type
+  END AS entry_method, -- 录入方式
+  a.corporation_code AS corporation_code, -- 公司代码
+  a.corporation_name AS corporation_name, -- 公司名称
+  a.pre_amortize_amount AS total_amortize_amount, -- 总摊销金额
+  a.cost_amount AS total_cost_amount, -- 总成本金额
+  a.tax_amount AS total_tax_amount, -- 总税金金额
+  COALESCE(Accounted_subtotal.amortize_sum, 0) AS accounted_amortize_amount,
+  -- 已记账摊销金额
+  COALESCE(Canceled_subtotal.amortize_sum, 0) AS canceled_amortize_amount,
+  -- 已注销摊销金额
+  COALESCE(Init_subtotal.amortize_sum, 0) AS init_amortize_amount,
+  -- 仍初始化待摊销金额
+  CASE
+    WHEN a.bl_sign = 'S' THEN '借方'
+    WHEN a.bl_sign = 'H' THEN '贷方'
+    ELSE a.bl_sign
+  END AS debit_credit_indicator,
+  a.ledger_account_code AS ledger_account_code, -- 总账科目代码
+  a.ledger_account_name AS ledger_account_name, -- 总账科目名称
+  c.name AS amortize_type, -- 摊销类型
+  a.amortize_period_number AS amortize_periods,
+  -- 摊销期数
+  a.business_start_date AS business_start_date, -- 业务开始日期
+  a.business_end_date AS business_end_date, -- 业务结算日期
+  a.amortize_start_date AS amortize_start_date, -- 起始日期
+  a.amortize_end_date AS amortize_end_date, -- 截止日期
+  a.tax_type_code AS tax_type_code, -- 税码
+  a.tax_type_name AS tax_type_name, -- 税金类型名称
+  a.tax_rate AS tax_rate, -- 税率
+  a.amortize_note AS amortize_note, -- 摊销说明
+  CASE
+    WHEN a.pre_amortize_status = 'Amortized' THEN '摊销完结'
+    WHEN a.pre_amortize_status = 'Amortizing' THEN '摊销中'
+    WHEN a.pre_amortize_status = 'Init' THEN '初始化'
+    ELSE a.pre_amortize_status
+  END AS amortize_status, -- 待摊状态
+  a.business_order_no AS business_order_no, -- 业务单据号
+  d.contract_no AS contract_no, -- 合同号
+  a.currency_code AS currency_code, -- 业务货币代码
+  a.currency_name AS currency_name, -- 业务货币名称
+  a.cost_center_code AS cost_center_code, -- 成本中心代码
+  a.cost_center_name AS cost_center_name, -- 成本中心名称
+  a.profit_center_code AS profit_center_code, -- 利润中心代码
+  a.profit_center_name AS profit_center_name, -- 利润中心名称
+  a.application_order_no AS application_order_no, -- 费用申请单号
+  a.supplier_code AS supplier_code, -- 供应商代码
+  a.supplier_name AS supplier_name, -- 供应商名称
+  a.sales_group_code AS sales_group_code, -- 销售组代码
+  a.sales_group_name AS sales_group_name, -- 销售组名称
+  a.project_code AS project_code, -- 项目代码
+  a.project_name AS project_description, -- 项目描述
+  a.creator_account AS creator_account, -- 创建人账号
+  a.creator_name AS creator_name, -- 创建人名称
+  a.created_date AS creation_date, -- 创建时间
+  a.last_editor_account AS last_editor_account, -- 最后修改人账号
+  a.last_edited_date AS last_edited_date, -- 最后修改时间
+  a.last_editor_name AS last_editor_name, -- 最后修改人名称
+  b.order_no AS ledger_detail_line_no, -- 台账明细行编号
+  b.amortize_amount AS ledger_detail_line_amount,
+  -- 台账明细行金额
+  b.cost_amount AS ledger_detail_line_cost_amount,
+  -- 台账明细行成本金额
+  b.tax_amount AS ledger_detail_line_tax_amount,
+  -- 台账明细行税金金额
+  b.amortize_period AS ledger_detail_line_period,
+  -- 台账明细行账期
+  b.amortize_period_days AS amortize_days,
+  -- 摊销天数
+  b.erp_account_no AS ledger_detail_voucher_no,
+  -- 台账明细行记账凭证号
+  b.accounting_date AS ledger_detail_voucher_date,
+  -- 台账明细行凭证记账日期
+  CASE
+    WHEN b.amortize_status = 'Accounted' THEN '已记账'
+    WHEN b.amortize_status = 'Canceled' THEN '已注销'
+    WHEN b.amortize_status = 'Init' THEN '初始化'
+    ELSE b.amortize_status
+  END AS ledger_detail_amortize_status, -- 台账明细行摊销状态
+  		b.tax_type_code AS amortize_line_tax_type_code,
+		b.tax_type_name AS amortize_line_tax_type_name,
+		b.tax_rate AS amortize_line_tax_rate 
+FROM
+  sdi.sdi_aam_pre_amortize_business_data_1039 a
+  LEFT JOIN sdi.sdi_aam_amortize_ledger_1039 b ON b.pre_amortize_business_data_id = a.id
+  LEFT JOIN sdi.sdi_aam_amortize_type_1039 c ON c.id = a.amortize_type_id
+  LEFT JOIN (
+    SELECT
+      pre_amortize_business_data_id,
+      amortize_status,
+      SUM(amortize_amount) AS amortize_sum,
+      SUM(cost_amount) AS cost_sum,
+      SUM(tax_amount) AS tax_sum
+    FROM
+      sdi.sdi_aam_amortize_ledger_1039
+    WHERE
+      amortize_status = 'Accounted'
+    GROUP BY
+      pre_amortize_business_data_id,
+      amortize_status
+  ) AS Accounted_subtotal ON Accounted_subtotal.pre_amortize_business_data_id = a.id
+  LEFT JOIN (
+    SELECT
+      pre_amortize_business_data_id,
+      amortize_status,
+      SUM(amortize_amount) AS amortize_sum,
+      SUM(cost_amount) AS cost_sum,
+      SUM(tax_amount) AS tax_sum
+    FROM
+      sdi.sdi_aam_amortize_ledger_1039
+    WHERE
+      amortize_status = 'Canceled'
+    GROUP BY
+      pre_amortize_business_data_id,
+      amortize_status
+  ) AS Canceled_subtotal ON Canceled_subtotal.pre_amortize_business_data_id = a.id
+  LEFT JOIN (
+    SELECT
+      pre_amortize_business_data_id,
+      amortize_status,
+      SUM(amortize_amount) AS amortize_sum,
+      SUM(cost_amount) AS cost_sum,
+      SUM(tax_amount) AS tax_sum
+    FROM
+      sdi.sdi_aam_amortize_ledger_1039
+    WHERE
+      amortize_status = 'Init'
+    GROUP BY
+      pre_amortize_business_data_id,
+      amortize_status
+  ) AS Init_subtotal ON Init_subtotal.pre_amortize_business_data_id = a.id
+  LEFT JOIN sdi.sdi_csm_contract_head_1039 d ON a.business_order_no = d.contract_no
+WHERE
+  a.deleted = 0;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+
+-- CREATE TABLE dwrfin.dwr_fin_amortization_ledger_f (
+--   input_type STRING COMMENT '录入方式',
+--   corporation_code STRING COMMENT '公司代码',
+--   corporation_name STRING COMMENT '公司名称',
+--   pre_amortize_amount DECIMAL(38, 10) COMMENT '总摊销金额',
+--   cost_amount DECIMAL(38, 10) COMMENT '总成本金额',
+--   tax_amount DECIMAL(38, 10) COMMENT '总税金金额',
+--   accounted_amortize_amount DECIMAL(38, 10) COMMENT '已记账摊销金额',
+--   canceled_amortize_amount DECIMAL(38, 10) COMMENT '已注销摊销金额',
+--   init_amortize_amount DECIMAL(38, 10) COMMENT '仍初始化待摊销金额',
+--   bl_sign STRING COMMENT '借贷标识',
+--   ledger_account_code STRING COMMENT '总账科目代码',
+--   ledger_account_name STRING COMMENT '总账科目名称',
+--   amortize_type STRING COMMENT '摊销类型',
+--   amortize_period_number INT COMMENT '摊销期数',
+--   business_start_date STRING COMMENT '业务开始日期',
+--   business_end_date STRING COMMENT '业务结算日期',
+--   amortize_start_date STRING COMMENT '起始日期',
+--   amortize_end_date STRING COMMENT '截止日期',
+--   tax_type_code STRING COMMENT '税码',
+--   tax_type_name STRING COMMENT '税金类型名称',
+--   tax_rate DECIMAL(5, 2) COMMENT '税率',
+--   amortize_note STRING COMMENT '摊销说明',
+--   pre_amortize_status STRING COMMENT '待摊状态',
+--   business_order_no STRING COMMENT '业务单据号',
+--   contract_no STRING COMMENT '合同号',
+--   currency_code STRING COMMENT '业务货币代码',
+--   currency_name STRING COMMENT '业务货币名称',
+--   cost_center_code STRING COMMENT '成本中心代码',
+--   cost_center_name STRING COMMENT '成本中心名称',
+--   profit_center_code STRING COMMENT '利润中心代码',
+--   profit_center_name STRING COMMENT '利润中心名称',
+--   application_order_no STRING COMMENT '费用申请单号',
+--   supplier_code STRING COMMENT '供应商代码',
+--   supplier_name STRING COMMENT '供应商名称',
+--   sales_group_code STRING COMMENT '销售组代码',
+--   sales_group_name STRING COMMENT '销售组名称',
+--   project_code STRING COMMENT '项目代码',
+--   project_description STRING COMMENT '项目描述',
+--   creator_account STRING COMMENT '创建人账号',
+--   creator_name STRING COMMENT '创建人名称',
+--   created_date STRING COMMENT '创建时间',
+--   last_editor_account STRING COMMENT '最后修改人账号',
+--   last_edited_date STRING COMMENT '最后修改时间',
+--   last_editor_name STRING COMMENT '最后修改人名称',
+--   amortize_line_order_no STRING COMMENT '台账明细行编号',
+--   amortize_line_amount DECIMAL(38, 10) COMMENT '台账明细行金额',
+--   amortize_line_cost_amount DECIMAL(38, 10) COMMENT '台账明细行成本金额',
+--   amortize_line_tax_amount DECIMAL(38, 10) COMMENT '台账明细行税金金额',
+--   amortize_line_period STRING COMMENT '台账明细行账期',
+--   amortize_period_days INT COMMENT '摊销天数',
+--   erp_account_no STRING COMMENT '台账明细行记账凭证号',
+--   accounting_date STRING COMMENT '台账明细行凭证记账日期',
+--   amortize_status STRING COMMENT '台账明细行摊销状态',
+--   amortize_line_tax_type_code STRING COMMENT '台账明细行对应税码',
+--   amortize_line_tax_type_name STRING COMMENT '台账明细行对应税金类型名称',
+--   amortize_line_tax_rate DECIMAL(5, 2) COMMENT '台账明细行税率'
+-- )
+-- COMMENT '摊销明细';

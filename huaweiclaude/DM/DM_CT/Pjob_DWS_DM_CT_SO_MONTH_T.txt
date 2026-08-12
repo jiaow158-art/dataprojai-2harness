@@ -1,0 +1,149 @@
+/*
+CREATE TABLE dm.dm_ct_so_month_t
+(
+    stat_month          varchar(50),
+    channel_text        varchar(50),
+    this_month_amount   numeric(38, 10),
+    this_month_area     numeric(38, 10),
+    last_month_amount   numeric(38, 10),
+    last_month_area     numeric(38, 10),
+    last_year_amount    numeric(38, 10),
+    last_year_area      numeric(38, 10),
+    dw_last_update_date timestamp(6)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(stat_month);
+comment on table dm.dm_ct_so_month_t is '瓷砖订单按月统计含同期、上期';
+comment on column dm.dm_ct_so_month_t.stat_month is '月份';
+comment on column dm.dm_ct_so_month_t.channel_text is '整合渠道';
+comment on column dm.dm_ct_so_month_t.this_month_amount is '本期金额';
+comment on column dm.dm_ct_so_month_t.this_month_area is '本期面积';
+comment on column dm.dm_ct_so_month_t.last_month_amount is '上期金额';
+comment on column dm.dm_ct_so_month_t.last_month_area is '上期面积';
+comment on column dm.dm_ct_so_month_t.last_year_amount is '同期金额';
+comment on column dm.dm_ct_so_month_t.last_year_area is '同期面积';
+comment on column dm.dm_ct_so_month_t.dw_last_update_date is '最后更新时间';*/
+-- update：2024/03/29 修改逻辑：出库面积使用业绩表，补充订单表过滤条件
+-- update：2024/09/26 新增工程类型字段
+
+delete
+from dm.dm_ct_so_month_t
+where stat_month = '${PERIOD_ID_M}';
+insert into dm.dm_ct_so_month_t
+select stat_month,
+       channel_text,
+       sum(this_month_amount) this_month_amount,
+       sum(this_month_area)   this_month_area,
+       sum(last_month_amount) last_month_amount,
+       sum(last_month_area)   last_month_area,
+       sum(last_year_amount)  last_year_amount,
+       sum(last_year_area)    last_year_area,
+       current_timestamp,
+       gc_type3
+from (
+         --本月
+         select to_char(to_date(A.audat), 'yyyy-MM')        stat_month,
+                case
+                    when zh_channel_code1 = 'GD03' then '工程'
+                    when zh_channel_code1 = 'GD01' then '零售'
+                    when zh_channel_code1 = 'GD02'
+                        then '整装' end                       channel_text,
+                sum(A.MWSBP + A.netwr)                      this_month_amount,
+                sum((vmeng + wqrsl) * c.width * c.length_1) this_month_area,
+                0                                           last_month_amount,
+                0                                           last_month_area,
+                0                                           last_year_amount,
+                0                                           last_year_area,
+                gc_type3
+         from DM.DM_OTD_SALES_ORDER_DET_T A
+                  LEFT JOIN dm.dm_rpt_sale_grp_t B
+                            ON A.vkgrp = B.sale_grp
+                  left join dwimd.dwi_md_data_material_general_t c on a.matnr = c.material_num
+         where case
+                   when A.audat in ('', '00000000') then ''
+                   when A.audat is null then ''
+                   else to_char(to_date(A.audat), 'yyyy-MM')
+                   end = '${PERIOD_ID_M}'
+           and to_char(to_date(A.audat), 'yyyy-MM-dd') <=
+               to_char(current_date - 1, 'yyyy-MM-dd')
+           and B.lev2_name = '瓷砖事业部'
+           and coalesce(abgru, '11') in ('11', '56')
+           and c.external_matl_group_code = '10010'
+           and substr(werks, 1, 2) in ('12', '13', '15', '16', '17', '18', '19', '7D', '72', '75', '77', '79', '8A')
+           and substr(lgort, 1, 2) != '00'
+           and lgort not in ('BC', 'GFZ', '7F21')
+         group by stat_month, channel_text,gc_type3
+         union all
+--上期
+         select to_char(to_date(A.audat) + interval '1 months', 'yyyy-MM') stat_month,
+                case
+                    when zh_channel_code1 = 'GD03' then '工程'
+                    when zh_channel_code1 = 'GD01' then '零售'
+                    when zh_channel_code1 = 'GD02'
+                        then '整装' end                                      channel_text,
+                0                                                          this_month_amount,
+                0                                                          this_month_area,
+                sum(A.MWSBP + A.netwr)                                     last_month_amount,
+                sum((vmeng + wqrsl) * c.width * c.length_1)                last_month_area,
+                0                                                          last_year_amount,
+                0                                                          last_year_area,
+                gc_type3
+         from DM.DM_OTD_SALES_ORDER_DET_T A
+                  LEFT JOIN dm.dm_rpt_sale_grp_t B
+                            ON A.vkgrp = B.sale_grp
+                  left join dwimd.dwi_md_data_material_general_t c on a.matnr = c.material_num
+         where case
+                   when A.audat in ('', '00000000') then ''
+                   when A.audat is null then ''
+                   else to_char(to_date(A.audat), 'yyyy-MM')
+                   end = to_char(('${PERIOD_ID_M}' || '-01')::date - interval '1 month', 'yyyy-MM')
+           and to_char(to_date(A.audat), 'yyyy-MM-dd') <=
+               to_char(current_date - 1 - interval '1 months', 'yyyy-MM-dd')
+           and B.lev2_name = '瓷砖事业部'
+           and coalesce(abgru, '11') in ('11', '56')
+           and c.external_matl_group_code = '10010'
+           and substr(werks, 1, 2) in ('12', '13', '15', '16', '17', '18', '19', '7D', '72', '75', '77', '79', '8A')
+           and substr(lgort, 1, 2) != '00'
+           and lgort not in ('BC', 'GFZ', '7F21')
+         group by stat_month, channel_text,gc_type3
+         union all
+--同期
+         select to_char(to_date(A.audat) + interval '1 years', 'yyyy-MM') stat_month,
+                case
+                    when zh_channel_code1 = 'GD03' then '工程'
+                    when zh_channel_code1 = 'GD01' then '零售'
+                    when zh_channel_code1 = 'GD02'
+                        then '整装' end                                     channel_text,
+                0                                                         this_month_amount,
+                0                                                         this_month_area,
+                0                                                         last_month_amount,
+                0                                                         last_month_area,
+                sum(A.MWSBP + A.netwr)                                    last_year_amount,
+                sum((vmeng + wqrsl) * c.width * c.length_1)               last_year_area,
+                gc_type3
+         from DM.DM_OTD_SALES_ORDER_DET_T A
+                  LEFT JOIN dm.dm_rpt_sale_grp_t B
+                            ON A.vkgrp = B.sale_grp
+                  left join dwimd.dwi_md_data_material_general_t c on a.matnr = c.material_num
+         where case
+                   when A.audat in ('', '00000000') then ''
+                   when A.audat is null then ''
+                   else to_char(to_date(A.audat), 'yyyy-MM')
+                   end = to_char(('${PERIOD_ID_M}' || '-01')::date - interval '1 year', 'yyyy-MM')
+           and to_char(to_date(A.audat), 'yyyy-MM-dd') <=
+               to_char(current_date - 1 - interval '1 year', 'yyyy-MM-dd')
+           and B.lev2_name = '瓷砖事业部'
+           and coalesce(abgru, '11') in ('11', '56')
+           and c.external_matl_group_code = '10010'
+           and substr(werks, 1, 2) in ('12', '13', '15', '16', '17', '18', '19', '7D', '72', '75', '77', '79', '8A')
+           and substr(lgort, 1, 2) != '00'
+           and lgort not in ('BC', 'GFZ', '7F21')
+         group by stat_month, channel_text,gc_type3
+     ) aa
+group by stat_month,
+         channel_text,
+         gc_type3

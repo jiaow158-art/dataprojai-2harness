@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_GROUP_ACHIEVEMENT_AMB_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "阿米巴数据销售组更新逻辑",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

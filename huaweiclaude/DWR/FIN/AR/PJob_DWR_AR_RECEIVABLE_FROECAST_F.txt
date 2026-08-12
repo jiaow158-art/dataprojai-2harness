@@ -1,0 +1,30 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002330
+-- create time: 2022/11/10 11:13:47 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_RECEIVABLE_FROECAST_F
+  SELECT CALMONTH,                                  		-- 月份
+         DEPT,                                      		-- 部门
+         WYQHK_JH 		AS NO_OVERDUE_PAYMENT_PLAN_AMT, 	-- 计划未逾期回款
+         YQHK_JH 		AS OVERDUE_PAYMENT_PLAN_AMT,    	-- 计划逾期回款
+         SPHK_JH 		AS TICKET_PAYMENT_PLAN_AMT,     	-- 计划商票回款
+         SPDF_JH 		AS TICKET_TO_CASH_PLAN_AMT, 		-- 计划商票兑付
+         YJ_YC 			AS INCOME_FORECAST_AMT, 			-- 业绩预测
+         SXZB 			AS CREDIT_FORECAT_RATE, 			-- 授信占比
+         YJ_YC * SXZB 	AS INCOME_CREDIT_FORECAST_AMT, 		-- 授信业绩预测
+         BHSSR 			AS EXCLUDING_TAX_INCOME_AMT, 		-- 不含税收入预测
+         YQZB_90 		AS OVERDUE_1_T0_90DAYS_RATE, 		-- 90天逾期占比预测
+         YQZB_275 		AS OVERDUE_91_T0_275DAYS_RATE, 		-- 91-275天逾期占比预测
+         YQZB_720 		AS OVERDUE_276_T0_720DAYS_RATE, 	-- 276-720天逾期占比预测
+         YQZB_4Y 		AS OVERDUE_721_T0_1440DAYS_RATE,	 -- 721天-4年逾期占比预测
+         YQZB_4YS 		AS OVERDUE_UP_1441DAYS_RATE, 		-- 4年以上逾期占比预测
+         UPDATE_DATE,-- 更新时间
+         CURRENT_TIMESTAMP()  as dw_last_update_date  --数据同步时间
+    FROM SDI.SDI_FIN_AR_FORECAST_1037
+;
+
+
+
+
+

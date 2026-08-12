@@ -1,0 +1,41 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2025/08/26 15:24:20 GMT+08:00
+-- description:  卫浴产销存基地映射关系
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+with tmp as (
+select t.move_type ,t.purchase_voucher_num ,t.factory_werks_code,t.material_num, t.factory_umwrk_cid_code,
+       row_number() over(partition by t.factory_werks_code,t.material_num  order by case when ((t.move_type ='101' and  substr(coalesce(t.purchase_voucher_num,'#'),1,2) not IN('46','47','48')) or t.move_type='301') then 1 else 0 end desc ,t.voucher_post_date desc ) as rn 
+ from dwrotd.dwr_wm_prodstock_out_in_f t
+where t.factory_werks_code  IN('3220')
+and t.stock_qty>0
+--and ((t.move_type ='101' and  coalesce(t.purchase_voucher_num,'#') not like '46%' ) or t.move_type='301')
+--and t.period_id_m>= replace(substring(date_sub(concat(substr('${PERIOD_ID_D}',1,7),'-01'),2),1,7),'-','')
+), 
+mat_src as(
+select t.factory_werks_code,
+       t.material_num,
+        case   when (t.move_type ='101' and  substr(coalesce(t.purchase_voucher_num,'#'),1,2) not IN('46','47','48')) then 'OEM' 
+           when t.move_type = '301' and coalesce(substr(t.factory_umwrk_cid_code,-1,2),'#') in('00') then '自制'
+           else '自制' end as material_source
+from tmp t   
+join dwimd.dwi_md_data_material_general_t mat ON t.material_num = mat.material_num
+where t.rn=1
+)
+INSERT OVERWRITE TABLE dm_sw.dm_otd_material_source_t
+select factory_werks_code,material_num,material_source,current_timestamp() as dw_last_update_date from mat_src;
+
+
+select t.move_type ,t.purchase_voucher_num ,t.factory_werks_code,t.material_num, t.factory_umwrk_cid_code,
+       row_number() over(partition by t.factory_werks_code,t.material_num  order by case when ((t.move_type ='101' and  substr(coalesce(t.purchase_voucher_num,'#'),1,2) not IN('46','47','48')) or t.move_type='301') then 1 else 0 end desc ,t.voucher_post_date desc ) as rn 
+ from dwrotd.dwr_wm_prodstock_out_in_f t
+where t.factory_werks_code  IN('3220')
+and t.stock_qty>0
+and  t.material_num = 'NC2312W';
+
+
+
+

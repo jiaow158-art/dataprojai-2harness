@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WM_LADINGBILL_ITEM_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/WM",
+    "description": "SAP提货单行表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

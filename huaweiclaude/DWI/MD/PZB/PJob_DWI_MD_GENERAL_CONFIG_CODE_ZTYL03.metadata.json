@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_ZTYL03",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "来源表ZTYL03",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

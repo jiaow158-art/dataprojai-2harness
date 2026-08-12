@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PAM_COST_WORK_CENTER_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PAM",
+    "description": "成本中心与工作中心关系表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

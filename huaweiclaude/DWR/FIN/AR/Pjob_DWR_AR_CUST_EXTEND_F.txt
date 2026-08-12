@@ -1,0 +1,77 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: zhangpeng  客户拓展表
+-- create time: 2023/11/27 10:55:22 GMT+08:00
+-- ******************************************************************** --
+WITH AGING AS (
+SELECT
+    T.YEAR							AS YEAR							-- 年度
+	,T.COMP_CODE					    AS COMP_CODE					-- 公司代码                	
+	,T.CUST_CODE                    AS CUST_CODE                    -- 客户编码
+	,T.CUST_NAME                    AS CUST_NAME                    -- 客户全称
+	,T.SALES_GROUP_MASTER_FILE      AS SALES_GROUP_MASTER_FILE      -- 销售组-主档
+	,T.WBS                          AS WBS                          -- WBS
+	,T.WBS_SALES_GROUP              AS WBS_SALES_GROUP              -- WBS-销售组
+	,T.SPECIAL_GENERAL_LEDGER       AS SPECIAL_GENERAL_LEDGER       -- 特别总账
+	,T.GENERAL_LEDGER_ACCOUNT       AS GENERAL_LEDGER_ACCOUNT       -- 总账科目
+	,T.CUR_CURRENCY                 AS CURRENCY                     -- 货币
+	,T.CUR_CU_CLOS_BALANCE_AMT      AS AMT                          -- 金额
+	,T.DUE_DATE                     AS DUE_DATE                     -- 到期日
+	,to_date(from_unixtime(unix_timestamp('${PERIOD_ID_D}','yyyy-MM-dd')))
+                                    AS DATE1						-- 查询日期
+	,T.VOUCHER_DATE					AS VOUCHER_DATE					-- 凭证日期
+	,T.SO_GROUP_CODE                AS SO_GROUP_CODE                -- 订单组编码
+	,to_date(from_unixtime(unix_timestamp(NVL(T2.WDATE,'47121231'),'yyyyMMdd'))) WDATE
+	,row_number ()over(partition by t.COMP_CODE,t.CUST_CODE,t.WBS,t.SPECIAL_GENERAL_LEDGER,t.GENERAL_LEDGER_ACCOUNT,t.CUR_CURRENCY,t.SO_GROUP_CODE 
+	 order by t.DW_LAST_UPDATE_DATE desc) as rn
+FROM 
+	DWRFIN.DWR_AR_CUST_DETAIL_F T
+	LEFT JOIN SDI.SDI_BSED_1001 T2 
+	ON  T.COMP_CODE = T2.BUKRS					-- 公司代码
+	AND T.YEAR  = T2.GJAHR 						-- 年度
+	AND T.VOUCHER_CODE  = T2.BELNR				-- 凭证号码
+	AND T.VOUCHER_ITEM  = T2.BUZEI				-- 项目
+WHERE T.POSTING_DATE <= to_date(from_unixtime(unix_timestamp('${PERIOD_ID_D}','yyyy-MM-dd')))
+AND T.CLEAR_DATE > to_date(from_unixtime(unix_timestamp('${PERIOD_ID_D}','yyyy-MM-dd')))
+ --AND T.SPECIAL_GENERAL_LEDGER IN('W','V')
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_AR_CUST_EXTEND_F
+SELECT
+    T1.YEAR							AS YEAR							-- 年度
+	,T1.COMP_CODE					AS COMP_CODE					-- 公司代码                	
+	,T1.CUST_CODE                   AS CUST_CODE                   	-- 客户编码
+	,T2.CUST_NAME                   AS CUST_NAME                   	-- 客户全称
+	,T2.SALES_GROUP_MASTER_FILE     AS SALES_GROUP_MASTER_FILE     	-- 销售组-主档
+	,T1.WBS                         AS WBS                         	-- WBS
+	,T2.WBS_SALES_GROUP             AS WBS_SALES_GROUP             	-- WBS-销售组
+	,T1.SPECIAL_GENERAL_LEDGER      AS SPECIAL_GENERAL_LEDGER      	-- 特别总账
+	,T1.GENERAL_LEDGER_ACCOUNT      AS GENERAL_LEDGER_ACCOUNT      	-- 总账科目
+	,T1.CURRENCY                	AS CURRENCY                    	-- 货币
+	,T1.AMT     					AS AMT                         	-- 金额
+	,LEAST(NVL(T1.AMT,0),0)          AS REPAY_AMT                	-- 回款金额
+	,greatest(NVL(T1.AMT,0),0)       AS OVERDUE_AMT                	-- 逾期金额
+	,T1.DUE_DATE                    AS DUE_DATE                    	-- 到期日
+	,T1.DATE1						AS DATE1						-- 查询日期
+	,T1.WDATE						AS WDATE						-- 签发日期
+	,CASE WHEN day(T1.DATE1 - T1.DUE_DATE) >= 0 THEN day(T1.DATE1 - T1.DUE_DATE)
+		ELSE 0
+	END 							AS DUE_DAYS						-- 到期天数
+	,T1.VOUCHER_DATE				AS VOUCHER_DATE					-- 凭证日期
+	,CASE WHEN day(T1.DUE_DATE - T1.DATE1) >= 0 THEN
+			CASE WHEN  T1.SPECIAL_GENERAL_LEDGER IN('','U','Q','M') THEN greatest(day(T1.DATE1 - T1.VOUCHER_DATE),0)
+			     WHEN T1.SPECIAL_GENERAL_LEDGER IN('W','V') THEN greatest(day(T1.DATE1 - T1.WDATE),0)
+			END 
+		ELSE -1
+	END 							AS N_OVERDUE_DUE_DAYS			-- 未逾期到期天数
+	,T1.SO_GROUP_CODE				AS SO_GROUP_CODE				-- 订单组编码
+FROM 
+	AGING T1
+ join AGING t2 on T1.COMP_CODE   = T2.COMP_CODE		    
+AND T1.CUST_CODE		        = T2.CUST_CODE
+AND NVL(T1.WBS,'SNULL')			= NVL(T2.WBS,'SNULL')
+AND T1.SPECIAL_GENERAL_LEDGER   = T2.SPECIAL_GENERAL_LEDGER
+AND T1.GENERAL_LEDGER_ACCOUNT   = T2.GENERAL_LEDGER_ACCOUNT
+AND NVL(T1.SO_GROUP_CODE,'SNULL')		    = NVL(T2.SO_GROUP_CODE,'SNULL')
+and NVL(T1.CURRENCY,'SNULL')		    = NVL(T2.CURRENCY,'SNULL')
+and t2.rn=1
+;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_V_SJZT_ACTIVE_USER_DETAIL_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/TOTAL",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

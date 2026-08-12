@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PUR_ORDER_ESTIMATION_REPORT_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

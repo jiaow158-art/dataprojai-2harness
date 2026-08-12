@@ -1,0 +1,12 @@
+insert overwrite table sdi.sdi_sys_user_data_1007
+select 
+id,
+cur_inv_org,
+language,
+sync_id,
+user_id,
+web_theme,
+wpf_theme,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_user_data_1007;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PUR_ORDER_ZJ_PRE_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "OEM准交率前端展示表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWR_DIM_FACTORY_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/FACT",
+    "description": "1",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

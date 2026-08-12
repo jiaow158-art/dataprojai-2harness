@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_TMS_RESERVATION_KPI_MONTH",
+    "type": "HiveSQL",
+    "directory": "/DM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipi"
+}

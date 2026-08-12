@@ -1,0 +1,8 @@
+{
+    "name": "DWR_MM_PRODUCT_LEVEL2_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN",
+    "description": "产品层次2",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

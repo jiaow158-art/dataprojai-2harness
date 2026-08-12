@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_AR_CREDIT_DEVALUE_F",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "信用减值",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

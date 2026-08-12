@@ -1,0 +1,77 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/08/27 15:51:07 GMT+08:00
+-- description:aps复板模型(指标不能汇总)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- create table dwrotd.dwr_pam_sample_confirm_t (
+--  external_only_id string comment '键值'
+-- ,plan_no string comment '生产工单号'
+-- ,channel_code  string comment '渠道编码'
+-- ,checkin_date timestamp comment '签板时间'
+-- ,dur_day decimal(38,10) comment '复板天数'
+-- ,dev_day decimal(38,10) comment '偏离天数'
+-- ,start_date timestamp comment '开始复板时间'
+-- ,start_pro_date timestamp comment '开始生产时间'
+-- ,end_pro_date timestamp comment '结束生产时间'
+-- ,material_num string comment '物料编码'
+-- ,material_name string comment '物料描述'
+-- ,base_name string comment '基地名称'
+-- ,pro_line_name string comment '产线名称'
+-- ,online_state string comment '上线情况'
+-- ,ord_qty decimal(38,10) comment '工单数量'
+-- ,rec_qty decimal(38,10) comment '入库数量'
+-- ,surface string comment '板面情况'
+-- ,supplier_name string comment '供应商名称'
+-- ,is_cancel_sample string comment '取消复板(0:否,1:是)'
+-- ,create_date timestamp comment '创建日期'
+-- ,update_date timestamp comment '修改日期'
+-- ,plan_codes string comment '源生产工单号'
+-- ,dw_last_update_date timestamp comment '数据同步时间'
+-- )
+with tmp as (
+SELECT id,plan_code 
+FROM SDI.SDI_SAMPLE_CONFIRMATION_1007 
+LATERAL VIEW explode(split(plan_codes, ',')) exploded_table AS plan_code
+)
+insert overwrite table dwrotd.dwr_pam_sample_confirm_t
+SELECT 
+ a.external_only_id as key_id
+,tmp.plan_code as plan_no
+,a.channel as channel_code -- 渠道编码
+,a.checkin_date --签板时间
+,a.duration as dur_day -- 复板天数
+,a.deviation_days as dev_day -- 偏离天数
+,a.start_date -- 开始复板时间
+,a.start_produce_date as start_pro_date  --开始生产时间
+,a.end_produce_date as end_pro_date  --结束生产时间
+,b.code as material_num --物料编码
+,b.description as material_name --物料描述
+,c.name as base_name -- 基地名称
+,d.name as pro_line_name --产线名称
+,a.online_state --上线情况
+,a.qty as ord_qty --工单数量
+,a.receipt_qty as rec_qty -- 入库数量
+,a.surface --板面情况
+,a.supplier_name --供应商名称
+,a.is_cancel_sample --取消复板(0:否,1:是)
+,a.create_date --创建日期
+,a.update_date --修改日期
+,a.plan_codes as s_plan_no --源生产工单号
+,current_timestamp() as dw_last_update_date --数据同步时间
+FROM SDI.SDI_SAMPLE_CONFIRMATION_1007 a
+left join tmp 
+on a.id = tmp.id
+left join sdi.sdi_item_1007 b
+on a.item_id = b.id 
+left join SDI.SDI_RES_ENTERPRISE_1007 c
+on c.id = a.base_resource_id
+left join SDI.SDI_RES_ENTERPRISE_1007 d
+on d.id = a.line_resource_id
+
+
+
+
+

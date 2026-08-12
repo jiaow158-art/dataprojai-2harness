@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_FIN_EXPENSE_DETAIL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "费用明细报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

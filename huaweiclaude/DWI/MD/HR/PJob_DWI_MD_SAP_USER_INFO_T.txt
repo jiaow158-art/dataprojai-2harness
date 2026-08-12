@@ -1,0 +1,48 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/03/20 15:01:30 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_SAP_USER_INFO_T
+SELECT
+       MANDT
+      ,BNAME
+      ,GLTGV
+      ,GLTGB
+      ,USTYP
+      ,CLASS
+      ,LOCNT
+      ,UFLAG
+      ,ACCNT
+      ,ANAME
+      ,ERDAT
+      ,TRDAT
+      ,LTIME
+      ,BCDA1
+      ,CODV1
+      ,BCDA2
+      ,CODV2
+      ,BCDA3
+      ,CODV3
+      ,BCDA4
+      ,CODV4
+      ,BCDA5
+      ,CODV5
+      ,VERSN
+      ,CODVN
+      ,TZONE
+      ,ZBVMASTER
+      ,PWDCHGDATE
+      ,PWDSTATE
+      ,RESERVED
+      ,PWDHISTORY
+      ,PWDLGNDATE
+      ,PWDSETDATE
+      ,PWDINITIAL
+      ,PWDLOCKDATE
+      ,PWDSALTEDHASH
+      ,SECURITY_POLICY
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM SDI.SDI_USR02_1001
+ WHERE MANDT = 800  
+;

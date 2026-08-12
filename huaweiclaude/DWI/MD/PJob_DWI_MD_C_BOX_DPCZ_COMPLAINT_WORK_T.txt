@@ -1,0 +1,71 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- desc：投诉工单表
+-- create time: 2022/09/20 15:25:43 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_C_BOX_DPCZ_COMPLAINT_WORK_T
+SELECT
+busi_order_id
+,buy_store
+,call_number
+,call_time
+,city
+,complaint_content
+,complaint_type
+,complaint_type_three
+,complaint_type_two
+,contacts
+,contact_address
+,contact_information
+,contact_number
+,create_time
+,customer_name
+,customer_source
+,customer_type
+,complaint_type_sign
+,detailed_address
+,district
+,ent_id
+,file
+,gender
+,handler_contact_number
+,handler_people
+,handler_people_acc
+,id
+,install_date
+,m_id
+,processing_object
+,provice
+,purchase_address
+,purchase_date
+,respondent
+,responsible_unit
+,salesman
+,seat_name
+,seat_name_acc
+,service_manager
+,sms_message
+,subject_appeal
+,subject_content
+,trip_times
+,urgency
+,work_channel
+,oa_order_id
+,service_manager_acc
+,s_id
+,village_address
+,r_id
+,c_complaint_type
+,c_complaint_type_two
+,c_complaint_type_three
+,is_send
+,dealer_name_acc
+,order_end_status
+,son_handle_status
+,location_address
+,customer_trip_times
+,handle_type
+,'N' AS DEL_FLAG
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+FROM SDI.SDI_C_BOX_DPCZ_COMPLAINT_WORK_1017

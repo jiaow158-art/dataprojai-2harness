@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SO_FZL_ORDER_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "准交准提-非战略订单明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

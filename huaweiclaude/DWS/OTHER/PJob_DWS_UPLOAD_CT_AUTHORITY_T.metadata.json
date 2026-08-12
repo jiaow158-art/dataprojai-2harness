@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_UPLOAD_CT_AUTHORITY_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTHER",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

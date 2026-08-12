@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_AP_SUPPLIER_TRANSACTION_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AP",
+    "description": "应付-供应商往来明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

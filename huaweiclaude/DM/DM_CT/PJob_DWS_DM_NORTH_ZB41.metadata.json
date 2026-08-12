@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB41",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "经营费用率（大供应链）ZB40",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

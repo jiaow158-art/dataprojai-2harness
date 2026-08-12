@@ -1,0 +1,8 @@
+{
+    "name": "DWR_WM_LADINGBILL_HEADER_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "SAP提货单头表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

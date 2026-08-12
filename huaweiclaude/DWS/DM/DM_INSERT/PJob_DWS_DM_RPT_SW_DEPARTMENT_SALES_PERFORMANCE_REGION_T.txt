@@ -1,0 +1,355 @@
+/*CREATE TABLE DM.dm_rpt_sw_department_sales_performance_region_t
+(
+    分页       varchar(500)    null,
+    一级       varchar(500)    null,
+    一级编码     varchar(500)    null,
+    二级       varchar(500)    null,
+    三级       varchar(500)    null,
+    四级       varchar(500)    null,
+    五级       varchar(500)    null,
+    当日业绩     numeric(38, 10) null,
+    当月业绩     numeric(38, 10) null,
+    去年同期业绩   numeric(38, 10) null,
+    年累计业绩    numeric(38, 10) null,
+    去年累计业绩   numeric(38, 10) null,
+    当月毛利额    numeric(38, 10) null,
+    当月不含税收入  numeric(38, 10) null,
+    年累计毛利额   numeric(38, 10) null,
+    年累计不含税收入 numeric(38, 10) null,
+    月目标      numeric(38, 10) null,
+    年目标      numeric(38, 10) null,
+    顺序a      int,
+    calday   varchar(8)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(calday);
+COMMENT ON TABLE DM.dm_rpt_sw_department_sales_performance_region_t is '卫浴业绩日报-大区维度（含目标）'; */
+-- update：2023/07/25 zhouhaochang 使用新业绩表，新架构
+-- update：2023/07/26 zhouhaochang 由于新底表分销渠道名称不一致，修改使用分销渠道编码
+-- update：2023/09/01 zhouhaochang 毛利额修改成本调整值
+-- update：2023/12/25 zhouhaochang 新目标导入，补充去重逻辑
+-- update：2024/03/12 zhouhaochang 补充业务员字段，用于直营体系（子公司）日报
+-- update: 2025/03/06 huangwenbin  修复逻辑：大区目标关联条件错误问题：用业绩表客编去关联
+-- ******************************************************************** --
+DELETE
+FROM DM.dm_rpt_sw_department_sales_performance_region_t
+where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd');
+insert into DM.dm_rpt_sw_department_sales_performance_region_t(分页, 一级, 一级编码, 二级, 三级, 四级, 五级, 当日业绩, 当月业绩, 去年同期业绩, 年累计业绩,
+                                                               去年累计业绩, 当月毛利额, 当月不含税收入, 年累计毛利额, 年累计不含税收入, 月目标, 年目标, 顺序a,
+                                                               calday, 业务员)
+with 目标 as (SELECT lpad(客编, 10, '0')                                                                客编,
+                   名称,
+                   渠道,
+                   unnest(string_to_array((
+                                                                                                                                  COALESCE("1月", '0') || ',' ||
+                                                                                                                                  COALESCE("2月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("3月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("4月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("5月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("6月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("7月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("8月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("9月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("10月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("11月", '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE("12月", '0')),
+                                          ','))                                                     目标,
+                   年份 || '-' || unnest(string_to_array('01,02,03,04,05,06,07,08,09,10,11,12', ',')) 月份,
+                   年度任务,
+                   类型
+            FROM upload.upload_卫浴运营商目标
+            where 年份 = to_char(to_date('${PERIOD_ID_D}'), 'yyyy')
+),
+     客户目标处理 as (
+         select 客编,
+                渠道,
+                sum(case when 月份 = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-mm') then 目标 else '0' end) 月目标,
+                年度任务                                                                                   年累计目标
+         from 目标
+         where 月份 between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-mm')
+           and 类型 = '客户'
+         group by 客编, 渠道, 年度任务),
+     大区目标处理 as (
+         select 名称,
+                渠道,
+                sum(case when 月份 = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-mm') then 目标 else '0' end) 月目标,
+                年度任务                                                                                   年累计目标
+         from 目标
+         where 月份 between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-mm')
+           and 类型 = '大区'
+           and 渠道 != '全渠道'
+         group by 名称, 渠道, 年度任务)
+select 分页,
+       一级,
+       一级编码,
+       二级,
+       三级,
+       四级,
+       五级,
+       sum(当日业绩)     当日业绩,
+       sum(当月业绩)     当月业绩,
+       sum(去年同期业绩)   去年同期业绩,
+       sum(年累计业绩)    年累计业绩,
+       sum(去年累计业绩)   去年累计业绩,
+       sum(当月毛利额)    当月毛利额,
+       sum(当月不含税收入)  当月不含税收入,
+       sum(年累计毛利额)   年累计毛利额,
+       sum(年累计不含税收入) 年累计不含税收入,
+       月目标,
+       年累计目标,
+       顺序,
+       calday,
+       业务员
+from (
+         select node_desc5                                     分页,
+                node_desc5 || '(组织)'                           一级,
+                node_name5 || '-B'                             一级编码,
+                z.node_desc9                                   二级,
+                e.txtmd                                        三级,
+                c.新名称                                          四级,
+                a.customer                                     五级,
+                sum(case when calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd') then ambperformance else 0 end) /
+                10000                                          当日业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) /
+                10000                                          当月业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    去年同期业绩,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    年累计业绩,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    去年累计业绩,
+                0                                              当月毛利额,
+                0                                              当月不含税收入,
+                0                                              年累计毛利额,
+                0                                              年累计不含税收入,
+                d.月目标,
+                d.年累计目标,
+                c.顺序,
+                to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd') calday,
+                f.emp_name                                     业务员
+         from DM.dm_ambv2_zzt_xssr_t a
+                  join dm.dm_rpt_zmaster_cus_t b
+                       on a.salesorg = b."SALES_ORGANIZATION_CODE" and b."SALES_CHANNEL_CODE" = a.distr_chan and
+                          a.customer = b."ACCOUNT_NUMBER" and "PRODUCT_GROUP_CODE" = '00' and "PARVW" = 'VE'
+                  left join dm.dm_rpt_sales_group_t z on b."SALES_GROUP_CODE" = z.node_name9
+                  left join upload.upload_keyproducts c on a.distr_chan = c.原名称 and c.类型 = '卫浴渠道'
+                  left join 客户目标处理 d on a.customer = d.客编 and c.新名称 = d.渠道
+                  left join dm.dm_rpt_bi0_tcustomer_t e on a.customer = e.customer
+                  left join dm.dm_wf_emp_info_t f on b."SALES_MAN_NUM" = f.emp_num
+         where node_name4 = 'H03230643'
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+         group by c.新名称, node_name5, node_desc5, a.customer, e.txtmd, node_desc9, d.月目标, d.年累计目标, c.顺序, f.emp_name
+         union all
+         select node_desc5                                                                  分页,
+                node_desc5 || '(组织)'                                                        一级,
+                node_name5 || '-B'                                                          一级编码,
+                z.node_desc9                                                                二级,
+                e.txtmd                                                                     三级,
+                c.新名称                                                                       四级,
+                a.customer                                                                  五级,
+                0                                                                           当日业绩,
+                0                                                                           当月业绩,
+                0                                                                           去年同期业绩,
+                0                                                                           年累计业绩,
+                0                                                                           去年累计业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then notax_sales_net_amt - coalesce(last_period_sum_price, 0)
+                        else 0 end) / 10000                                                 当月毛利额,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            then notax_sales_net_amt
+                        else 0 end) / 10000                                                 当月不含税收入,
+                (sum(case
+                         when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                             and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                             then notax_sales_net_amt
+                         else 0 end) - (sum(case
+                                                when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 months', 'yyyy-MM')
+                                                    then coalesce(ext_act_sales_cost, 0) + coalesce(cost_1n, 0) +
+                                                         coalesce(cross_cost, 0) +
+                                                         case
+                                                             when bus_area not in ('E000', 'F000', 'J000', 'H000', 'I000')
+                                                                 or bus_area is null then zcbtzz
+                                                             else 0 end + coalesce(dept_inner_cost, 0) +
+                                                         coalesce(prod_cost_adjust, 0)
+                                                else 0 end) + sum(case
+                                                                      when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                                                                          then coalesce(last_period_sum_price, 0)
+                                                                      else 0 end))) / 10000 年累计毛利额,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then notax_sales_net_amt
+                        else 0 end) / 10000                                                 年累计不含税收入,
+                d.月目标,
+                d.年累计目标,
+                c.顺序,
+                to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')                              calday,
+                f.emp_name                                                                  业务员
+         from DM.dm_ambv2_profit_t a
+                  join dm.dm_rpt_zmaster_cus_t b
+                       on a.salesorg = b."SALES_ORGANIZATION_CODE" and b."SALES_CHANNEL_CODE" = a.distr_chan and
+                          a.customer = b."ACCOUNT_NUMBER" and "PRODUCT_GROUP_CODE" = '00' and "PARVW" = 'VE'
+                  left join dm.dm_rpt_sales_group_t z on b."SALES_GROUP_CODE" = z.node_name9
+                  left join upload.upload_keyproducts c on a.distr_chan = c.原名称 and c.类型 = '卫浴渠道'
+                  left join 客户目标处理 d on a.customer = d.客编 and c.新名称 = d.渠道
+                  left join dm.dm_rpt_bi0_tcustomer_t e on a.customer = e.customer
+                  left join dm.dm_wf_emp_info_t f on b."SALES_MAN_NUM" = f.emp_num
+         where node_name4 = 'H03230643'
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+         group by c.新名称, node_desc5, node_name5, a.customer, node_desc9, e.txtmd, d.月目标, d.年累计目标, c.顺序, f.emp_name
+         union all
+         select node_desc5                                     分页,
+                node_desc5 || '(渠道)'                           一级,
+                node_name5 || '-A'                             一级编码,
+                c.新名称                                          二级,
+                ''                                             三级,
+                ''                                             四级,
+                ''                                             五级,
+                sum(case when calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd') then ambperformance else 0 end) /
+                10000                                          当日业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) /
+                10000                                          当月业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    去年同期业绩,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    年累计业绩,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd')
+                            then ambperformance
+                        else 0 end) / 10000                    去年累计业绩,
+                0                                              当月毛利额,
+                0                                              当月不含税收入,
+                0                                              年累计毛利额,
+                0                                              年累计不含税收入,
+                d.月目标,
+                d.年累计目标,
+                c.顺序,
+                to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd') calday,
+                f.emp_name                                     业务员
+         from DM.dm_ambv2_zzt_xssr_t a
+                  join dm.dm_rpt_zmaster_cus_t b
+                       on a.salesorg = b."SALES_ORGANIZATION_CODE" and b."SALES_CHANNEL_CODE" = a.distr_chan and
+                          a.customer = b."ACCOUNT_NUMBER" and "PRODUCT_GROUP_CODE" = '00' and "PARVW" = 'VE'
+                  left join dm.dm_rpt_sales_group_t z on b."SALES_GROUP_CODE" = z.node_name9
+                  left join upload.upload_keyproducts c on a.distr_chan = c.原名称 and c.类型 = '卫浴渠道'
+                  left join 大区目标处理 d on d.名称 = z.node_desc5 and c.新名称 = d.渠道
+                  left join dm.dm_rpt_bi0_tcustomer_t e on a.customer = e.customer
+                  left join dm.dm_wf_emp_info_t f on b."SALES_MAN_NUM" = f.emp_num
+         where node_name4 = 'H03230643'
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+         group by c.新名称, node_name5, node_desc5, a.customer, e.txtmd, d.月目标, d.年累计目标, c.顺序, f.emp_name
+         union all
+         select node_desc5                                                                  分页,
+                node_desc5 || '(渠道)'                                                        一级,
+                node_name5 || '-A'                                                          一级编码,
+                c.新名称                                                                       二级,
+                ''                                                                          三级,
+                ''                                                                          四级,
+                ''                                                                          五级,
+                0                                                                           当日业绩,
+                0                                                                           当月业绩,
+                0                                                                           去年同期业绩,
+                0                                                                           年累计业绩,
+                0                                                                           去年累计业绩,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then notax_sales_net_amt - coalesce(last_period_sum_price, 0)
+                        else 0 end) / 10000                                                 当月毛利额,
+                sum(case
+                        when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            then notax_sales_net_amt
+                        else 0 end) / 10000                                                 当月不含税收入,
+                (sum(case
+                         when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                             and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                             then notax_sales_net_amt
+                         else 0 end) - (sum(case
+                                                when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 months', 'yyyy-MM')
+                                                    then coalesce(ext_act_sales_cost, 0) + coalesce(cost_1n, 0) +
+                                                         coalesce(cross_cost, 0) +
+                                                         case
+                                                             when bus_area not in ('E000', 'F000', 'J000', 'H000', 'I000')
+                                                                 or bus_area is null then zcbtzz
+                                                             else 0 end + coalesce(dept_inner_cost, 0) +
+                                                         coalesce(prod_cost_adjust, 0)
+                                                else 0 end) + sum(case
+                                                                      when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                                                                          then coalesce(last_period_sum_price, 0)
+                                                                      else 0 end))) / 10000 年累计毛利额,
+                sum(case
+                        when calmonth between to_char(to_date('${PERIOD_ID_D}'), 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+                            and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+                            then notax_sales_net_amt
+                        else 0 end) / 10000                                                 年累计不含税收入,
+                d.月目标,
+                d.年累计目标,
+                c.顺序,
+                to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')                              calday,
+                f.emp_name                                                                  业务员
+         from DM.dm_ambv2_profit_t a
+                  join dm.dm_rpt_zmaster_cus_t b
+                       on a.salesorg = b."SALES_ORGANIZATION_CODE" and b."SALES_CHANNEL_CODE" = a.distr_chan and
+                          a.customer = b."ACCOUNT_NUMBER" and "PRODUCT_GROUP_CODE" = '00' and "PARVW" = 'VE'
+                  left join dm.dm_rpt_sales_group_t z on b."SALES_GROUP_CODE" = z.node_name9
+                  left join upload.upload_keyproducts c on a.distr_chan = c.原名称 and c.类型 = '卫浴渠道'
+                  left join 大区目标处理 d on d.名称 = z.node_desc5 and c.新名称 = d.渠道
+                  left join dm.dm_rpt_bi0_tcustomer_t e on a.customer = e.customer
+                  left join dm.dm_wf_emp_info_t f on b."SALES_MAN_NUM" = f.emp_num
+         where node_name4 = 'H03230643'
+           and calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+         group by c.新名称, node_desc5, node_name5, a.customer, e.txtmd, d.月目标, d.年累计目标, c.顺序, f.emp_name
+     ) aa
+group by 分页,
+         一级,
+         一级编码,
+         二级,
+         三级,
+         四级,
+         五级,
+         月目标,
+         年累计目标,
+         顺序,
+         calday,
+         业务员

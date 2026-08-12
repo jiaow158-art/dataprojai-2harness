@@ -1,0 +1,34 @@
+ -- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- TABLE DESC:工作流节点基本信息表（DWI）
+-- create time: chenzhiyong 20220310
+-- ******************************************************************** --
+ 
+INSERT OVERWRITE TABLE dwipi.dwi_wf_node_basic_into_t
+SELECT  
+  id 
+  ,trim(nodename)
+  ,isstart  
+  ,isreject 
+  ,isreopen 
+  ,isend 	
+  ,drawxpos 
+  ,drawypos 
+  ,totalgroups 			
+  ,nodeattribute 		
+  ,passnum 				
+  ,isfreenode 			
+  ,floworder 			
+  ,signtype 				
+  ,operators_1 			
+  ,requestid 			
+  ,startnodeid 			
+  ,operators 			
+  ,ecology_pinyin_search 
+  ,drawstyle 			
+  ,uuid 					
+  ,del_flag 				
+  ,dw_last_update_date	
+ FROM sdi.sdi_workflow_nodebase_1004
+ WHERE del_flag = 'N';

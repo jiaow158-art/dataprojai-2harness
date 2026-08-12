@@ -1,0 +1,112 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/05/10 09:08:28 GMT+08:00
+-- ******************************************************************** --
+-- 营销系统外剩余待分配责任库存
+with tmp as(
+	select material_num ,
+		   batch_num ,
+		   factory_werks_code as factory_code,
+		   inv_location,
+		   sum(stock_qty) as stock_qty,
+		   sum(q_stock) as q_stock,
+		   sum(zkkc) as zkkc,
+		   sum(zjkc) as zjkc,
+		   sum(djkc) as djkc,
+		   0 as res_prepare_stock_qty,
+		   0 as exclusive_stock,
+		   0 as exclusive_stock_mid,
+		   0 as exclusive_stock_mid2,
+		   0 as dz1_stock
+	from dm.dm_wm_stock_responsibility_total_tmp 
+	where stat_month = substr('${PERIOD_ID_D}',1,7)
+	group by material_num ,
+			 batch_num ,
+			 factory_werks_code,
+			 inv_location
+	union all 
+	select material_num ,
+		   batch_num ,
+		   factory_code as factory_code,
+		   inv_location,
+		   0 as stock_qty,
+		   0 as q_stock,
+		   0 as zkkc,
+		   0 as zjkc,
+		   0 as djkc,
+		   sum(res_stock_qty)+sum(sku_prepare_qty) as res_prepare_stock_qty,
+		   0 as exclusive_stock,
+		   0 as exclusive_stock_mid,
+		   0 as exclusive_stock_mid2,
+		   0 as dz1_stock
+	  from dm.dm_wm_stock_responsibility_res_prepare_tmp 
+	group by material_num ,
+			 batch_num ,
+			 factory_code,
+			 inv_location
+	union all 
+	select material_num ,
+		   batch_num ,
+		   factory_code as factory_code,
+		   inv_location,
+		   0 as stock_qty,
+		   0 as q_stock,
+		   0 as zkkc,
+		   0 as zjkc,
+		   0 as djkc,
+		   0 as res_prepare_stock_qty,
+		   sum(exclusive_stock) as exclusive_stock,
+		   sum(exclusive_stock_mid) as exclusive_stock_mid,
+		   sum(exclusive_stock_mid2) as exclusive_stock_mid2,
+		   0 as dz1_stock
+	  from dm.dm_wm_stock_responsibility_exclusive_tmp
+	group by material_num ,
+			 batch_num ,
+			 factory_code,
+			 inv_location
+	union all 
+	select material_num ,
+		   batch_num ,
+		   factory_code as factory_code,
+		   inv_location,
+		   0 as stock_qty,
+		   0 as q_stock,
+		   0 as zkkc,
+		   0 as zjkc,
+		   0 as djkc,
+		   0 as res_prepare_stock_qty,
+		   0 as exclusive_stock,
+		   0 as exclusive_stock_mid,
+		   0 as exclusive_stock_mid2,
+		   sum(dz1_stock) as dz1_stock
+	  from dm.dm_wm_stock_responsibility_dz1_tmp
+	group by material_num ,
+			 batch_num ,
+			 factory_code,
+			 inv_location
+)
+insert overwrite table DM.DM_WM_STOCK_RESPONSIBILITY_LEFT_1
+select t1.material_num ,
+	   batch_num ,
+	   factory_code,
+	   inv_location,
+       sum(stock_qty) as stock_qty,
+       sum(q_stock) as q_stock,
+       sum(zkkc) as zkkc,
+       sum(zjkc) as zjkc,
+       sum(djkc) as djkc,
+       sum(res_prepare_stock_qty) as res_prepare_stock_qty,
+       sum(exclusive_stock) as exclusive_stock,
+       sum(dz1_stock) as dz1_stock,
+       sum(stock_qty) -  sum(q_stock) -sum(res_prepare_stock_qty) - sum(exclusive_stock)-sum(dz1_stock) as left_stock_qty,  -- 剩余总库
+       sum(zkkc) - sum(res_prepare_stock_qty) - sum(exclusive_stock_mid)-sum(dz1_stock)  as left_zkkc, -- 剩余可用库存
+       sum(zjkc) + sum(djkc) - sum(exclusive_stock_mid2) as left_djzjkc, -- 剩余冻结库存
+	   current_timestamp() as dw_last_update_date
+from tmp t1 
+join dm.dm_wm_stock_responsibility_mat_tmp t4 
+On t1.material_num  = t4.material_num 
+group by t1.material_num ,
+		 batch_num ,
+		 factory_code,
+		 inv_location;

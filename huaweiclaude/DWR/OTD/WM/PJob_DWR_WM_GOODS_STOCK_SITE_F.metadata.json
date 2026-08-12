@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_WM_GOODS_STOCK_SITE_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "SAP货物库位表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

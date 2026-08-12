@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB10",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "指标应收周转天数（战略工程）",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,197 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- 每日30日后应收余额表
+-- create time: 2022/11/19 10:30:50 GMT+08:00
+-- ******************************************************************** --
+delete from DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_AF30D_T where EDITION_DATE = '${start_date}';
+INSERT INTO DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_AF30D_T
+  WITH AAA AS
+   (SELECT COMP_CODE,
+           DEBITOR,
+           WBS_ELEMT,
+           CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) AS TEMP,
+           SUM(ZYSYE) AS ZYSYE
+      FROM DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_T_01
+     WHERE EDITION_DATE = '${start_date}'
+     GROUP BY COMP_CODE,
+              DEBITOR,
+              WBS_ELEMT,
+              CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT)
+    HAVING SUM(ZYSYE) > 0), 
+  BBB AS
+   (SELECT COMP_CODE,
+           DEBITOR,
+           WBS_ELEMT,
+           CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) AS TEMP,
+           SUM(ZYQ) AS ZYQ
+      FROM DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_T_01
+     WHERE EDITION_DATE = '${start_date}'
+     GROUP BY COMP_CODE,
+              DEBITOR,
+              WBS_ELEMT,
+              CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT)
+    HAVING SUM(ZYQ) > 0), 
+  CCC AS
+   (SELECT --AC_DOC_NO, /*会计凭证*/
+           --AC_DOC_TYP, /*凭证类型*/
+           --AC_DOC_TYP___T, /*凭证类型描述*/
+           COMP_CODE, /*公司代码*/
+           COMP_CODE___T, /*公司描述*/
+           DEBITOR, /*客户编码*/
+           DEBITOR___T, /*客户描述*/
+           WBS_ELEMT, /*WBS编号*/
+           WBS_ELEMT___T, /*WBS描述*/
+           --NETDUEDATE, /*到期日*/
+           --PSTNG_DATE, /*过账日期*/
+           --RC_ACCOUNT, /*总账科目*/
+           --RC_ACCOUNT___T, /*科目描述*/
+           SALES_GRP, /*销售组*/
+           SALES_GRP___T, /*销售组描述*/
+           --ZXSQD, /*销售渠道*/
+           --ZXSQD___T, /*渠道描述*/
+           CASE
+             WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                  (SELECT TEMP FROM AAA) THEN
+              SUM(ZYSYE)
+             ELSE
+              0
+           END AS ZYSYE, /*应收余额*/
+           CASE
+             WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                  (SELECT TEMP FROM AAA) THEN
+              (CASE
+                WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                     (SELECT TEMP FROM BBB) THEN
+                 SUM(ZYQ)
+                ELSE
+                 0
+              END)
+             ELSE
+              0
+           END AS ZYQ, /*逾期余额*/
+           CASE
+             WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                  (SELECT TEMP FROM AAA) THEN
+              SUM(ZDQYJ)
+             ELSE
+              0
+           END AS ZDQYJ /*截至日到期预警*/
+      FROM DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_T_01
+     WHERE EDITION_DATE = '${start_date}'
+     GROUP BY --AC_DOC_NO,
+              --AC_DOC_TYP,
+              --AC_DOC_TYP___T,
+              COMP_CODE,
+              COMP_CODE___T,
+              DEBITOR,
+              DEBITOR___T,
+              --NETDUEDATE,
+              --PSTNG_DATE,
+              --RC_ACCOUNT,
+              --RC_ACCOUNT___T,
+              WBS_ELEMT,
+              WBS_ELEMT___T,
+              SALES_GRP,
+              SALES_GRP___T
+              --ZXSQD,
+              --ZXSQD___T
+			  ), 
+  DDD AS
+   (SELECT COMP_CODE,
+           DEBITOR,
+           WBS_ELEMT,
+           CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) AS TEMP,
+           SUM(ZYSYE) AS ZYSYE,
+           SUM(ZYQ) AS ZYQ
+      FROM CCC
+     GROUP BY COMP_CODE,
+              DEBITOR,
+              WBS_ELEMT,
+              CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT)
+    HAVING SUM(ZYSYE) < SUM(ZYQ))  
+  SELECT EDITION_DATE, /*定版日期*/
+         COMP_CODE, /*公司代码*/
+         COMP_CODE___T, /*公司描述*/
+         DEBITOR, /*客户编码*/
+         DEBITOR___T, /*客户描述*/
+         WBS_ELEMT, /*WBS编号*/
+         WBS_ELEMT___T, /*WBS描述*/
+         SALES_GRP, /*销售组*/
+         SALES_GRP___T, /*销售组描述*/
+         CASE
+           WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                (SELECT TEMP FROM AAA) THEN
+            SUM(ZYSYE)
+           ELSE
+            0
+         END AS ZYSYE, /*应收余额*/
+         CASE
+           WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                (SELECT TEMP FROM AAA) THEN
+            (CASE
+              WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                   (SELECT TEMP FROM BBB) THEN
+               (CASE
+                 WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                      (SELECT TEMP FROM DDD) THEN
+                  SUM(ZYSYE)
+                 ELSE
+                  SUM(ZYQ)
+               END)
+              ELSE
+               0
+            END)
+           ELSE
+            0
+         END AS ZYQ, /*逾期余额*/
+         CASE
+           WHEN CONCAT(CONCAT(COMP_CODE, DEBITOR), WBS_ELEMT) IN
+                (SELECT TEMP FROM AAA) THEN
+            SUM(ZDQYJ)
+           ELSE
+            0
+         END AS ZDQYJ, /*截至日到期预警*/
+         CURRENT_TIMESTAMP() 		AS DW_LAST_UPDATE_DATE /*数据同步时间*/,
+         SUM(ZAF_YQ_RV_Z) 			AS ZAF_YQ_RV_Z/*2020年后逾期RV正数*/,
+         SUM(ZBF_YQ_RV_Z) 			AS ZBF_YQ_RV_Z/*2020年前逾期RV正数*/,
+         SUM(ZAF_YQ_NRV) 			AS ZAF_YQ_NRV/*2020年后逾期非RV*/,
+         SUM(ZBF_YQ_NRV) 			AS ZBF_YQ_NRV/*2020年前逾期非RV*/,
+         SUM(ZAF_YQ_RV_Z_1_90) 		AS ZAF_YQ_RV_Z_1_90/*2020后 1-90天逾期RV正数*/,
+         SUM(ZAF_YQ_RV_Z_91_275) 	AS ZAF_YQ_RV_Z_91_275/*2020后 91-275天逾期RV正数*/,
+         SUM(ZAF_YQ_RV_Z_276_720) 	AS ZAF_YQ_RV_Z_276_720/*2020后 276-720天逾期RV正数*/,
+         SUM(ZAF_YQ_RV_Z_721_1440) 	AS ZAF_YQ_RV_Z_721_1440/*2020后 721-1440天逾期RV正数*/,
+         SUM(ZAF_YQ_RV_Z_1440) 		AS ZAF_YQ_RV_Z_1440/*2020后 1440天以上逾期RV正数*/,
+         SUM(ZYQ_NRV_1_90)			AS ZYQ_NRV_1_90/*1-90天逾期非RV*/,
+         SUM(ZYQ_NRV_91_275) 		AS ZYQ_NRV_91_275/*91-275天逾期非RV*/,
+         SUM(ZYQ_NRV_276_720) 		AS ZYQ_NRV_276_720/*276-720天逾期非RV*/,
+         SUM(ZYQ_NRV_721_1440) 		AS ZYQ_NRV_721_1440/*721-1440天逾期非RV*/,
+         SUM(ZYQ_NRV_1440) 			AS ZYQ_NRV_1440/*1440天以上逾期非RV*/,
+         SUM(ZBF_YQ_RV_Z_1_90) 		AS ZBF_YQ_RV_Z_1_90/*2020前 1-90天逾期RV正数*/,
+         SUM(ZBF_YQ_RV_Z_91_275) 	AS ZBF_YQ_RV_Z_91_275/*2020前 91-275天逾期RV正数*/,
+         SUM(ZBF_YQ_RV_Z_276_720) 	AS ZBF_YQ_RV_Z_276_720/*2020前 276-720天逾期RV正数*/,
+         SUM(ZBF_YQ_RV_Z_721_1440) 	AS ZBF_YQ_RV_Z_721_1440/*2020前 721-1440天逾期RV正数*/,
+         SUM(ZBF_YQ_RV_Z_1440) 		AS ZBF_YQ_RV_Z_1440/*2020前 1440天以上逾期RV正数*/,
+         SUM(ZAF_WYQ) 				AS ZAF_WYQ/*2020年后未逾期应收*/,
+         SUM(ZBF_WYQ) 				AS ZBF_WYQ/*2020年前未逾期应收*/,
+         SUM(ZWYQ_1) 				AS ZWYQ_1/*1年内未逾期应收*/,
+         SUM(ZWYQ_1_2) 				AS ZWYQ_1_2/*1-2年未逾期应收*/,
+         SUM(ZWYQ_2_3) 				AS ZWYQ_2_3/*2-3年未逾期应收*/,
+         SUM(ZWYQ_3_4) 				AS ZWYQ_3_4/*3-4年未逾期应收*/,
+         SUM(ZWYQ_4) 				AS ZWYQ_4/*4年以上未逾期应收*/,
+		 SUM(ZWYQ_1_90)				AS ZWYQ_1_90/*1-90天未逾期应收*/,
+		 SUM(ZWYQ_91_275)			AS ZWYQ_91_275/*91-275天未逾期应收*/,
+		 SUM(ZWYQ_276_720)			AS ZWYQ_276_720/*276-720天未逾期应收*/,
+		 SUM(ZWYQ_721_1440)			AS ZWYQ_721_1440/*721-1440天未逾期应收*/,
+		 SUM(ZWYQ_1440)				AS ZWYQ_1440/*1440天以上未逾期应收*/
+    FROM DM.DM_RPT_RECEIVABLE_QUOTA_DAILY_T_01
+   WHERE EDITION_DATE = '${start_date}'
+   GROUP BY EDITION_DATE,
+            COMP_CODE,
+            COMP_CODE___T,
+            DEBITOR,
+            DEBITOR___T,
+            WBS_ELEMT,
+            WBS_ELEMT___T,
+            SALES_GRP,
+            SALES_GRP___T

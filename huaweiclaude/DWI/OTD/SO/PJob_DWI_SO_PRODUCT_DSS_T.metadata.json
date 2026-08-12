@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_SO_PRODUCT_DSS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "DSS产品",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

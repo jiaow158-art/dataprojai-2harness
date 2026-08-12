@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_SW_DEPARTMENT_SALES_PERFORMANCE_REGION_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "卫浴业绩日报-大区维度（含目标）",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

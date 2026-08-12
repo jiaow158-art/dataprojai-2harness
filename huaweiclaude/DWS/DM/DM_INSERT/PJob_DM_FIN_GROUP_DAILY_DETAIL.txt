@@ -1,0 +1,277 @@
+/*create table DM.DM_FIN_GROUP_DAILY_detail
+(
+    calmonth       varchar(50),
+    calday         varchar(50),
+    sales_grp      varchar(50),
+    distr_chan     varchar(50),
+    distr_chan___t varchar(500),
+    node_name9 varchar(500),
+    node_desc9 varchar(500),
+    node_name2 varchar(500),
+    node_desc2 varchar(500),
+    node_name3 varchar(500),
+    node_desc3 varchar(500),
+    node_name4 varchar(500),
+    node_desc4 varchar(500),
+    node_name5 varchar(500),
+    node_desc5 varchar(500),
+    cust_group varchar(500),
+    extmatlgrp varchar(500),
+    cust_grp1 varchar(500),
+    integrate_channel varchar(500),
+    integrate_channel_t varchar(500),
+    data_source varchar(500),
+    zcust_group varchar(500),
+    zcust_grp1 varchar(500),
+    PROD_PROPERTY varchar(500),
+    PROD_PROPERTY_name varchar(500),
+    trading_mode varchar(500),
+    ambperformance numeric(36,10),
+    performance_1n numeric(36,10),
+    cross_performance numeric(36,10),
+    notax numeric(36,10),
+    A_sales_cost numeric(36,10),
+    group_A_sales_cost numeric(36,10),
+    salescost numeric(36,10),
+    standard_price_a numeric(36,10),
+    notax_1n numeric(36,10),
+    cost_1n numeric(36,10),
+    cross_salescost numeric(36,10),
+    dw_last_update_date timestamp(6)
+);
+comment on table DM.DM_FIN_GROUP_DAILY_detail is '集团日报中间表';*/
+-- update：2024/03/11 zhouhaochang 标A剔除Z0客户组，家居并入瓷砖导致
+-- update：2024/03/12 zhouhaochang 修改时间范围取数逻辑
+-- update：2024/03/13 zhouhaochang 标A成本修改逻辑，数据来源D、U标A成本按照实际A成本读取。瓷砖国贸双计部分改为读REQ
+-- update：2024/03/18 修改逻辑：不含税修改使用notax_sales_net_amt字段，原公式含事业部内部成本。
+-- update：2024/03/21 修改逻辑：大零售渠道修改为零售渠道
+-- update：2024/03/25 修改逻辑：剔除系统来源U
+-- update：2024/03/26 修改逻辑：瓷砖高端品牌需要读U
+-- update：2024/03/29 修改逻辑：A成本加上安装费
+-- update：2024/04/14 修改逻辑：肖老姐修改标A，实际A部分减去安装费，成本调整值
+-- update：2024/06/23 修改逻辑：增加第六层
+-- update：2024/12/27 代码优化
+-- update: 2025/06/26 增加字段：销售数量、销售面积、年份
+-- update: 2026/03/13 增加字段：二级渠道编码、二级渠道描述
+TRUNCATE
+table DM.DM_FIN_GROUP_DAILY_detail;
+insert into DM.DM_FIN_GROUP_DAILY_detail(
+    calmonth,
+	calday,
+	sales_grp,
+	distr_chan,
+	distr_chan___t,
+	node_name9,
+	node_desc9,
+	node_name2,
+	node_desc2,
+	node_name3,
+	node_desc3,
+	node_name4,
+	node_desc4,
+	node_name5,
+	node_desc5,
+	cust_group,
+	extmatlgrp,
+	cust_grp1,
+	integrate_channel,
+	integrate_channel_t,
+	data_source,
+	zcust_group,
+	zcust_grp1,
+	prod_property,
+	prod_property_name,
+	trading_mode,
+	ambperformance,
+	performance_1n,
+	cross_performance,
+	notax,
+	a_sales_cost,
+	group_a_sales_cost,
+	salescost,
+	standard_price_a,
+	notax_1n,
+	cost_1n,
+	cross_salescost,
+	node_name6,
+	node_desc6,
+	dw_last_update_date,
+	zxssl,
+	zxsmj,
+	calyear,
+	tow_lev_channel_code,  --二级渠道编码
+	tow_lev_channel_name --二级渠道描述
+)
+select calmonth,
+       calday,
+       a.sales_grp,
+       distr_chan,
+       coalesce(c.vtext, '#')         distr_chan___t,
+       b.node_name9,
+       b.node_desc9,
+       node_name2,
+       node_desc2,
+       node_name3,
+       node_desc3,
+       node_name4,
+       node_desc4,
+       node_name5,
+       node_desc5,
+       cust_group,
+       extmatlgrp,
+       cust_grp1,
+       integrate_channel,
+       e.channel_name                 integrate_channel_t,
+       data_source,
+       z."ACCOUNT_GROUP_CODE"         zcust_group,
+       z."ACCNT_GROUP1CODE"           zcust_grp1,
+       a.PROD_PROPERTY,
+       a.PROD_PROPERTY_name,
+       trading_mode,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else ambperformance end    ambperformance,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else performance_1n end    performance_1n,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else cross_performance end cross_performance,
+       0                              notax,
+       0                              A_sales_cost,
+       0                              group_A_sales_cost,
+       0                              salescost,
+       0                              standard_price_a,
+       0                              notax_1n,
+       0                              cost_1n,
+       0                              cross_salescost,
+        node_name6,
+       node_desc6,
+	   current_timestamp as dw_last_update_date,
+	   zxssl, --销售数量
+	   zxsmj, --销售面积
+	   left(calmonth,4) as calyear, --年份
+	   f.tow_lev_channel_code,  --二级渠道编码
+	   f.tow_lev_channel_name --二级渠道描述
+from dm.dm_ambv2_zzt_xssr_t a
+         left join dm.dm_rpt_zmaster_cus_t z
+                   on a.customer = z."ACCOUNT_NUMBER"
+                       and a.distr_chan = z."SALES_CHANNEL_CODE"
+                       and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                       and z."PARVW" = 'AG'
+         left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F zz
+                   on a.wbs_elemt = zz.WBS_LEVEL3
+         left join dm.dm_rpt_sales_group_t b on case
+                                                    when a.data_source in ('S', 'T')
+                                                        then COALESCE(
+                                                            COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                            a.sales_grp)
+                                                    else a.sales_grp
+                                                    end = b.node_name9
+         left join dm.dm_sdi_tvtwt_1001_t c
+                   on a.distr_chan = c.vtweg and spras = '1' and c.mandt = '800'
+         left join upload.upload_business_analysis_channel_t e
+                   on a.integrate_channel = e.channel_code
+		 left join dwimd.dwi_md_data_material_general_t f
+		           on a.material = f.material_num
+where calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+  and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+union all
+select calmonth,
+       calday,
+       a.sales_grp,
+       distr_chan,
+       coalesce(c.vtext, '#')                                                                    distr_chan___t,
+       b.node_name9,
+       b.node_desc9,
+       node_name2,
+       node_desc2,
+       node_name3,
+       node_desc3,
+       node_name4,
+       node_desc4,
+       node_name5,
+       node_desc5,
+       cust_group,
+       extmatlgrp,
+       cust_grp1,
+       integrate_channel,
+       e.channel_name                                                                            integrate_channel_t,
+       data_source,
+       z."ACCOUNT_GROUP_CODE"                                                                    zcust_group,
+       z."ACCNT_GROUP1CODE"                                                                      zcust_grp1,
+       a.PROD_PROPERTY,
+       a.PROD_PROPERTY_name,
+       trading_mode,
+       0                                                                                         ambperformance,
+       0                                                                                         performance_1n,
+       0                                                                                         cross_performance,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else notax_sales_net_amt end                                                          notax,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf end                                    A_sales_cost,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf end                                    group_A_sales_cost,
+       case
+           when node_name2 = 'H11000003' and
+                customer in ('0000315546', '0000315548', '0000315552') then 0
+           else coalesce(last_period_sum_price, 0) end +
+       coalesce(zzyywcb_azf, 0)                                                                  salescost,
+       case
+           when calmonth = to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM') then
+               case
+                   when coalesce(a.prod_property, '#') = 'A0001' and coalesce(a.cust_group, '#') != 'Z0' THEN
+                       case
+                           when a.data_source in ('S', 'T') then coalesce(standard_price_a, 0)
+                           else coalesce(last_period_sum_price, 0) end
+                   else coalesce(last_period_sum_price, 0) end
+           else
+               case
+                   when coalesce(a.prod_property, '#') = 'A0001' and coalesce(a.cust_group, '#') != 'Z0' THEN
+                       case
+                           when a.data_source in ('S', 'T') then coalesce(standard_price_a, 0)
+                           else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end
+                   else act_cost_sum_amt - zyywcb_zxf - zyywcb_yf - zcbtzz - zzyywcb_azf end end standard_price_a,
+       coalesce(income_1n, 0) - zsyjf - zytjf_sg - zytjf_xt                                      notax_1n,
+       coalesce(cost_1n, 0)                                                                      cost_1n,
+       coalesce(cross_cost, 0)                                                                   cross_salescost,
+       node_name6,
+       node_desc6,
+	   current_timestamp as dw_last_update_date,
+	   0 as zxssl, --销售数量
+	   0 as zxsmj, --销售面积
+	   left(calmonth,4) as calyear, --年份
+	   f.tow_lev_channel_code,  --二级渠道编码
+	   f.tow_lev_channel_name --二级渠道描述
+from dm.dm_ambv2_profit_t a
+         left join dm.dm_rpt_zmaster_cus_t z
+                   on a.customer = z."ACCOUNT_NUMBER"
+                       and a.distr_chan = z."SALES_CHANNEL_CODE"
+                       and a.salesorg = z."SALES_ORGANIZATION_CODE"
+                       and z."PARVW" = 'AG'
+         left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F zz
+                   on a.wbs_elemt = zz.WBS_LEVEL3
+         left join dm.dm_rpt_sales_group_t b on case
+                                                    when a.data_source in ('S', 'T')
+                                                        then COALESCE(
+                                                            COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),
+                                                            a.sales_grp)
+                                                    else a.sales_grp
+                                                    end = b.node_name9
+         left join dm.dm_sdi_tvtwt_1001_t c
+                   on a.distr_chan = c.vtweg and spras = '1' and c.mandt = '800'
+         left join upload.upload_business_analysis_channel_t e
+                   on a.integrate_channel = e.channel_code
+		 left join dwimd.dwi_md_data_material_general_t f
+		           on a.material = f.material_num
+where calmonth between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy-01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM')
+  and calday <= to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')

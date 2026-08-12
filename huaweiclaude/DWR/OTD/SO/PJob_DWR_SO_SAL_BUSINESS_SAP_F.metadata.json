@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_SAL_BUSINESS_SAP_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "SAP销售凭证业务数据表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

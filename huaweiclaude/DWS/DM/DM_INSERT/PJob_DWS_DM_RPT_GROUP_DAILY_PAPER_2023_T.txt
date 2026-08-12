@@ -1,0 +1,1300 @@
+-- DWS sql
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/02/14 17:17:57 GMT+08:00
+-- update：2023/04/18 zhouhaochang 更新逻辑
+-- update：2023/04/20 zhouhaochang 卫浴商用中心更新
+-- update：2023/04/21 zhouhaochang 卫浴商用中心更新，瓷砖同期数据渠道划分，卫浴预算J65 03渠道并入08渠道
+-- update：2023/04/22 zhouhaochang 瓷砖同期数据渠道划分
+-- update：2023/04/24 zhouhaochang 瓷砖同期数据先汇总以防预算发散
+-- update：2023/04/25 zhouhaochang 瓷砖2022填报数据过滤修改，家居事业部剔除整装家居
+-- desc：2023年集团日报
+-- ******************************************************************** --
+DELETE
+FROM DM.DM_RPT_GROUP_DAILY_PAPER_2023_T
+where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd');
+insert into DM.DM_RPT_GROUP_DAILY_PAPER_2023_T (level1_code, level1_name, level2_code, level2_name, level3_code,
+                                                level3_name, level4_code,
+                                                level4_name, zxsyj_dr, zmle_dr, zbhsxsje_dr, zxsyj_dy, zmle_dy,
+                                                zbhsxsje_dy, zxsyj_sy, zmle_sy,
+                                                zbhsxsje_sy, zxsyj_qntq, zmle_qntq, zbhsxsje_qntq, zxsyj_dnlj,
+                                                zmle_dnlj, zbhsxsje_dnlj,
+                                                zxsyj_qnlj, zmle_qnlj, zbhsxsje_qnlj, budget_dy, budget_dnlj,
+                                                budget_qntq, budget_qnlj, calday,
+                                                dw_last_update_date)
+with last_year_month_days as (
+    select date_part('days',
+                     date_trunc('months', to_date('${PERIOD_ID_D}') - interval '1 years') + interval '1 months' -
+                     interval '1 days')::int days
+),
+     ct_2022_GD02 as (
+         select sum(case
+                        when stat_month = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then
+                                target / b.days *
+                                to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'dd')::int
+                        else 0 end)   ct_2022_GD02_zxsyj_qntq,
+                sum(case
+                        when (stat_month between '202201' and to_char(
+                                to_date('${PERIOD_ID_D}') - interval '1 years 1 months',
+                                'yyyyMM')) then target
+                        else 0 end
+                    + case
+                          when stat_month = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then
+                                  target / b.days * to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'dd')::int
+                          else 0 end) ct_2022_GD02_zxsyj_qnlj
+         from (
+                  SELECT unnest(string_to_array((
+                                                                                                                                        COALESCE(january_value, '0') || ',' ||
+                                                                                                                                        COALESCE(february_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(march_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(april_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(may_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(june_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(july_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(august_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(september_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(october_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(november_value, '0') ||
+                                                                                                                                        ',' ||
+                                                                                                                                        COALESCE(december_value, '0')),
+                                                ',')) ::numeric(38, 10)                                target,
+                         '2022' || unnest(string_to_array('01,02,03,04,05,06,07,08,09,10,11,12', ',')) stat_month,
+                         all_year_value
+                  FROM upload.upload_ct_2022_integral_head_t
+                  where department_name != '总计') a,
+              last_year_month_days b
+         where stat_month between '202201' and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+     ),
+     base as (
+         select sales_grp,
+                distr_chan,
+                zqdzhdesc,
+                distr_chandesc,
+                sales_dept,
+                sales_dept_name,
+                sales_group,
+                utilities_dept,
+                utilities_dept_name,
+                system,
+                system_name,
+                subcompany_big_area,
+                subcompany_big_area_name,
+                "CUST_GR_CM",
+                extmatlgrp,
+                cust_grp1,
+                zqdzhdesc231desc
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+         where b.subcompany_big_area not in ('33000008', '33000067', '33000068')
+           and b.system not in ('11000011', '11000012')
+     ),
+     base_include_sales_achievement as (
+         select sales_grp,
+                distr_chan,
+                zqdzhdesc,
+                distr_chandesc,
+                sales_dept,
+                sales_dept_name,
+                sales_group,
+                utilities_dept,
+                utilities_dept_name,
+                system,
+                system_name,
+                subcompany_big_area,
+                subcompany_big_area_name,
+                "CUST_GR_CM",
+                extmatlgrp,
+                cust_grp1,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                    else 0 end zxsyj_dr,
+                zmle_dr,
+                zbhsxsje_dr,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                    else 0 end zxsyj_dy,
+                zmle_dy,
+                zbhsxsje_dy,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                    else 0 end zxsyj_sy,
+                zmle_sy,
+                zbhsxsje_sy,
+                zxsyj_qntq,
+                zmle_qntq,
+                zbhsxsje_qntq,
+                case
+                    when (subcompany_big_area != '33000057' or
+                          (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                    else 0 end zxsyj_dnlj,
+                zmle_dnlj,
+                zbhsxsje_dnlj,
+                zxsyj_qnlj,
+                zmle_qnlj,
+                zbhsxsje_qnlj,
+                "/BIC/ZQDZH23_1",
+                zqdzhdesc231desc
+         from dm.DM_RPT_BIC_AZMSD_O2292_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sales_grp = b.sales_group
+         where a.calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+     ),
+     base_include_budget as (
+         select "DISTR_CHAN" distr_chan,
+                "ZZHQDMS"    zqdzhdesc,
+                sales_dept,
+                sales_dept_name,
+                sales_group,
+                utilities_dept,
+                utilities_dept_name,
+                system,
+                system_name,
+                subcompany_big_area,
+                subcompany_big_area_name,
+                "ZYJ",
+                "CALMONTH"
+         from dm.DM_RPT_BIC_AZSSD_O0282_T a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a."SALES_GRP" = b.sales_group
+         where "CALMONTH" BETWEEN to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy12')
+           and utilities_dept != '11000010'
+         union all
+         select '' distr_chan,
+                '' zqdzhdesc,
+                '' sales_dept,
+                '' sales_dept_name,
+                '' sales_group,
+                utilities_dept_code,
+                utilities_dept,
+                system_code,
+                system_name,
+                subcompany_big_area_code,
+                subcompany_big_area_name,
+                ROLL_PERFORMANCE_TARGET,
+                calendar_month
+         from DWRFIN.DWR_GL_GROUP_DAYRPT_F
+         where calendar_month BETWEEN to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy12')
+           and utilities_dept_code = '11000010'
+         union all
+         select prod_channel_name                      distr_chan,
+                prod_channel_name                      zqdzhdesc,
+                sales_dept,
+                sales_dept_name,
+                sales_group,
+                utilities_dept,
+                utilities_dept_name,
+                system,
+                system_name,
+                subcompany_big_area,
+                subcompany_big_area_name,
+                prod_it_amt1                           "ZYJ",
+                to_char(to_date(stat_month), 'yyyyMM') "CALMONTH"
+         from upload.upload_achievement_budget_t a
+                  join DWRFIN.DWR_GL_SALES_GROUP_V b
+                       on a.sale_grp_name = b.sales_group
+         where to_char(to_date(stat_month), 'yyyyMM') BETWEEN to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+     ),
+     title as (
+--基础
+         select distinct utilities_dept                        level1_code,
+                         utilities_dept_name                   level1_name,
+                         case
+                             when system in ('22000001', '22000004', '22000003', '22000017')
+                                 then utilities_dept || '-01'
+                             when system = '22000005' then utilities_dept || '-03'
+                             when system = '22000016' then utilities_dept || '-04'
+                             when sales_group = 'Z67' then utilities_dept || '-05'
+                             when system = '22000018' then utilities_dept || '-06'--瓷砖
+                             when subcompany_big_area in ('33000009', '33000047') then utilities_dept || '-01'
+                             when subcompany_big_area = '33000012' then utilities_dept || '-05'
+                             when subcompany_big_area = '33000010' then utilities_dept || '-06'
+                             when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                                 then '11000002-04'--卫浴
+                             else ''
+                             end                               level2_code,
+                         case
+                             when utilities_dept = '11000003' then ''
+                             when system in ('22000001', '22000004', '22000003', '22000017') then '国内营销系统（分区域）'
+                             when system = '22000005' then '国际营销系统'
+                             when system = '22000016' then '瓷砖梦之家系统'
+                             when sales_group = 'Z67' then '瓷砖包销业务'
+                             when system = '22000018' then '瓷砖跨事业部交易'
+                             when subcompany_big_area in ('33000009', '33000047') then '营销中心（区域）'
+                             when subcompany_big_area = '33000012' then '国际营销'
+                             when subcompany_big_area = '33000010' then 'OEM'
+                             when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                                 then '非全资'
+                             else ''
+                             end                               level2_name,
+                         case
+                             when system in ('22000001', '22000004') and subcompany_big_area != '33000046' then system
+                             when subcompany_big_area = '33000046' then '22000004' || subcompany_big_area
+                             when system in ('22000003', '22000017') then '22000017'
+                             else '' end                       level3_code,
+                         case
+                             when system in ('22000001', '22000004') and subcompany_big_area != '33000046'
+                                 then system_name
+                             when subcompany_big_area = '33000046' then subcompany_big_area_name
+                             when system in ('22000003', '22000017') then '市场系统'
+                             else '' end                       level3_name,
+                         case
+                             when system in
+                                  ('22000005', '22000016', '22000018', '22000009', '22000020', '22000003', '22000017')
+                                 or sales_group = 'Z67'
+                                 or subcompany_big_area in ('33000012', '33000010')
+                                 then ''
+                             when subcompany_big_area = '33000046' then
+                                 (case
+                                      when sales_dept = 'Z031' then '1'
+                                      when sales_dept = 'Z033' then '2'
+                                      when sales_dept not in ('Z031', 'Z033') then '3'
+                                      else '' end)
+                             when subcompany_big_area in ('33000017', '33000070') then '33000017'
+                             when subcompany_big_area = '33000071' then '33000071'
+                             when subcompany_big_area in ('33000063', '33000073') then '33000073'
+                             when subcompany_big_area in ('33000009', '33000047') then
+                                 case
+                                     when strpos(sales_dept_name, '子公司') > 0 or strpos(sales_dept_name, '大区') > 0
+                                         then sales_dept
+                                     else 'ZZZZ' end
+                             when utilities_dept = '11000010' then
+                                 case
+                                     when sales_grp in ('XS1', 'XS2', 'XS3', 'XS4') then '33000060'
+                                     ELSE '33000053' END
+                             else subcompany_big_area end      level4_code,
+                         case
+                             when system in
+                                  ('22000005', '22000016', '22000018', '22000009', '22000020', '22000003', '22000017')
+                                 or sales_group = 'Z67'
+                                 or subcompany_big_area in ('33000012', '33000010')
+                                 then ''
+                             when subcompany_big_area = '33000046' then
+                                 (case
+                                      when sales_dept = 'Z031' then '幕墙工程中心'
+                                      when sales_dept = 'Z033' then '商机资源开发部'
+                                      when sales_dept not in ('Z033', 'Z031') then '战略工程中心'
+                                      else '' end)
+                             when subcompany_big_area in ('33000017', '33000070') then '卫浴艺耐品牌'
+                             when subcompany_big_area = '33000071' then '鹏美绿家'
+                             when subcompany_big_area in ('33000063', '33000073') then subcompany_big_area_name
+                             when subcompany_big_area in ('33000009', '33000047') then
+                                 case
+                                     when strpos(sales_dept_name, '子公司') > 0 or strpos(sales_dept_name, '大区') > 0
+                                         then sales_dept_name
+                                     else '其他' end
+                             when utilities_dept = '11000010' then
+                                 case
+                                     when sales_grp in ('XS1', 'XS2', 'XS3', 'XS4') then '生态阿米巴内部交易'
+                                     ELSE '国内业务' END
+                             else subcompany_big_area_name end level4_name
+         from base
+         where utilities_dept in ('11000001', '11000002', '11000003', '11000010')
+           and subcompany_big_area not in ('33000011', '33000035', '33000062', '33000053', '33000019')
+           and subcompany_big_area != '33000001'
+--瓷砖事业部-国内营销（渠道）
+         union all
+         select distinct '11000001'                        level1_code,
+                         '瓷砖事业部'                           level1_name,
+                         '11000001-02'                     level2_code,
+                         '国内营销系统（渠道）'                      level2_name,
+                         ''                                level3_code,
+                         ''                                level3_name,
+                         '11000001-02' || "/BIC/ZQDZH23_1" level4_code,
+                         zqdzhdesc231desc                  level4_name
+         from dm.dm_rpt_bic_azmsd_o2292_t
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+--卫浴事业部-商用中心
+         union all
+         select distinct '11000002'     level1_code,
+                         '卫浴事业部'        level1_name,
+                         '11000002-03'  level2_code,
+                         '商用中心'         level2_name,
+                         ''             level3_code,
+                         ''             level3_name,
+                         '11000002-034' level4_code,
+                         '瓷卫联动'         level4_name
+         from base
+         where (subcompany_big_area in ('33000035', '33000062')
+             or (system = '00000000' and subcompany_big_area = '00000000'))
+           and utilities_dept = '11000002'
+         union all
+         select distinct '11000002'    level1_code,
+                         '卫浴事业部'       level1_name,
+                         '11000002-03' level2_code,
+                         '商用中心'        level2_name,
+                         ''            level3_code,
+                         ''            level3_name,
+                         (case
+                              when "CUST_GR_CM" in ('A0', 'A1') then '11000002-031'--旧称直营KA
+                              when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                                   ("CUST_GR_CM" = 'A6' and coalesce(cust_grp1, 'qita') != 'J1') then '11000002-032'--旧称经销商工程
+                              when "CUST_GR_CM" in ('B0', 'B1', 'A7') or
+                                   ("CUST_GR_CM" = 'A6' and cust_grp1 = 'J1')
+                                  then '11000002-033'--旧称运营中心
+                             end)      level4_code,
+                         (case
+                              when "CUST_GR_CM" in ('A0', 'A1') then '直营KA'--旧称直营KA
+                              when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                                   ("CUST_GR_CM" = 'A6' and coalesce(cust_grp1, 'qita') != 'J1') then '工程代理商'--旧称经销商工程
+                              when "CUST_GR_CM" in ('B0', 'B1', 'A7') or ("CUST_GR_CM" = 'A6' and cust_grp1 = 'J1')
+                                  then '平台/运营商'--旧称运营中心
+                             end)      level4_name
+         from base
+         where utilities_dept = '11000002'
+           and ((subcompany_big_area in ('33000011'))
+             or (subcompany_big_area = '33000009' and distr_chan = '06'))
+           --卫浴事业部-营销中心（渠道）
+         union all
+         select distinct '11000002'                  level1_code,
+                         '卫浴事业部'                     level1_name,
+                         '11000002-02'               level2_code,
+                         '营销中心（渠道）'                  level2_name,
+                         ''                          level3_code,
+                         ''                          level3_name,
+                         '11000002-02' || distr_chan level4_code,
+                         distr_chandesc              level4_name
+         from base a
+         where utilities_dept = '11000002'
+           and subcompany_big_area in ('33000009', '33000047')
+           and distr_chan is not null
+--家居事业部-跨事业部
+         union all
+         select distinct '11000003'   level1_code,
+                         '家居事业部'      level1_name,
+                         ''           level2_code,
+                         ''           level2_name,
+                         ''           level3_code,
+                         ''           level3_name,
+                         '33000058-9' level4_code,
+                         '跨事业部交易'     level4_name
+         from base
+         where utilities_dept = '11000003'
+           and (sales_dept like '%XA%')
+--家居事业部-木地板
+         union all
+         select distinct '11000003'               level1_code,
+                         '家居事业部'                  level1_name,
+                         ''                       level2_code,
+                         ''                       level2_name,
+                         ''                       level3_code,
+                         ''                       level3_name,
+                         '33000058-8'             level4_code,
+                         subcompany_big_area_name level4_name
+         from base
+         where utilities_dept = '11000003'
+           and subcompany_big_area = '33000001'
+--家居事业部-小计
+         union all
+         select distinct '11000003'   level1_code,
+                         '家居事业部'      level1_name,
+                         ''           level2_code,
+                         ''           level2_name,
+                         ''           level3_code,
+                         ''           level3_name,
+                         '33000058-7' level4_code,
+                         '小计'         level4_name
+         from base
+         where utilities_dept = '11000003'
+           and subcompany_big_area != '33000001'
+     ),
+     sales_achievement_data as (
+         select utilities_dept                        level1_code,
+                utilities_dept_name                   level1_name,
+                case
+                    when system in ('22000001', '22000004', '22000003', '22000017')
+                        then utilities_dept || '-01'
+                    when system = '22000005' then utilities_dept || '-03'
+                    when system = '22000016' then utilities_dept || '-04'
+                    when sales_group = 'Z67' then utilities_dept || '-05'
+                    when system = '22000018' then utilities_dept || '-06'--瓷砖
+                    when subcompany_big_area in ('33000009', '33000047') then utilities_dept || '-01'
+                    when subcompany_big_area = '33000012' then utilities_dept || '-05'
+                    when subcompany_big_area = '33000010' then utilities_dept || '-06'
+                    when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                        then '11000002-04'--卫浴
+                    else ''
+                    end                               level2_code,
+                case
+                    when utilities_dept = '11000003' then ''
+                    when system in ('22000001', '22000004', '22000003', '22000017') then '国内营销系统（分区域）'
+                    when system = '22000005' then '国际营销系统'
+                    when system = '22000016' then '瓷砖梦之家系统'
+                    when sales_group = 'Z67' then '瓷砖包销业务'
+                    when system = '22000018' then '瓷砖跨事业部交易'
+                    when subcompany_big_area in ('33000009', '33000047') then '营销中心（区域）'
+                    when subcompany_big_area = '33000012' then '国际营销'
+                    when subcompany_big_area = '33000010' then 'OEM'
+                    when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                        then '非全资'
+                    else ''
+                    end                               level2_name,
+                case
+                    when system in ('22000001', '22000004') and subcompany_big_area != '33000046' then system
+                    when subcompany_big_area = '33000046' then '22000004' || subcompany_big_area
+                    when system in ('22000003', '22000017') then '22000017'
+                    else '' end                       level3_code,
+                case
+                    when system in ('22000001', '22000004') and subcompany_big_area != '33000046'
+                        then system_name
+                    when subcompany_big_area = '33000046' then subcompany_big_area_name
+                    when system in ('22000003', '22000017') then '市场系统'
+                    else '' end                       level3_name,
+                case
+                    when system in
+                         ('22000005', '22000016', '22000018', '22000009', '22000020', '22000003', '22000017')
+                        or sales_group = 'Z67'
+                        or subcompany_big_area in ('33000012', '33000010')
+                        then ''
+                    when subcompany_big_area = '33000046' then
+                        (case
+                             when sales_dept = 'Z031' then '1'
+                             when sales_dept = 'Z033' then '2'
+                             when sales_dept not in ('Z031', 'Z033') then '3'
+                             else '' end)
+                    when subcompany_big_area in ('33000017', '33000070') then '33000017'
+                    when subcompany_big_area = '33000071' then '33000071'
+                    when subcompany_big_area in ('33000063', '33000073') then '33000073'
+                    when subcompany_big_area in ('33000009', '33000047') then
+                        case
+                            when strpos(sales_dept_name, '子公司') > 0 or strpos(sales_dept_name, '大区') > 0 then sales_dept
+                            else 'ZZZZ' end
+                    when utilities_dept = '11000010' then
+                        case
+                            when sales_grp in ('XS1', 'XS2', 'XS3', 'XS4') then '33000060'
+                            ELSE '33000053' END
+                    else subcompany_big_area end      level4_code,
+                case
+                    when system in
+                         ('22000005', '22000016', '22000018', '22000009', '22000020', '22000003', '22000017')
+                        or sales_group = 'Z67'
+                        or subcompany_big_area in ('33000012', '33000010')
+                        then ''
+                    when subcompany_big_area = '33000046' then
+                        (case
+                             when sales_dept = 'Z031' then '幕墙工程中心'
+                             when sales_dept = 'Z033' then '商机资源开发部'
+                             when sales_dept not in ('Z033', 'Z031') then '战略工程中心'
+                             else '' end)
+                    when subcompany_big_area in ('33000017', '33000070') then '卫浴艺耐品牌'
+                    when subcompany_big_area = '33000071' then '鹏美绿家'
+                    when subcompany_big_area in ('33000063', '33000073') then subcompany_big_area_name
+                    when subcompany_big_area in ('33000009', '33000047') then
+                        case
+                            when strpos(sales_dept_name, '子公司') > 0 or strpos(sales_dept_name, '大区') > 0
+                                then sales_dept_name
+                            else '其他' end
+                    when utilities_dept = '11000010' then
+                        case
+                            when sales_grp in ('XS1', 'XS2', 'XS3', 'XS4') then '生态阿米巴内部交易'
+                            ELSE '国内业务' END
+                    else subcompany_big_area_name end level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000)           zxsyj_dr,
+                sum(zmle_dr / 10000)                  zmle_dr,
+                sum(zbhsxsje_dr / 10000)              zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000)           zxsyj_dy,
+                sum(zmle_dy / 10000)                  zmle_dy,
+                sum(zbhsxsje_dy / 10000)              zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000)           zxsyj_sy,
+                sum(zmle_sy / 10000)                  zmle_sy,
+                sum(zbhsxsje_sy / 10000)              zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)               zxsyj_qntq,
+                sum(zmle_qntq / 10000)                zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)            zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000)           zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)                zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)            zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)               zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)                zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)            zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where utilities_dept in ('11000001', '11000002', '11000003', '11000010')
+           and subcompany_big_area not in ('33000011', '33000035', '33000062', '33000053')
+           and subcompany_big_area != '33000001'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+--瓷砖事业部-国内营销（渠道）
+         union all
+         --工程、整装头部
+         select '11000001'                           level1_code,
+                '瓷砖事业部'                              level1_name,
+                '11000001-02'                        level2_code,
+                '国内营销系统（渠道）'                         level2_name,
+                ''                                   level3_code,
+                ''                                   level3_name,
+                '11000001-02' || "/BIC/ZQDZH23_1"    level4_code,
+                zqdzhdesc231desc                     level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000)          zxsyj_dr,
+                sum(zmle_dr / 10000)                 zmle_dr,
+                sum(zbhsxsje_dr / 10000)             zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000)          zxsyj_dy,
+                sum(zmle_dy / 10000)                 zmle_dy,
+                sum(zbhsxsje_dy / 10000)             zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000)          zxsyj_sy,
+                sum(zmle_sy / 10000)                 zmle_sy,
+                sum(zbhsxsje_sy / 10000)             zbhsxsje_sy,
+                case zqdzhdesc231desc
+                    when '整装头部' then c.ct_2022_GD02_zxsyj_qntq
+                    else sum(zxsyj_qntq / 10000) end zxsyj_qntq,
+                sum(zmle_qntq / 10000)               zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)           zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000)          zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)               zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)           zbhsxsje_dnlj,
+                case zqdzhdesc231desc
+                    when '整装头部' then c.ct_2022_GD02_zxsyj_qnlj
+                    else sum(zxsyj_qnlj / 10000) end zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)               zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)           zbhsxsje_qnlj
+         from base_include_sales_achievement a,
+              ct_2022_GD02 c
+         where system in ('22000001', '22000004', '22000003', '22000017')
+           and zqdzhdesc231desc in ('工程渠道', '整装头部')
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code,
+                  level4_name, c.ct_2022_GD02_zxsyj_qntq, c.ct_2022_GD02_zxsyj_qnlj
+         union all
+         ----大零售本年
+         select level1_code,
+                level1_name,
+                level2_code,
+                level2_name,
+                level3_code,
+                level3_name,
+                level4_code,
+                level4_name,
+                sum(zxsyj_dr)      zxsyj_dr,
+                sum(zmle_dr)       zmle_dr,
+                sum(zbhsxsje_dr)   zbhsxsje_dr,
+                sum(zxsyj_dy)      zxsyj_dy,
+                sum(zmle_dy)       zmle_dy,
+                sum(zbhsxsje_dy)   zbhsxsje_dy,
+                sum(zxsyj_sy)      zxsyj_sy,
+                sum(zmle_sy)       zmle_sy,
+                sum(zbhsxsje_sy)   zbhsxsje_sy,
+                sum(zxsyj_qntq)    zxsyj_qntq,
+                sum(zmle_qntq)     zmle_qntq,
+                sum(zbhsxsje_qntq) zbhsxsje_qntq,
+                sum(zxsyj_dnlj)    zxsyj_dnlj,
+                sum(zmle_dnlj)     zmle_dnlj,
+                sum(zbhsxsje_dnlj) zbhsxsje_dnlj,
+                sum(zxsyj_qnlj)    zxsyj_qnlj,
+                sum(zmle_qnlj)     zmle_qnlj,
+                sum(zbhsxsje_qnlj) zbhsxsje_qnlj
+         from (
+                  select '11000001'                  level1_code,
+                         '瓷砖事业部'                     level1_name,
+                         '11000001-02'               level2_code,
+                         '国内营销系统（渠道）'                level2_name,
+                         ''                          level3_code,
+                         ''                          level3_name,
+                         '11000001-02' || 'GD01'     level4_code,
+                         '大零售渠道'                     level4_name,
+                         sum(case
+                                 when (subcompany_big_area != '33000057' or
+                                       (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                                 else 0 end / 10000) zxsyj_dr,
+                         sum(zmle_dr / 10000)        zmle_dr,
+                         sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                         sum(case
+                                 when (subcompany_big_area != '33000057' or
+                                       (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                                 else 0 end / 10000) zxsyj_dy,
+                         sum(zmle_dy / 10000)        zmle_dy,
+                         sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                         sum(case
+                                 when (subcompany_big_area != '33000057' or
+                                       (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                                 else 0 end / 10000) zxsyj_sy,
+                         sum(zmle_sy / 10000)        zmle_sy,
+                         sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                         0                           zxsyj_qntq,
+                         sum(zmle_qntq / 10000)      zmle_qntq,
+                         sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                         sum(zxsyj_dnlj / 10000)     zxsyj_dnlj,
+                         sum(zmle_dnlj / 10000)      zmle_dnlj,
+                         sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                         0                           zxsyj_qnlj,
+                         sum(zmle_qnlj / 10000)      zmle_qnlj,
+                         sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+                  from base_include_sales_achievement a
+                  where system in ('22000001', '22000004', '22000003', '22000017')
+                    and zqdzhdesc231desc = '大零售渠道'
+                  group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code,
+                           level4_name
+                  union all
+                  ---大零售去年
+                  select '11000001'                                          level1_code,
+                         '瓷砖事业部'                                             level1_name,
+                         '11000001-02'                                       level2_code,
+                         '国内营销系统（渠道）'                                        level2_name,
+                         ''                                                  level3_code,
+                         ''                                                  level3_name,
+                         '11000001-02' || 'GD01'                             level4_code,
+                         '大零售渠道'                                             level4_name,
+                         0                                                   zxsyj_dr,
+                         0                                                   zmle_dr,
+                         0                                                   zbhsxsje_dr,
+                         0                                                   zxsyj_dy,
+                         0                                                   zmle_dy,
+                         0                                                   zbhsxsje_dy,
+                         0                                                   zxsyj_sy,
+                         0                                                   zmle_sy,
+                         0                                                   zbhsxsje_sy,
+                         sum(zxsyj_qntq) / 10000 - c.ct_2022_GD02_zxsyj_qntq zxsyj_qntq,
+                         sum(zmle_qntq / 10000)                              zmle_qntq,
+                         sum(zbhsxsje_qntq / 10000)                          zbhsxsje_qntq,
+                         0                                                   zxsyj_dnlj,
+                         0                                                   zmle_dnlj,
+                         0                                                   zbhsxsje_dnlj,
+                         sum(zxsyj_qnlj) / 10000 - c.ct_2022_GD02_zxsyj_qnlj zxsyj_qnlj,
+                         sum(zmle_qnlj / 10000)                              zmle_qnlj,
+                         sum(zbhsxsje_qnlj / 10000)                          zbhsxsje_qnlj
+                  from base_include_sales_achievement a,
+                       ct_2022_GD02 c
+                  where system in ('22000001', '22000004', '22000003', '22000017')
+                    and zqdzhdesc in ('零售', '家装大包', '设计师')
+                  group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code,
+                           level4_name, c.ct_2022_GD02_zxsyj_qntq, c.ct_2022_GD02_zxsyj_qnlj
+              ) a
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+--卫浴事业部-商用中心
+         union all
+         select '11000002'                  level1_code,
+                '卫浴事业部'                     level1_name,
+                '11000002-03'               level2_code,
+                '商用中心'                      level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '11000002-034'              level4_code,
+                '瓷卫联动'                      level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where (subcompany_big_area in ('33000035', '33000062')
+             or (system = '00000000' and subcompany_big_area = '00000000'))
+           and utilities_dept = '11000002'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+         union all
+         select '11000002'                  level1_code,
+                '卫浴事业部'                     level1_name,
+                '11000002-03'               level2_code,
+                '商用中心'                      level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                (case
+                     when "CUST_GR_CM" in ('A0', 'A1') then '11000002-031'--旧称直营KA
+                     when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                          ("CUST_GR_CM" = 'A6' and coalesce(cust_grp1, 'qita') != 'J1') then '11000002-032'--旧称经销商工程
+                     when "CUST_GR_CM" in ('B0', 'B1', 'A7') or ("CUST_GR_CM" = 'A6' and cust_grp1 = 'J1')
+                         then '11000002-033'--旧称运营中心
+                    end)                    level4_code,
+                (case
+                     when "CUST_GR_CM" in ('A0', 'A1') then '直营KA'--旧称直营KA
+                     when "CUST_GR_CM" in ('A2', 'A3', 'A4') or
+                          ("CUST_GR_CM" = 'A6' and coalesce(cust_grp1, 'qita') != 'J1') then '工程代理商'--旧称经销商工程
+                     when "CUST_GR_CM" in ('B0', 'B1', 'A7') or ("CUST_GR_CM" = 'A6' and cust_grp1 = 'J1') then '平台/运营商'--旧称运营中心
+                    end)                    level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where utilities_dept = '11000002'
+           and ((subcompany_big_area in ('33000011'))
+             or (subcompany_big_area = '33000009' and distr_chan = '06'))
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+                  --卫浴事业部-营销中心（渠道）
+         union all
+         select '11000002'                  level1_code,
+                '卫浴事业部'                     level1_name,
+                '11000002-02'               level2_code,
+                '营销中心（渠道）'                  level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '11000002-02' || distr_chan level4_code,
+                distr_chandesc              level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement a
+         where utilities_dept = '11000002'
+           and subcompany_big_area in ('33000009', '33000047')
+           and distr_chan is not null
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+--家居事业部-跨事业部
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-9'                level4_code,
+                '跨事业部交易'                    level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where utilities_dept = '11000003'
+           and (sales_dept like '%XA%')
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+--家居事业部-木地板
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-8'                level4_code,
+                subcompany_big_area_name    level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where utilities_dept = '11000003'
+           and subcompany_big_area = '33000001'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+--家居事业部-小计
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-7'                level4_code,
+                '小计'                        level4_name,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dr
+                        else 0 end / 10000) zxsyj_dr,
+                sum(zmle_dr / 10000)        zmle_dr,
+                sum(zbhsxsje_dr / 10000)    zbhsxsje_dr,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dy
+                        else 0 end / 10000) zxsyj_dy,
+                sum(zmle_dy / 10000)        zmle_dy,
+                sum(zbhsxsje_dy / 10000)    zbhsxsje_dy,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_sy
+                        else 0 end / 10000) zxsyj_sy,
+                sum(zmle_sy / 10000)        zmle_sy,
+                sum(zbhsxsje_sy / 10000)    zbhsxsje_sy,
+                sum(zxsyj_qntq / 10000)     zxsyj_qntq,
+                sum(zmle_qntq / 10000)      zmle_qntq,
+                sum(zbhsxsje_qntq / 10000)  zbhsxsje_qntq,
+                sum(case
+                        when (subcompany_big_area != '33000057' or
+                              (subcompany_big_area = '33000057' and extmatlgrp != '10060')) then zxsyj_dnlj
+                        else 0 end / 10000) zxsyj_dnlj,
+                sum(zmle_dnlj / 10000)      zmle_dnlj,
+                sum(zbhsxsje_dnlj / 10000)  zbhsxsje_dnlj,
+                sum(zxsyj_qnlj / 10000)     zxsyj_qnlj,
+                sum(zmle_qnlj / 10000)      zmle_qnlj,
+                sum(zbhsxsje_qnlj / 10000)  zbhsxsje_qnlj
+         from base_include_sales_achievement
+         where utilities_dept = '11000003'
+           and subcompany_big_area != '33000001'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code, level4_name
+     ),
+     budget_data as (
+         select utilities_dept                   level1_code,
+                utilities_dept_name              level1_name,
+                case
+                    when system in ('22000001', '22000004', '22000003', '22000017')
+                        then utilities_dept || '-01'
+                    when system = '22000005' then utilities_dept || '-03'
+                    when system = '22000016' then utilities_dept || '-04'
+                    when sales_group = 'Z67' then utilities_dept || '-05'
+                    when system = '22000018' then utilities_dept || '-06'--瓷砖
+                    when subcompany_big_area in ('33000009', '33000047') then utilities_dept || '-01'
+                    when subcompany_big_area = '33000012' then utilities_dept || '-05'
+                    when subcompany_big_area = '33000010' then utilities_dept || '-06'
+                    when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                        then '11000002-04'--卫浴
+                    else ''
+                    end                          level2_code,
+                case
+                    when utilities_dept = '11000003' then ''
+                    when system in ('22000001', '22000004', '22000003', '22000017') then '国内营销系统（分区域）'
+                    when system = '22000005' then '国际营销系统'
+                    when system = '22000016' then '瓷砖梦之家系统'
+                    when sales_group = 'Z67' then '瓷砖包销业务'
+                    when system = '22000018' then '瓷砖跨事业部交易'
+                    when subcompany_big_area in ('33000009', '33000047') then '营销中心（区域）'
+                    when subcompany_big_area = '33000012' then '国际营销'
+                    when subcompany_big_area = '33000010' then 'OEM'
+                    when subcompany_big_area in ('33000070', '33000071', '33000073', '33000017', '33000063')
+                        then '非全资'
+                    else ''
+                    end                          level2_name,
+                case
+                    when system in ('22000001', '22000004') and subcompany_big_area != '33000046' then system
+                    when subcompany_big_area = '33000046' then '22000004' || subcompany_big_area
+                    when system in ('22000003', '22000017') then '22000017'
+                    else '' end                  level3_code,
+                case
+                    when system in ('22000001', '22000004') and subcompany_big_area != '33000046'
+                        then system_name
+                    when subcompany_big_area = '33000046' then subcompany_big_area_name
+                    when system in ('22000003', '22000017') then '市场系统'
+                    else '' end                  level3_name,
+                case
+                    when system in
+                         ('22000005', '22000016', '22000018', '22000009', '22000020', '22000003', '22000017')
+                        or sales_group = 'Z67'
+                        or subcompany_big_area in ('33000012', '33000010')
+                        then ''
+                    when subcompany_big_area = '33000046' then
+                        (case
+                             when sales_dept = 'Z031' then '1'
+                             when sales_dept = 'Z033' then '2'
+                             when sales_dept not in ('Z033', 'Z031') then '3'
+                             else '' end)
+                    when subcompany_big_area in ('33000017', '33000070') then '33000017'
+                    when subcompany_big_area = '33000071' then '33000071'
+                    when subcompany_big_area in ('33000063', '33000073') then '33000073'
+                    when subcompany_big_area in ('33000009', '33000047') then
+                        case
+                            when strpos(sales_dept_name, '子公司') > 0 or strpos(sales_dept_name, '大区') > 0 then sales_dept
+                            else 'ZZZZ' end
+                    when utilities_dept = '11000010' then
+                        case
+                            when sales_group in ('XS1', 'XS2', 'XS3', 'XS4') then '33000060'
+                            ELSE '33000053' END
+                    else subcompany_big_area end level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                            budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                            budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                            budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000      budget_qnlj
+         from base_include_budget
+         where utilities_dept in ('11000001', '11000002', '11000003', '11000010')
+           and subcompany_big_area not in ('33000011', '33000035', '33000062', '33000053')
+           and subcompany_big_area != '33000001'
+
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+--瓷砖事业部-国内营销（渠道）
+         union all
+         select '11000001'                  level1_code,
+                '瓷砖事业部'                     level1_name,
+                '11000001-02'               level2_code,
+                '国内营销系统（渠道）'                level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '11000001-02' || zqdzhdesc  level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where system in ('22000001', '22000004', '22000003', '22000017')
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+--卫浴事业部-商用中心
+         union all
+         select '11000002'                  level1_code,
+                '卫浴事业部'                     level1_name,
+                '11000002-03'               level2_code,
+                '商用中心'                      level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '4'                         level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where (subcompany_big_area in ('33000035', '33000062')
+             or (system = '00000000' and subcompany_big_area = '00000000'))
+           and utilities_dept = '11000002'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+         union all
+         select '11000002'                  level1_code,
+                '卫浴事业部'                     level1_name,
+                '11000002-03'               level2_code,
+                '商用中心'                      level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                ''                          level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where utilities_dept = '11000002'
+           and ((subcompany_big_area in ('33000011'))
+             or (subcompany_big_area = '33000009' and distr_chan = '06'))
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+                  --卫浴事业部-营销中心（渠道）
+         union all
+         select '11000002'                                                                        level1_code,
+                '卫浴事业部'                                                                           level1_name,
+                '11000002-02'                                                                     level2_code,
+                '营销中心（渠道）'                                                                        level2_name,
+                ''                                                                                level3_code,
+                ''                                                                                level3_name,
+                '11000002-02' ||
+                case when sales_group = 'J65' and distr_chan = '03' then '08' else distr_chan end level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                                                                             budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                                                                             budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                                                                             budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000                                                       budget_qnlj
+         from base_include_budget a
+         where utilities_dept = '11000002'
+           and subcompany_big_area in ('33000009', '33000047')
+           and distr_chan is not null
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+--家居事业部-跨事业部
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-9'                level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where utilities_dept = '11000003'
+           and (sales_dept like '%XA%')
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+--家居事业部-木地板
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-8'                level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where utilities_dept = '11000003'
+           and subcompany_big_area = '33000001'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+--家居事业部-小计
+         union all
+         select '11000003'                  level1_code,
+                '家居事业部'                     level1_name,
+                ''                          level2_code,
+                ''                          level2_name,
+                ''                          level3_code,
+                ''                          level3_name,
+                '33000058-7'                level4_code,
+                sum(case when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM') then "ZYJ" else 0 end) /
+                10000                       budget_dy,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}'), 'yyyy01') and to_char(to_date('${PERIOD_ID_D}'), 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) /
+                10000                       budget_dnlj,
+                sum(case
+                        when "CALMONTH" = to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM') then "ZYJ"
+                        else 0 end) /
+                10000                       budget_qntq,
+                sum(case
+                        when "CALMONTH" between to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyy01') and to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMM')
+                            then "ZYJ"
+                        else 0 end) / 10000 budget_qnlj
+         from base_include_budget
+         where utilities_dept = '11000003'
+           and subcompany_big_area != '33000001'
+         group by level1_code, level1_name, level2_code, level2_name, level3_code, level3_name, level4_code
+     )
+select a.level1_code,
+       a.level1_name,
+       a.level2_code,
+       a.level2_name,
+       a.level3_code,
+       a.level3_name,
+       a.level4_code,
+       a.level4_name,
+       b.zxsyj_dr,
+       b.zmle_dr,
+       b.zbhsxsje_dr,
+       b.zxsyj_dy,
+       b.zmle_dy,
+       b.zbhsxsje_dy,
+       b.zxsyj_sy,
+       b.zmle_sy,
+       b.zbhsxsje_sy,
+       b.zxsyj_qntq,
+       b.zmle_qntq,
+       b.zbhsxsje_qntq,
+       b.zxsyj_dnlj,
+       b.zmle_dnlj,
+       b.zbhsxsje_dnlj,
+       b.zxsyj_qnlj,
+       b.zmle_qnlj,
+       b.zbhsxsje_qnlj,
+       c.budget_dy,
+       c.budget_dnlj,
+       c.budget_qntq,
+       c.budget_qnlj,
+       to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd'),
+       current_timestamp()
+from title a
+         left join sales_achievement_data b on a.level1_code = b.level1_code
+    and coalesce(a.level2_code, '#') = coalesce(b.level2_code, '#')
+    and coalesce(a.level3_code, '#') = coalesce(b.level3_code, '#')
+    and coalesce(a.level4_code, '#') = coalesce(b.level4_code, '#')
+         left join budget_data c on a.level1_code = c.level1_code
+    and coalesce(a.level2_code, '#') = coalesce(c.level2_code, '#')
+    and coalesce(a.level3_code, '#') = coalesce(c.level3_code, '#')
+    and coalesce(a.level4_code, '#') = coalesce(c.level4_code, '#')
+where 1 = 1

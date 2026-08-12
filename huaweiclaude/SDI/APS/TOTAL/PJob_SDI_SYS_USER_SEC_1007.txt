@@ -1,0 +1,19 @@
+insert overwrite table sdi.sdi_sys_user_sec_1007
+select 
+id,
+change_pwd_next_time,
+enforce_pwd_expiration,
+enforce_pwd_policy,
+failed_pwd_times,
+last_login_time,
+login_count,
+max_login_count,
+modify_pwd_time_stamp,
+password,
+pwd_due_time,
+sync_id,
+unlock_time,
+user_id,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_user_sec_1007;

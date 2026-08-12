@@ -1,0 +1,21 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/19 17:06:20 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_CARDCOMEFROM_T
+SELECT
+'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+CUSTCODE AS customer_code, -- 客户编码
+Code, -- 编号
+Name, -- 客户来源名称
+CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE-- 同步数据时间
+FROM SDI.SDI_CARDCOMEFROM_1010 
+UNION ALL
+SELECT
+'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+CUSTCODE AS customer_code, -- 客户编码
+Code, -- 编号
+Name, -- 客户来源名称
+CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE-- 同步数据时间
+FROM SDI.SDI_SW_CARDCOMEFROM_1010;

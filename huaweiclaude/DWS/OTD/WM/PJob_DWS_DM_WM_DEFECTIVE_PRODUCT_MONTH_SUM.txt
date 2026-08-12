@@ -1,0 +1,87 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/13 17:40:34 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_WM_DEFECTIVE_PRODUCT_MONTH_SUM WHERE stat_month = '${PERIOD_ID_M}';
+
+INSERT INTO DM.DM_WM_DEFECTIVE_PRODUCT_MONTH_SUM
+select stat_month,
+       coalesce(rejects_type,'其他') as defective_type,
+       sum(stock_area_month_start) as stock_area_month_start,
+       sum(stock_area_month_end) as stock_area_month_end,
+       sum(stock_area_month_end_10) as stock_area_month_end_10, 
+       sum(stock_area_month_end_20) as stock_area_month_end_20, 
+       sum(stock_area_month_end_30) as stock_area_month_end_30, 
+       sum(stock_area_month_end_40) as stock_area_month_end_40, 
+       sum(sales_stock_out_area) as sales_stock_out_area,
+       coalesce(sum(stock_area_month_end),0) - coalesce(sum(stock_area_month_start),0)+ coalesce(sum(sales_stock_out_area),0) as inc_area,
+	   current_timestamp() as dw_last_update_date,
+	   inv_location,
+	   sum(stock_area_month_end_a1) as stock_area_month_end_a1, 
+	   sum(stock_area_month_end_a2) as stock_area_month_end_a2, 
+	   sum(stock_area_month_end_a3) as stock_area_month_end_a3, 
+	   sum(stock_area_month_end_a4) as stock_area_month_end_a4, 
+	   sum(stock_area_month_end_a5) as stock_area_month_end_a5
+from(
+SELECT 
+	'${PERIOD_ID_M}' as  stat_month,
+	REJECTS_TYPE ,
+	 t.inv_location,
+	sum(stock_area) as stock_area_month_start,
+	0 stock_area_month_end,
+	0 as stock_area_month_end_10,
+	0 as stock_area_month_end_20,
+	0 as stock_area_month_end_30,
+	0 as stock_area_month_end_40,
+	0 sales_stock_out_area,
+	0 stock_area_month_end_a1,
+	0 stock_area_month_end_a2,
+	0 stock_area_month_end_a3,
+	0 stock_area_month_end_a4,
+	0 stock_area_month_end_a5
+	from dm.dm_wm_defective_product_stock_detail t
+	where stat_month = replace(substring(cast(add_months(cast(concat('${PERIOD_ID_M}','01') as date),-1)  as varchar),1,7),'-','')
+	group by stat_month,REJECTS_TYPE, t.inv_location 
+	union all
+	-- 期末
+	SELECT 
+	'${PERIOD_ID_M}' as  stat_month,
+	REJECTS_TYPE ,
+	 t.inv_location ,
+	0,
+	sum(stock_area) stock_area_month_end,
+	sum(case when  stock_age_seg ='半年以内' then stock_area else 0 end )  as stock_area_month_end_10,
+	sum(case when  stock_age_seg ='7-12个月' then stock_area else 0 end)  as stock_area_month_end_20,
+	sum(case when  stock_age_seg ='1-2年' then stock_area else 0 end)  as stock_area_month_end_30,
+	sum(case when  stock_age_seg ='2年以上' then stock_area else 0 end)  as stock_area_month_end_40,
+	0,
+	sum(case when  substr(t.batch_in_time,1,4) = substr('${PERIOD_ID_M}',1,4)  then stock_area else 0 end ) stock_area_month_end_a1,  -- 本年
+	sum(case when  substr(t.batch_in_time,1,4) = substr('${PERIOD_ID_M}',1,4)-1 and  substr(t.batch_in_time,6,2)>='07' then stock_area else 0 end )  stock_area_month_end_a2 ,  -- 去年7-12月
+	sum(case when  substr(t.batch_in_time,1,4) = substr('${PERIOD_ID_M}',1,4)-1 and  substr(t.batch_in_time,6,2)<='06' then stock_area else 0 end )  stock_area_month_end_a3 ,  -- 去年1-6月
+	sum(case when  substr(t.batch_in_time,1,4) = substr('${PERIOD_ID_M}',1,4)-2  then stock_area else 0 end )  stock_area_month_end_a4 ,  -- 前年,
+	sum(case when  substr(t.batch_in_time,1,4) < substr('${PERIOD_ID_M}',1,4)-2 or t.batch_in_time is null   then stock_area else 0 end )  stock_area_month_end_a5  -- 前年之前
+from DM.dm_wm_defective_product_stock_detail t
+where stat_month ='${PERIOD_ID_M}'
+--and t.rejects_type  is not null
+group by stat_month,REJECTS_TYPE, t.inv_location 
+union all
+select '${PERIOD_ID_M}' as stat_month,
+       rejects_type ,
+        t.inv_location ,
+       0,0,
+       0,
+       0,
+       0,
+       0,
+       sum(sales_stock_out_area) as sales_stock_out_area,
+       0,0,0,0,0
+from dm.dm_wm_defective_product_stockout_t t
+where stat_month ='${PERIOD_ID_M}'
+group by stat_month,
+       rejects_type,
+        t.inv_location 
+      ) tmp
+     group by stat_month,
+       rejects_type,
+        inv_location ;

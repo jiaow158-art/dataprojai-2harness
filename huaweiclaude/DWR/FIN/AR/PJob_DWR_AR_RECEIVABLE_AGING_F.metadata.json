@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_AR_RECEIVABLE_AGING_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/AR",
+    "description": "应收账龄",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrfin"
+}

@@ -1,0 +1,160 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/15 11:51:39 GMT+08:00
+-- description:破损及签收报表数据
+-- history list:
+-- UPDATE FROM 15000571 时间<8月22日> 修改取值范围
+-- UPDATE FROM 15000571 时间<9月23日>  补充【DELV_TYPE_CODE】增加SELF_WITHDRAWAL（即服务商提货）。
+-- UPDATE FROM 15000571 时间<9月27日   修改 【DELV_TYPE_CODE】取SERVICE_WITHDRAWAL（服务商提货)，不是SELF_WITHDRAWAL
+-- UPDATE FROM 15000571 时间<9月27日   新增字段签收人工号
+-- update from huangwenbin 2024-10-07 源表DWR_BO_DSPT_ORDER_F修改字段：DELVE_LINE_NUM --> DELV_LINE_NUM
+-- update from 15000571 时间<10月07日   新增字段线组信息
+-- update from 15000571 时间<10月14日   限制行数据不为空
+-- update from 15000571 时间 2025年3月5日  新增SAP发票号字段
+-- update from 10004210 时间 2025年4月11日 修改发运日期的逻辑
+-- update from 10004210 时间 2025年6月19日 修改发运日期的逻辑:改从提货单获取实际发货日期
+-- update from 10004210 时间 2025年6月19日 增加字段：商机名称
+-- update from 10004210 时间 2025年6月20日 放大发票数据过滤时间
+-- update from 10004210 时间 2025年6月30日 增加自提部分数据
+-- update from 10004210 时间 2025年7月31日 取消限制from_flag = CZ
+-- ******************************************************************** -- --
+-- DWROTD.DWR_TRA_TMS_SHIP_DTL_F 运单
+-- DWROTD.DWR_TRA_TMS_ABNML_F 异常头行融合表
+-- DWROTD.DWR_TRA_TMS_DED_DTL_F 索赔扣款模型
+-- DWROTD.DWR_TRA_TMS_BILL_STM_F 对账单
+-- DWRLTC.DWR_BO_DSPT_ORDER_F 发运委托
+-- DWRLTC.DWR_BO_DMAND_ORDER_F 要货单模型
+-- DWRLTC.DWR_BO_BUSI_INFO_F  商机模型
+-- DWRLTC.DWR_BO_SIGN_ORDER_F  签收单
+with
+	acdoca as (
+		SELECT
+			RCNTR, --成本中心
+			MAT_KDAUF, --提货单号
+			MAT_KDPOS, --提货单行号
+			sum(tsl) AS TSL --金额
+		FROM
+			SDI.SDI_ACDOCA_1001
+		where
+			period_id_m >= '202301'
+			and RACCT = '0019110101'
+			and MAT_KDAUF in (
+				SELECT
+					DELIVERY_NO
+				FROM
+					SDI.SDI_DELIVER_DESPATCH_HEADER_1033
+			)
+		group by
+			RCNTR, --成本中心
+			MAT_KDAUF, --提货单号
+			MAT_KDPOS
+	)
+,inv as ( ---根据提货单号,行号,批次，数量，公司去匹配创建日期最大的发票号
+select
+reference_bill_num,reference_item_num,CONCAT_WS(',', COLLECT_LIST(bill_voucher_num)) AS bill_voucher_num 
+from  dwrfin.dwr_gl_invoice_conditional_f
+where period_id_m >= '202201' 
+group by 
+reference_bill_num,reference_item_num
+)
+
+
+INSERT OVERWRITE  TABLE  DM.DM_VM_WORN_SIGN_T  
+select
+	H.lveal_7_name as SALES_OFF, --销售部门
+	H.lveal_8_name SALES_AREA, --销售区域
+	a.sap_order_num SALES_NUM, --销售订单号
+	a.busi_code, --商机号
+	G.cust_num, --客户编码
+	G.cust_name, --客户名称
+	b.wbs_num, --WBS号
+	a.dspt_num, --发运单
+	a.delv_num, --提货单号
+	b.aply_emp_name, --签收人
+	DD.actual_goods_move_date as DELV_DATE, --发运日期
+	a.sign_date, --签收日期
+	a.material_num, --物料编码
+	a.material_name, --物料描述
+	coalesce(a.actl_qty, 0), --实发数量
+	a.pic, --单价
+	coalesce(a.damaged_qty, 0), --物流破损数量
+	coalesce(a.sign_qty, 0), --实际签收数量
+	i.sign_st_name, --签收状态
+	a.plan_factory_name, --发货工厂
+	a.wh_loc, --库存地点
+	ACDOCA.RCNTR AS bad_cost_cent_code, --LTC签收破损成本中心
+	coalesce(ACDOCA.tsl, 0) AS BAD_amount, --LTC签收破损金额
+	case
+		when d.abnormal_attr_name = '货品类异常'
+		and d.abnormal_type_name = '货损货差' then d.abnormal_skuqty_line
+		else 0
+	end as abnormal_skuqty_line, --TMS破损数量
+	coalesce(E.compensable_amount, 0), --承运商应赔偿金额
+	case
+		when f.fee_item_name = '其他费用' then case
+			when f.bill_total_line <> 0 then f.bill_total_line * -1
+		end
+		else 0
+	end as compensable_amount_act, --承运商实际赔偿金额
+	f.statu_name, --状态
+	f.indty_id, --实际赔偿凭证号
+	f.cost_cent_code, --实际赔偿凭证号成本中心
+	C.do_num, --TNS运单号
+	C.do_line_num, --TMS运单行号
+	D.abnml_no, --TMS异常单号
+	D.wb_line_no as abnml_line_no, --TMS异常单行号
+	A.delv_line_num, --SAP提货行号
+	E.deduction_no, --异常扣款单号
+	E.wb_line_no as deduction_line_no, --异常扣款行号
+	f.fee_item_name, --费用项目
+	current_timestamp AS LAST_UPDATE_DATE,
+	A.DIMENSION, --规格    
+	B.APLY_EMP_ID, --签收人ID     
+	D.responsible_party_name as CARR_TMS, --TMS承运商
+	a.wh_name, --库存地点名称
+	B.APLY_EMP_NUM, --签收人工号
+	cus.sales_group_code   --线组信息
+	,inv.bill_voucher_num   --SAP发票号
+	,b.busi_name --商机名称
+from
+	DWRLTC.DWR_BO_DSPT_ORDER_F a --发运委托
+	LEFT join DWRLTC.DWR_BO_BUSI_INFO_F b --商机
+	on a.busi_id = b.busi_id
+	LEFT join DWROTD.DWR_TRA_TMS_SHIP_DTL_F c --运单
+	on a.dspt_num = c.dspt_num
+	and a.delv_num = c.delv_num
+	and a.delv_line_num = c.delv_line_num
+	left join DWROTD.DWR_TRA_TMS_ABNML_F D --异常单
+	ON C.do_num = D.wb_no
+	AND C.do_line_num = D.wb_line_no
+	left join DWROTD.DWR_TRA_TMS_DED_DTL_F E --异常扣款
+	ON D.abnml_no = E.abnormal_no
+	AND D.wb_line_no = E.wb_line_no
+	LEFT JOIN DWROTD.DWR_TRA_TMS_BILL_STM_F F --对账
+	ON E.deduction_no = F.source_order_no
+	AND E.deduction_line_no = F.source_order_lineno
+	and F.dtl_code = 'TMS_ABNORMAL_DEDUCTION'
+	left join DWRLTC.DWR_BO_DMAND_ORDER_F G --要货单
+	ON A.DMAND_ID = G.DMAND_ID
+	AND A.DMAND_LINE_ID = G.DMAND_LINE_ID
+	LEFT JOIN SDI.SDI_BASE_SAP_ORGANIZATIONAL_STRUCTURE_1029 H ON B.aply_emp_num = H.employee
+	left join DWRLTC.DWR_BO_SIGN_ORDER_F i --签收单
+	on a.delv_num = i.delv_num
+	left join ACDOCA ON A.delv_num = ACDOCA.MAT_KDAUF
+	and a.delv_line_num = ACDOCA.MAT_KDPOS
+	LEFT JOIN SDI.SDI_ZMASTER_CUS_1001 CUS ON G.cust_num = CUS.ACCOUNT_NUMBER
+	AND G.SALE_ORG_CODE = CUS.SALES_ORGANIZATION_CODE
+	AND CUS.SALES_CHANNEL_CODE = '06'
+	AND CUS.MANDT = '800'
+	AND CUS.PARVW = 'AG'
+	LEFT JOIN   INV 
+	ON a.delv_num = INV.reference_bill_num
+	AND A.delv_line_num = INV.reference_item_num
+	LEFT JOIN DWIOTD.DWI_WM_LADINGBILL_HEADER_T DD
+	ON A.delv_num = DD.DELIVERY
+where
+	A.DELV_TYPE_CODE IN ('SUB', 'DP', 'SERVICE_WITHDRAWAL','SELF_WITHDRAWAL')
+	and A.IS_PAR_CODE = 'N'
+	AND A.DEPT_ST_CODE = 'ALLOW'
+	AND A.DSPT_LINE_ID IS NOT NULL 

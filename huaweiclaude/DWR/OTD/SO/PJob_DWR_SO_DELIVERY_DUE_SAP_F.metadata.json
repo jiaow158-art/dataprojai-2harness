@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_DELIVERY_DUE_SAP_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "SAP交货到期表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

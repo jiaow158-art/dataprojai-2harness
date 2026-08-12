@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_BILL_OUT_APPLY_DETAIL",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

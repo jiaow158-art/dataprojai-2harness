@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_ZZT_QTXSSR_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/COST",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

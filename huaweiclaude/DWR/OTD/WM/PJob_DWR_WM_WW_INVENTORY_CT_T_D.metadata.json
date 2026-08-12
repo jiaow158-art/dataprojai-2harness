@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_WM_WW_INVENTORY_CT_T_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/WM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

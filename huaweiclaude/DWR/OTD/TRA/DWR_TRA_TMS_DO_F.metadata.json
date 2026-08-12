@@ -1,0 +1,8 @@
+{
+    "name": "DWR_TRA_TMS_DO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/TRA",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrdim"
+}

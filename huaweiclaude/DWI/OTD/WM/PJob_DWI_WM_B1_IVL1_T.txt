@@ -1,0 +1,36 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/18 17:59:23 GMT+08:00
+-- update from huangwenbin 2026-01-14 新增字段：new_flag
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_IVL1_T							
+SELECT							
+    'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具							
+	custcode AS customer_code, -- 客户编码						
+	TransSeq, -- 交易序列号						
+	LayerID, -- 层标识						
+	CalcPrice, -- 计算价格						
+	Balance, -- 库存余额						
+	TransValue, -- 交易值						
+	LayerInQty, -- 收货数量						
+	LayerOutQ, -- 发货数量						
+	RevalTotal, -- 库存重估总计						
+	CURRENT_TIMESTAMP() DW_LAST_UPDATE_DATE, -- 同步数据时间	
+    'new' as new_flag --版本标识，区分数据归档后的数据来源	
+FROM SDI.sdi_ivl1_1010 							
+UNION ALL							
+SELECT							
+    'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具							
+	custcode AS customer_code, -- 客户编码						
+	TransSeq, -- 交易序列号						
+	LayerID, -- 层标识						
+	CalcPrice, -- 计算价格						
+	Balance, -- 库存余额						
+	TransValue, -- 交易值						
+	LayerInQty, -- 收货数量						
+	LayerOutQ, -- 发货数量						
+	RevalTotal, -- 库存重估总计						
+	CURRENT_TIMESTAMP() DW_LAST_UPDATE_DATE, -- 同步数据时间
+    coalesce(new_flag,'new') as new_flag --版本标识，区分数据归档后的数据来源	
+FROM SDI.sdi_SW_ivl1_1010 ;

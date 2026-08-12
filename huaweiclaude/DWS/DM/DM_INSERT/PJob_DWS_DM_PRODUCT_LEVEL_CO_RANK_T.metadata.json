@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_PRODUCT_LEVEL_CO_RANK_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "产品层次与对应层级表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

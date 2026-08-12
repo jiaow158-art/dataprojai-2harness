@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_BUSINESS_COST_FLOW_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "LTC商机费用流水表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

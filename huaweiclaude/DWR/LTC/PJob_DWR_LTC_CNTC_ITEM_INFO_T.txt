@@ -1,0 +1,174 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/07/15 16:50:32 GMT+08:00
+-- update from huangwenbin 2025-08-11 新增字段：经销商客编、经销商客户名称
+-- update from huangwenbin 2025-08-13 修改产品来源描述枚举值
+-- update from huangwenbin 2025-08-13 修改销售额的逻辑，新增字段：重包费率
+-- update from huangwenbin 2025-08-20 修复：1.0的申请数量是项目评审的申请数量，合同用量是实际合同的数量，2.0的申请数量是实际合同的数量，而合同用量这个值很多都是空的
+-- update from huangwenbin 2025-08-21 修改销售额的逻辑
+-- update from huangwenbin 2025-08-21 修复源系统的单位面积存在0的问题
+-- update from huangwenbin 2025-08-29 增加过滤条件DELETE_FLAG = 0
+-- update from wjh 2025-09-16 新增字段VERSION_FLAG
+-- update from wjh 2025-09-18 新增字段contract_amount2合同总金额
+-- ******************************************************************** --
+WITH T AS(
+SELECT LOOKUP_CODE
+      ,LOOKUP_TYPE
+	  ,MEANING
+  FROM SDI.SDI_BASE_LOOKUP_VALUES_1029 T1
+ WHERE T1.DELETE_FLAG = 0
+)
+INSERT OVERWRITE TABLE DWRLTC.DWR_LTC_CNTC_ITEM_INFO_T
+SELECT 
+       B.CONTRACT_MATERIAL_ID AS CNTC_ITEM_ID --合同行ID
+      ,A.CNTC_ID --合同ID
+      ,A.CNTC_NUM --单据编号
+      ,A.CNTC_NAME --合同名称
+      ,A.SRC_CNTC_ID --变更合同来源ID
+	  ,B.SOURCE_MATERIAL_ID AS SRC_CNTC_ITEM_ID --变更合同来源行ID
+      ,A.PROJ_ID --评审ID	 
+      ,A.PROJ_NUM --项目评审编号
+	  ,B.PROJECT_MATERIAL_ID AS PROJ_ITEM_ID --项目评审行ID
+      ,A.BUSI_ID --商机ID
+      ,A.BUSI_NUM --商机编号
+      ,A.BUSI_NAME --商机名称
+      ,A.MTHR_BUSI_ID --母商机ID
+      ,A.MTHR_BUSI_NUM --母商机编号
+      ,A.CUST_NUM --客户编码
+      ,A.CUST_NAME --客户名称(甲方)
+	  ,A.ENGR_CUST_NUM --工程方客编
+      ,A.ENGR_CUST_NAME --工程方客户名称
+      ,A.DSTR_CUST_NUM --经销商客编
+      ,A.DSTR_CUST_NAME --经销商客户名称
+      ,A.PROJ_CLASS_CODE --工程类别编码
+	  ,A.PROJ_CLASS_NAME --工程类别描述
+      ,A.IS_SUB_CO_CODE --是否子公司编码
+	  ,A.IS_SUB_CO_NAME --是否子公司描述
+	  ,A.IS_ALGR_CODE --是否代签编码
+	  ,A.IS_ALGR_NAME --是否代签描述
+	  ,A.IS_COOP_CODE --是否厂商合作编码
+	  ,A.IS_COOP_NAME --是否厂商合作描述
+	  ,A.IS_OVER_DIV_CODE --是否跨事业部编码
+	  ,A.IS_OVER_DIV_NAME --是否跨事业部描述
+	  ,A.IS_CR_CODE --是否授信项目编码
+	  ,A.IS_CR_NAME --是否授信项目描述
+	  ,A.SEAL_DATE --盖章日期
+	  ,A.NEW_FLAG --最新标识
+	  ,A.RCPTS_ST_CODE --单据状态编码
+	  ,A.RCPTS_ST_NAME --单据状态描述
+	  ,A.DIV_CODE --事业部编码
+	  ,A.DIV_NAME --事业部描述
+	  ,A.CNTC_ST_CODE	--合同状态编码
+	  ,A.CNTC_ST_NAME --合同状态描述
+	  ,A.CNTC_VERS --合同版本号
+	  ,A.EFF_DATE --生效日期
+      ,A.INVAL_DATE --失效日期
+	  ,A.DELV_PER --预计供货周期
+	  ,A.DELV_START_DATE --预计供货开始日期
+	  ,A.DELV_END_DATE --预计供货结束日期
+	  ,B.PRODUCT_ATTRIBUTE AS MATERIAL_SRC_CODE --产品来源编码
+      ,T1.MEANING AS MATERIAL_SRC_NAME --产品来源描述
+	  ,B.MATERIAL AS MATERIAL_NUM --物料编码
+	  ,B.MATERIAL_DESCRIPTION AS MATERIAL_NAME --物料名称
+	  ,B.CATEGORY AS MATERIAL_CAT_NAME --品类描述
+	  ,B.PRODUCT_SPECIFICATION AS DIMENSION --规格
+	  ,B.PRODUCT_CHANNEL AS MATERIAL_CHNL_NAME --产品渠道描述
+	  ,COALESCE(B.ENGINEERING_SIDE_PRICE,0) AS GCF_PRC --工程方价格
+	  ,COALESCE(B.APPLY_QUOTATION,0) AS APLY_PRC --申请价格
+	  ,CASE WHEN A.VERS_FLAG = 'LTC2.0' THEN COALESCE(C.REVIEW_DOSAGE,B.REVIEW_DOSAGE,0)
+	        ELSE COALESCE(B.REVIEW_DOSAGE,C.REVIEW_DOSAGE,0)
+			 END AS APLY_QTY --申请数量
+	  ,COALESCE(B.PRODUCT_NAKED_PRICE,0) AS APPR_NAK_PRC --审批裸价
+	  ,COALESCE(B.REVIEW_QUOTATION,0) AS APPR_PRC --审批价格
+	  ,COALESCE(B.AMOEBA_COST,0) AS AMB_COST --阿米巴成本
+	  ,COALESCE(B.AMOEBA_PROFIT,0) AS AMT_PRFT_AMT --阿米巴毛利额
+	  ,COALESCE(B.AMOEBA_MARGIN,0) AS AMT_PRFT_RATE --阿米巴毛利率
+	  ,COALESCE(B.ACOST,0) AS STD_A_COST --标A成本
+	  ,COALESCE(B.ACOST_PROFIT,0) AS STD_A_AMT --标A成本毛利额
+	  ,COALESCE(B.ACOST_MARGIN,0) AS STD_A_RATE --标A成本毛利率
+      ,COALESCE(B.FORECAST_FUTURE_COSTS,0) AS FCST_COST	--预测未来成本
+      ,COALESCE(B.FORECAST_FUTURE_COSTS_PROFIT,0) AS FCST_AMT --预测未来成本毛利额
+      ,COALESCE(B.FORECAST_FUTURE_COSTS_MARGIN,0) AS FCST_RATE --预测未来成本毛利率
+      ,COALESCE(B.DISTRIBUTOR_MARGIN,0) AS DSTR_GRS_RATE --经销商毛利率
+      ,COALESCE(B.TRANSPORT_COST,0) AS TRNSP_COST --运输成本
+/*销售额逻辑：
+销售额逻辑修改：
+LTC：有合同用合同用量，没合同用申请数量
+1.0：(【合同单价或审批价格】/1.13-【合同单价或审批价格】*【综合费率】/100)*1.13*合同用量或申请数量
+2:0：（审批价格-工程方价格*集采服务费率/100-工程方价格*重包费率*0.13/100）*合同用量或申请数量
+（1.0 version_flag is NULL，2.0version_flag =2）
+（合同价审表新增字段：重包费率：repackage_rate）
+OSS/OA：
+LTC039流程：(审批价格/1.13-审批价格*服务费率/100)*1.13*申请数量
+LTC042流程： (审批价格/1.13-审批价格*服务费率/100)*1.13*申请数量
+*/  
+	  ,CASE WHEN A.VERS_FLAG = 'LTC1.0'
+	        THEN (COALESCE(COALESCE(B.CONTRACT_PRICE,B.REVIEW_QUOTATION),0) / 1.13 - COALESCE(COALESCE(B.CONTRACT_PRICE,B.REVIEW_QUOTATION),0) * COALESCE(B.SERVICE_RATE,0) / 100) * 1.13 * COALESCE(COALESCE(B.CONTRACT_QUANTITY,B.REVIEW_DOSAGE),0)
+			WHEN A.VERS_FLAG = 'LTC2.0'
+			THEN (COALESCE(B.REVIEW_QUOTATION,0) - COALESCE(B.ENGINEERING_SIDE_PRICE,0) * COALESCE(B.CENTRALIZED_SERVICE_RATE,0) / 100 - COALESCE(B.ENGINEERING_SIDE_PRICE,0) * COALESCE(B.REPACKAGE_RATE,0) * 0.13 / 100 ) * COALESCE(COALESCE(B.REVIEW_DOSAGE,C.REVIEW_DOSAGE),0)
+			 END AS SALE_AMT --销售额
+      ,COALESCE(B.CONTRACT_PRICE,0) AS CNTC_PRC	--合同单价
+      ,B.UNIT --单位
+      ,COALESCE(B.WEIGHT_VOLUME,0) AS WT_VOL --重量体积
+      ,COALESCE(B.DEALER_PICK_PRICE,0) AS DEALER_PRC --经销商提货价
+      ,COALESCE(B.EP_PRICE,0) AS EP_PRC	--EP牌价
+      ,COALESCE(B.DISCOUNT_RATE,0) AS DISC_RATE --折扣率
+      ,CASE WHEN A.VERS_FLAG = 'LTC2.0' THEN COALESCE(B.REVIEW_DOSAGE,0)
+	        ELSE COALESCE(B.CONTRACT_QUANTITY,0)
+			 END AS CNTC_QTY --合同用量
+      ,B.IS_INSTALL AS IS_INSTL_CODE --是否包安装编码
+	  ,T2.MEANING AS IS_INSTL_NAME --是否包安装描述
+	  ,COALESCE(B.INSTALLATION_COST,0) AS INSTL_PRC	--安装单价
+	  ,COALESCE(B.CENTRALIZED_SERVICE_RATE,0) AS CTRL_SRVC_RATE	--集采服务费率
+	  ,COALESCE(B.ORDER_SERVICE_RATE,0) AS ORDER_SRVC_RATE --抢单服务费率
+	  ,COALESCE(B.GROUND_SERVICE_RATE,0) AS GRND_SRVC_RATE --落地服务费率
+	  ,COALESCE(B.ADVANCE_SERVICE_RATE,0) AS ADVN_SRVC_RATE --垫资服务费率
+	  ,COALESCE(B.SERVICE_RATE,0) AS SRVC_RATE --综合费率
+	  ,COALESCE(B.SERVICE_RATE2,0) AS SRVC_RATE2 --综合费率2
+	  ,COALESCE(B.BUSINESS_COMMISSION_RATE,0) AS BUSI_COMS_RATE --业务提成率
+      ,B.MATERIAL_STATUS AS MATERIAL_ST_CODE --物料状态编码
+	  ,T3.MEANING AS MATERIAL_ST_NAME --物料状态
+	  ,A.CREATE_DATE --头创建日期
+      ,B.CREATION_DATE AS ITEM_CREATE_DATE --行创建日期
+	  ,A.UPDATE_DATE --头更新日期
+      ,B.LAST_UPDATE_DATE AS ITEM_UPDATE_DATE --行更新日期
+      ,D.UNIT_AREA AS UNIT_AREA --单片面积
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+      ,A.IS_PLTF_CODE --是否运营平台编码
+	  ,A.IS_PLTF_NAME --是否运营平台描述
+	  ,D.UNIT_AREA * CASE WHEN A.VERS_FLAG = 'LTC2.0' THEN COALESCE(COALESCE(B.REVIEW_DOSAGE,C.REVIEW_DOSAGE),0)
+	                  ELSE COALESCE(COALESCE(B.CONTRACT_QUANTITY,B.REVIEW_DOSAGE),0)
+			           END AS APLY_AREA --合同评审面积
+	  ,A.IS_SPEC_PROJ_CODE --是否特殊工程编码
+	  ,A.IS_SPEC_PROJ_NAME --是否特殊工程描述
+	  ,COALESCE(B.REPACKAGE_RATE,0) AS REPACK_RATE --重包费率
+	  ,A.version_flag   --新增字段VERSION_FLAG
+	  ,T4.contract_amount2    --新增字段合同总金额
+	  ,CASE WHEN A.SALE_ORG_CODE IS NULL OR A.SALE_ORG_CODE = '' THEN A.engr_sale_org_code ELSE A.SALE_ORG_CODE END SALE_ORG_CODE  --销售组织
+	  ,T5.MEANING as price_type --申请价格类型 空代表手动填写
+	  ,B.buyout_price --一口价
+	  ,A.WBS_NUM --WBS号
+  FROM DWRLTC.DWR_LTC_CNTC_INFO_T A
+ INNER JOIN SDI.SDI_CONTRACT_MATERIAL_1033 B
+    ON A.CNTC_ID = B.CONTRACT_ID
+   AND B.DELETE_FLAG = 0
+  LEFT JOIN SDI.SDI_PROJECT_REVIEW_JJJXS_MATERIAL_PRICE_1033 C
+    ON B.PROJECT_MATERIAL_ID = C.MATERIAL_PRICE_ID
+  LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T D
+    ON B.MATERIAL = D.MATERIAL_NUM
+  LEFT JOIN T AS T1
+    ON B.PRODUCT_ATTRIBUTE = T1.LOOKUP_CODE
+   AND T1.LOOKUP_TYPE = 'PRODUCT_TYPE'
+  LEFT JOIN T AS T2
+    ON B.IS_INSTALL = T2.LOOKUP_CODE
+   AND T2.LOOKUP_TYPE = 'YES_OR_NO'
+  LEFT JOIN T AS T3
+    ON B.MATERIAL_STATUS = T3.LOOKUP_CODE
+   AND T3.LOOKUP_TYPE = 'INFO_CUSTONMER_MATERIAL_STATUS'
+   LEFT JOIN SDI.SDI_contract_settlement_head_1033    T4
+   ON A.cntc_id   = T4.contract_id
+  LEFT JOIN T AS T5
+   ON B.PRICE_TYPE = T5.LOOKUP_CODE
+   AND T5.LOOKUP_TYPE = 'LTC_PRICE_TYPE'
+   

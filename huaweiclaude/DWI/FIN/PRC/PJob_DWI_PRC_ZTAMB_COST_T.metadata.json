@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PRC_ZTAMB_COST_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/PRC",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

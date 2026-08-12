@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_MATERIAL_BRAND_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/MM",
+    "description": "物料品牌主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

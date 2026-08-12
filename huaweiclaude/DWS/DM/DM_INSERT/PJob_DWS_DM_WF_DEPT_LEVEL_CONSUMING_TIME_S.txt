@@ -1,0 +1,331 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/09/22 09:31:13 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_WF_DEPT_LEVEL_CONSUMING_TIME_S
+ WHERE STAT_MONTH = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+ ;
+
+with base as (select 
+request_code
+,request_explain
+,dept_name
+,lastname
+,sapid
+,node_name
+,l1lc
+,wf_name
+,receive_date
+,receive_time
+,operate_date
+,operate_time
+,operatedatesj
+,operatetimesj
+,operate_type
+,last_operate_type
+,hs_hour
+,hs_minute
+,dept_jg_name
+,node_count
+,gz_hour
+,lev1_dept_name
+,case when lev2_dept_name like '%董事会||%' then '东鹏||董事会' 
+      else lev2_dept_name end lev2_dept_name
+,case when lev2_dept_name like '%董事会||%' then substr(lev2_dept_name,6)
+      else lev3_dept_name end lev3_dept_name
+,case when lev2_dept_name like '%董事会||%' then lev3_dept_name
+      else lev4_dept_name end lev4_dept_name
+,case when lev2_dept_name like '%董事会||%' then lev4_dept_name
+      else lev5_dept_name end lev5_dept_name
+,case when lev2_dept_name like '%董事会||%' then lev5_dept_name
+      else lev6_dept_name end lev6_dept_name      
+,case when lev2_dept_name like '%董事会||%' then lev6_dept_name
+      else lev7_dept_name end lev7_dept_name    
+,case when lev2_dept_name like '%董事会||%' then lev7_dept_name
+      else lev8_dept_name end lev8_dept_name  
+      ,dw_last_update_date
+      ,stat_month
+      ,current_node_type
+      ,emp_post_name
+      ,wf_type_name
+      ,wf_code
+      ,is_zx
+from dm.dm_wf_requests_consuming_time_pre_t
+WHERE 1 = 1
+and stat_month = substr(replace(receive_date,'-',''),1,6)
+and stat_month >= REPLACE(SUBSTR(TO_DATE('${PERIOD_ID_D}','yyyy-MM-dd') - interval '1 month',1,7),'-','')
+)
+,XD as (select 
+'1' lv
+,'L0-'||lev1_dept_name         AS  lev_dept_name
+,'L0-'||lev1_dept_name         AS  lest_dept_name
+,LEV1_DEPT_NAME  DEPT_NAME--部门层级
+,stat_month            --统计月
+,wf_type_name
+,current_node_type
+,COUNT(distinct  request_code) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base  b
+where 1 = 1
+and LEV1_DEPT_NAME is not null
+group by LEV1_DEPT_NAME,stat_month,rollup(current_node_type),wf_type_name  
+----------------------------------------------------------------
+union all
+
+select 
+'2' lv
+,'    L1-'||lev2_dept_name        AS  lev2_dept_name
+,'L0-'||lev1_dept_name         AS  lest_dept_name
+,LEV2_DEPT_NAME --部门层级2
+,stat_month 
+,wf_type_name
+,current_node_type 
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base b
+where 1 = 1
+and LEV2_DEPT_NAME is not null
+group by LEV1_DEPT_NAME,LEV2_DEPT_NAME,stat_month ,rollup(current_node_type),wf_type_name  
+-------------------------------------------------
+union all
+
+select 
+'3' lv
+,'        L2-'||lev3_dept_name       AS  lev3_dept_name
+,'    L1-'||lev2_dept_name           AS  lest_dept_name
+,LEV3_DEPT_NAME --部门层级3
+,stat_month 
+,wf_type_name
+,current_node_type 
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1 
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base  b
+where 1 = 1
+and LEV3_DEPT_NAME is not null
+group by LEV2_DEPT_NAME,LEV3_DEPT_NAME,stat_month ,rollup(current_node_type),wf_type_name
+---------------------------------------------------------------
+union all
+
+select 
+'4' lv
+,'            L3-'||lev4_dept_name      AS  lev4_dept_name
+,'        L2-'||lev3_dept_name         AS  lest_dept_name
+,LEV4_DEPT_NAME --部门层级4
+,stat_month   
+,wf_type_name
+,current_node_type 
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base  b
+where 1 = 1
+and LEV4_DEPT_NAME is not null
+group by LEV3_DEPT_NAME,LEV4_DEPT_NAME,stat_month ,rollup(current_node_type),wf_type_name 
+-----------------------------------------------
+union all
+select 
+'5' lv
+,'                L4-'||lev5_dept_name     AS  lev5_dept_name
+,'            L3-'||lev4_dept_name         AS  lest_dept_name
+,LEV5_DEPT_NAME --部门层级5
+,stat_month  
+,wf_type_name
+,current_node_type 
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base  b
+where 1 = 1
+and LEV5_DEPT_NAME is not null
+group by LEV4_DEPT_NAME,LEV5_DEPT_NAME,stat_month ,rollup(current_node_type) ,wf_type_name 
+
+--------------------------------------------------------
+
+union all
+select 
+'6' lv
+,'                    L5-'||lev6_dept_name    AS  lev6_dept_name
+,'                L4-'||lev5_dept_name        AS  lest_dept_name
+,LEV6_DEPT_NAME --部门层级6
+,stat_month
+,wf_type_name
+,current_node_type   
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base  b
+where 1 = 1
+and LEV6_DEPT_NAME is not null
+group by LEV5_DEPT_NAME,LEV6_DEPT_NAME,stat_month,rollup(current_node_type) ,wf_type_name
+-----------------------------------------------------------
+union all
+
+select 
+'7' lv
+,'                        L6-'||lev7_dept_name   AS  lev7_dept_name
+,'                    L5-'||lev6_dept_name       AS  lest_dept_name
+,LEV7_DEPT_NAME --部门层级7
+,stat_month  
+,wf_type_name
+,current_node_type  
+,COUNT(distinct  request_code ) WF_COUNT --流程数
+,sum(NODE_COUNT) NODE_COUNT --节点数
+,sum(GZ_HOUR) GZ_HOUR --耗时(工作时间:小时)
+,sum(case when GZ_HOUR > 6 and stat_month < 202209 then 1 
+          when GZ_HOUR > 4 and stat_month >= 202209 and stat_month < 202303 then 1
+		  when GZ_HOUR > 3.5 and stat_month >= 202303 then 1
+          else 0 end ) CS_NODE_COUNT --超时节点数
+from base b
+where 1 = 1
+and LEV7_DEPT_NAME is not null
+group by LEV6_DEPT_NAME,LEV7_DEPT_NAME,stat_month,rollup(current_node_type),wf_type_name  
+)
+,XXD AS (SELECT 
+lv
+,lev_dept_name
+,lest_dept_name
+,DEPT_NAME--部门层级
+,stat_month            --统计月
+,wf_type_name
+,case when current_node_type is null then '合计' else current_node_type end current_node_type  
+,WF_COUNT --流程数
+,NODE_COUNT --节点数
+,GZ_HOUR --耗时(工作时间:小时)
+,CS_NODE_COUNT --超时节点数
+FROM XD
+where 1 = 1
+)
+INSERT INTO DM.DM_WF_DEPT_LEVEL_CONSUMING_TIME_S(
+        STAT_MONTH
+	   ,LEVEL_ID
+	   ,LEV_DEPT_NAME
+	   ,LAST_DEPT_NAME
+	   ,DEPT_NAME
+	   ,WF_TYPE_NAME
+	   ,CURRENT_NODE_TYPE
+	   ,WF_COUNT
+	   ,NODE_COUNT
+	   ,GZ_HOUR
+	   ,CS_NODE_COUNT
+	   ,LAST_WF_COUNT
+	   ,LAST_NODE_COUNT
+	   ,LAST_GZ_HOUR
+	   ,DW_LAST_UPDATE_DATE
+)
+SELECT 
+ A.STAT_MONTH --统计月 
+,A.LEVEL_ID --部门层级ID
+,A.LEV_DEPT_NAME --部门层级名称
+,A.LAST_DEPT_NAME --上级部门层级名称
+,A.DEPT_NAME--部门名称
+,A.WF_TYPE_NAME --流程分类
+,A.CURRENT_NODE_TYPE  --节点类型
+,SUM(A.WF_COUNT) AS WF_COUNT --流程数
+,SUM(A.NODE_COUNT) AS NODE_COUNT --节点数
+,SUM(A.GZ_HOUR) AS NODE_COUNT --耗时(工作时间:小时)
+,SUM(A.CS_NODE_COUNT) AS CS_NODE_COUNT --超时节点数
+,SUM(A.LAST_WF_COUNT) AS LAST_WF_COUNT --上个月流程数
+,SUM(A.LAST_NODE_COUNT) AS LAST_NODE_COUNT --上个月节点数
+,SUM(A.LAST_GZ_HOUR) AS LAST_GZ_HOUR --上个月耗时(工作时间:小时)
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+FROM(
+SELECT 
+ A.STAT_MONTH --统计月 
+,A.LV AS LEVEL_ID --部门层级ID
+,A.LEV_DEPT_NAME --部门层级名称
+,A.LEST_DEPT_NAME AS LAST_DEPT_NAME --上级部门层级名称
+,A.DEPT_NAME--部门名称
+,A.WF_TYPE_NAME --流程分类
+,A.CURRENT_NODE_TYPE  --节点类型
+,CAST(A.WF_COUNT AS NUMERIC(38,10)) AS WF_COUNT --流程数
+,CAST(A.NODE_COUNT AS NUMERIC(38,10)) AS NODE_COUNT --节点数
+,CAST(A.GZ_HOUR AS NUMERIC(38,10)) AS GZ_HOUR --耗时(工作时间:小时)
+,CAST(A.CS_NODE_COUNT AS NUMERIC(38,10)) AS CS_NODE_COUNT --超时节点数
+,CAST(0 AS NUMERIC(38,10)) AS LAST_WF_COUNT --上个月流程数
+,CAST(0 AS NUMERIC(38,10)) AS LAST_NODE_COUNT --上个月节点数
+,CAST(0 AS NUMERIC(38,10)) AS LAST_GZ_HOUR --上个月耗时(工作时间:小时)
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+FROM(SELECT lv
+,lev_dept_name
+,lest_dept_name
+,DEPT_NAME--部门层级
+,stat_month            --统计月
+,wf_type_name
+,current_node_type  
+,WF_COUNT --流程数
+,NODE_COUNT --节点数
+,GZ_HOUR --耗时(工作时间:小时)
+,CS_NODE_COUNT --超时节点数
+FROM XXD
+where stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+) A
+
+UNION ALL
+
+SELECT 
+ CAST(A.STAT_MONTH AS INT) AS STAT_MONTH --统计月 
+,A.LV AS LEVEL_ID --部门层级ID
+,A.LEV_DEPT_NAME --部门层级名称
+,A.LEST_DEPT_NAME AS LAST_DEPT_NAME --上级部门层级名称
+,A.DEPT_NAME--部门名称
+,A.WF_TYPE_NAME --流程分类
+,A.CURRENT_NODE_TYPE  --节点类型
+,CAST(0 AS NUMERIC(38,10)) AS WF_COUNT --流程数
+,CAST(0 AS NUMERIC(38,10)) AS NODE_COUNT --节点数
+,CAST(0 AS NUMERIC(38,10)) AS GZ_HOUR --耗时(工作时间:小时)
+,CAST(0 AS NUMERIC(38,10)) AS CS_NODE_COUNT --超时节点数
+,CAST(A.LWF_COUNT AS NUMERIC(38,10)) AS LAST_WF_COUNT --上个月流程数
+,CAST(A.LNODE_COUNT AS NUMERIC(38,10)) AS LAST_NODE_COUNT --上个月节点数
+,CAST(A.LGZ_HOUR AS NUMERIC(38,10)) AS LAST_GZ_HOUR --上个月耗时(工作时间:小时)
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+FROM (SELECT lv
+,lev_dept_name
+,lest_dept_name
+,DEPT_NAME--部门层级
+,to_char(to_date(substr(stat_month,1,4)||'-'||substr(stat_month,5,2) ||'-01')+ interval '1 month','yyyymm') AS stat_month     --统计月
+,wf_type_name
+,current_node_type  
+,WF_COUNT LWF_COUNT --流程数
+,NODE_COUNT LNODE_COUNT --节点数
+,GZ_HOUR LGZ_HOUR --耗时(工作时间:小时)
+,CS_NODE_COUNT --超时节点数
+FROM XXD
+) A 
+where stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+) A
+GROUP BY A.STAT_MONTH --统计月 
+,A.LEVEL_ID --部门层级ID
+,A.LEV_DEPT_NAME --部门层级名称
+,A.LAST_DEPT_NAME --上级部门层级名称
+,A.DEPT_NAME--部门名称
+,A.WF_TYPE_NAME --流程分类
+,A.CURRENT_NODE_TYPE  --节点类型
+;

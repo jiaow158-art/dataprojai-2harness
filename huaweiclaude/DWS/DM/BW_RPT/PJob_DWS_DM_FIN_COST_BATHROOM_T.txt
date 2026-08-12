@@ -1,0 +1,393 @@
+
+WITH AAA as(--阿米巴费用合计
+(
+SELECT 
+ ZMFIO012."CALMONTH"
+,ZMAMO004."/BIC/ZA_SYAMB"
+,ZMFIO012."CO_AREA"
+,ZMFIO012."COSTCENTER"
+,ZMFIO012."CHRT_ACCTS"
+,ZMFIO012."GL_ACCOUNT"
+-- ,SUM("ZA_LHCZ_GLZT" + "ZA_SJQTFY" + "ZA_GGPPSYF" + "ZA_YFSJFY" + "ZA_ZYCBYF"  + "ZA_CPZLPC_GLZT"+"ZA_SHFWF_GLZT") AS A   -- 2022-12-04 14:55:39   linw
+,SUM("ZA_LHCZ_GLZT" + "ZA_SJQTFY" + "ZA_GGPPSYF" + "ZA_YFSJFY" + "ZA_ZYCBYF"  + "ZA_CPZLPC_GLZT") AS A   -- 2022-12-04 14:55:39   linw
+FROM dm.dm_rpt_bic_azmfi_o0122_t  ZMFIO012
+LEFT JOIN dm.dm_rpt_bic_azmam_o0042_t AS ZMAMO004 ON ZMFIO012."SALES_GRP" = ZMAMO004."SALES_GRP"
+GROUP BY ZMFIO012."CALMONTH",ZMAMO004."/BIC/ZA_SYAMB",ZMFIO012."CO_AREA",ZMFIO012."COSTCENTER",ZMFIO012."CHRT_ACCTS",ZMFIO012."GL_ACCOUNT"
+UNION 
+SELECT 
+ ZMFIO012_1."CALMONTH"
+,ZMAMO004."/BIC/ZA_SYAMB"
+,ZMFIO012_1."CO_AREA"
+,ZMFIO012_1."COSTCENTER"
+,ZMFIO012_1."CHRT_ACCTS"
+,ZMFIO012_1."GL_ACCOUNT"
+,SUM("ZA_JF_GLZT" ) AS A 
+FROM dm.dm_rpt_bic_azmfi_o0122_t AS ZMFIO012_1
+LEFT JOIN  dm.dm_rpt_bic_azmam_o0042_t  AS ZMAMO004 ON ZMFIO012_1."SALES_GRP" = ZMAMO004."SALES_GRP"
+WHERE ZMAMO004."/BIC/ZA_SYAMB" IN ('ZAMBID33000033','ZAMBID33000014','ZAMBID33000016','ZAMBID33000018','ZAMBID33000019')
+GROUP BY ZMFIO012_1."CALMONTH",ZMAMO004."/BIC/ZA_SYAMB",ZMFIO012_1."CO_AREA",ZMFIO012_1."COSTCENTER",ZMFIO012_1."CHRT_ACCTS",ZMFIO012_1."GL_ACCOUNT"
+UNION
+SELECT 
+ZMFIO010."CALMONTH"
+,ZMAMO004."/BIC/ZA_SYAMB"
+,ZMFIO010."CO_AREA"
+,ZMFIO010."COSTCENTER"
+,ZMFIO010."CHRT_ACCTS"
+,ZMFIO010."GL_ACCOUNT"
+,SUM("ZA_GDZCLX" + "ZA_CQDTLX" + "ZA_WXZCLX" + "ZA_ZJGCLX") AS A 
+FROM dm.dm_rpt_bic_azmfi_o0101_t AS ZMFIO010
+LEFT JOIN  dm.dm_rpt_bic_azmam_o0042_t AS ZMAMO004 ON ZMFIO010."SALES_GRP" = ZMAMO004."SALES_GRP"
+GROUP BY ZMFIO010."CALMONTH",ZMAMO004."/BIC/ZA_SYAMB",ZMFIO010."CO_AREA",ZMFIO010."COSTCENTER",ZMFIO010."CHRT_ACCTS",ZMFIO010."GL_ACCOUNT"
+UNION
+SELECT 
+ZMFIO015."CALMONTH"
+,ZMAMO004."/BIC/ZA_SYAMB"
+,ZMFIO015."CO_AREA"
+,ZMFIO015."COSTCENTER"
+,ZMFIO015."CHRT_ACCTS"
+,ZMFIO015."GL_ACCOUNT"
+,SUM("ZA_YYWZC_CPZLPC") AS A
+FROM dm.dm_rpt_bic_azmfi_o0152_t   AS ZMFIO015
+LEFT JOIN dm.dm_rpt_bic_azmam_o0042_t AS ZMAMO004 ON ZMFIO015."SALES_GRP" = ZMAMO004."SALES_GRP"
+GROUP BY ZMFIO015."CALMONTH",ZMAMO004."/BIC/ZA_SYAMB",ZMFIO015."CO_AREA",ZMFIO015."COSTCENTER",ZMFIO015."CHRT_ACCTS",ZMFIO015."GL_ACCOUNT"
+)
+UNION
+(
+SELECT 
+ ZMFIO010."CALMONTH"
+,ZMAMO006."BIC_ZA_SYAMB" "/BIC/ZA_SYAMB"
+,ZMFIO010."CO_AREA"
+,ZMFIO010."COSTCENTER"
+,ZMFIO010."CHRT_ACCTS"
+,ZMFIO010."GL_ACCOUNT"
+,SUM("ZA_GYSXFLX" + "ZA_CQZCLX") AS A 
+FROM dm.dm_rpt_bic_azmfi_o0101_t  AS ZMFIO010
+INNER JOIN dm.DM_RPT_BIC_AZMAM_O0062_T AS ZMAMO006 ON ZMFIO010."COMP_CODE" = ZMAMO006."COMP_CODE"
+GROUP BY ZMFIO010."CALMONTH",ZMAMO006."BIC_ZA_SYAMB",ZMFIO010."CO_AREA",ZMFIO010."COSTCENTER",ZMFIO010."CHRT_ACCTS",ZMFIO010."GL_ACCOUNT"
+)
+--"/BIC/AZMAM_O0062"   
+--select * from dm.DM_RPT_BIC_AZMAM_O0062_T
+UNION
+(     
+SELECT 
+ZMFIO213."CALMONTH"
+,ZMFIO213."/BIC/ZA_SYAMB"
+,NULL AS "CO_AREA"
+,NULL AS "COSTCENTER"
+,NULL AS "CHRT_ACCTS"
+,NULL AS "GL_ACCOUNT"
+,SUM("ZA_YSSXEDLX" + "ZA_YSZKLX") AS A 
+FROM dm.dm_rpt_bic_azmfi_o2131_t  AS ZMFIO213
+GROUP BY ZMFIO213."CALMONTH",ZMFIO213."/BIC/ZA_SYAMB"
+)
+UNION
+(
+SELECT 
+ZMMMO208."CALMONTH"
+,ZMMMO208."/BIC/ZA_SYAMB"
+,NULL AS "CO_AREA"
+,NULL AS "COSTCENTER"
+,NULL AS "CHRT_ACCTS"
+,NULL AS "GL_ACCOUNT"
+,SUM("CZZGSZJLX" + "LBHLS_DY" + "DY_ZJCB_DY") AS A 
+FROM dm.DM_RPT_BIC_AZMMM_O2081_T AS ZMMMO208
+GROUP BY ZMMMO208."CALMONTH",ZMMMO208."/BIC/ZA_SYAMB"
+)
+),
+
+BBB as--成本中心层级结构
+(
+SELECT H."NODENAME",
+CASE WHEN H."IOBJNM" = '0COSTCENTER' THEN ST."TXTSH" ELSE R."TXTSH" END "NODEDESC" ,
+H."NODEID",
+H."PARENTID" , 
+H."TLEVEL",
+H."IOBJNM"
+FROM dm.dm_rpt_bi0_hcostcenter_t H   
+left join dm.dm_rpt_bi0_tcostcenter_t  ST ON H."NODENAME" = CONCAT(ST."CO_AREA",ST."COSTCENTER") AND TO_CHAR(CURRENT_DATE,'YYYYMMDD' ) BETWEEN ST."DATEFROM" AND ST."DATETO"  AND ST."LANGU" = '1' AND H."IOBJNM" = '0COSTCENTER'
+left JOIN dm.dm_rpt_rsthiernode_t R ON R."NODENAME" = H."NODENAME" AND R."OBJVERS" = 'A' AND R."HIEID" = 'U7IQQJ5IOXTSXJ041AZFRIE05' AND R."LANGU" = '1'
+WHERE H."HIEID" = 'U7IQQJ5IOXTSXJ041AZFRIE05'
+/* (select HIEID from RSHIEDIR where hienm = 'DP00G') 替换 MAINTREE */
+),
+
+
+CCC AS--成本中心层级结构
+(
+
+SELECT 
+DISTINCT
+CASE WHEN H1."IOBJNM" = '0COSTCENTER' THEN H1."NODENAME"
+WHEN H2."IOBJNM" = '0COSTCENTER' THEN H2."NODENAME"
+WHEN H3."IOBJNM" = '0COSTCENTER' THEN H3."NODENAME"
+WHEN H4."IOBJNM" = '0COSTCENTER' THEN H4."NODENAME"
+WHEN H5."IOBJNM" = '0COSTCENTER' THEN H5."NODENAME"
+WHEN H6."IOBJNM" = '0COSTCENTER' THEN H6."NODENAME"
+WHEN H7."IOBJNM" = '0COSTCENTER' THEN H7."NODENAME"
+WHEN H8."IOBJNM" = '0COSTCENTER' THEN H8."NODENAME"
+WHEN H9."IOBJNM" = '0COSTCENTER' THEN H9."NODENAME"
+WHEN H10."IOBJNM" = '0COSTCENTER' THEN H10."NODENAME"
+WHEN H11."IOBJNM" = '0COSTCENTER' THEN H11."NODENAME"
+WHEN H12."IOBJNM" = '0COSTCENTER' THEN H12."NODENAME"
+WHEN H13."IOBJNM" = '0COSTCENTER' THEN H13."NODENAME"
+WHEN H14."IOBJNM" = '0COSTCENTER' THEN H14."NODENAME"
+WHEN H15."IOBJNM" = '0COSTCENTER' THEN H15."NODENAME"
+END "ZCOSTCENTER",
+H1."NODENAME" AS "节点1ID", 
+H1."NODEDESC" AS "成本中心层级1",
+H2."NODENAME" AS "节点2ID", 
+H2."NODEDESC" AS "成本中心层级2",
+H3."NODENAME" AS "节点3ID", 
+H3."NODEDESC" AS "成本中心层级3",
+H4."NODENAME" AS "节点4ID", 
+H4."NODEDESC" AS "成本中心层级4",
+H4."IOBJNM" AS "层级4类型",
+H5."NODENAME" AS "节点5ID", 
+H5."NODEDESC" AS "节点5描述",
+H6."NODENAME" AS "节点6ID", 
+H6."NODEDESC" AS "节点6描述",
+H7."NODENAME" AS "节点7ID", 
+H7."NODEDESC" AS "节点7描述",
+H8."NODENAME" AS "节点8ID", 
+H8."NODEDESC" AS "节点8描述",
+H9."NODENAME" AS "节点9ID", 
+H9."NODEDESC" AS "节点9描述",
+H10."NODENAME" AS "节点10ID", 
+H10."NODEDESC" AS "节点10描述",
+H11."NODENAME" AS "节点11ID", 
+H11."NODEDESC" AS "节点11描述",
+H12."NODENAME" AS "节点12ID", 
+H12."NODEDESC" AS "节点12描述",
+H13."NODENAME" AS "节点13ID", 
+H13."NODEDESC" AS "节点13描述",
+H14."NODENAME" AS "节点14ID", 
+H14."NODEDESC" AS "节点14描述",
+H15."NODENAME" AS "节点15ID", 
+H15."NODEDESC" AS "节点15描述"
+FROM BBB H1
+LEFT JOIN BBB H2 ON H1."NODEID" = H2."PARENTID"
+LEFT JOIN BBB H3 ON H2."NODEID" = H3."PARENTID"
+LEFT JOIN BBB H4 ON H3."NODEID" = H4."PARENTID"
+LEFT JOIN BBB H5 ON H4."NODEID" = H5."PARENTID"
+LEFT JOIN BBB H6 ON H5."NODEID" = H6."PARENTID"
+LEFT JOIN BBB H7 ON H6."NODEID" = H7."PARENTID" 
+LEFT JOIN BBB H8 ON H7."NODEID" = H8."PARENTID"
+LEFT JOIN BBB H9 ON H8."NODEID" = H9."PARENTID"
+LEFT JOIN BBB H10 ON H9."NODEID" = H10."PARENTID"
+LEFT JOIN BBB H11 ON H10."NODEID" = H11."PARENTID"
+LEFT JOIN BBB H12 ON H11."NODEID" = H12."PARENTID"
+LEFT JOIN BBB H13 ON H12."NODEID" = H13."PARENTID"
+LEFT JOIN BBB H14 ON H13."NODEID" = H14."PARENTID"
+LEFT JOIN BBB H15 ON H14."NODEID" = H15."PARENTID"
+WHERE H1."TLEVEL" = '01' 
+AND H2."NODEDESC" = '卫浴事业部'
+)
+
+,tmp AS (
+SELECT 
+  case when substr("CALMONTH",1,4) = '0000' then '1970' else substr("CALMONTH",1,4) end "CALYEARS" 
+ ,case when "CALMONTH" = '000000' then '197001' else "CALMONTH" end "CALMONTH"
+,CCC."成本中心层级1"
+,CCC."成本中心层级2"
+,CCC."成本中心层级3"
+--,CONCAT(CONCAT(AAA."CO_AREA",'/'),ltrim(AAA."COSTCENTER",'0') )  AS "成本中心层级4结构"
+,CASE WHEN "层级4类型" = '0COSTCENTER' THEN CONCAT(CONCAT(AAA."CO_AREA",'/'),ltrim(AAA."COSTCENTER",'0')) ELSE "节点4ID" END AS "成本中心层级4结构"
+,CCC."成本中心层级4"
+,GL_ACCOUNT."TXTSH" AS "总账科目"
+,CONCAT(CONCAT(AAA."CHRT_ACCTS",'/'),ltrim(AAA."GL_ACCOUNT",'0') ) AS "总账科目结构"
+,SUM(A) AS "本月" 
+,0 "年至今"
+,"节点7ID"
+FROM AAA 
+LEFT JOIN CCC ON CCC."ZCOSTCENTER" = CONCAT(AAA."CO_AREA",AAA."COSTCENTER")
+LEFT JOIN dm.dm_rpt_bi0_tgl_account_t  AS GL_ACCOUNT ON GL_ACCOUNT."CHRT_ACCTS" = AAA."CHRT_ACCTS" AND GL_ACCOUNT."GL_ACCOUNT" = AAA."GL_ACCOUNT" 
+and GL_ACCOUNT."LANGU" = '1' 
+WHERE  1=1 
+--and ("节点7ID" <> 'DP00GW36FCD' or "节点7ID" is null )
+and "/BIC/ZA_SYAMB" = 'ZAMBID11000002'
+--AND "CALMONTH" = '202204' --输入月份
+
+
+
+GROUP BY CCC."成本中心层级1",CCC."成本中心层级2",CCC."成本中心层级3"
+--,CONCAT(CONCAT(AAA."CO_AREA",'/'),ltrim(AAA."COSTCENTER",'0') )
+,CCC."成本中心层级4"
+,CASE WHEN "层级4类型" = '0COSTCENTER' THEN CONCAT(CONCAT(AAA."CO_AREA",'/'),ltrim(AAA."COSTCENTER",'0')) ELSE "节点4ID" END
+,GL_ACCOUNT."TXTSH",CONCAT(CONCAT(AAA."CHRT_ACCTS",'/'),ltrim(AAA."GL_ACCOUNT",'0') ),  
+case when substr("CALMONTH",1,4) = '0000' then '1970' else substr("CALMONTH",1,4) end
+ ,case when "CALMONTH" = '000000' then '197001' else "CALMONTH" end ,"节点7ID"
+)
+
+
+--select * from CCC where "ZCOSTCENTER"  = 'DP00/3900DA0003'
+--select * from dm.dm_rpt_bic_azmam_o0042_t where "SALES_GRP" ='JG3'
+
+
+
+
+,union_data as (
+select 
+ "month_id" "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构"  
+,sum("本月") "本月"
+,0 "本月同期"
+,0 "年累计"
+,0 "年累计同期"
+from tmp join (
+    select "month_id" from dm.dm_dim_date_d 
+	where "month_id" <= replace(substring(cast(current_date as varchar),1,7),'-','') -- '202206' 
+	and "month_id" >='202101'    
+	group by "month_id" ) t2 on 1=1 
+where trunc(to_date("CALMONTH",'yyyy-mm-dd')) = trunc(to_date("month_id",'yyyy-mm-dd'))
+group by  "month_id","成本中心层级1","成本中心层级2","成本中心层级3","成本中心层级4结构","成本中心层级4","总账科目","总账科目结构"  
+union all 
+select 
+ "month_id" "CALMONTH"
+, "成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构"  
+,0"本月"
+,sum("本月") "本月同期"
+,0 "年累计"
+,0 "年累计同期"
+from tmp join (
+     select "month_id" 
+	 from dm.dm_dim_date_d 
+	 where "month_id"<= replace(substring(cast(current_date as varchar),1,7),'-','') -- '202206'
+	 and "month_id">='202101'   
+	 group by "month_id" ) t2 on 1=1 
+where trunc(to_date("CALMONTH",'yyyy-mm-dd')) =  Date_trunc ('MONTHS', add_months(to_date("month_id",'yyyy-mm-dd'),-12 )) 
+group by "month_id","成本中心层级1","成本中心层级2","成本中心层级3","成本中心层级4结构","成本中心层级4","总账科目","总账科目结构"  
+union all 
+select 
+ "month_id" "CALMONTH"
+, "成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构"  
+,0"本月"
+,0 "本月同期"
+,SUM("本月") "年累计"
+,0 "年累计同期"
+from tmp join (
+    select "month_id" 
+	from dm.dm_dim_date_d 
+	where "month_id" <= replace(substring(cast(current_date as varchar),1,7),'-','') -- '202206'
+	and "month_id" >='202101'  
+	group by "month_id" ) t2 on 1=1 
+where 1=1
+ and trunc(to_date("CALMONTH",'yyyy-mm-dd')) <=  trunc(to_date("month_id" ,'yyyy-mm-dd'))
+ and trunc(to_date("CALMONTH",'yyyy-mm-dd')) >=  Date_trunc ('YEARS',to_date("month_id" ,'yyyy-mm-dd') )
+group by "month_id","成本中心层级1","成本中心层级2","成本中心层级3","成本中心层级4结构","成本中心层级4","总账科目","总账科目结构"  
+union all 
+select 
+ "month_id" "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构"  
+,0"本月"
+,0 "本月同期"
+,0 "年累计"
+,SUM("本月") "年累计同期"
+from tmp join (
+     select "month_id" from dm.dm_dim_date_d
+     where "month_id" <=replace(substring(cast(current_date as varchar),1,7),'-','') -- '202206' 
+     and "month_id" >='202101'   
+     group by "month_id" ) t2 on 1=1 
+where 1=1
+and to_date("CALMONTH",'yyyy-mm-dd') >= Date_trunc ('YEARS', add_months(to_date("month_id",'yyyy-mm-dd'),-12 ) )
+and to_date("CALMONTH",'yyyy-mm-dd') <= trunc(add_months(to_date("month_id",'yyyy-mm-dd'),-12 ) )
+group by "month_id","成本中心层级1","成本中心层级2","成本中心层级3","成本中心层级4结构","成本中心层级4","总账科目","总账科目结构"  
+
+)
+ ,tmp2 as (
+ select 
+ "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构"  
+,sum("本月") "本月"
+,sum("本月同期")"本月同期"
+,sum("年累计") "年累计"
+,sum("年累计同期") "年累计同期"
+from union_data 
+group by 
+ "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构" 
+ )
+
+
+insert overwrite  into DM.DM_FIN_COST_BATHROOM_T 
+select 
+ "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构" 
+,sum("本月") "本月"
+,sum("本月同期")"本月同期"
+,sum("年累计") "年累计"
+,sum("年累计同期") "年累计同期"
+,T3.cost_class "费用分类"
+,T3.cost_category "费用大类"
+,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE  -- 数据同步时间
+,coalesce(T4.item_name,t5.cost_category_name) "费用大类(新)"
+from 
+tmp2 t2 
+left join 
+(select cost_matter,cost_class,cost_category from DM.DM_RPT_COST_GL_SUBJECT_T   group by cost_matter,cost_class,cost_category  ) T3
+on concat(case when trim(t2."成本中心层级4") is null then '未分配' else trim(t2."成本中心层级4") end ,case when trim(t2."总账科目结构") ='/'then '#/#' else trim(t2."总账科目结构") end) = t3.cost_matter
+left join 
+(select item_name,external_code from dwimd.dwi_item_map_relation_t ) t4
+on right(t2."总账科目结构",8) = right(t4.external_code,8)
+left join upload.upload_sw_frozen_cost_category_t t5 on t5.gl_subject_name = t2."总账科目结构"
+where "总账科目结构"  not like 'CNDP/1%'
+group by  "CALMONTH"
+,"成本中心层级1"
+,"成本中心层级2"
+,"成本中心层级3"
+,"成本中心层级4结构"
+,"成本中心层级4"
+,"总账科目"
+,"总账科目结构" 
+,T3.cost_class
+,T3.cost_category
+,coalesce(T4.item_name,t5.cost_category_name)
+
+--
+--truncate  table dm.dm_rpt_cost_gl_subject_t 
+--
+--select * from dm.dm_rpt_cost_gl_subject_t drcgst  where cost_class is null or dw_last_update_date is null 
+----
+
+
+ 

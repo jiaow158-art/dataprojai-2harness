@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_PREPARE_STOCK_DTL_MONTH",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

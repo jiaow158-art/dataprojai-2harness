@@ -1,0 +1,284 @@
+insert overwrite table DWIOTD.DWI_TRA_TMS_DO_T
+select 
+   ts.id,			
+   ts.do_no as DO_NUM,
+   ts.order_no as ORDER_NUM,
+   ts.priority as PRIORITY_CODE,
+   ts.mversion as MVERSION,
+   ts.status as STATUS_CODE,
+   ts.wms_picking_status as WMS_PICKING_STATUS,
+   ts.entrydt as CREATE_TIME,
+   ts.entryid as CREATOR_ID,
+   ts.reallocate_flag as REALLOCATE_FLAG,
+   ts.is_delivery_order as DELIVERY_ORDER_FLAG,
+   ts.da_status as DA_STATUS_CODE,
+   ts.tenant_id as TENANT_ID,
+   ts.cargo_owner_code as OPERATION_CENTER_CODE,
+   ts.shipper_code as SHIPPER_CODE,
+   ts.carrier_name as CARRIER_NAME,
+   ts.carrier_code as CARRIER_CODE,
+   ts.loading_site_code as LOADING_SITE_CODE,
+   ts.loading_site_name as LOADING_SITE_NAME,
+   ts.loading_addr as LOADING_ADDRESS_NAME,
+   ts.unloading_addr as UNLOADING_ADDRESS_NAME	,
+   ts.unloading_site_code as UNLOADING_SITE_CODE,
+   ts.unloading_site_name as UNLOADING_SITE_NAME,
+   ts.ship_method as SHIP_METHOD_CODE,
+   ts.outsourcing as OUTSOURCING,
+   ts.picking_location as PICKING_LOCATION,
+   ts.description as DESCRIPTION,
+   ts.rms_flag as RMS_FLAG,
+   ts.updatedt as UPDATE_TIME,
+   ts.updateid as UPDATE_ID,
+   ts.susr1 as DELIVERY_FLAG,
+   ts.susr2 as TRAY_DEDUCT_COST_CENTER_CODE,
+   ts.susr3 as COMBINE_DELIVERY_NUM,
+   ts.susr4 as DEPARTMENT_AUTHORITY_CODE,
+   ts.susr5 as DRIVER_PHONE_NUM,
+   ts.susr7 as CONTAINER_NUM,
+   ts.susr8 as WOODEN_FRAME_QTY,
+   ts.susr9 as DELIVERY_REQUIREMENTS,
+   ts.express_no as CARRIER_LIST_NUMBER,
+   ts.kpi_flag as KPI_FLAG,
+   ts.bill_flag as BILL_FLAG,
+   ts.loading_contact as LOADING_CONTACT_NAME,
+   ts.loading_phone as LOADING_CONTACT_PHONE,
+   ts.loading_province as LOADING_PROVINCE_CODE,
+   ts.loading_city as LOADING_CITY_CODE,
+   ts.loading_county as LOADING_COUNTY_CODE,
+   ts.loading_town as LOADING_TOWN_CODE,
+   ts.unloading_contact as UNLOADING_CONTACT_NAME1,
+   ts.unloading_phone as UNLOADING_CONTACT_PHONE1,
+   ts.unloading_province as UNLOADING_PROVINCE_CODE,
+   ts.unloading_city as UNLOADING_CITY_CODE,
+   ts.unloading_county as UNLOADING_COUNTY_CODE,
+   ts.unloading_town as UNLOADING_TOWN_CODE,
+   ts.plan_ship_date as PLAN_LOADING_TIME,
+   ts.demand_arrive_date as DEMAND_ARRIVE_TIME,
+   ts.plan_no as PLAN_NUM,
+   ts.ship_line as SHIP_LINE_CODE,
+   ts.cost_center as COST_CENTER_CODE,
+   ts.actual_ship_date as ACTUAL_SHIP_TIME,
+   ts.actual_arrive_date as ACTUAL_ARRIVE_TIME,
+   ts.total_goods_piece as TOTAL_GOODS_PIECE,
+   ts.actual_goods_piece as ACTUAL_GOODS_PIECE,
+   ts.total_goods_colume as TOTAL_GOODS_VOLUME,
+   ts.actual_goods_colume as ACTUAL_GOODS_VOLUME,
+   ts.total_rough_weight as TOTAL_ROUGH_WEIGHT,
+   ts.actual_rough_weight as ACTUAL_ROUGH_WEIGHT,
+   ts.total_net_weight as TOTAL_NET_WEIGHT,
+   ts.actual_net_weight as ACTUAL_NET_WEIGHT,
+   ts.total_boxes as TOTAL_BOXES,
+   ts.actual_boxes as ACTUAL_TOTAL_BOXES,
+   ts.total_goods_amounts as TOTAL_GOODS_AMT,
+   ts.actual_goods_amounts as ACTUAL_GOODS_AMT,
+   ts.owner_code as OWNER_CODE,
+   ts.owner_name as OWNER_NAME,
+   ts.original_order_source as ORIGINAL_ORDER_SOURCE_CODE,
+   ts.sourceorderentrydt as SOURCE_ORDER_CREATE_TIME,
+   ts.loadingpersonname2 as LOADING_CONTACT_NAME2,
+   ts.loadingperson_telephone2 as LOADING_CONTACT_PHONE2,
+   ts.unloadingpersonname2 as UNLOADING_CONTACT_NAME2,
+   ts.unloadingperson_telephone2 as UNLOADING_CONTACT_PHONE2,
+   ts.externno as EXTERNAL_NUM,
+   ts.isbilled as BILL_FLAG2,
+   ts.settlement_method as SETTLEMENT_METHOD,
+   ts.customer_code as CUST_NUM,
+   ts.is_forbidden_region as FORBIDDEN_REGION_FLAG,
+   ts.is_faraway as FARAWAY_FLAG,
+   ts.bill_retry_count as BILL_RETRY_COUNT,
+   ts.ordertype as BUSINESS_TYPE_CODE,
+   ts.api_req_count as EXTERNAL_API_REQ_COUNT,
+   ts.suspenddescription as SUSPEND_DESC,
+   ts.suspendreason as SUSPEND_REASON_CODE,
+   ts.delivery_tag as DELIVERY_TAG,
+   ts.allocatecode as ALLOCATE_CODE,
+   ts.warehousekey as WAREHOUSE_CODE,
+   ts.company_id as COMPANY_ID,
+   ts.regional as REGIONAL_NAME,
+   ts.request_delivery_date as REQUEST_DELIVERY_TIME,
+   ts.sync_status as SHIP_SYNC_STATUS_CODE,
+   ts.susr10 as TEMPORARY_CONTRACTS_FLAG,
+   ts.order_source as ORDER_SOURCE,
+   ts.is_pallet as PALLET_FLAG,
+   ts.is_unloading as UNLOADING_FLAG,
+   ts.is_backingup as BACKINGUP_FLAG,
+   ts.tms_pay_method as TMS_PAY_METHOD,
+   ts.transfer_site as TRANSFER_SITE_CODE,
+   ts.is_machining as MACHINING_FLAG,
+   ts.printtype as PRINT_TYPE_CODE,
+   ts.sale_linegroup as SALE_LINE_GROUP_CODE,
+   ts.department_code as DEPARTMENT_CODE,
+   ts.loading_method as LOADING_METHOD,
+   ts.mileage as SHIP_MILEAGE,
+   ts.car_type as CAR_TYPE,
+   ts.special_car as SPECIAL_CAR_FLAG,
+   ts.machininger as MACHININGER_NAME,
+   ts.licenseno as DRIVER_LICENSE_ID,
+   ts.driver_name as DRIVER_NAME,
+   ts.license_plate_no as LICENSE_PLATE_NUM,
+   ts.requetstid as OA_REQUEST_ID,
+   ts.wbs as WBS_FACTORY_ITEM_NUM,
+   ts.carrier_publish_date as CARRIER_PUBLISH_TIME,
+   ts.receipt_status as RECEIPT_STATUS_FLAG,
+   ts.processor as PROCESSOR_NAME,
+   ts.docid as ATTACHMENT_ID,
+   ts.machining_notes as MACHINING_NOTES,
+   ts.machining_no as MACHINING_NUM,
+   ts.deliver_docid as DELIVER_ATTACHMENT_ID,
+   ts.require_docid as REQUIRE_ATTACHMENT_ID,
+   ts.actual_reveived_quantity as ACTUAL_REVEIVED_QTY,
+   CASE WHEN ts.CUSTOMER_CODE IS NULL THEN
+          -999999
+         ELSE
+          NVL(CUST.CUST_ID, -999998)
+       END AS CUST_ID,
+       CUST.CUST_NAME,
+   'N' as DEL_FLAG,
+   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+ from SDI.SDI_TMS_DO_1005 ts
+  LEFT JOIN DWIMD.DWI_MD_CUST_GENERAL_T CUST
+    ON ts.CUSTOMER_CODE = CUST.CUST_NUM
+   AND CUST.END_DATE = '4712-12-31'
+   AND CUST.DEL_FLAG = 'N'
+ UNION 
+  --更新删除标识:DWI表外关联SDI表，DWI表有SDI表没有的数据。DEL_FLAG打上Y，DW_LAST_UPDATE_DATE 取系统时间，其余字段取DWI表数据  
+  SELECT 
+    t2.ID	 					
+    ,t2.DO_NUM	 				
+    ,t2.ORDER_NUM	 				
+    ,t2.PRIORITY_CODE	 			
+    ,t2.MVERSION	 				
+    ,t2.STATUS_CODE	 			
+    ,t2.WMS_PICKING_STATUS	 	
+    ,t2.CREATE_TIME	 			
+    ,t2.CREATOR_ID	 			
+    ,t2.REALLOCATE_FLAG	 		
+    ,t2.DELIVERY_ORDER_FLAG	 	
+    ,t2.DA_STATUS_CODE	 		
+    ,t2.TENANT_ID	 				
+    ,t2.OPERATION_CENTER_CODE	 	
+    ,t2.SHIPPER_CODE	 			
+    ,t2.CARRIER_NAME	 			
+    ,t2.CARRIER_CODE	 			
+    ,t2.LOADING_SITE_CODE	 		
+    ,t2.LOADING_SITE_NAME	 		
+    ,t2.LOADING_ADDRESS_NAME	 	
+    ,t2.UNLOADING_ADDRESS_NAME	
+    ,t2.UNLOADING_SITE_CODE	    
+    ,t2.UNLOADING_SITE_NAME	    
+    ,t2.SHIP_METHOD_CODE	 		
+    ,t2.OUTSOURCING	 			
+    ,t2.PICKING_LOCATION	 		
+    ,t2.DESCRIPTION	 			
+    ,t2.RMS_FLAG	 				
+    ,t2.UPDATE_TIME	 			
+    ,t2.UPDATE_ID	 				
+    ,t2.DELIVERY_FLAG	 			
+    ,t2.TRAY_DEDUCT_COST_CENTER_CODE
+    ,t2.COMBINE_DELIVERY_NUM	 	
+    ,t2.DEPARTMENT_AUTHORITY_CODE	
+    ,t2.DRIVER_PHONE_NUM	 		
+    ,t2.CONTAINER_NUM	 			
+    ,t2.WOODEN_FRAME_QTY	 		
+    ,t2.DELIVERY_REQUIREMENTS	 	
+    ,t2.CARRIER_LIST_NUMBER	 	
+    ,t2.KPI_FLAG	 				
+    ,t2.BILL_FLAG	 				
+    ,t2.LOADING_CONTACT_NAME	 	
+    ,t2.LOADING_CONTACT_PHONE	 	
+    ,t2.LOADING_PROVINCE_CODE	 	
+    ,t2.LOADING_CITY_CODE	 		
+    ,t2.LOADING_COUNTY_CODE	 	
+    ,t2.LOADING_TOWN_CODE	 		
+    ,t2.UNLOADING_CONTACT_NAME1	
+    ,t2.UNLOADING_CONTACT_PHONE1	
+    ,t2.UNLOADING_PROVINCE_CODE	
+    ,t2.UNLOADING_CITY_CODE	 	
+    ,t2.UNLOADING_COUNTY_CODE	 	
+    ,t2.UNLOADING_TOWN_CODE	 	
+    ,t2.PLAN_LOADING_TIME	 		
+    ,t2.DEMAND_ARRIVE_TIME	 	
+    ,t2.PLAN_NUM	 				
+    ,t2.SHIP_LINE_CODE	 		
+    ,t2.COST_CENTER_CODE	 		
+    ,t2.ACTUAL_SHIP_TIME	 		
+    ,t2.ACTUAL_ARRIVE_TIME	 	
+    ,t2.TOTAL_GOODS_PIECE	 		
+    ,t2.ACTUAL_GOODS_PIECE	 	
+    ,t2.TOTAL_GOODS_VOLUME	 	
+    ,t2.ACTUAL_GOODS_VOLUME	 	
+    ,t2.TOTAL_ROUGH_WEIGHT	 	
+    ,t2.ACTUAL_ROUGH_WEIGHT	 	
+    ,t2.TOTAL_NET_WEIGHT	 		
+    ,t2.ACTUAL_NET_WEIGHT	 		
+    ,t2.TOTAL_BOXES	 			
+    ,t2.ACTUAL_TOTAL_BOXES	 	
+    ,t2.TOTAL_GOODS_AMT	 		
+    ,t2.ACTUAL_GOODS_AMT	 		
+    ,t2.OWNER_CODE	 			
+    ,t2.OWNER_NAME	 			
+    ,t2.ORIGINAL_ORDER_SOURCE_CODE
+    ,t2.SOURCE_ORDER_CREATE_TIME	
+    ,t2.LOADING_CONTACT_NAME2	 	
+    ,t2.LOADING_CONTACT_PHONE2	
+    ,t2.UNLOADING_CONTACT_NAME2	
+    ,t2.UNLOADING_CONTACT_PHONE2	
+    ,t2.EXTERNAL_NUM	 			
+    ,t2.BILL_FLAG2	 			
+    ,t2.SETTLEMENT_METHOD	 		
+    ,t2.CUST_NUM	 				
+    ,t2.FORBIDDEN_REGION_FLAG	 	
+    ,t2.FARAWAY_FLAG	 			
+    ,t2.BILL_RETRY_COUNT	 		
+    ,t2.BUSINESS_TYPE_CODE	 	
+    ,t2.EXTERNAL_API_REQ_COUNT	
+    ,t2.SUSPEND_DESC	 			
+    ,t2.SUSPEND_REASON_CODE	 	
+    ,t2.DELIVERY_TAG 			
+    ,t2.ALLOCATE_CODE	 			
+    ,t2.WAREHOUSE_CODE	 		
+    ,t2.COMPANY_ID	 			
+    ,t2.REGIONAL_NAME	 			
+    ,t2.REQUEST_DELIVERY_TIME	 	
+    ,t2.SHIP_SYNC_STATUS_CODE	 	
+    ,t2.TEMPORARY_CONTRACTS_FLAG	
+    ,t2.ORDER_SOURCE	 			
+    ,t2.PALLET_FLAG	 			
+    ,t2.UNLOADING_FLAG	 		
+    ,t2.BACKINGUP_FLAG	 		
+    ,t2.TMS_PAY_METHOD	 		
+    ,t2.TRANSFER_SITE_CODE	 	
+    ,t2.MACHINING_FLAG	 		
+    ,t2.PRINT_TYPE_CODE	 		
+    ,t2.SALE_LINE_GROUP_CODE	 	
+    ,t2.DEPARTMENT_CODE	 		
+    ,t2.LOADING_METHOD	 		
+    ,t2.SHIP_MILEAGE	 			
+    ,t2.CAR_TYPE	 				
+    ,t2.SPECIAL_CAR_FLAG	 		
+    ,t2.MACHININGER_NAME	 		
+    ,t2.DRIVER_LICENSE_ID	 		
+    ,t2.DRIVER_NAME	 			
+    ,t2.LICENSE_PLATE_NUM	 		
+    ,t2.OA_REQUEST_ID	 			
+    ,t2.WBS_FACTORY_ITEM_NUM	 	
+    ,t2.CARRIER_PUBLISH_TIME	 	
+    ,t2.RECEIPT_STATUS_FLAG	 	
+    ,t2.PROCESSOR_NAME	 		
+    ,t2.ATTACHMENT_ID	 			
+    ,t2.MACHINING_NOTES	 		
+    ,t2.MACHINING_NUM	 			
+    ,t2.DELIVER_ATTACHMENT_ID	 	
+    ,t2.REQUIRE_ATTACHMENT_ID	 	
+    ,t2.ACTUAL_REVEIVED_QTY	 	
+    ,t2.CUST_ID	
+    ,T2.CUST_NAME
+    ,'Y' AS DEL_FLAG	 				
+    ,CURRENT_TIMESTAMP() as DW_LAST_UPDATE_DATE	 
+FROM  DWIOTD.DWI_TRA_TMS_DO_T T2
+LEFT JOIN SDI.SDI_TMS_DO_1005 ts	
+on T2.DO_NUM = TS.do_no 
+AND T2.ORDER_NUM = TS.order_no 
+WHERE TS.do_no is null 
+  and TS.order_no is null;

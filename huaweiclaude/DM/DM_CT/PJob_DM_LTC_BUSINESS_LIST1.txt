@@ -1,0 +1,162 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004363
+-- create time: 2023/03/02 15:43:26 GMT+08:00
+-- 20230406 yueyuzhan 新增字段评审预计用量review_dosage
+-- ******************************************************************** --
+--商机预测
+with business_forcast as(
+    select 
+    bsf.created_by
+    ,bsf.business_id
+    ,sum(use_quantity) as use_quantity 
+    ,sum(estimated_amount) as estimated_amount 
+    ,sum(estimated_year_deliver_amount) as estimated_year_deliver_amount 
+    ,max(estimated_signed_date) as estimated_signed_date
+    ,max(estimated_delivery_date) as estimated_delivery_date 
+from STG.STG_BUSINESS_SALE_FORECAST_1033 bsf
+join SDI.SDI_BUSINESS_OPPORTUNITY_1033 bo on bo.business_id  = bsf.business_id and bo.created_by = bsf.created_by 
+where bsf.delete_flag = 0 
+group by bsf.created_by,bsf.business_id
+)
+--商机升级信息记录
+,business_operate_log as (
+SELECT 
+bo.business_id
+,bol.current_business_stage
+,bol.after_business_stage
+,bol.upgrade_time
+FROM SDI.SDI_business_operate_log_1031 BOl
+LEFT JOIN SDI.SDI_BUSINESS_OPPORTUNITY_1033 BO ON BOL.BUSINESS_ID = BO.BUSINESS_ID
+WHERE bol.delete_flag = 0
+)
+--项目评审用量
+,project_review as (
+    select sum(prmp.review_quotation * prmp.review_dosage) as review_dosage
+            ,pr.business_code
+            ,pr.project_code
+    FROM SDI.SDI_PROJECT_REVIEW_1033 pr
+    left join SDI.SDI_PROJECT_REVIEW_MATERIAL_PRICE_1033  prmp on prmp.project_id = pr.project_id and prmp.delete_flag = 0
+    where pr.delete_flag = 0
+    group by pr.business_code  ,pr.project_code
+)
+INSERT OVERWRITE TABLE DM.DM_LTC_business_list_T
+select 
+        'LTC' as  system                --系统1
+        ,BO.business_id                 --商机ID
+        ,BO.pid                         --父商机id
+        ,BO.business_type               --商机类别
+        ,bla3.meaning   as    business_type_text             --商机类别描述
+        ,BO.strategic_business_code     --战略商机编号
+        ,BO.strategic_business_name     --战略商机名称
+        ,BO.strategy_type               --销售战略类型(直营或经销商)
+        ,bla4.meaning   as    strategy_type_text             --销售战略类型描述
+        ,BO.business_code               --商机编号
+        ,BO.business_name               --商机名称
+        ,BO.customer_name               --客户名称
+        ,bo.is_other_division           --是否跨事业部
+        ,CASE
+            WHEN BO.is_other_division = 'DIRECT_SALES_STRATEGY' THEN BO.customer_code
+            WHEN BO.strategy_type = 'DEALER_STRATEGY' AND BO.is_other_division = 'Y' THEN BO.company_code
+            WHEN BO.strategy_type = 'DEALER_STRATEGY' AND ( BO.is_other_division = ' ' OR BO.is_other_division = 'N') THEN BO.customer_code
+        END AS customer                 --客户编号
+        ,BO.apply_date                  --申请日期
+        ,BO.engineering_big_category    --工程大类
+        ,bla1.meaning   as    engineering_big_category_text             --工程大类描述
+        ,BO.engineering_small_category  --工程小类
+        ,bla2.meaning as  engineering_small_category_text                  --工程小类类描述
+        ,BO.division                    --事业部
+        ,case BO.division 
+            when 'BATHROOM_DIVISION' then '卫浴事业部'
+            when 'CERAMIC_TILE_DIVISION' then '瓷砖事业部' 
+            when 'HOUSEHOLD_DIVISION' then '家居事业部' 
+            when 'NEW_ECOLOGICAL_TIMBER_DIVISION' then '生态新材事业部' 
+            else '其他'
+        end                         as business_dept                -- 事业部
+        ,BO.expected_cooperation_type   --预计合作类型
+        -- ,bla5.meaning as  expected_cooperation_type_text                  --预计合作类型描述
+        ,BO.approve_state               --审批状态
+        ,bla5.meaning as  approve_state_text                  --审批状态描述
+        ,BO.business_stage              --商机阶段
+        ,BO.stage_state                 --阶段状态
+        ,bla6.meaning as  stage_state_text                  --阶段状态描述
+        ,BO.effective_date              --有效日期
+        ,BO.product_category            --产品品类
+        ,bla8.meaning as  product_category_text                  --产品品类描述
+        ,BO.strategic_type              --战略类型(甲方战略或总包战略)
+        ,bla7.meaning as  strategic_type_text                  --战略类型描述
+        ,BO.project_follow_channel      --项目跟进渠道
+        ,bla9.meaning as  project_follow_channel_text                  --项目跟进渠道描述
+        ,BO.report_cost_state           --报备费状态
+        ,bla10.meaning as  report_cost_state_text                  --报备费状态描述
+        ,BO.report_cost_amount          --报备费金额
+        ,BO.report_payment_method       --报备费支付方式
+        ,bla11.meaning as  report_payment_method_text                  --报备费支付方式描述
+        ,BO.stage_validity              --阶段有效期
+        ,BO.project_type                --项目类型
+        ,bla12.meaning as  project_type_text  --项目类型描述
+        ,BO.is_xiong_an                 --是否雄安
+        ,BO.is_special_engineering      --是否特殊工程
+        ,BO.is_build_side               --是否连锁网点
+        ,BO.company_code            --公司代码
+        ,BO.business_tracker        --商机跟进人
+        ,BO.business_tracker_phone  --商机跟进人电话
+        ,BO.apply_user_id          --申请人ID
+        ,BO.apply_user              --申请人
+        ,BO.apply_user_area_code    --申请人区域编码
+        ,BO.apply_user_area         --申请人区域
+        ,BO.apply_user_dept_code    --申请人部门编码
+        ,BO.apply_user_dept         --申请人部门
+        ,BO.province                --省
+        ,BO.city                    --市
+        ,BO.county                  --县区
+        ,BO.detail_address          --详细地址
+        ,BO.wbs                     --WBS
+        ,BO.building_side           --建设方（甲方）
+        ,BO.construction_side       --施工方（乙方）
+        ,bsf.use_quantity --建设方式计算使用产品数量（平方/套/个）
+        ,bsf.estimated_amount --预计标的金额
+        ,bsf.estimated_year_deliver_amount --预计本年度可发货金额
+        ,bsf.estimated_signed_date --预计签订日期
+        ,bsf.estimated_delivery_date --预计交货日期
+        ,current_timestamp() as DW_LAST_UPDATE_DATE --最后更新日期
+        ,substr(BOL1.upgrade_time,1,10) as upgrade_time_s1              --S0_S1升级时间
+        ,substr(BOL2.upgrade_time,1,10) as upgrade_time_s2              --S1_S2升级时间
+        ,substr(BOL3.upgrade_time,1,10) as upgrade_time_s3              --S2_S3升级时间
+        ,substr(BOL4.upgrade_time,1,10) as upgrade_time_s4              --S3_S4升级时间
+        ,substr(BOL5.upgrade_time,1,10) as upgrade_time_s5              --S4_S5升级时间
+        ,pr.review_dosage                                               --评审预计用量 
+from SDI.SDI_BUSINESS_OPPORTUNITY_1033 BO
+left join business_forcast bsf on bo.business_id  = bsf.business_id and bo.created_by = bsf.created_by
+-- left join STG.STG_BUSINESS_COST_FLOW_1033 bcf on bcf.business_id = bo.business_id 
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla1 on bla1.lookup_code = BO.engineering_big_category and bla1.lookup_type = 'ENGINEERING_BIG_CATEGORY' 
+                                              and bla1.enabled_flag = 'Y' and bla1.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla2 on bla2.lookup_code = BO.engineering_small_category and bla2.lookup_type = 'ENGINEERING_SMALL_CATEGORY' 
+                                              and bla2.enabled_flag = 'Y' and bla2.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla3 on bla3.lookup_code = BO.business_type and bla3.lookup_type = 'BUSINESS_CATEGORY' 
+                                              and bla3.enabled_flag = 'Y' and bla3.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla4 on bla4.lookup_code = BO.strategy_type and bla4.lookup_type = 'USER_TYPE_PROJECT' 
+                                              and bla4.enabled_flag = 'Y' and bla4.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla5 on bla5.lookup_code = BO.approve_state and bla5.lookup_type = 'BUSINESS_APPROVE_STATE' 
+                                              and bla5.enabled_flag = 'Y' and bla5.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla6 on bla6.lookup_code = BO.stage_state and bla6.lookup_type = 'STAGE_STATE' 
+                                              and bla6.enabled_flag = 'Y' and bla6.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla7 on bla7.lookup_code = BO.strategic_type and bla7.lookup_type = 'STRATEGIC_TYPE' 
+                                              and bla7.enabled_flag = 'Y' and bla7.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla8 on bla8.lookup_code = BO.product_category and bla8.lookup_type = 'PRODUCT_CATEGORY' 
+                                              and bla8.enabled_flag = 'Y' and bla8.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla9 on bla9.lookup_code = BO.project_follow_channel and bla9.lookup_type = 'PROJECT_FOLLOW_CHANNEL' 
+                                              and bla9.enabled_flag = 'Y' and bla9.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla10 on bla10.lookup_code = BO.report_cost_state and bla10.lookup_type = 'REPORT_COST_STATE' 
+                                              and bla10.enabled_flag = 'Y' and bla10.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla11 on bla11.lookup_code = BO.report_payment_method and bla11.lookup_type = 'PAY_TYPE' 
+                                              and bla11.enabled_flag = 'Y' and bla11.system_code = 'LTC'
+left join STG.STG_BASE_LOOKUP_VALUES_1029 bla12 on bla12.lookup_code = BO.project_type and bla12.lookup_type = 'PROJECT_TYPE' 
+                                              and bla12.enabled_flag = 'Y' and bla12.system_code = 'LTC'
+left join business_operate_log bol1 on bol1.business_id = bo.business_id and bol1.current_business_stage = 'S0' AND bol1.after_business_stage = 'S1'
+left join business_operate_log bol2 on bol2.business_id = bo.business_id and bol2.current_business_stage = 'S1' AND bol2.after_business_stage = 'S2'
+left join business_operate_log bol3 on bol3.business_id = bo.business_id and bol3.current_business_stage = 'S2' AND bol3.after_business_stage = 'S3'
+left join business_operate_log bol4 on bol4.business_id = bo.business_id and bol4.current_business_stage = 'S3' AND bol4.after_business_stage = 'S4'
+left join business_operate_log bol5 on bol5.business_id = bo.business_id and bol5.current_business_stage = 'S4' AND bol5.after_business_stage = 'S5'
+left join project_review pr         on pr.business_code = bo.business_code 
+where BO.delete_flag = 0

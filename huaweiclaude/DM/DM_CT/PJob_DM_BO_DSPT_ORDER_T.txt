@@ -1,0 +1,72 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/09/19 10:22:03 GMT+08:00
+-- update from huangwenbin 2025-09-30 出货计划表增加过滤条件：A.IS_HIDE_CODE = 1
+-- ******************************************************************** --
+set tez.grouping.max-size=268435456;  -- 256MB（单位字节）
+
+WITH T AS(
+SELECT DISTINCT
+       DELV_SHIP_ID --出货计划ID
+	  ,RECV_PROV_NAME --收货省
+      ,RECV_CITY_NAME --收货市
+      ,RECV_DIST_NAME --收货县/区
+      ,RECV_ADDR --收货详细地址
+  FROM DWRLTC.DWR_BO_DELV_SHIP_ORDER_F
+ WHERE IS_HIDE_CODE = 1
+),T1 AS(
+SELECT DISTINCT
+       DMAND_NUM
+      ,DMAND_ID
+	  ,APLY_EMP_NAME
+  FROM DWRLTC.DWR_BO_DMAND_ORDER_F
+)
+INSERT OVERWRITE TABLE DM.DM_BO_DSPT_ORDER_T
+SELECT A.DSPT_NUM --发运单号
+      ,A.DEPT_ST_NAME --发运委托状态
+	  ,A.CREATE_DATE --提货申请时间
+	  ,F.OA_APPROVAL_NUMBER AS SER_NUM --OA运输委托书流水号
+	  ,F.APPROVAL_STATUS AS NODE_APPR_ST_NAME --流程节点
+	  ,NULL AS APPR_TIME --审批时间
+	  ,B.CREATE_DATE AS DELV_CREATE_DATE --创建提货单时间
+	  ,B.PLAN_NUM AS LOAD_PLAN_NUM --装载计划号
+	  ,B.PLAN_ITEM_NUM --项目计划号
+	  ,A.DELV_NUM --提货单号
+	  ,E.APLY_EMP_NAME --申请人
+	  ,B.CNSGN_PNONE AS RECV_PNONE_NUM --收货人电话
+	  ,B.PLAN_LOAD_DATE AS RESV_DATE --预约时间
+	  ,A.DELV_TYPE_NAME --配送方式描述
+	  ,B.DRIVER_NAME AS DRVR_NAME --提货司机
+	  ,B.DRIVER_PHONE AS DRVR_PHONE_NUM --司机电话
+	  ,B.DRIVER_ID AS DRVR_CARD_NUM --证件号
+	  ,B.CAR_NUM AS DRVR_CAR_NUM --车牌号
+	  ,D.RECV_PROV_NAME --收货省
+      ,D.RECV_CITY_NAME --收货市
+      ,D.RECV_DIST_NAME --收货县/区
+      ,D.RECV_ADDR --收货详细地址
+	  ,A.IS_PLLT_NAME --是否打托描述
+	  ,A.DSCHG_NAME AS IS_DELV_NAEM --是否送货描述
+	  ,A.IS_RVRS_NAME --是否倒车描述
+	  ,E.DMAND_NUM --要货单号
+	  ,A.DMAND_LINE_ID --要货单行ID
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,REPLACE(TRUNC((UNIX_TIMESTAMP(B.CREATE_DATE) - UNIX_TIMESTAMP(A.CREATE_DATE)) / 86400,0) || '天'
+	  || TRUNC((MOD((UNIX_TIMESTAMP(B.CREATE_DATE) - UNIX_TIMESTAMP(A.CREATE_DATE)),86400)) / 3600,0) || '小时','.0','') AS DELV_APPR_CNSUM_TIME --提单审批耗时 创建提货单时间-提货单申请时间
+  FROM DWRLTC.DWR_BO_DSPT_ORDER_F A
+  LEFT JOIN DWROTD.DWR_OTD_LOADING_PLAN_T B
+    ON A.DELV_NUM = B.DELV_NUM
+   AND A.DELV_LINE_NUM = B.DELV_ITEM_NUM
+  LEFT JOIN T AS D
+    ON A.DELV_SHIP_ID = D.DELV_SHIP_ID
+  LEFT JOIN T1 AS E
+    ON A.DMAND_ID = E.DMAND_ID
+  LEFT JOIN (SELECT DISTINCT 
+                     LOADING_PLAN_NUMBER
+					,LOADING_PLAN_NUMBER_ITEM
+					,OA_APPROVAL_NUMBER
+					,APPROVAL_STATUS
+               FROM DWROTD.DWR_OTD_SO_PICKUP_ORDERS_F) F
+    ON B.PLAN_NUM = F.LOADING_PLAN_NUMBER
+   AND B.PLAN_ITEM_NUM = F.LOADING_PLAN_NUMBER_ITEM
+ WHERE A.IS_PAR_NAME = '否'

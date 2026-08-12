@@ -1,0 +1,191 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/08/31 14:54:30 GMT+08:00
+-- update 覃永健 2024/03/04 新增部门划分条件
+-- update 覃永健 2024/03/21 划分条件调整
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with tem as
+(
+SELECT  
+    sales_order_num,
+    sales_order_item_num,
+    cust_num,
+    cust_name,
+    material_num,
+    material_name,
+    sales_org_code,
+    factory_code,
+    inv_location,
+    res_stock_date,
+    total_sku_confirm_qty,
+    busi_volume,
+    unit_price,
+    total_res_stock_volume,
+    total_res_stock_amt,
+    res_stock_days,
+    distribution_channel_code,
+    org_lev2_code,
+    org_lev2_name,
+    org_lev3_code,
+    org_lev3_name,
+    org_lev4_code,
+    org_lev4_name,
+    org_lev5_code,
+    org_lev5_name,
+    order_source,
+    creator_id,
+    dw_last_update_date,
+    require_date,
+    promise_date,
+    creator_name,
+    item_desc,
+    max_res_stock_date
+    ,POSNR_CD -- 拆单源行号
+    ,POSNR_ZCD -- 拆单总行
+    ,case 
+    	when date_format(date_sub(current_date(),1),'EEEE') = 'Wednesday' then date_sub(current_date(),1) --周三
+    	when day(last_day(date_sub(current_date(),1))) = day(date_sub(current_date(),1)) then date_sub(current_date(),1)--月末
+    	when date_format(date_sub(current_date(),1), 'MMdd') = '1231' then date_sub(current_date(),1)--年底
+    end as partition_ymd
+FROM dm_sw.dm_wm_res_stock_dtl
+
+UNION ALL 
+
+SELECT  
+    sales_order_num,
+    sales_order_item_num,
+    cust_num,
+    cust_name,
+    material_num,
+    material_name,
+    sales_org_code,
+    factory_code,
+    inv_location,
+    res_stock_date,
+    total_sku_confirm_qty,
+    busi_volume,
+    unit_price,
+    total_res_stock_volume,
+    total_res_stock_amt,
+    res_stock_days,
+    distribution_channel_code,
+    org_lev2_code,
+    org_lev2_name,
+    org_lev3_code,
+    org_lev3_name,
+    org_lev4_code,
+    org_lev4_name,
+    org_lev5_code,
+    org_lev5_name,
+    order_source,
+    creator_id,
+    dw_last_update_date,
+    require_date,
+    promise_date,
+    creator_name,
+    item_desc,
+    max_res_stock_date,
+    POSNR_CD -- 拆单源行号
+    ,POSNR_ZCD -- 拆单总行
+    ,'4712-12-31' as partition_ymd
+FROM dm_sw.dm_wm_res_stock_dtl
+)
+
+INSERT OVERWRITE TABLE dm_sw.dm_wm_res_stock_dtl_ymd partition(partition_ymd)
+SELECT  
+    a.sales_order_num,
+    a.sales_order_item_num,
+    a.cust_num,
+    a.cust_name,
+    a.material_num,
+    a.material_name,
+    a.sales_org_code,
+    a.factory_code,
+    a.inv_location,
+    a.res_stock_date,
+    a.total_sku_confirm_qty,
+    a.busi_volume,
+    a.unit_price,
+    a.total_res_stock_volume,
+    a.total_res_stock_amt,
+    a.res_stock_days,
+    a.distribution_channel_code,
+    a.org_lev2_code,
+    a.org_lev2_name,
+    a.org_lev3_code,
+    a.org_lev3_name,
+    a.org_lev4_code,
+    a.org_lev4_name,
+    a.org_lev5_code,
+    a.org_lev5_name,
+    a.order_source,
+    a.creator_id,
+    a.dw_last_update_date,
+    a.require_date,
+    a.promise_date,
+    a.creator_name,
+    a.item_desc,
+    a.max_res_stock_date,
+    case 
+		when a.org_lev3_name = '供应链中心' or a.org_lev4_name = '供应链中心' then '供应链中心'
+		when a.org_lev3_name = '卫浴国际营销' then '卫浴国际营销'
+		when a.org_lev3_name = '品类运营部' then '品类运营部'
+		when (a.org_lev3_name = '商用中心' or a.org_lev4_name = '商用中心')  then '商用中心' --这里需要区分自营、经销
+		when a.org_lev3_name = '国内营销中心' then '卫浴子公司-STO转储订单' --卫浴子公司-STO转储订单
+		when (a.org_lev3_name = '营销中心' or  a.org_lev4_name = '营销中心') and a.distribution_channel_code <> '06' then '营销中心'
+		when (a.org_lev3_name = '营销中心' or  a.org_lev4_name = '营销中心') and a.distribution_channel_code = '06' then '商用中心'
+		when a.org_lev3_name = '客户服务部' then '客户服务部'
+		when a.org_lev3_name = '鹏嘉家居' then '鹏嘉家居'
+		when a.org_lev3_name = '国内直营板块' then '瓷砖事业部'
+		when a.org_lev3_name = '国内经销板块' then '瓷砖事业部'
+		when a.org_lev3_name = '国内营销系统' then '瓷砖事业部'
+		when a.org_lev3_name = '国际营销系统' then '瓷砖事业部'
+		when a.org_lev3_name = '瓷砖新零售中心' then '瓷砖事业部'
+		when a.org_lev3_name = '瓷砖营销中心' then '瓷砖事业部'
+		when a.org_lev3_name = '其他' then '其他'
+		else org_lev2_name
+	end as sub_grp,
+	case 
+		when a.org_lev3_name = '供应链中心' or a.org_lev4_name = '供应链中心' then '供应链中心'
+		when a.org_lev3_name = '卫浴国际营销' then '卫浴国际营销'
+		when a.org_lev3_name = '品类运营部' then a.org_lev5_name
+		when (a.org_lev3_name = '商用中心' or a.org_lev4_name = '商用中心') and d.cust_group_code in ('A0','A4','A1') then '商用中心-自营' 
+		when (a.org_lev3_name = '商用中心' or a.org_lev4_name = '商用中心') and d.cust_group_code not in ('A0','A4','A1') then '商用中心-经销'--这里需要区分自营、经销
+		when a.org_lev3_name = '国内营销中心' then a.org_lev4_name --卫浴子公司-STO转储订单
+		when (a.org_lev3_name = '营销中心' or  a.org_lev4_name = '营销中心') and a.distribution_channel_code <> '06' then a.org_lev5_name
+		when (a.org_lev3_name = '营销中心' or  a.org_lev4_name = '营销中心') and a.distribution_channel_code = '06' and d.cust_group_code in ('A0','A4','A1')  then '商用中心-自营'
+		when (a.org_lev3_name = '营销中心' or  a.org_lev4_name = '营销中心') and a.distribution_channel_code = '06' and d.cust_group_code not in ('A0','A4','A1')  then '商用中心-经销'
+		when a.org_lev3_name = '客户服务部' then '客户服务部'
+		when a.org_lev3_name = '鹏嘉家居' then '鹏嘉家居'
+		when a.org_lev3_name = '国内直营板块' then a.org_lev4_name
+		when a.org_lev3_name = '国内经销板块' then a.org_lev4_name
+		when a.org_lev3_name = '国内营销系统' then a.org_lev5_name
+		when a.org_lev3_name = '国际营销系统' then '国际营销系统'
+		when a.org_lev3_name = '瓷砖新零售中心' then '瓷砖新零售中心'
+		when a.org_lev3_name = '瓷砖营销中心' and a.org_lev4_name like '%子公司' then a.org_lev4_name
+		when a.org_lev3_name = '瓷砖营销中心' and a.org_lev4_name not like '%子公司' then a.org_lev5_name
+		when a.org_lev3_name = '其他' then '其他'
+		else concat(org_lev2_name,'-其他部门')
+	end as sub_grp1,
+	d.cust_group_code
+	,a.POSNR_CD -- 拆单源行号
+    ,a.POSNR_ZCD -- 拆单总行
+    ,a.partition_ymd
+FROM tem a
+left join dwrdim.dwr_dim_cust_sales_area_d d on a.cust_num = d.cust_num and a.distribution_channel_code = d.distribution_chnl_code 
+			and a.sales_org_code = d.sales_org_code and substring(d.end_date,1,10) = '4712-12-31'
+where a.partition_ymd is not null
+and (
+COALESCE(a.res_stock_date,'NAL') <> date_format(current_date(),'yyyy-MM-dd') 
+or COALESCE(a.max_res_stock_date,'NAL') <> date_format(current_date(),'yyyy-MM-dd')
+)

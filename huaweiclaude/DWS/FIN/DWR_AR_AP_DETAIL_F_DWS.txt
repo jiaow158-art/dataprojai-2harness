@@ -1,0 +1,240 @@
+DROP TABLE IF  EXISTS  DWRFIN.DWR_AR_AP_DETAIL_F;
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_AR_AP_DETAIL_F
+(GROUP_NUM                             VARCHAR(500),                       
+FISCAL_YEAR                            INT,                                
+COMPANY_ID                             VARCHAR(500),                       
+COMPANY_CODE                           VARCHAR(500),                       
+COMPANY_NAME                           VARCHAR(500),                       
+CUST_ID                                INT,                                
+CUST_NUM                               VARCHAR(500),                       
+CUST_NAME                              VARCHAR(500),                       
+SUPPLIER_OR_CREDITOR_ID                VARCHAR(500),                       
+SUPPLIER_OR_CREDITOR_NUM               VARCHAR(500),                       
+SUPPLIER_OR_CREDITOR_NAME              VARCHAR(500),                       
+ACCOUNT_NUM                            VARCHAR(500),                       
+ACCOUNT_NAME                           VARCHAR(500),                       
+ACCOUNT_VOUCHER_NUM                    VARCHAR(500),                       
+LEDGER_POST_ITEM                       VARCHAR(500),                       
+LEDGER_CODE                            VARCHAR(500),                       
+ACC_VOUCHER_LINE_ITEM_QTY              VARCHAR(500),                       
+OBJECT_KEY                             VARCHAR(500),                       
+REFERENCE_PROCESS                      VARCHAR(500),                       
+BILL_SHORT_NUM                         VARCHAR(500),                       
+VOUCHER_TYPE                           VARCHAR(500),                       
+VOUCHER_DATE                           TIMESTAMP,                          
+VOUCHER_POST_DATE                      TIMESTAMP,                          
+ITEM_TEXT                              VARCHAR(500),                       
+SQUARE_UP_BILL_NUM                     VARCHAR(500),                       
+ACCOUNT_PERIOD                         INT,                                
+FUNCTION_SCOPE                         VARCHAR(500),                       
+LOCAL_CURRENCY_CODE                    VARCHAR(500),                       
+POST_PERIOD                            INT,                                
+COST_CENTER                            VARCHAR(500),                       
+RELEVANT_INVOICE_LINE_ITEM             VARCHAR(500),                       
+MATERIAL_NUM                           VARCHAR(500),                       
+OFFSET_ACCOUNT_NUM                     VARCHAR(500),                       
+QUANTITY                               DECIMAL(38,10),                     
+SALES_PURCHASE_TAX_CODE                VARCHAR(500),                       
+CASH_FLOW                              VARCHAR(500),                       
+SQUARE_UP_DATE                         TIMESTAMP,                          
+VOUCHER_STATUS                         VARCHAR(500),                       
+PURCHASE_VOUCHER_NUM                   VARCHAR(500),                       
+BUSINESS_SCOPE                         VARCHAR(500),                       
+ACCOUNT_TYPE                           VARCHAR(500),                       
+PURCHASE_VOUCHER_ITEM_NUM              VARCHAR(500),                       
+GL_TRANSACTION_TYPE                    VARCHAR(500),                       
+TRADE_PARTNER_COMPANY_ID               VARCHAR(500),                       
+CURRENCY_CODE                          VARCHAR(500),                       
+DRAFT_DUE_DATE                         TIMESTAMP,                          
+PAY_TERM_CODE                          VARCHAR(500),                       
+EX_RATE                                DECIMAL(38,10),                     
+SETTLEMENT_PAYMENT_CARD                VARCHAR(500),                       
+TRANSACTION_TYPE                       VARCHAR(500),                       
+TRADE_PARTNER_BUSINESS_SCOPE           VARCHAR(500),                       
+BAL_TC_AMT                             DECIMAL(38,10),                     
+COMPANY_CURRENCY_CODE                  VARCHAR(500),                       
+COMPANY_CURRENCY_AMT                   DECIMAL(38,10),                     
+TC_AMT                                 DECIMAL(38,10),                     
+GLOBAL_CURRENCY_CODE                   VARCHAR(500),                       
+GLOBAL_CURRENCY_FIXED_AMT              DECIMAL(38,10),	                     
+GLOBAL_CURRENCY_AMT                    DECIMAL(38,10),                     
+BUSINESS_TRANSACTION                   VARCHAR(500),
+CREDIT_CONTROL_SCOPE                   VARCHAR(500),
+GL_ACCOUNT                             VARCHAR(500),
+CONTRACT_NUMBER                        VARCHAR(500),
+CONTRACT_TYPE                          VARCHAR(500),
+SALE_VOUCHER_NUM                       VARCHAR(500),
+BILL_VOUCHER_NUM                       VARCHAR(500),
+CASH_FLOW_TYPE                         VARCHAR(500),
+DRAFT_DRAWER_NAME                      VARCHAR(500),
+DRAFT_DRAWEE_NAME                      VARCHAR(500),
+DRAFT_SIGN_DATE                        TIMESTAMP,
+BANK_NAME                              VARCHAR(500),
+DRAFT_LONG_NUM                         VARCHAR(500),
+DEL_FLAG                               VARCHAR(500),
+DW_LAST_UPDATE_DATE                    TIMESTAMP,                       
+PERIOD_ID_M                            VARCHAR(500))    
+PARTITION BY RANGE(PERIOD_ID_M) 
+(PARTITION BEFORE_P000000 VALUES LESS THAN ('201812'),
+ PARTITION P_201812 VALUES LESS THAN ('201901'),
+ PARTITION P_201901 VALUES LESS THAN ('201902'),
+ PARTITION P_201902 VALUES LESS THAN ('201903'),
+ PARTITION P_201903 VALUES LESS THAN ('201904'),
+ PARTITION P_201904 VALUES LESS THAN ('201905'),
+ PARTITION P_201905 VALUES LESS THAN ('201906'),
+ PARTITION P_201906 VALUES LESS THAN ('201907'),
+ PARTITION P_201907 VALUES LESS THAN ('201908'),
+ PARTITION P_201908 VALUES LESS THAN ('201909'),
+ PARTITION P_201909 VALUES LESS THAN ('201910'),
+ PARTITION P_201910 VALUES LESS THAN ('201911'),
+ PARTITION P_201911 VALUES LESS THAN ('201912'),
+ PARTITION P_201912 VALUES LESS THAN ('202001'),
+ PARTITION P_202001 VALUES LESS THAN ('202002'),
+ PARTITION P_202002 VALUES LESS THAN ('202003'),
+ PARTITION P_202003 VALUES LESS THAN ('202004'),
+ PARTITION P_202004 VALUES LESS THAN ('202005'),
+ PARTITION P_202005 VALUES LESS THAN ('202006'),
+ PARTITION P_202006 VALUES LESS THAN ('202007'),
+ PARTITION P_202007 VALUES LESS THAN ('202008'),
+ PARTITION P_202008 VALUES LESS THAN ('202009'),
+ PARTITION P_202009 VALUES LESS THAN ('202010'),
+ PARTITION P_202010 VALUES LESS THAN ('202011'),
+ PARTITION P_202011 VALUES LESS THAN ('202012'),
+ PARTITION P_202012 VALUES LESS THAN ('202101'),
+ PARTITION P_202101 VALUES LESS THAN ('202102'),
+ PARTITION P_202102 VALUES LESS THAN ('202103'),
+ PARTITION P_202103 VALUES LESS THAN ('202104'),
+ PARTITION P_202104 VALUES LESS THAN ('202105'),
+ PARTITION P_202105 VALUES LESS THAN ('202106'),
+ PARTITION P_202106 VALUES LESS THAN ('202107'),
+ PARTITION P_202107 VALUES LESS THAN ('202108'),
+ PARTITION P_202108 VALUES LESS THAN ('202109'),
+ PARTITION P_202109 VALUES LESS THAN ('202110'),
+ PARTITION P_202110 VALUES LESS THAN ('202111'),
+ PARTITION P_202111 VALUES LESS THAN ('202112'),
+ PARTITION P_202112 VALUES LESS THAN ('202201'),
+ PARTITION P_202201 VALUES LESS THAN ('202202'),
+ PARTITION P_202202 VALUES LESS THAN ('202203'),
+ PARTITION P_202203 VALUES LESS THAN ('202204'),
+ PARTITION P_202204 VALUES LESS THAN ('202205'),
+ PARTITION P_202205 VALUES LESS THAN ('202206'),
+ PARTITION P_202206 VALUES LESS THAN ('202207'),
+ PARTITION P_202207 VALUES LESS THAN ('202208'),
+ PARTITION P_202208 VALUES LESS THAN ('202209'),
+ PARTITION P_202209 VALUES LESS THAN ('202210'),
+ PARTITION P_202210 VALUES LESS THAN ('202211'),
+ PARTITION P_202211 VALUES LESS THAN ('202212'),
+ PARTITION P_202212 VALUES LESS THAN ('202301'),
+ PARTITION P_202301 VALUES LESS THAN ('202302'),
+ PARTITION P_202302 VALUES LESS THAN ('202303'),
+ PARTITION P_202303 VALUES LESS THAN ('202304'),
+ PARTITION AFTER_P202303 VALUES LESS THAN (MAXVALUE)
+);
+
+COMMENT    ON TABLE    DWRFIN.DWR_AR_AP_DETAIL_F                                   IS   '应收应付明细表';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GROUP_NUM                         IS   '集团';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.FISCAL_YEAR                       IS   '财年';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COMPANY_ID                        IS   '公司ID';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COMPANY_CODE                      IS   '公司代码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COMPANY_NAME                      IS   '公司名称';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CUST_ID                           IS   '客户ID';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CUST_NUM                          IS   '客户编码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CUST_NAME                         IS   '客户名称';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SUPPLIER_OR_CREDITOR_ID           IS   '供应商ID';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SUPPLIER_OR_CREDITOR_NUM          IS   '供应商编码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SUPPLIER_OR_CREDITOR_NAME         IS   '供应商名称';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACCOUNT_NUM                       IS   '科目编码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACCOUNT_NAME                      IS   '科目名称';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACCOUNT_VOUCHER_NUM               IS   '会计凭证号码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.LEDGER_POST_ITEM                  IS   '分类账 6 字符过账项目';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.LEDGER_CODE                       IS   '总账会计中的分类账';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACC_VOUCHER_LINE_ITEM_QTY         IS   '会计凭证中的行项目数';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.OBJECT_KEY                        IS   '对象键值';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.REFERENCE_PROCESS                 IS   '参照';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BILL_SHORT_NUM                    IS   '汇票短号（分配）';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.VOUCHER_TYPE                      IS   '凭证类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.VOUCHER_DATE                      IS   '凭证日期';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.VOUCHER_POST_DATE                 IS   '过帐日期';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ITEM_TEXT                         IS   '文本';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SQUARE_UP_BILL_NUM                IS   '清帐凭证';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACCOUNT_PERIOD                    IS   '年度/月份';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.FUNCTION_SCOPE                    IS   '功能范围';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.LOCAL_CURRENCY_CODE               IS   '本币';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.POST_PERIOD                       IS   '过账期间';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COST_CENTER                       IS   '成本中心';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.RELEVANT_INVOICE_LINE_ITEM        IS   '行项目';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.MATERIAL_NUM                      IS   '物料';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.OFFSET_ACCOUNT_NUM                IS   '冲销科目记帐';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.QUANTITY                          IS   '数量';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SALES_PURCHASE_TAX_CODE           IS   '税码';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CASH_FLOW                         IS   '现金流量';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SQUARE_UP_DATE                    IS   '清帐日期';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.VOUCHER_STATUS                    IS   '凭证状态';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.PURCHASE_VOUCHER_NUM              IS   '采购凭证';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BUSINESS_SCOPE                    IS   '业务范围';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.ACCOUNT_TYPE                      IS   '帐户类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.PURCHASE_VOUCHER_ITEM_NUM         IS   '项目';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GL_TRANSACTION_TYPE               IS   '特定总帐事务类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.TRADE_PARTNER_COMPANY_ID          IS   '贸易伙伴';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CURRENCY_CODE                     IS   '凭证货币';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DRAFT_DUE_DATE                    IS   '汇票到期日';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.PAY_TERM_CODE                     IS   '付款条款';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.EX_RATE                           IS   '实际汇率';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SETTLEMENT_PAYMENT_CARD           IS   '结算运行';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.TRANSACTION_TYPE                  IS   '事务类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.TRADE_PARTNER_BUSINESS_SCOPE      IS   '伙伴业务范围';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BAL_TC_AMT                        IS   '金额（余额交易货币）';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COMPANY_CURRENCY_CODE             IS   '公司代码货币';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.COMPANY_CURRENCY_AMT              IS   '以公司代码货币计的金额';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.TC_AMT                            IS   '以交易货币计的金额';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GLOBAL_CURRENCY_CODE              IS   '全球货币';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GLOBAL_CURRENCY_FIXED_AMT         IS   '以全球货币计的固定金额';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GLOBAL_CURRENCY_AMT               IS   '以全球货币计的金额';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BUSINESS_TRANSACTION              IS   '业务事务';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CREDIT_CONTROL_SCOPE              IS   '信用控制范围';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.GL_ACCOUNT                        IS   '总账科目';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CONTRACT_NUMBER                   IS   '合同号';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CONTRACT_TYPE                     IS   '合同类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.SALE_VOUCHER_NUM                  IS   '销售凭证';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BILL_VOUCHER_NUM                  IS   '开票凭证';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.CASH_FLOW_TYPE                    IS   '现金流类型';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DRAFT_DRAWER_NAME                 IS   '出票人';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DRAFT_DRAWEE_NAME                 IS   '承兑下一手';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DRAFT_SIGN_DATE                   IS   '签发日期';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.BANK_NAME                         IS   '银行名称';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DRAFT_LONG_NUM                    IS   '汇票长号';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DEL_FLAG                          IS   '删除标识';
+COMMENT    ON COLUMN   DWRFIN.DWR_AR_AP_DETAIL_F.DW_LAST_UPDATE_DATE               IS   'DW最后更新日期';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

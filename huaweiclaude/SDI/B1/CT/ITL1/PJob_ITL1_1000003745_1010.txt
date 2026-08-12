@@ -1,0 +1,9 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/30 16:35:38 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+ALTER TABLE SDI.SDI_CT_ITL1_1010 drop partition(custcode= '1000003745');INSERT INTO TABLE SDI.SDI_CT_ITL1_1010 partition(custcode= '1000003745')(LogEntry,ItemCode,SysNumber,Quantity,AllocQty,MdAbsEntry,ReleaseQty,PickedQty,CUST_CODE,DEL_FLAG,DW_LAST_UPDATE_DATE) SELECT LogEntry,ItemCode,SysNumber,Quantity,AllocQty,MdAbsEntry,ReleaseQty,PickedQty,'1000003745' AS CUST_CODE,'N' AS DEL_FLAG, current_timestamp() as DW_LAST_UPDATE_DATE FROM STG.STG_ITL1_1000003745_1010;

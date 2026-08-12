@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_VM_OMS_SALE_ORDER_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

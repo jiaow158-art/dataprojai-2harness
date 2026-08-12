@@ -1,0 +1,36 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/09/10 17:04:23 GMT+08:00
+-- update from huangwenbin 2024-11-19 销售订单创建日期取值字段修改：CREATE_DATE-->CREATE_TIME
+-- update from huangwenbin 2025-09-30 增加过滤条件：A.IS_HIDE_CODE = 1
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_TRA_SHIP_DTL_T
+SELECT A.DELV_SHIP_LINE_ID --出货计划行号
+      ,A.DELV_SHIP_ST_NAME --出货计划单状态
+	  ,A.DELV_SHIP_CODE --出货计划编码
+	  ,A.CREATE_DATE --出货计划创建时间
+	  ,A.SAP_ORDER_NUM --SAP订单号
+	  ,B.SAP_ORDER_LINE_NUM --SAP订单行号
+	  ,C.CREATE_TIME AS SAP_CREATE_DATE --销售订单创建日期
+	  ,REPLACE(TRUNC((UNIX_TIMESTAMP(C.CREATE_TIME) - UNIX_TIMESTAMP(A.CREATE_DATE)) / 86400,0) || '天'
+	  || TRUNC((MOD((UNIX_TIMESTAMP(C.CREATE_TIME) - UNIX_TIMESTAMP(A.CREATE_DATE)),86400)) / 3600,0) || '小时','.0','') AS ORDER_PER --开单周期
+	  ,A.SHIP_PLAN_QTY --本次计划出货数
+	  ,A.RSDU_SHIP_QTY AS RSDU_SHIP_QTY --出货数剩余未开单数
+	  ,B.ACTL_SHIP_QTY --实际已开单数
+	  ,REPLACE(TRUNC((UNIX_TIMESTAMP(C.CREATE_TIME) - UNIX_TIMESTAMP(A.CREATE_DATE)) / 86400,0) || '天'
+	  || TRUNC((MOD((UNIX_TIMESTAMP(C.CREATE_TIME) - UNIX_TIMESTAMP(A.CREATE_DATE)),86400)) / 3600,0) || '小时','.0','') AS SHIP_CNSUM_TIME --出货计划耗时 SAP订单创建时间-出货计划创建时间
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+      ,A.DMAND_NUM --要货单编号
+      ,DELV_DMAND_LINE_ID AS DMAND_LINE_ID --要货单行ID
+  FROM DWRLTC.DWR_BO_DELV_SHIP_ORDER_F A --出货计划
+  LEFT JOIN DWROTD.DWR_BO_DELV_SHIP_BILL_F B --出货计划票据
+    ON A.DELV_SHIP_LINE_ID = B.DELV_SHIP_LINE_ID
+   AND A.DELV_SHIP_ID = B.DELV_SHIP_ID
+  LEFT JOIN DWROTD.DWR_SO_HEAD_SAP_F C --SAP订单
+    ON A.SAP_ORDER_NUM = C.SAL_VCH_NUM
+ -- LEFT JOIN DWRLTC.DWR_BO_PLAN_ORDER_F D
+ --   ON B.PLAN_ITEM_NUM = D.PLAN_ITEM_NUM
+ WHERE COALESCE(A.DELV_SHIP_ST_NAME,'') <> '已失效'
+   AND A.IS_HIDE_CODE = 1
+;

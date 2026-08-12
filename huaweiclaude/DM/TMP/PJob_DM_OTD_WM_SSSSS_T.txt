@@ -1,0 +1,8 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: shizujun
+-- create time: 2023/08/15 16:35:18 GMT+08:00
+-- ******************************************************************** --
+INSERT INTO DM.DM_OTD_WM_SSSSS_T SELECT * FORM B WHERE STAT_MONTH between date_sub('${PERIOD_ID_D}',2) and '${PERIOD_ID_D}';
+
+sdfsdfsadfsa

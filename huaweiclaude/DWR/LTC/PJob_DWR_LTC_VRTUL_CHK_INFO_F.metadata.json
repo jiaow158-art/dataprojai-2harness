@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_VRTUL_CHK_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "LTC虚拟验收单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_SUPPLIER_GENERAL_BAK",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/BACKUP",
+    "description": "供应商主数据（一般数据）备份表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrbs"
+}

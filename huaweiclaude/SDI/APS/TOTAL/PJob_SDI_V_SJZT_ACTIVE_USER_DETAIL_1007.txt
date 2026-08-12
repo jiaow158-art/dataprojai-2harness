@@ -1,0 +1,12 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/07/13 11:24:53 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE SDI.SDI_V_SJZT_ACTIVE_USER_DETAIL_1007
+SELECT
+  code, 
+  state,
+  'N' AS DEL_FLAG,
+  CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+FROM STG.STG_V_SJZT_ACTIVE_USER_DETAIL_1007;

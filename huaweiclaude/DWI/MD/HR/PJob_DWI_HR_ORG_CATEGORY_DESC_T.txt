@@ -1,0 +1,14 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/08/01 16:23:38 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_HR_ORG_CATEGORY_DESC_T
+  SELECT MANDT,
+         SPRSL,
+         ZZ_LBBM,
+         ZZ_JGLBWB,
+         DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+    FROM SDI.SDI_ZHRT_JGLB_T_1001
+   WHERE DEL_FLAG = 'N';

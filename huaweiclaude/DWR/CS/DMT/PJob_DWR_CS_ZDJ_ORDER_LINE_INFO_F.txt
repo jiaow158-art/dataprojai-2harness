@@ -1,0 +1,149 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/09/26 10:52:02 GMT+08:00
+-- update from huangwenbin 2024-04-11 新增字段：一级部门名称等4个字段
+-- update from huangwenbin 2024-04-17 新增字段：签约时间等5个字段
+-- update from huangwenbin 2024-07-03 新增字段：销售员工ID、销售员工名称等4个字段
+-- update from huangwenbin 2024-08-10 增加字段：系统签单时间
+-- update from huangwenbin 2024-10-30 源系统修改导致修改产品的取值字段：DECORATION_RESOURCE_ID_LIST-->SCHEMEITEMSRESOURCELIST
+-- update from huangwenbin 2024-11-20 逻辑修改：SALE_NUM优先取 productCount ，num；SALE_AREA优先取 constructArea，area
+-- ******************************************************************** --
+WITH T0 AS(
+SELECT  SCHEMEITEMSRESOURCELIST
+       ,ORDER_QUOTATION_ID
+       ,SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,'"decorationResourceId": ')[1],',')[0] AS PROD_ID1 --产品ID1
+       ,SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,'"decorationResourceId": ')[2],',')[0] AS PROD_ID2 --产品ID2
+       ,SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,'"decorationResourceId": ')[3],',')[0] AS PROD_ID3 --产品ID3
+       ,SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,'"decorationResourceId": ')[4],',')[0] AS PROD_ID4 --产品ID3
+       ,SPLIT(REPLACE(REPLACE(SCHEMEITEMSRESOURCELIST,', {"id": ','黄文彬'),', {"num": ','黄文彬'),'黄文彬')[0] AS LIST1 --列表1
+       ,SPLIT(REPLACE(REPLACE(SCHEMEITEMSRESOURCELIST,', {"id": ','黄文彬'),', {"num": ','黄文彬'),'黄文彬')[1] AS LIST2 --列表2
+       ,SPLIT(REPLACE(REPLACE(SCHEMEITEMSRESOURCELIST,', {"id": ','黄文彬'),', {"num": ','黄文彬'),'黄文彬')[2] AS LIST3 --列表3
+       ,SPLIT(REPLACE(REPLACE(SCHEMEITEMSRESOURCELIST,', {"id": ','黄文彬'),', {"num": ','黄文彬'),'黄文彬')[4] AS LIST4 --列表4
+       --,REPLACE(SPLIT(SCHEMEITEMSRESOURCELIST,',')[0],'{"num": ','') as ORDER_NUM --订单数量
+       --,REPLACE(SPLIT(SCHEMEITEMSRESOURCELIST,',')[1],'"area": ','') as AREA --订单面积
+       --,SPLIT(SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,'"尺寸"')[1],'"attrValue": "')[1],'",')[0] AS PROD_SPEC --产品规格
+       --,SPLIT(SPLIT(SCHEMEITEMSRESOURCELIST,', "totalPrice": ')[1],',')[0] AS SALE_AMT --订单行金额
+  FROM SDI.SDI_HD_ORDER_QUOTATION_SCHEME_ITEMS_1030
+ WHERE EP_ID = 3044
+   AND APP_ID = 1831
+   AND IS_DELETED = 0)
+,T1 AS(
+SELECT  SCHEMEITEMSRESOURCELIST
+       ,ORDER_QUOTATION_ID
+       ,PROD_ID1 AS PROD_ID --产品ID1
+       ,SPLIT(SPLIT(LIST1,'"num":')[1],',')[0] as ORDER_NUM --订单数量
+       ,SPLIT(SPLIT(LIST1,'"productCount":')[1],',')[0] as ORDER_NUM1 --订单数量
+       ,SPLIT(SPLIT(LIST1,'"area":')[1],',')[0] as AREA --面积
+       ,SPLIT(SPLIT(LIST1,'"constructArea":')[1],',')[0] as AREA1 --面积
+       ,SPLIT(SPLIT(SPLIT(LIST1,'"尺寸"')[1],'"attrValue": "')[1],'",')[0] AS PROD_SPEC --产品规格
+       ,SPLIT(SPLIT(LIST1,', "totalPrice": ')[1],',')[0] AS SALE_AMT --订单行金额
+  FROM T0
+ WHERE PROD_ID1 IS NOT NULL
+ 
+ UNION ALL
+ 
+SELECT  SCHEMEITEMSRESOURCELIST
+       ,ORDER_QUOTATION_ID
+       ,PROD_ID2 AS PROD_ID --产品ID1
+       ,SPLIT(SPLIT(LIST2,'"num":')[1],',')[0] as ORDER_NUM --订单数量
+       ,SPLIT(SPLIT(LIST2,'"productCount":')[1],',')[0] as ORDER_NUM1 --订单数量
+       ,SPLIT(SPLIT(LIST2,'"area":')[1],',')[0] as AREA --面积
+       ,SPLIT(SPLIT(LIST2,'"constructArea":')[1],',')[0] as AREA1 --面积
+       ,SPLIT(SPLIT(SPLIT(LIST2,'"尺寸"')[1],'"attrValue": "')[1],'",')[0] AS PROD_SPEC --产品规格
+       ,SPLIT(SPLIT(LIST2,', "totalPrice": ')[1],',')[0] AS SALE_AMT --订单行金额
+  FROM T0
+ WHERE PROD_ID2 IS NOT NULL
+ 
+ UNION ALL
+ 
+SELECT  SCHEMEITEMSRESOURCELIST
+       ,ORDER_QUOTATION_ID
+       ,PROD_ID3 AS PROD_ID --产品ID1
+       ,SPLIT(SPLIT(LIST3,'"num":')[1],',')[0] as ORDER_NUM --订单数量
+       ,SPLIT(SPLIT(LIST3,'"productCount":')[1],',')[0] as ORDER_NUM1 --订单数量
+       ,SPLIT(SPLIT(LIST3,'"area":')[1],',')[0] as AREA --面积
+       ,SPLIT(SPLIT(LIST3,'"constructArea":')[1],',')[0] as AREA1 --面积
+       ,SPLIT(SPLIT(SPLIT(LIST3,'"尺寸"')[1],'"attrValue": "')[1],'",')[0] AS PROD_SPEC --产品规格
+       ,SPLIT(SPLIT(LIST3,', "totalPrice": ')[1],',')[0] AS SALE_AMT --订单行金额
+  FROM T0
+ WHERE PROD_ID3 IS NOT NULL
+ 
+ UNION ALL
+ 
+SELECT  SCHEMEITEMSRESOURCELIST
+       ,ORDER_QUOTATION_ID
+       ,PROD_ID4 AS PROD_ID --产品ID1
+       ,SPLIT(SPLIT(LIST4,'"num":')[1],',')[0] as ORDER_NUM --订单数量
+       ,SPLIT(SPLIT(LIST4,'"productCount":')[1],',')[0] as ORDER_NUM1 --订单数量
+       ,SPLIT(SPLIT(LIST4,'"area":')[1],',')[0] as AREA --面积
+       ,SPLIT(SPLIT(LIST4,'"constructArea":')[1],',')[0] as AREA1 --面积
+       ,SPLIT(SPLIT(SPLIT(LIST4,'"尺寸"')[1],'"attrValue": "')[1],'",')[0] AS PROD_SPEC --产品规格
+       ,SPLIT(SPLIT(LIST4,', "totalPrice": ')[1],',')[0] AS SALE_AMT --订单行金额
+  FROM T0
+ WHERE PROD_ID4 IS NOT NULL)
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_ZDJ_ORDER_LINE_INFO_F
+SELECT T1.ORDER_QUOTATION_ID AS OFR_ORDER_ID --报价单ID
+      ,T.CREATE_TIME --创建时间
+      ,T.ORDER_NUM --订单编号
+      ,T.CNTC_CODE --合同编码
+      ,T.PRVDR_CODE --服务商编码
+      ,T.PRVDR_NAME --服务商名称
+      ,T.CUST_ID --客户ID
+      ,T.CUST_NAME --客户名称
+      ,T.PROV_NAME --省份
+      ,T.CITY_NAME --城市
+      ,T.DIST_NAME --区域名称
+      ,T.ADDR --地址
+	  ,T.STAGE_NAME --订单阶段名称
+	  ,T1.PROD_ID AS MATERIAL_ID --产品ID
+      ,B.RESOURCE_NO AS MATERIAL_NUM --产品编码
+      ,B.RESOURCE_NAME AS MATERIAL_NAME --产品名称
+	  ,B.RESOURCE_CATEGORY AS MATERIAL_CAT_ID --产品类别
+	  ,C.CATEGORY_NAME AS MATERIAL_CAT_NAME --产品类别名称
+	  ,COALESCE(T1.ORDER_NUM1,T1.ORDER_NUM) AS SALE_NUM --订单数量
+	  ,COALESCE(T1.AREA1,T1.AREA) AS SALE_AREA --订单面积
+	  ,T1.PROD_SPEC --产品规格
+	  ,T1.SALE_AMT --订单行金额
+	  ,COALESCE(E.CATEGORY_NAME,D.CATEGORY_NAME) AS MATERIAL_CAT_TYPE_NAME --产品大类名称
+	  ,T.ORDER_SIGN_TIME --签单时间
+	  ,T.ORDER_OVER_TIME --完工时间
+	  ,CASE WHEN D.CATEGORY_LEVEL = 2 THEN D.CATEGORY_NAME 
+	        WHEN C.CATEGORY_LEVEL = 2 THEN C.CATEGORY_NAME
+	         END AS MATERIAL_CAT_LVL2_NAME --产品二级名称
+	  ,SPLIT(SPLIT(B.UNIT,'dictName":"')[1],'",')[0] AS UNIT_VAL --计量单位
+	  ,T.LVL1_DEPT_NAME	--一级部门名称
+      ,T.LVL2_DEPT_NAME	--二级部门名称
+	  ,T.LVL3_DEPT_NAME	--三级部门名称
+	  ,T.LVL4_DEPT_NAME	--四级部门名称
+      ,T.CNTC_SIGN_TIME	--签约时间
+      ,T.ASSIGN_TIME --指派师傅时间
+      ,T.FOLLOW_TIME --完成沟通时间
+      ,T.ORDER_START_TIME --师傅开工时间
+      ,T.DECOR_NAME	--师傅姓名
+      ,T.EMP_ID --销售员工ID
+	  ,T.EMP_NAME --销售员工名称
+	  ,T.STORE_ID --销售员工所属门店ID
+	  ,T.STORE_NAME --销售员工所属门店名称	  
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,T.SYS_ORDER_SIGN_TIME --系统签单时间
+  FROM T1
+ INNER JOIN DWRCS.DWR_CS_ZDJ_ORDER_INFO_F T
+    ON T.OFR_ORDER_ID = T1.ORDER_QUOTATION_ID
+  LEFT JOIN SDI.SDI_HD_DECORATION_RESOURCE_1030 B
+    ON T1.PROD_ID = B.ID
+   AND B.EP_ID = 3044
+   AND B.APP_ID = 1831
+   AND B.IS_DELETED = 0
+  LEFT JOIN SDI.SDI_HD_DECORATION_CATEGORY_1030 C
+    ON B.RESOURCE_CATEGORY = C.ID
+   AND C.EP_ID = 3044
+   AND C.APP_ID = 1831
+  LEFT JOIN SDI.SDI_HD_DECORATION_CATEGORY_1030 D
+    ON C.PARENT_ID = D.ID
+   AND D.EP_ID = 3044
+   AND D.APP_ID = 1831
+  LEFT JOIN SDI.SDI_HD_DECORATION_CATEGORY_1030 E
+    ON D.PARENT_ID = E.ID
+   AND E.EP_ID = 3044
+   AND E.APP_ID = 1831

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WF_DEPT_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "OA部门维表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

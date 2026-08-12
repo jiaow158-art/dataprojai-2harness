@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_RPT_SALES_DELIVER_JXGC_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

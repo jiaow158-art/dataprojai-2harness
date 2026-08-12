@@ -1,0 +1,117 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/14 14:09:22 GMT+08:00
+-- description:异常单模型
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE DWROTD.DWR_TRA_TMS_ABNML_F PARTITION (PERIOD_ID_M) 
+SELECT
+    A.ABNORMAL_DATE AS ABNORMAL_DATE,--异常发生日期
+    A.ABNORMAL_NO AS ABNORMAL_NO,  --异常单号  
+    A.ORDER_NO AS MRG_PLAN_NO,--合并发货计划号
+    AD.DO_NO AS WB_NO,--TMS运单号
+    AD.LINE_NO   AS WB_LINE_NO, -- 运单行号
+    AD.ERP_NO AS LDNG_NO,--SAP提货单号
+    AD.OBLIGATE_NO AS OBLIGATE_NO  , --预留单号
+    A.ORDER_TYPE AS ORDER_TYPE_CODE  ,--订单类型       
+    P.DESCR  AS ORDER_TYPE_NAME,--订单类型描述    
+    A.SKU_TYPE AS CARGO_TYPE_CODE  , -- 货品类型编码   
+    PSKU.NAME AS CARGO_TYPE_NAME ,--货品类型描述
+    A.STATUS AS ABNML_STATUS_CODE   ,--异常状态 
+    P1.NAME  AS ABNML_STATUS_NAME   ,--状态描述
+    A.RESPONSIBLE_PARTY_CODE AS RESPONSIBLE_PARTY_CODE   ,--异常责任方编码
+    A.RESPONSIBLE_PARTY_NAME AS RESPONSIBLE_PARTY_NAME   ,--异常责任方
+    A.TRADE_TYPE AS TRADE_TYPE_CODE  ,--责任方类型编码
+    P2.NAME AS TRADE_TYPE_NAME   , --责任方类型描述
+    A.DEDUCTIBLE_RATIO AS DEDUCTIBLE_RATIO  ,--免赔率
+    A.DEDUCTIBLE_AREA AS DEDUCTIBLE_AREA  ,--合并发货计划总面积/总体积
+    A.DAMAGED_AREA AS DAMAGED_QTY   ,--破损面积/破损体积
+    A.DAMAGED_RATIO AS DAMAGED_RATIO  ,--破损比率
+    A.COMPENSABLE_RATIO AS COMPENSABLE_RATIO  ,--应赔比率
+    A.ABNORMAL_ATTRIBUTE AS ABNORMAL_ATTR_CODE,--异常属性编码
+    P3.NAME  AS ABNORMAL_ATTR_NAME,--异常属性描述
+    A.ABNORMAL_TYPE AS ABNORMAL_TYPE_CODE  ,--异常类型编码
+    P4.NAME AS ABNORMAL_TYPE_NAME  , --异常类型描述
+    A.ABNORMAL_DESCRIPTION AS ABNORMAL_DESC     ,--异常说明
+    AD.ABNORMAL_SKUCODE AS ABNORMAL_SKUCODE  ,--异常货品编码
+    AD.ABNORMAL_SKUQTY AS ABNORMAL_SKUQTY_LINE  ,  --异常货品数量
+    AD.LOTNO AS BTCH_NO   ,      --批次号
+    AD.COSTCENTER_CODE AS COST_CENTER_CODE ,      --成本中心编码
+    TCUST.COSTCENTER_NAME  AS COST_CENTER_NAME ,     --成本中心名称
+    CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE,
+    SUBSTR(A.ABNORMAL_DATE,1,7) AS PERIOD_ID_M
+FROM
+SDI.SDI_TMS_ABNORMAL_1005 A
+ JOIN SDI.SDI_TMS_ABNORMAL_DETAIL_1005 AD ON A.ABNORMAL_NO = AD.ABNORMAL_NO
+    LEFT JOIN SDI.SDI_TMS_DO_1005 D ON AD.DO_NO = D.DO_NO
+    LEFT JOIN SDI.SDI_PLAT_CODE_1005 P ON P.CODE = A.ORDER_TYPE 
+    AND P.TYPENAME = 'ABNORMAL_ORDER_TYPE' 
+    AND P.TENANT_ID = A.TENANT_ID
+    LEFT JOIN SDI.SDI_PLAT_CODE_1005 PSKU ON PSKU.CODE = A.SKU_TYPE 
+     AND PSKU.TYPENAME = 'SKU_TYPE' 
+    AND PSKU.TENANT_ID = A.TENANT_ID  
+    LEFT JOIN SDI.SDI_PLAT_CODE_1005 P1 ON P1.CODE = A.STATUS 
+     AND P1.TYPENAME = 'TMS_EXCEPTION_STATUS' 
+    AND P1.TENANT_ID = A.TENANT_ID      
+    LEFT JOIN SDI.SDI_PLAT_CODE_1005 P2 ON P2.CODE = A.TRADE_TYPE 
+     AND P2.TYPENAME = 'PARTNER_RELATION_TYPE_LIST' 
+    AND P2.TENANT_ID = A.TENANT_ID       
+    LEFT JOIN SDI.SDI_PLAT_CODE_1005 P3 ON P3.CODE = A.ABNORMAL_ATTRIBUTE 
+     AND P3.TYPENAME = 'TMS_ABNORMAL_ATTR' 
+    AND P3.TENANT_ID = A.TENANT_ID       
+    LEFT JOIN SDI.SDI_BMS_COSTCENTER_1005 TCUST 
+    ON AD.COSTCENTER_CODE = TCUST.COSTCENTER_CODE
+     LEFT JOIN SDI.SDI_PLAT_CODE_1005 P4 ON P4.CODE = A.ABNORMAL_TYPE 
+     AND P4.TYPENAME = 'TMS_EXCEPTION_TYPE' 
+    AND P4.TENANT_ID = A.TENANT_ID        
+    
+    
+    
+-- create table DWROTD.DWR_TRA_TMS_ABNML_F(
+-- ABNORMAL_DATE STRING  COMMENT '异常发生日期',
+-- ABNML_NO   String comment '异常单号',
+-- MRG_PLAN_NO STRING COMMENT '合并发货计划号',
+-- WB_NO  STRING COMMENT 'TMS运单号',
+-- WB_LINE_NO STRING COMMENT 'TMS运单行号',
+-- LDNG_NO  STRING COMMENT 'SAP提货单号',
+-- OBLIGATE_NO  STRING COMMENT '预留单号',
+-- order_type_code  STRING  COMMENT '订单类型',
+-- order_type_name string comment '订单类型描述',
+-- CARGO_type_code  string  comment '货品类型',
+-- CARGO_type_name string comment '货品类型描述',
+-- ABNML_status_CODE   string comment '异常状态',
+-- ABNML_status_name   STRING COMMENT '异常状态描述',
+-- RESPONSIBLE_PARTY_CODE   STRING COMMENT '异常责任方',
+-- RESPONSIBLE_PARTY_NAME   STRING COMMENT '异常责任方描述',
+-- TRADE_TYPE_CODE  STRING COMMENT '责任方类型编码',
+-- TRADE_TYPE_NAME   STRING  COMMENT '责任方类型名称',
+-- DEDUCTIBLE_RATIO  DECIMAL(38,10) COMMENT '免赔率(头)',
+-- DEDUCTIBLE_AREA  DECIMAL(38,10)   comment '合并发货计划总面积/体积（头）',
+-- DAMAGED_QTY   DECIMAL(38,10)   comment '破损面积/破损体积（头）',
+-- DAMAGED_RATIO  DECIMAL(38,10)   comment '破损比率（头）',
+-- COMPENSABLE_RATIO  DECIMAL(38,10)   comment '应赔比率（头）',
+-- ABNORMAL_ATTR_CODE  STRING COMMENT '异常属性编码',
+-- ABNORMAL_ATTR_NAME  STRING  COMMENT '异常属性描述',
+-- ABNORMAL_TYPE_CODE STRING COMMENT '异常类型编码',
+-- ABNORMAL_TYPE_NAME STRING COMMENT '异常类型描述',
+-- ABNORMAL_DESC     String comment '异常说明',
+-- ABNORMAL_SKUCODE  STRING  COMMENT '异常货品编码',
+-- ABNORMAL_SKUQTY_LINE  DECIMAL(38,10)   comment '异常货品数量',
+-- BTCH_NO   STRING COMMENT '批次号',
+-- COST_CENTER_CODE string  COMMENT '成本中心编码',
+-- COST_CENTER_NAME   string   COMMENT '成本中心名称',
+-- last_update_date  TIMESTAMP
+-- )
+-- PARTITIONED BY (period_id_m VARCHAR(255));
+
+
+

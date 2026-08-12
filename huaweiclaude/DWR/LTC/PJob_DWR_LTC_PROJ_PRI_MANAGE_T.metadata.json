@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_LTC_PROJ_PRI_MANAGE_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "项目评审管理价格表（可根据实际出货量去关联对应政策价）",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

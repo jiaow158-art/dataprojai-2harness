@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_WM_LOW_TURNOVER_STOCKOUT_DETAIL_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

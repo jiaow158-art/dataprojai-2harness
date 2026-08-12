@@ -1,0 +1,659 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/06/27 10:39:05 GMT+08:00
+-- desc：供应商往来重分类前自然账龄 DWRFIN.DWR_AP_SUPPLIER_TRANS_AGING_F
+-- update：2023/06/28 guzhengfeng 0-30日账龄段取值修改
+-- update：2023/10/10 guzhengfeng 动态参数格式修改为 yyyy-MM-dd
+-- update 2023-12-03  linw 修复因为没有限定拉链表区间导致数据扩散问题(取最新)
+-- update 2024-05-14 zhz 月结123号读上月月底数据
+-- UPDATE: 20240905 ZHZ 修改月结3号不自动跑上月数
+-- ******************************************************************** --
+/*
+取限定条件数据：
+ACDOCA-KOART='K'  或者 ACDOCA-RACCT = '0021210910' 或者 ACDOCA-RACCT = '0021210920' 
+ACDOCA-BUDAT <>'00000000' 
+ACDOCA-BUDAT <>'' 
+ACDOCA-BUDAT <= 查询日期
+ACDOCA-AUGDT>'查询日期' 或者 ACDOCA-AUGDT = '00000000'
+*/
+WITH AGING AS (
+SELECT 
+    T.FISAL_YEAR                                -- 财年
+    ,T.COMP_CODE                                -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT                   -- 总账科目
+    ,T.GENERAL_LEDGER_ACCOUNT_DESC              -- 总账科目描述
+    ,T.SPECIAL_GENERAL_LEDGER                   -- 特别总账
+    ,T.SUPPLIER_ATTRIBUTE_CODE                  -- 供应商属性代码
+    ,T.SUPPLIER_ATTRIBUTE_DESC                  -- 供应商属性描述
+    ,T.SUPPLIER_CODE                            -- 供应商代码
+    ,T.SUPPLIER_NAME                            -- 供应商全称
+    ,T.PAY_TERM_CODE                            -- 付款条款
+    ,T.PAY_TERM_DESC                            -- 付款条款描述
+    ,T.VOUCHER_TYPE                             -- 凭证类型
+    ,T.VOUCHER_CODE                             -- 凭证编码
+    ,T.VOUCHER_LINE_CODE                        -- 凭证行编码
+    ,T.VOUCHER_DATE                             -- 凭证日期
+    ,T.POTING_DATE                              -- 过账日期
+    ,replace(T.DUE_DATE,'-','') DUE_DATE        -- 到期日
+    ,T.CLEARED_DATE                             -- 清账日期
+    ,T.ORIGIN_CU_END_BALANCE_AMT                -- 原币期末余额
+    ,T.VOUCHER_CURRENCY                         -- 凭证货币
+    ,T.LOCAL_CU_END_BALANCE_AMT                 -- 本币期末余额
+    ,T.LOCAL_CURRENCY                           -- 本币货币
+    ,T.ACTUAL_EXCHANGE_RATE                     -- 实际汇率
+    ,CASE WHEN T.FISAL_YEAR < 2019 THEN T.VOUCHER_DATE
+        ELSE T.POTING_DATE
+    END DATE1                                   -- 用于计算自然账龄
+FROM 
+    DWRFIN.DWR_AP_SUPPLIER_TRANSACTION_D T
+WHERE T.POTING_DATE <> '00000000' 
+AND T.POTING_DATE <> ''
+AND to_date(from_unixtime(unix_timestamp(T.POTING_DATE,'yyyyMMdd'))) <= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' end ,'yyyy-MM-dd')))
+AND (T.CLEARED_DATE = '00000000' OR to_date(from_unixtime(unix_timestamp(T.CLEARED_DATE,'yyyyMMdd'))) > to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' end ,'yyyy-MM-dd'))) )
+UNION ALL
+SELECT 
+    T1.FISAL_YEAR                               -- 财年
+    ,T1.COMP_CODE                               -- 公司代码
+    ,T1.GENERAL_LEDGER_ACCOUNT                  -- 总账科目
+    ,T1.GENERAL_LEDGER_ACCOUNT_DESC             -- 总账科目描述
+    ,T1.SPECIAL_GENERAL_LEDGER                  -- 特别总账
+    ,T1.SUPPLIER_ATTRIBUTE_CODE                 -- 供应商属性代码
+    ,T1.SUPPLIER_ATTRIBUTE_DESC                 -- 供应商属性描述
+    ,T1.SUPPLIER_CODE                           -- 供应商代码
+    ,T1.SUPPLIER_NAME                           -- 供应商全称
+    ,T1.PAY_TERM_CODE                           -- 付款条款
+    ,T1.PAY_TERM_DESC                           -- 付款条款描述
+    ,T1.VOUCHER_TYPE                            -- 凭证类型
+    ,T1.VOUCHER_CODE                            -- 凭证编码
+    ,T1.VOUCHER_LINE_CODE                       -- 凭证行编码
+    ,T1.VOUCHER_DATE                            -- 凭证日期
+    ,T1.POTING_DATE                             -- 过账日期
+    ,T1.DUE_DATE                                -- 到期日
+    ,T1.CLEARED_DATE                            -- 清账日期
+    ,T1.ORIGIN_CU_END_BALANCE_AMT               -- 原币期末余额
+    ,T1.VOUCHER_CURRENCY                        -- 凭证货币
+    ,T1.LOCAL_CU_END_BALANCE_AMT                -- 本币期末余额
+    ,T1.LOCAL_CURRENCY                          -- 本币货币
+    ,T1.ACTUAL_EXCHANGE_RATE                    -- 实际汇率
+    ,CASE WHEN T1.FISAL_YEAR < 2019 THEN T1.VOUCHER_DATE
+        ELSE T1.POTING_DATE
+    END DATE1                                   -- 用于计算自然账龄    
+FROM 
+    DWRFIN.DWR_AP_SUPPLIER_TRANSACTION_EST_D T1
+WHERE T1.POTING_DATE <> '00000000' 
+AND T1.POTING_DATE <> ''
+AND to_date(from_unixtime(unix_timestamp(T1.POTING_DATE,'yyyyMMdd'))) <= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END ,'yyyy-MM-dd')))
+AND (T1.CLEARED_DATE = '00000000' OR to_date(from_unixtime(unix_timestamp(T1.CLEARED_DATE,'yyyyMMdd'))) > to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd'))) )
+
+)
+/*
+将限定条件数据插入中间表 DWRFIN.DWR_AP_M1_D
+*/
+INSERT OVERWRITE TABLE DWRFIN.DWR_AP_M1_D
+SELECT 
+    T.FISAL_YEAR                                -- 财年
+    ,T.COMP_CODE                                -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT                   -- 总账科目
+    ,T.GENERAL_LEDGER_ACCOUNT_DESC              -- 总账科目描述
+    ,T.SPECIAL_GENERAL_LEDGER                   -- 特别总账
+    ,T.SUPPLIER_ATTRIBUTE_CODE                  -- 供应商属性代码
+    ,T.SUPPLIER_ATTRIBUTE_DESC                  -- 供应商属性描述
+    ,T.SUPPLIER_CODE                            -- 供应商代码
+    ,T.SUPPLIER_NAME                            -- 供应商全称
+    ,T.PAY_TERM_CODE                            -- 付款条款
+    ,T.PAY_TERM_DESC                            -- 付款条款描述
+    ,T.VOUCHER_TYPE                             -- 凭证类型
+    ,T.VOUCHER_CODE                             -- 凭证编码
+    ,T.VOUCHER_LINE_CODE                        -- 凭证行编码
+    ,T.VOUCHER_DATE                             -- 凭证日期
+    ,T.POTING_DATE                              -- 过账日期
+    ,T.DUE_DATE                                 -- 到期日
+    ,T.CLEARED_DATE                             -- 清账日期
+    ,T.ORIGIN_CU_END_BALANCE_AMT                -- 原币期末余额
+    ,T.VOUCHER_CURRENCY                         -- 凭证货币
+    ,T.LOCAL_CU_END_BALANCE_AMT                 -- 本币期末余额
+    ,T.LOCAL_CURRENCY                           -- 本币货币
+    ,T.ACTUAL_EXCHANGE_RATE                     -- 实际汇率
+    ,T.DATE1                                    -- 用于计算自然账龄
+    ,day( to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END ,'yyyy-MM-dd'))) - to_date(from_unixtime(unix_timestamp(T.DATE1,'yyyyMMdd'))) ) AS DUE_DAYS         -- 自然到期天数
+    ,day( to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END ,'yyyy-MM-dd'))) - to_date(from_unixtime(unix_timestamp(T.DUE_DATE,'yyyyMMdd'))) ) AS DUE_DAYS1     -- 到期日到期天数
+FROM 
+    AGING T
+;
+/*
+取自然账龄和到期日账龄各账龄段
+*/
+WITH AGING1 AS (
+SELECT 
+    T1.COMP_CODE                                -- 公司代码
+    ,T1.GENERAL_LEDGER_ACCOUNT                  -- 总账科目
+    ,T1.GENERAL_LEDGER_ACCOUNT_DESC             -- 总账科目描述
+    ,T1.SPECIAL_GENERAL_LEDGER                  -- 特别总账
+    ,T1.SUPPLIER_ATTRIBUTE_CODE                 -- 供应商属性代码
+    ,T1.SUPPLIER_ATTRIBUTE_DESC                 -- 供应商属性描述
+    ,T1.SUPPLIER_CODE                           -- 供应商代码
+    ,T1.SUPPLIER_NAME                           -- 供应商全称
+    ,T1.PAY_TERM_CODE                           -- 付款条款
+    ,T1.PAY_TERM_DESC                           -- 付款条款描述
+    ,T2.LOCAL_CU_END_BALANCE_AGING              -- 本币期末余额
+    ,T3.NATRUE_BALANCE_AGING_1YEAR              -- 自然账龄1年以内
+	,T4.NATRUE_BALANCE_AGING_0_30DAY            -- 自然账龄0-30日
+	,T5.NATRUE_BALANCE_AGING_31_60DAY           -- 自然账龄31-60日
+	,T6.NATRUE_BALANCE_AGING_61_90DAY           -- 自然账龄61-90日
+	,T7.NATRUE_BALANCE_AGING_91_180DAY          -- 自然账龄91-180日
+	,T8.NATRUE_BALANCE_AGING_181_365DAY         -- 自然账龄181-365日
+	,T9.NATRUE_BALANCE_AGING_1_2YEAR            -- 自然账龄1-2年
+	,T10.NATRUE_BALANCE_AGING_2_3YEAR           -- 自然账龄2-3年
+	,T11.NATRUE_BALANCE_AGING_3_4YEAR           -- 自然账龄3-4年
+	,T12.NATRUE_BALANCE_AGING_4_5YEAR           -- 自然账龄4-5年
+	,T13.NATRUE_BALANCE_AGING_5YEAR             -- 自然账龄5年以上
+	,T14.DUE_BALANCE_AGING_1YEAR                -- 到期日账龄1年以内
+	,T15.DUE_BALANCE_AGING_0_30DAY              -- 到期日账龄0-30日
+	,T16.DUE_BALANCE_AGING_31_60DAY             -- 到期日账龄31-60日
+	,T17.DUE_BALANCE_AGING_61_90DAY             -- 到期日账龄61-90日
+	,T18.DUE_BALANCE_AGING_91_180DAY            -- 到期日账龄91-180日
+	,T19.DUE_BALANCE_AGING_181_365DAY           -- 到期日账龄181-365日
+	,T20.DUE_BALANCE_AGING_1_2YEAR              -- 到期日账龄1-2年
+	,T21.DUE_BALANCE_AGING_2_3YEAR              -- 到期日账龄2-3年
+	,T22.DUE_BALANCE_AGING_3_4YEAR              -- 到期日账龄3-4年
+	,T23.DUE_BALANCE_AGING_4_5YEAR              -- 到期日账龄4-5年
+	,T24.DUE_BALANCE_AGING_5YEAR                -- 到期日账龄5年以上
+FROM 
+    DWRFIN.DWR_AP_M1_D T1
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)    AS LOCAL_CU_END_BALANCE_AGING
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE to_date(from_unixtime(unix_timestamp(T.POTING_DATE,'yyyyMMdd'))) <= to_date(from_unixtime(unix_timestamp(CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) ELSE '${PERIOD_ID_D}' END,'yyyy-MM-dd')))
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T2
+ON T1.COMP_CODE = T2.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T2.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T2.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_1YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE T.DUE_DAYS <= 365
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T3
+ON T1.COMP_CODE = T3.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T3.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T3.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_0_30DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE T.DUE_DAYS <= 30
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T4
+ON T1.COMP_CODE = T4.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T4.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T4.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_31_60DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 31 <= T.DUE_DAYS AND T.DUE_DAYS <= 60
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T5
+ON T1.COMP_CODE = T5.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T5.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T5.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_61_90DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 61 <= T.DUE_DAYS AND T.DUE_DAYS <= 90
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T6
+ON T1.COMP_CODE = T6.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T6.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T6.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_91_180DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 91 <= T.DUE_DAYS AND T.DUE_DAYS <= 180
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T7
+ON T1.COMP_CODE = T7.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T7.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T7.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_181_365DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 181 <= T.DUE_DAYS AND T.DUE_DAYS <= 365
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T8
+ON T1.COMP_CODE = T8.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T8.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T8.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_1_2YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 366 <= T.DUE_DAYS AND T.DUE_DAYS <= 730
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T9
+ON T1.COMP_CODE = T9.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T9.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T9.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_2_3YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 731 <= T.DUE_DAYS AND T.DUE_DAYS <= 1095
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T10
+ON T1.COMP_CODE = T10.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T10.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T10.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_3_4YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1096 <= T.DUE_DAYS AND T.DUE_DAYS <= 1460
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T11
+ON T1.COMP_CODE = T11.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T11.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T11.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_4_5YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1461 <= T.DUE_DAYS AND T.DUE_DAYS <= 1825
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T12
+ON T1.COMP_CODE = T12.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T12.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T12.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS NATRUE_BALANCE_AGING_5YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1826 <= T.DUE_DAYS
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T13
+ON T1.COMP_CODE = T13.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T13.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T13.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_1YEAR 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE T.DUE_DAYS1 <= 365
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T14
+ON T1.COMP_CODE = T14.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T14.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T14.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_0_30DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE T.DUE_DAYS1 <= 30
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T15
+ON T1.COMP_CODE = T15.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T15.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T15.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_31_60DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 31 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 60
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T16
+ON T1.COMP_CODE = T16.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T16.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T16.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_61_90DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 61 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 90
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T17
+ON T1.COMP_CODE = T17.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T17.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T17.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_91_180DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 91 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 180
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T18
+ON T1.COMP_CODE = T18.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T18.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T18.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_181_365DAY 
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 181 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 365
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T19
+ON T1.COMP_CODE = T19.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T19.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T19.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_1_2YEAR
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 366 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 730
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T20
+ON T1.COMP_CODE = T20.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T20.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T20.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_2_3YEAR
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 731 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 1095
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T21
+ON T1.COMP_CODE = T21.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T21.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T21.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_3_4YEAR
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1096 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 1460
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T22
+ON T1.COMP_CODE = T22.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T22.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T22.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_4_5YEAR
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1461 <= T.DUE_DAYS1 AND T.DUE_DAYS1 <= 1825
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T23
+ON T1.COMP_CODE = T23.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T23.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T23.SUPPLIER_CODE
+
+LEFT JOIN 
+(
+SELECT 
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+    ,SUM(T.LOCAL_CU_END_BALANCE_AMT)   AS DUE_BALANCE_AGING_5YEAR
+FROM DWRFIN.DWR_AP_M1_D T
+WHERE 1826 <= T.DUE_DAYS1
+GROUP BY
+    T.COMP_CODE                         -- 公司代码
+    ,T.GENERAL_LEDGER_ACCOUNT           -- 总账科目
+    ,T.SUPPLIER_CODE                    -- 供应商代码
+) T24
+ON T1.COMP_CODE = T24.COMP_CODE
+AND T1.GENERAL_LEDGER_ACCOUNT = T24.GENERAL_LEDGER_ACCOUNT
+AND T1.SUPPLIER_CODE = T24.SUPPLIER_CODE
+
+GROUP BY
+    T1.COMP_CODE                                -- 公司代码
+    ,T1.GENERAL_LEDGER_ACCOUNT                  -- 总账科目
+    ,T1.GENERAL_LEDGER_ACCOUNT_DESC             -- 总账科目描述
+    ,T1.SPECIAL_GENERAL_LEDGER                  -- 特别总账
+    ,T1.SUPPLIER_ATTRIBUTE_CODE                 -- 供应商属性代码
+    ,T1.SUPPLIER_ATTRIBUTE_DESC                 -- 供应商属性描述
+    ,T1.SUPPLIER_CODE                           -- 供应商代码
+    ,T1.SUPPLIER_NAME                           -- 供应商全称
+    ,T1.PAY_TERM_CODE                           -- 付款条款
+    ,T1.PAY_TERM_DESC                           -- 付款条款描述
+    ,T2.LOCAL_CU_END_BALANCE_AGING              -- 本币期末余额
+    ,T3.NATRUE_BALANCE_AGING_1YEAR              -- 自然账龄1年以内
+	,T4.NATRUE_BALANCE_AGING_0_30DAY            -- 自然账龄0-30日
+	,T5.NATRUE_BALANCE_AGING_31_60DAY           -- 自然账龄31-60日
+	,T6.NATRUE_BALANCE_AGING_61_90DAY           -- 自然账龄61-90日
+	,T7.NATRUE_BALANCE_AGING_91_180DAY          -- 自然账龄91-180日
+	,T8.NATRUE_BALANCE_AGING_181_365DAY         -- 自然账龄181-365日
+	,T9.NATRUE_BALANCE_AGING_1_2YEAR            -- 自然账龄1-2年
+	,T10.NATRUE_BALANCE_AGING_2_3YEAR           -- 自然账龄2-3年
+	,T11.NATRUE_BALANCE_AGING_3_4YEAR           -- 自然账龄3-4年
+	,T12.NATRUE_BALANCE_AGING_4_5YEAR           -- 自然账龄4-5年
+	,T13.NATRUE_BALANCE_AGING_5YEAR             -- 自然账龄5年以上
+	,T14.DUE_BALANCE_AGING_1YEAR                -- 到期日账龄1年以内
+	,T15.DUE_BALANCE_AGING_0_30DAY              -- 到期日账龄0-30日
+	,T16.DUE_BALANCE_AGING_31_60DAY             -- 到期日账龄31-60日
+	,T17.DUE_BALANCE_AGING_61_90DAY             -- 到期日账龄61-90日
+	,T18.DUE_BALANCE_AGING_91_180DAY            -- 到期日账龄91-180日
+	,T19.DUE_BALANCE_AGING_181_365DAY           -- 到期日账龄181-365日
+	,T20.DUE_BALANCE_AGING_1_2YEAR              -- 到期日账龄1-2年
+	,T21.DUE_BALANCE_AGING_2_3YEAR              -- 到期日账龄2-3年
+	,T22.DUE_BALANCE_AGING_3_4YEAR              -- 到期日账龄3-4年
+	,T23.DUE_BALANCE_AGING_4_5YEAR              -- 到期日账龄4-5年
+	,T24.DUE_BALANCE_AGING_5YEAR                -- 到期日账龄5年以上
+)
+/*
+1、取事业部
+2、将数据插入目标表 
+*/
+INSERT OVERWRITE TABLE DWRFIN.DWR_AP_SUPPLIER_TRANS_AGING_F
+SELECT 
+    CASE WHEN substr(current_date,1,7) = substr('${PERIOD_ID_D}',1,7) AND SUBSTR('${PERIOD_ID_D}',9,2) IN('01') THEN SUBSTR(last_day(add_months('${PERIOD_ID_D}',-1)),1,10) 
+    ELSE '${PERIOD_ID_D}' END                   AS QUERY_DATE                                       -- 查询日期
+    ,T1.COMP_CODE                               AS COMP_CODE                                        -- 公司代码
+    ,T2.DIVISION_CODE                           AS BUSINESS_DEPARTMENT_CODE                         -- 事业部编码
+    ,T1.GENERAL_LEDGER_ACCOUNT                  AS GENERAL_LEDGER_ACCOUNT                           -- 总账科目
+    ,T1.GENERAL_LEDGER_ACCOUNT_DESC             AS GENERAL_LEDGER_ACCOUNT_DESC                      -- 总账科目描述
+    ,T1.SPECIAL_GENERAL_LEDGER                  AS SPECIAL_GENERAL_LEDGER                           -- 特别总账
+    ,T1.SUPPLIER_ATTRIBUTE_CODE                 AS SUPPLIER_ATTRIBUTE_CODE                          -- 供应商属性代码
+    ,T1.SUPPLIER_ATTRIBUTE_DESC                 AS SUPPLIER_ATTRIBUTE_DESC                          -- 供应商属性描述
+    ,T1.SUPPLIER_CODE                           AS SUPPLIER_CODE                                    -- 供应商代码
+    ,T1.SUPPLIER_NAME                           AS SUPPLIER_NAME                                    -- 供应商全称
+    ,T1.PAY_TERM_CODE                           AS PAY_TERM_CODE                                    -- 付款条款
+    ,T1.PAY_TERM_DESC                           AS PAY_TERM_DESC                                    -- 付款条款描述
+    ,NVL(T1.LOCAL_CU_END_BALANCE_AGING,0)       AS LOCAL_CU_END_BALANCE_AGING                       -- 本币期末余额
+    ,NVL(T1.NATRUE_BALANCE_AGING_1YEAR,0)       AS NATRUE_BALANCE_AGING_1YEAR                       -- 自然账龄1年以内
+	,NVL(T1.NATRUE_BALANCE_AGING_0_30DAY,0)     AS NATRUE_BALANCE_AGING_0_30DAY                     -- 自然账龄0-30日
+	,NVL(T1.NATRUE_BALANCE_AGING_31_60DAY,0)    AS NATRUE_BALANCE_AGING_31_60DAY                    -- 自然账龄31-60日
+	,NVL(T1.NATRUE_BALANCE_AGING_61_90DAY,0)    AS NATRUE_BALANCE_AGING_61_90DAY                    -- 自然账龄61-90日
+	,NVL(T1.NATRUE_BALANCE_AGING_91_180DAY,0)   AS NATRUE_BALANCE_AGING_91_180DAY                   -- 自然账龄91-180日
+	,NVL(T1.NATRUE_BALANCE_AGING_181_365DAY,0)  AS NATRUE_BALANCE_AGING_181_365DAY                  -- 自然账龄181-365日
+	,NVL(T1.NATRUE_BALANCE_AGING_1_2YEAR,0)     AS NATRUE_BALANCE_AGING_1_2YEAR                     -- 自然账龄1-2年
+	,NVL(T1.NATRUE_BALANCE_AGING_2_3YEAR,0)     AS NATRUE_BALANCE_AGING_2_3YEAR                     -- 自然账龄2-3年
+	,NVL(T1.NATRUE_BALANCE_AGING_3_4YEAR,0)     AS NATRUE_BALANCE_AGING_3_4YEAR                     -- 自然账龄3-4年
+	,NVL(T1.NATRUE_BALANCE_AGING_4_5YEAR,0)     AS NATRUE_BALANCE_AGING_4_5YEAR                     -- 自然账龄4-5年
+	,NVL(T1.NATRUE_BALANCE_AGING_5YEAR,0)       AS NATRUE_BALANCE_AGING_5YEAR                       -- 自然账龄5年以上
+	,NVL(T1.DUE_BALANCE_AGING_1YEAR,0)          AS DUE_BALANCE_AGING_1YEAR                          -- 到期日账龄1年以内
+	,NVL(T1.DUE_BALANCE_AGING_0_30DAY,0)        AS DUE_BALANCE_AGING_0_30DAY                        -- 到期日账龄0-30日
+	,NVL(T1.DUE_BALANCE_AGING_31_60DAY,0)       AS DUE_BALANCE_AGING_31_60DAY                       -- 到期日账龄31-60日
+	,NVL(T1.DUE_BALANCE_AGING_61_90DAY,0)       AS DUE_BALANCE_AGING_61_90DAY                       -- 到期日账龄61-90日
+	,NVL(T1.DUE_BALANCE_AGING_91_180DAY,0)      AS DUE_BALANCE_AGING_91_180DAY                      -- 到期日账龄91-180日
+	,NVL(T1.DUE_BALANCE_AGING_181_365DAY,0)     AS DUE_BALANCE_AGING_181_365DAY                     -- 到期日账龄181-365日
+	,NVL(T1.DUE_BALANCE_AGING_1_2YEAR,0)        AS DUE_BALANCE_AGING_1_2YEAR                        -- 到期日账龄1-2年
+	,NVL(T1.DUE_BALANCE_AGING_2_3YEAR,0)        AS DUE_BALANCE_AGING_2_3YEAR                        -- 到期日账龄2-3年
+	,NVL(T1.DUE_BALANCE_AGING_3_4YEAR,0)        AS DUE_BALANCE_AGING_3_4YEAR                        -- 到期日账龄3-4年
+	,NVL(T1.DUE_BALANCE_AGING_4_5YEAR,0)        AS DUE_BALANCE_AGING_4_5YEAR                        -- 到期日账龄4-5年
+	,NVL(T1.DUE_BALANCE_AGING_5YEAR,0)          AS DUE_BALANCE_AGING_5YEAR                          -- 到期日账龄5年以上
+	,CURRENT_TIMESTAMP()                        AS DW_LAST_UPDATE_DATE	                            -- 数据同步时间
+FROM AGING1 T1
+LEFT JOIN SDI.SDI_DIVISION_COMP_T_1037 T2
+ON T1.COMP_CODE = T2.COMP_CODE
+and substr( t2.end_date,1,10) ='9999-12-31'  -- @2023-12-03 linw

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SO_TRANSIT_INVENTORY_ALL_T_NEW",
+    "type": "HiveSQL",
+    "directory": "/",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

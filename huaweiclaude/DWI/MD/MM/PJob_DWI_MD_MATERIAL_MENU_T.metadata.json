@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_MATERIAL_MENU_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/MM",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

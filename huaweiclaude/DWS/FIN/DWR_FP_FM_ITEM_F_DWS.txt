@@ -1,0 +1,105 @@
+DROP TABLE IF  EXISTS  DWRFIN.DWR_FP_FM_ITEM_TMP;
+CREATE TABLE IF NOT EXISTS  DWRFIN.DWR_FP_FM_ITEM_TMP
+(FM_ITEM_VOUCHER_NUM                       VARCHAR(500),                
+LEDGER_CODE                                VARCHAR(500),                
+FM_ITEM_RULE_NUM                           VARCHAR(500),                
+DB_LINE_KEY                                VARCHAR(500),                
+FIN_MANAGEMENT_SCOPE                       VARCHAR(500),                
+FIN_MANAGEMENT_SCOPE_NAME                  VARCHAR(500),                
+FISCAL_YEAR                                INT,                         
+AMOUNT_TYPE                                VARCHAR(500),                
+GROUP_NUM                                  VARCHAR(500),                
+CO_BUSINESS_TRANSACTION                    VARCHAR(500),                
+CO_BUSINESS_TRANSACTION_NAME               VARCHAR(500),                
+FI_VOUCHER_NUM                             VARCHAR(500),                
+FI_VOUCHER_ACCOUNT_YEAR                    VARCHAR(500),                
+FI_VOUCHER_ITEM                            VARCHAR(500),                
+FM_VOUCHER_PAYMENT_STATUS                  VARCHAR(500),                
+BUSINESS_SCOPE                             VARCHAR(500),                
+BUSINESS_SCOPE_NAME                        VARCHAR(500),                
+BUSINESS_CURRENCY_AMT                      decimal(38,10),              
+TRANSACTIONAL_CURRENCY_CODE                VARCHAR(500),                
+PAYMENT_VOUCHER_NUM                        VARCHAR(500),                
+FM_CURRENCY_AMT                            decimal(38,10),              
+VALUE_TYPE                                 VARCHAR(500),                
+PRE_VOUCHER_LIST                           VARCHAR(500),                
+PRE_VOUCHER_NUM                            VARCHAR(500),                
+PRE_VOUCHER_ITEM                           VARCHAR(500),                
+PRE_ACCOUNT_NUM                            VARCHAR(500),                
+COMPANY_CODE                               VARCHAR(500),                
+PROFIT_CENTER                              VARCHAR(500),                
+REFERENCE_PROCESS                          VARCHAR(500),                
+BASE_MEASURE_UNIT                          VARCHAR(500),                
+FUND_CENTER_CODE                           VARCHAR(500),                
+GL_ACCOUNT                                 VARCHAR(500),                
+COMMITMENT_ITEM_ID                         VARCHAR(500),                
+VOUCHER_ACCOUNT_YEAR                       INT,                         
+VOUCHER_COMPANY_CODE                       VARCHAR(500),                
+QUANTITY                                   decimal(38,10),              
+ACCOUNT_PERIOD                             VARCHAR(500),                
+CASH_FLOW                                  VARCHAR(500),                
+CARRY_FORWARD_LEVEL                        VARCHAR(500),                
+LINE_ITEM_REFERENCE_CODE                   VARCHAR(500),                
+TRADE_PARTNER_COMPANY_ID                   VARCHAR(500),                
+FM_TRANSACTION_NUM                         VARCHAR(500),                
+FUND_MNGMT_REF_VOUCHER_NUM                 VARCHAR(500),                
+FUND_MNGMT_REF_YEAR                        INT,                         
+FUND_MNGMT_REF_LINE_ITEM                   VARCHAR(500),                
+FM_UPDATE_DATE                             TIMESTAMP,                   
+POST_DATE                                  TIMESTAMP,                   
+ITEM_TEXT                                  VARCHAR(500),                
+DEL_FLAG                                   VARCHAR(500),                
+DW_LAST_UPDATE_DATE                        TIMESTAMP);                  
+
+
+COMMENT  ON TABLE  DWRFIN.DWR_FP_FM_ITEM_TMP	                         IS   '在资金管理中的FI行项目'; 
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_ITEM_VOUCHER_NUM             IS  'FM凭证行项目的凭证编号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.LEDGER_CODE                     IS  '分类账';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_ITEM_RULE_NUM                IS  '在TR-FM行项目中的规则行号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.DB_LINE_KEY                     IS  '数据库中的行键值的清楚标识号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FIN_MANAGEMENT_SCOPE            IS  '财务管理范围';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FIN_MANAGEMENT_SCOPE_NAME       IS  '财务管理范围名称';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FISCAL_YEAR                     IS  '财年';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.AMOUNT_TYPE                     IS  '金额类型';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.GROUP_NUM                       IS  '集团';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.CO_BUSINESS_TRANSACTION         IS  'CO 业务事务';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.CO_BUSINESS_TRANSACTION_NAME    IS  'CO 业务事务名称';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FI_VOUCHER_NUM                  IS  'FI 凭证号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FI_VOUCHER_ACCOUNT_YEAR         IS  'FI 凭证号的会计年度';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FI_VOUCHER_ITEM                 IS  'FI 凭证号的凭证项目';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_VOUCHER_PAYMENT_STATUS       IS  'FM 凭证的付款状态';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.BUSINESS_SCOPE                  IS  '业务范围';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.BUSINESS_SCOPE_NAME             IS  '业务范围名称';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.BUSINESS_CURRENCY_AMT           IS  '业务货币计价的金额';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.TRANSACTIONAL_CURRENCY_CODE     IS  '交易货币';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PAYMENT_VOUCHER_NUM             IS  '付款凭证编号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_CURRENCY_AMT                 IS  '以FM范围货币计的金额';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.VALUE_TYPE                      IS  '值类型';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PRE_VOUCHER_LIST                IS  '先前凭证目录';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PRE_VOUCHER_NUM                 IS  '先前凭证编号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PRE_VOUCHER_ITEM                IS  '先前凭证项目';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PRE_ACCOUNT_NUM                 IS  '先前科目设置';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.COMPANY_CODE                    IS  '公司代码';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.PROFIT_CENTER                   IS  '利润中心';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.REFERENCE_PROCESS               IS  '参考过程';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.BASE_MEASURE_UNIT               IS  '基本计量单位';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FUND_CENTER_CODE                IS  '基金中心';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.GL_ACCOUNT                      IS  '总账科目';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.COMMITMENT_ITEM_ID              IS  '承诺项目';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.VOUCHER_ACCOUNT_YEAR            IS  '收付凭证号的会计年度';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.VOUCHER_COMPANY_CODE            IS  '收付凭证号的公司代码';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.QUANTITY                        IS  '数量';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.ACCOUNT_PERIOD                  IS  '期间';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.CASH_FLOW                       IS  '现金流量';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.CARRY_FORWARD_LEVEL             IS  '结转层次';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.LINE_ITEM_REFERENCE_CODE        IS  '行项目的参考码';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.TRADE_PARTNER_COMPANY_ID        IS  '贸易伙伴的公司标识';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_TRANSACTION_NUM              IS  '资金管理事务编号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FUND_MNGMT_REF_VOUCHER_NUM      IS  '资金管理参考凭证编号';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FUND_MNGMT_REF_YEAR             IS  '资金管理参考年度';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FUND_MNGMT_REF_LINE_ITEM        IS  '资金管理参考行项目';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.FM_UPDATE_DATE                  IS  '资金管理更新日期';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.POST_DATE                       IS  '过帐日期';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.ITEM_TEXT                       IS  '项目文本';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.DEL_FLAG                        IS  '删除标识';
+COMMENT  ON COLUMN DWRFIN.DWR_FP_FM_ITEM_TMP.DW_LAST_UPDATE_DATE             IS  'DW最后更新日期';

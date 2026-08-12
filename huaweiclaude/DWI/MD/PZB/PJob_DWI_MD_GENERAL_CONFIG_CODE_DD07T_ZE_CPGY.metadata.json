@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_GENERAL_CONFIG_CODE_DD07T_ZE_CPGY",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "物料主数据-产品工艺配置",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

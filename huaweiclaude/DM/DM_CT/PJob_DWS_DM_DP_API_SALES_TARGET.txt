@@ -1,0 +1,138 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/10/20 18:27:19 GMT+08:00
+-- description: 需求预测项目：年度计划
+-- history list:
+-- UPDATE FROM 10004701 20240230 2023年“大零售渠道”，而2024年为“零售渠道”
+-- UPDATE FROM 10004701 20240409 2024年逻辑调整
+-- update from 10004400 20250321 25年不双计从业务提报的目标表出运营中心的目标
+-- ******************************************************************** --
+DELETE FROM dm.dm_dp_api_sales_target ;
+INSERT INTO dm.dm_dp_api_sales_target 
+
+with 目标 as (
+select 
+substring(t1.stat_month,1,4) as stat_year,
+t1.stat_month as stat_month,
+t2.sales_center_code,
+t2.sales_center,
+t1.integrate_channel,
+t2.sales_dep_code,
+t2.sales_dep,
+t2.sales_region_code,
+t2.sales_region,
+sum(coalesce(target,0)) as target_sales_amt,
+sum(coalesce(target_1n,0)) as n_target_amount
+from upload.upload_ct_sales_performance_target_t t1
+join dm.dm_dp_api_sales_group_struct t2 on t1.sales_group = t2.sales_grp
+left join dm.dm_rpt_sales_group_t b on t1.sales_group=b.node_name9
+where 1=1
+--and is_double_count = 0 --0不是双计，1是双计
+and fr_delete = 0
+and t1.sales_group not in ('ZB04','ZK01')
+
+group by 
+t1.stat_month,
+t2.sales_center_code,
+t2.sales_center,
+t1.integrate_channel,
+t2.sales_dep_code,
+t2.sales_dep,
+t2.sales_region_code,
+t2.sales_region
+)
+
+,tem as (
+-- 年度	月度	业务单位	渠道	营销部	销区	目标值（万元）	销售组织类型
+select 
+	stat_year ,   -- 年度
+    stat_month,  -- 月度
+    sales_center_code,
+	sales_center,
+	integrate_channel,  -- 整合渠道2
+	sales_dep_code,
+	sales_dep,
+	sales_region_code,
+	sales_region,
+    target_sales_amt as target_sales_amt,  -- 目标值（万元）
+    '销区' as  org_type, -- 销售组织类型
+    n_target_amount as n_target_amount
+from 目标
+where sales_region_code is not null
+union all
+select 
+	stat_year ,   -- 年度
+    stat_month,  -- 月度
+    sales_center_code,
+	sales_center,
+	integrate_channel,  -- 整合渠道2
+	sales_dep_code,
+	sales_dep,
+	null as sales_region_code,
+	null as sales_region,
+    sum(target_sales_amt) as target_sales_amt,  -- 目标值（万元）
+    '营销部' as  org_type, -- 销售组织类型
+    sum(n_target_amount) as n_target_amount
+from 目标
+where sales_dep_code is not null
+group by stat_year,stat_month,sales_center_code,sales_center,integrate_channel,sales_dep_code,sales_dep
+union all
+-- 24年数据
+select 
+	substring(t1.stat_month,1,4) as stat_year,
+	substring(t1.stat_month,1,7) as stat_month,
+	t2.sales_center_code,
+	t2.sales_center,
+	t1.prod_channel_name as integrate_channel ,  -- 整合渠道2
+	null as sales_dep_code,
+	null as sales_dep,
+	null as sales_region_code,
+	null as sales_region,
+	sum(coalesce(t1.prod_it_amt1,0)-coalesce(t1.budget1n,0))/10000 as target_sales_amt,
+	'业务单位' as  org_type,
+	sum(case when data_source = 'S' and prod_property <> 'A0001'  then prod_it_amt1 else 0 end)/10000 as n_target_amount
+from upload.upload_achievement_budget_t t1
+join dm.dm_dp_api_sales_group_struct t2 on t1.sale_grp_name = t2.sales_grp
+where 1=1
+and substring(t1.stat_month,1,4)  >= 2024  and substring(t1.stat_month,1,7)<='2024-12'
+group by substring(t1.stat_month,1,4) ,substring(t1.stat_month,1,7),t2.sales_center_code,t2.sales_center,prod_channel_name
+union all 
+--25年数据
+select 
+	stat_year ,   -- 年度
+    stat_month,  -- 月度
+    sales_center_code,
+	sales_center,
+	integrate_channel,  -- 整合渠道2
+	null sales_dep_code,
+	null sales_dep,
+	null as sales_region_code,
+	null as sales_region,
+    sum(target_sales_amt) as target_sales_amt,  -- 目标值（万元）
+    '业务单位' as  org_type, -- 销售组织类型
+    sum(n_target_amount) as n_target_amount
+from 目标
+where sales_center_code is not null
+and stat_month>='2025-01'
+group by stat_year,stat_month,sales_center_code,sales_center,integrate_channel
+)
+
+select 
+stat_year,
+stat_month,
+sales_center_code,
+sales_center,
+integrate_channel,
+sales_dep_code,
+sales_dep,
+sales_region_code,
+sales_region,
+coalesce(target_sales_amt,0) - coalesce(n_target_amount,0) as target_sales_amt,
+org_type,
+current_timestamp() as dw_last_update_date,
+stat_month as stat_month_ym,
+coalesce(n_target_amount,0)  as n_target_amount
+from tem 
+where 1=1
+and target_sales_amt <> 0

@@ -1,0 +1,166 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004363
+-- create time: 2023/02/13 10:05:05 GMT+08:00
+-- 2023/06/01 yueyuzhan 添加字段 month_roll_qty 月度滚入数
+-- ******************************************************************** --
+--瓷砖1+N滚动计划清单
+
+--要货单信息
+with demand_plan as(
+select sum(ddl.shipment_qty) as shipment_qty
+        ,ddh.deliver_roll_plan_id
+        ,ddl.roll_plan_line_id
+from STG.STG_DELIVER_DEMAND_HEADER_1033 ddh 
+left join STG.STG_DELIVER_DEMAND_LINE_1033 ddl on ddl.deliver_demand_id = ddh.deliver_demand_id and ddl.delete_flag = 0
+where ddh.delete_flag = 0
+  and ddh.demand_status = 'SUBMIT'
+group by ddh.deliver_roll_plan_id,ddl.roll_plan_line_id--,ddh.demand_status
+)
+--工程计划信息
+,order_plan as (
+select 
+sum(splo.quantity) as quantity
+,splo.roll_plan_line_id
+from SDI.SDI_S_PROJECT_PLAN_ORDER_ITEM_1029 splo
+WHERE splo.status <> 'inactive'
+group by splo.roll_plan_line_id
+)
+INSERT OVERWRITE TABLE DM.DM_RPT_CT_1PLUSN_ROLL_PLAN_LIST_T
+select 
+b.width * b.length_1 / 1000000 AS area--面积
+,substring(max(t2.START_TIME_),1,10) as submit_date   --审批申请日期
+,substring(max(t4.end_time_),1,10) as permit_date  --审批结束日期
+,h.plan_status --单据状态
+,blv2.meaning AS plan_status --单据状态名称
+,h.created_by --下单人
+,us.user_full_name --下单人名称
+,a.strategic_business_code --战略商机编号
+,a.strategic_business_name --战略商机名称
+,h.business_code --子商机编号
+,a.business_name --子商机名称
+,view.vkbur  --销售部门
+,view.vkbur_name  --销售部门描述
+,view.vkgrp --销售组
+,view.vkgrp_name --销售组描述
+,view.customer_group --客户组
+,view.bzirk --销售区域
+,view.bzirk_name --销售区域描述
+,a.wbs --wbs
+,a.business_type --商机类别
+,blv1.meaning AS business_type_meaning --商机类别名称
+,h.plan_type --计划类型
+,blv3.meaning --计划类型名称
+,a.customer_code --客户编号
+,a.customer_name --客户名称
+,l.product_code --产品型号
+,l.product_name  --产品描述
+,l.product_category --产品类别
+,l.product_specification --产品规格
+,l.total_qty --数量（总）
+,op.quantity as order_placed_qty --已下计划单量
+,l.demand_total_qty --已下要货单量
+,l.surplus_qty --剩余数量
+,l.delivery_area --供货产区
+,l.roll_plan_line_id --计划行ID
+,m.month_code --计划月份
+,m.month_qty --计划数量
+,a.division --事业部编码
+,current_timestamp() as dw_last_update_date
+,a.apply_user_area_code    --申请人区域编码
+,a.apply_user_area         --申请人区域
+,a.apply_user_dept_code    --申请人部门编码
+,a.apply_user_dept         --申请人部门
+,a.province                --省
+,a.city                    --市
+,a.county                  --县区
+,l.total_qty - l.demand_total_qty  AS remainder_shipment_qty --剩余要货单数
+,l.total_qty - dp.shipment_qty AS remainder_ORDER_qty --剩余开单数
+,dp.shipment_qty            --已出货数量
+,l.month_roll_qty           -- 月度滚入数
+from SDI.SDI_DELIVER_ROLL_PLAN_HEADER_1033 h
+left join SDI.SDI_DELIVER_ROLL_PLAN_LINE_1033 l on l.deliver_roll_plan_id = h.deliver_roll_plan_id
+left join SDI.SDI_BUSINESS_OPPORTUNITY_1033 a on a.business_id  = h.business_id 
+left join SDI.SDI_BASE_USERS_1029 us on us.user_id = h.created_by
+left join SDI.SDI_PROJECT_REVIEW_1033 view on h.business_code  = view.business_code and view.delete_flag = 0
+left join SDI.SDI_DELIVER_ROLL_PLAN_MONTH_1033 m on m.roll_plan_line_id  = l.roll_plan_line_id  
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T b on b.material_num = L.product_code
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv1 on blv1.lookup_code = a.business_type
+              and blv1.system_code = 'LTC'
+          	  and blv1.enabled_flag = 'Y'
+          	  and blv1.lookup_type = 'BUSINESS_CATEGORY'
+          	  
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv2 on blv2.lookup_code = h.plan_status
+              and blv2.system_code = 'LTC'
+          	  and blv2.enabled_flag = 'Y'
+          	  and blv2.lookup_type = 'DELIVER_STATUS'
+          	  
+left join SDI.SDI_BASE_LOOKUP_VALUES_1029 blv3 on blv3.lookup_code = h.plan_type
+              and blv3.system_code = 'LTC'
+          	  and blv3.enabled_flag = 'Y'
+          	  and blv3.lookup_type = 'PLAN_TYPE'
+          	  
+left join demand_plan dp on dp.roll_plan_line_id = l.roll_plan_line_id
+left join order_plan op on op.roll_plan_line_id = l.roll_plan_line_id
+   	  
+        
+-- 发起审批          	 
+left join sdi.sdi_act_bpm_list_1031 t on t.business_key = h.deliver_roll_plan_id and t.proc_def_key ='LTC_ROLL_PLAN.0'
+left join sdi.sdi_act_hi_taskinst_1031 t2 on t2.PROC_INST_ID_ = t.proc_inst_id 
+left join SDI.SDI_ACT_HI_DETAIL_1029 t3 on t3.TASK_ID_  = t2.ID_  and t3.NAME_ = 'option' and t3.TEXT_ ='DF'
+-- 审批通过
+left join sdi.sdi_act_bpm_list_1031 t6 on t6.business_key = h.deliver_roll_plan_id and t6.proc_def_key ='LTC_ROLL_PLAN.0'
+left join sdi.sdi_act_hi_taskinst_1031 t4 on t4.PROC_INST_ID_ = t6.proc_inst_id 
+left join sdi.SDI_ACT_HI_DETAIL_1029 t5 on t5.TASK_ID_  = t4.ID_  and t5.NAME_ = 'option' and t5.TEXT_ ='Y'
+
+
+where a.division = 'CERAMIC_TILE_DIVISION' --瓷砖
+  and h.delete_flag = 0
+group by h.business_code,h.plan_status 
+,blv2.meaning 
+,h.created_by 
+,us.user_full_name 
+,a.strategic_business_code 
+,a.strategic_business_name 
+,h.business_code 
+,a.business_name 
+,view.vkbur  
+,view.vkbur_name  
+,view.vkgrp 
+,view.vkgrp_name 
+,view.customer_group 
+,view.bzirk 
+,view.bzirk_name 
+,a.wbs
+,a.business_type 
+,blv1.meaning 
+,h.plan_type 
+,blv3.meaning 
+,a.customer_code
+,a.customer_name 
+,l.product_code 
+,l.product_name  
+,l.product_category 
+,l.product_specification 
+,l.total_qty 
+,op.quantity
+,l.demand_total_qty 
+,l.surplus_qty 
+,l.delivery_area 
+,l.roll_plan_line_id 
+,m.month_code 
+,m.month_qty 
+,a.division
+,b.width * b.length_1 / 1000000
+,a.apply_user_area_code
+,a.apply_user_area     
+,a.apply_user_dept_code
+,a.apply_user_dept     
+,a.province            
+,a.city                
+,a.county              
+,l.total_qty - l.demand_total_qty
+,l.total_qty - dp.shipment_qty
+,dp.shipment_qty
+,l.month_roll_qty
+;

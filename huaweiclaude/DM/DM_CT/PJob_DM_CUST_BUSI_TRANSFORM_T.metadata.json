@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_CUST_BUSI_TRANSFORM_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "经销商商机转化统计表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

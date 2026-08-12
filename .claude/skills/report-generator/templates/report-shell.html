@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{REPORT_TITLE}}</title>
+<style>
+  :root {
+    --bg-base: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #FAFAFA;
+    --bg-insight: #F9FAFB;
+    --bg-table-head: #F9FAFB;
+    --bg-provenance: #F9FAFB;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #9CA3AF;
+    --accent-blue: #2563EB;
+    --accent-purple: #2563EB;
+    --accent-cyan: #2563EB;
+    --accent-pink: #2563EB;
+    --color-up: #DC2626;
+    --color-down: #16A34A;
+    --color-neutral: #6B7280;
+    --border: #E5E7EB;
+    --border-strong: #D1D5DB;
+    --border-accent: #2563EB;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    color: var(--text-primary);
+    background: var(--bg-base);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .report {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 48px;
+  }
+
+  /* ---- Header ---- */
+  .report-header {
+    background: #FFFFFF;
+    border-top: 2px solid var(--accent-blue);
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 28px 0 24px;
+    margin-bottom: 32px;
+    position: relative;
+  }
+  .report-header::before,
+  .report-header::after { display: none; }
+  .header-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--accent-blue);
+    margin-bottom: 10px;
+  }
+  .report-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .report-header .meta {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .report-header .meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .report-header .meta .sep { width: 1px; height: 14px; background: var(--border); }
+
+  /* ---- KPI Section ---- */
+  .kpi-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .kpi-section:empty { display: none; }
+  .kpi-card {
+    background: #FFFFFF;
+    border-radius: 0;
+    padding: 18px 22px 20px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    transition: background 0.15s;
+  }
+  .kpi-card:hover { background: var(--bg-card-hover); }
+  .kpi-card[data-accent="blue"],
+  .kpi-card[data-accent="purple"],
+  .kpi-card[data-accent="cyan"],
+  .kpi-card[data-accent="pink"] {
+    background: #FFFFFF;
+    border-bottom: 1px solid var(--border);
+  }
+  .kpi-card[data-accent="blue"]:hover,
+  .kpi-card[data-accent="purple"]:hover,
+  .kpi-card[data-accent="cyan"]:hover,
+  .kpi-card[data-accent="pink"]:hover {
+    background: var(--bg-card-hover);
+  }
+  .kpi-card .kpi-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .kpi-card .kpi-value {
+    font-size: 30px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-card .kpi-change {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 8px;
+  }
+  .kpi-change.up { color: var(--color-up); }
+  .kpi-change.down { color: var(--color-down); }
+  .kpi-change.neutral { color: var(--color-neutral); }
+
+  /* ---- Insight Banner ---- */
+  .insight-banner {
+    background: var(--bg-insight);
+    border-left: 3px solid var(--accent-blue);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 18px 24px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.85;
+  }
+  .insight-banner:empty { display: none; }
+  .insight-banner .insight-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent-blue);
+    margin-bottom: 6px;
+  }
+
+  /* ---- Tab Navigation ---- */
+  .tab-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+    padding-left: 0;
+    overflow-x: auto;
+  }
+  .tab-nav:empty { display: none; }
+  .tab-btn {
+    padding: 12px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text-primary); }
+  .tab-btn.active {
+    color: var(--accent-blue);
+    border-bottom-color: var(--accent-blue);
+    font-weight: 600;
+  }
+
+  /* ---- Tab Content ---- */
+  .tab-content-container { margin-bottom: 28px; }
+  .tab-content-container:empty { display: none; }
+  .tab-content {
+    display: none;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 24px;
+  }
+  .tab-content.active { display: block; }
+
+  /* ---- Chart Block ---- */
+  .chart-block {
+    background: #FFFFFF;
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .chart-block:last-child { margin-bottom: 0; }
+  .chart-block .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .chart-container { width: 100%; height: 380px; }
+  .chart-block.tall .chart-container { height: 420px; }
+  .chart-error {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px; color: var(--text-muted); font-size: 13px;
+    background: var(--bg-insight); border-radius: var(--radius);
+    border: 1px dashed var(--border-strong);
+  }
+
+  /* ---- Charts Grid (side-by-side) ---- */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .charts-grid .chart-block { margin-bottom: 0; }
+
+  /* ---- Analysis Grid ---- */
+  .analysis-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .analysis-card {
+    background: var(--bg-insight);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-blue);
+  }
+  .analysis-card:has(.analysis-label[data-color="pink"]) { border-left-color: var(--color-up); }
+  .analysis-card:has(.analysis-label[data-color="cyan"]) { border-left-color: #06B6D4; }
+  .analysis-card .analysis-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .analysis-card .analysis-label[data-color="blue"] { color: var(--accent-blue); }
+  .analysis-card .analysis-label[data-color="pink"] { color: var(--color-up); }
+  .analysis-card .analysis-label[data-color="cyan"] { color: #0891B2; }
+  .analysis-card .analysis-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+  }
+
+  /* ---- Data Table ---- */
+  .table-section {
+    margin-bottom: 24px;
+  }
+  .table-section:empty { display: none; }
+  .table-section .table-title {
+    font-size: 14px; font-weight: 600; color: var(--text-primary);
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-wrapper { overflow-x: auto; }
+  .data-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  .data-table thead { background: var(--bg-table-head); }
+  .data-table th {
+    padding: 12px 16px; text-align: left; font-weight: 600;
+    color: var(--text-secondary); font-size: 12px; white-space: nowrap;
+    border-bottom: 1px solid var(--border-strong);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .data-table td {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .data-table tbody tr:nth-child(even) { background: var(--bg-insight); }
+  .data-table tbody tr:hover { background: rgba(37,99,235,0.04); }
+  .data-table td.num {
+    text-align: right; font-variant-numeric: tabular-nums;
+    font-family: "SF Mono", "Cascadia Code", "Menlo", "Consolas", monospace;
+    font-size: 12px;
+    color: var(--accent-blue);
+    font-weight: 600;
+  }
+  .data-table td.neg { color: var(--color-up); }
+
+  /* ---- Pagination ---- */
+  .pagination {
+    display: flex; align-items: center; justify-content: center;
+    gap: 4px; margin-top: 20px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .pagination:empty { display: none; }
+  .page-btn {
+    width: 32px; height: 32px; border: 1px solid var(--border);
+    background: #FFFFFF; border-radius: 4px; cursor: pointer;
+    font-size: 12px; color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .page-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+  .page-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+  .page-info { font-size: 12px; color: var(--text-muted); margin: 0 8px; }
+
+  /* ---- Provenance Section ---- */
+  .provenance-section {
+    background: var(--bg-provenance);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .provenance-section:empty { display: none; }
+  .provenance-section .provenance-title {
+    font-size: 14px; font-weight: 600; color: var(--text-primary);
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .provenance-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 32px;
+    margin-bottom: 16px;
+  }
+  .provenance-grid .provenance-item {
+    display: flex; gap: 8px; font-size: 13px;
+  }
+  .provenance-grid .provenance-label {
+    color: var(--text-muted); white-space: nowrap; min-width: 80px;
+  }
+  .provenance-grid .provenance-value {
+    color: var(--text-secondary);
+  }
+  .provenance-sql {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    font-family: "SF Mono", "Cascadia Code", "Menlo", "Consolas", monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 240px;
+    overflow-y: auto;
+    line-height: 1.6;
+  }
+  .provenance-sql:empty { display: none; }
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag-list:empty { display: none; }
+  .tag-list .tag {
+    display: inline-block;
+    background: rgba(37,99,235,0.08);
+    color: var(--accent-blue);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid rgba(37,99,235,0.15);
+  }
+  .tag-list .tag.warn {
+    background: rgba(220,38,38,0.06);
+    color: var(--color-up);
+    border-color: rgba(220,38,38,0.2);
+  }
+
+  /* ---- Responsive ---- */
+  @media (max-width: 768px) {
+    .report { padding: 16px 12px 32px; }
+    .report-header { padding: 24px 20px; }
+    .report-header h1 { font-size: 20px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .analysis-grid { grid-template-columns: 1fr; }
+    .chart-block.tall .chart-container, .chart-container { height: 300px; }
+    .kpi-section { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .kpi-card .kpi-value { font-size: 22px; }
+    .provenance-grid { grid-template-columns: 1fr; }
+    .tab-btn { padding: 10px 16px; font-size: 12px; }
+  }
+
+  /* ---- Print ---- */
+  @media print {
+    body { background: #fff !important; }
+    .report { max-width: none; padding: 0; }
+    .report-header { margin-bottom: 16px; }
+    .tab-nav { display: none !important; }
+    .tab-content {
+      display: block !important;
+      border: none !important;
+      padding: 12px 0;
+    }
+    .chart-block { page-break-inside: avoid; border-color: #ddd; }
+    .kpi-card:hover,
+    .kpi-card[data-accent]:hover { background: #fff !important; }
+    .pagination { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="report">
+
+  <div class="report-header">
+    <div class="header-tag">Performance Analysis Report</div>
+    <h1>{{REPORT_TITLE}}</h1>
+    <div class="meta">{{REPORT_META}}</div>
+  </div>
+
+  <div class="kpi-section"></div>
+  <div class="insight-banner"></div>
+  <div class="tab-nav"></div>
+  <div class="tab-content-container"></div>
+  <div class="provenance-section"></div>
+
+</div>
+
+{{ECHARTS_LIB}}
+
+<script>
+(function() {
+  var data = {{REPORT_JSON}};
+
+  if (!data) { console.error('REPORT_JSON is empty'); return; }
+
+  /* ---- Helper: escape HTML ---- */
+  function escapeHTML(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  /* ---- Helper: revive function strings from JSON ---- */
+  function reviveFunctions(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      for (var i = 0; i < obj.length; i++) {
+        if (typeof obj[i] === 'string' && /^\s*function\s*\(/.test(obj[i])) {
+          try { obj[i] = eval('(' + obj[i] + ')'); } catch(e) {}
+        } else if (typeof obj[i] === 'object' && obj[i] !== null) {
+          reviveFunctions(obj[i]);
+        }
+      }
+    } else {
+      for (var key in obj) {
+        if (!obj.hasOwnProperty(key)) continue;
+        var val = obj[key];
+        if (typeof val === 'string' && /^\s*function\s*\(/.test(val)) {
+          try { obj[key] = eval('(' + val + ')'); } catch(e) {}
+        } else if (typeof val === 'object' && val !== null) {
+          reviveFunctions(val);
+        }
+      }
+    }
+    return obj;
+  }
+
+  /* ---- Helper: deep merge (source into target) ---- */
+  function deepMerge(target, source) {
+    var result = {};
+    for (var key in target) {
+      if (target.hasOwnProperty(key)) result[key] = target[key];
+    }
+    for (var key in source) {
+      if (!source.hasOwnProperty(key)) continue;
+      var srcVal = source[key];
+      var tgtVal = target[key];
+      if (srcVal && typeof srcVal === 'object' && !Array.isArray(srcVal) &&
+          tgtVal && typeof tgtVal === 'object' && !Array.isArray(tgtVal)) {
+        result[key] = deepMerge(tgtVal, srcVal);
+      } else {
+        result[key] = srcVal;
+      }
+    }
+    return result;
+  }
+
+  /* ---- ECharts light base option ---- */
+  var darkBase = {
+    backgroundColor: 'transparent',
+    textStyle: { color: '#374151', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif' },
+    legend: { textStyle: { color: '#4B5563' } },
+    tooltip: {
+      backgroundColor: 'rgba(255,255,255,0.98)',
+      borderColor: '#E5E7EB',
+      textStyle: { color: '#111827', fontSize: 12 },
+      extraCssText: 'box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-radius: 6px;'
+    },
+    xAxis: {
+      axisLine: { lineStyle: { color: '#E5E7EB' } },
+      axisTick: { lineStyle: { color: '#E5E7EB' } },
+      axisLabel: { color: '#6B7280' },
+      splitLine: { lineStyle: { color: '#F3F4F6' } },
+      nameTextStyle: { color: '#6B7280' }
+    },
+    yAxis: {
+      axisLine: { lineStyle: { color: '#E5E7EB' } },
+      axisTick: { lineStyle: { color: '#E5E7EB' } },
+      axisLabel: { color: '#6B7280' },
+      splitLine: { lineStyle: { color: '#F3F4F6' } },
+      nameTextStyle: { color: '#6B7280' }
+    },
+    toolbox: { iconStyle: { borderColor: '#6B7280' } },
+    color: ['#2563EB', '#9CA3AF', '#06B6D4', '#7C3AED', '#DB2777', '#F59E0B', '#10B981', '#EF4444']
+  };
+
+  /* ---- Accent color rotation for KPI cards ---- */
+  var accentColors = ['blue', 'purple', 'cyan', 'pink'];
+
+  /* ---- Render KPI cards ---- */
+  var kpiSection = document.querySelector('.kpi-section');
+  if (data.kpis && data.kpis.length) {
+    var kpiHTML = '';
+    data.kpis.forEach(function(k, idx) {
+      var accent = accentColors[idx % accentColors.length];
+      var cls = k.direction === 'up' ? 'up' : (k.direction === 'down' ? 'down' : 'neutral');
+      kpiHTML += '<div class="kpi-card" data-accent="' + accent + '">'
+        + '<div class="kpi-label">' + escapeHTML(k.label) + '</div>'
+        + '<div class="kpi-value">' + escapeHTML(String(k.value)) + '</div>'
+        + (k.change ? '<div class="kpi-change ' + cls + '">' + escapeHTML(k.change) + '</div>' : '')
+        + '</div>';
+    });
+    kpiSection.innerHTML = kpiHTML;
+  } else {
+    kpiSection.style.display = 'none';
+  }
+
+  /* ---- Render insight banner ---- */
+  var insightBanner = document.querySelector('.insight-banner');
+  if (data.insight && data.insight.trim()) {
+    insightBanner.innerHTML = '<div class="insight-label">KEY INSIGHTS</div>'
+      + '<div>' + escapeHTML(data.insight) + '</div>';
+  } else {
+    insightBanner.style.display = 'none';
+  }
+
+  /* ---- Chart instance tracking ---- */
+  var chartInstances = [];
+  var chartInstanceMap = {};
+
+  /* ---- Tab rendering ---- */
+  var tabNav = document.querySelector('.tab-nav');
+  var tabContainer = document.querySelector('.tab-content-container');
+
+  if (data.sections && data.sections.length) {
+    var navHTML = '';
+    var contentHTML = '';
+
+    data.sections.forEach(function(section, sIdx) {
+      var tabId = 'tab-' + sIdx;
+      var isActive = sIdx === 0;
+
+      navHTML += '<button class="tab-btn' + (isActive ? ' active' : '') + '" data-tab="' + tabId + '">'
+        + escapeHTML(section.tab || ('Tab ' + (sIdx + 1)))
+        + '</button>';
+
+      contentHTML += '<div class="tab-content' + (isActive ? ' active' : '') + '" id="' + tabId + '">';
+
+      if (section.type === 'chart-with-analysis') {
+        contentHTML += renderChartWithAnalysis(section, tabId);
+      } else if (section.type === 'table') {
+        contentHTML += renderTableSection(section, tabId);
+      }
+
+      contentHTML += '</div>';
+    });
+
+    tabNav.innerHTML = navHTML;
+    tabContainer.innerHTML = contentHTML;
+
+    /* Tab click handler */
+    tabNav.addEventListener('click', function(e) {
+      var btn = e.target.closest('.tab-btn');
+      if (!btn) return;
+      var tabId = btn.getAttribute('data-tab');
+
+      tabNav.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+
+      tabContainer.querySelectorAll('.tab-content').forEach(function(tc) { tc.classList.remove('active'); });
+      var targetPanel = document.getElementById(tabId);
+      if (targetPanel) targetPanel.classList.add('active');
+
+      /* Resize charts in newly visible panel */
+      setTimeout(function() {
+        chartInstances.forEach(function(inst) {
+          try { inst.resize(); } catch(e) {}
+        });
+      }, 50);
+    });
+
+    /* Initialize ECharts after DOM is built */
+    initializeCharts();
+  } else {
+    tabNav.style.display = 'none';
+    tabContainer.style.display = 'none';
+  }
+
+  /* ---- Render chart-with-analysis section ---- */
+  function renderChartWithAnalysis(section, tabId) {
+    var html = '';
+
+    /* Determine if single chart or multiple */
+    var charts = section.chart ? (Array.isArray(section.chart) ? section.chart : [section.chart]) : [];
+
+    if (charts.length === 1) {
+      var ch = charts[0];
+      var tallClass = ch.tall ? ' tall' : '';
+      var chId = tabId + '-chart-0';
+      html += '<div class="chart-block' + tallClass + '">'
+        + (ch.title ? '<div class="chart-title">' + escapeHTML(ch.title) + '</div>' : '')
+        + '<div class="chart-container" id="' + chId + '"></div>'
+        + '</div>';
+    } else if (charts.length > 1) {
+      html += '<div class="charts-grid">';
+      charts.forEach(function(ch, cIdx) {
+        var tallClass = ch.tall ? ' tall' : '';
+        var chId = tabId + '-chart-' + cIdx;
+        html += '<div class="chart-block' + tallClass + '">'
+          + (ch.title ? '<div class="chart-title">' + escapeHTML(ch.title) + '</div>' : '')
+          + '<div class="chart-container" id="' + chId + '"></div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+    /* Analysis cards */
+    if (section.analysis && section.analysis.length) {
+      html += '<div class="analysis-grid">';
+      section.analysis.forEach(function(a) {
+        var color = a.color || 'blue';
+        html += '<div class="analysis-card">'
+          + '<div class="analysis-label" data-color="' + color + '">' + escapeHTML(a.label || '') + '</div>'
+          + '<div class="analysis-text">' + escapeHTML(a.text || '') + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+
+    return html;
+  }
+
+  /* ---- Render table section ---- */
+  function renderTableSection(section, tabId) {
+    var tbl = section.table || section;
+    if (!tbl.columns || !tbl.columns.length) return '';
+
+    var pageSize = tbl.pageSize || 20;
+    var totalPages = Math.ceil(tbl.rows.length / pageSize);
+
+    var colHTML = '<th>#</th>';
+    tbl.columns.forEach(function(c) { colHTML += '<th>' + escapeHTML(c) + '</th>'; });
+
+    var html = '<div class="table-section">'
+      + '<div class="table-title">' + escapeHTML(tbl.title || '明细数据') + '</div>'
+      + '<div class="table-wrapper"><table class="data-table" id="' + tabId + '-table">'
+      + '<thead><tr>' + colHTML + '</tr></thead><tbody></tbody></table></div>'
+      + '<div class="pagination" id="' + tabId + '-pagination"></div>'
+      + '</div>';
+
+    /* We need to set up table rendering after DOM insertion */
+    setTimeout(function() { setupTable(tbl, tabId, pageSize, totalPages); }, 0);
+
+    return html;
+  }
+
+  /* ---- Setup table with pagination ---- */
+  function setupTable(tbl, tabId, pageSize, totalPages) {
+    var currentPage = 0;
+    var tbody = document.querySelector('#' + tabId + '-table tbody');
+    var pagDiv = document.querySelector('#' + tabId + '-pagination');
+    if (!tbody || !pagDiv) return;
+
+    function renderPage(page) {
+      currentPage = page;
+      var start = page * pageSize;
+      var end = Math.min(start + pageSize, tbl.rows.length);
+      var rowHTML = '';
+      for (var i = start; i < end; i++) {
+        rowHTML += '<tr><td>' + (i + 1) + '</td>';
+        tbl.rows[i].forEach(function(cell, ci) {
+          var cls = '';
+          var text = String(cell);
+          /* Detect numeric cells: pure number, no Chinese unit suffix */
+          if (typeof cell === 'number' || (!isNaN(parseFloat(text)) && isFinite(text) && text.trim() !== '')) {
+            /* Skip values that already have Chinese formatting */
+            if (/[亿万%％]$/.test(text)) {
+              cls = '';
+            } else if (text === '—' || text === '-') {
+              cls = '';
+            } else {
+              cls = 'num';
+            }
+          }
+          /* Detect negative values */
+          var numVal = parseFloat(text.replace(/,/g, ''));
+          if (!isNaN(numVal) && numVal < 0) {
+            cls += ' neg';
+          }
+          rowHTML += '<td class="' + cls + '">' + escapeHTML(text) + '</td>';
+        });
+        rowHTML += '</tr>';
+      }
+      tbody.innerHTML = rowHTML;
+      formatNumbers(tbody);
+      updatePaginationUI(page);
+    }
+
+    function updatePaginationUI(page) {
+      if (totalPages <= 1) { pagDiv.style.display = 'none'; return; }
+      pagDiv.style.display = 'flex';
+      var html = '<button class="page-btn" data-page="prev" ' + (page === 0 ? 'disabled' : '') + '>&#8249;</button>';
+      for (var p = 0; p < totalPages; p++) {
+        html += '<button class="page-btn' + (p === page ? ' active' : '') + '" data-page="' + p + '">' + (p + 1) + '</button>';
+      }
+      html += '<button class="page-btn" data-page="next" ' + (page >= totalPages - 1 ? 'disabled' : '') + '>&#8250;</button>';
+      html += '<span class="page-info">第 ' + (page + 1) + ' / ' + totalPages + ' 页（共 ' + tbl.rows.length + ' 条）</span>';
+      pagDiv.innerHTML = html;
+    }
+
+    pagDiv.addEventListener('click', function(e) {
+      var btn = e.target.closest('.page-btn');
+      if (!btn || btn.disabled) return;
+      var p = btn.getAttribute('data-page');
+      if (p === 'prev') renderPage(currentPage - 1);
+      else if (p === 'next') renderPage(currentPage + 1);
+      else renderPage(parseInt(p));
+    });
+
+    renderPage(0);
+  }
+
+  /* ---- Format number cells (with bug fix) ---- */
+  function formatNumbers(tbody) {
+    if (!tbody) tbody = document.querySelector('.data-table tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('td.num').forEach(function(td) {
+      var text = td.textContent.trim();
+      /* Skip values ending with 亿/万/%/％ or equal to — / - */
+      if (/[亿万%％]$/.test(text)) return;
+      if (text === '—' || text === '-') return;
+      var num = parseFloat(text.replace(/,/g, ''));
+      if (!isNaN(num)) {
+        td.textContent = num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+    });
+  }
+
+  /* ---- Initialize ECharts instances ---- */
+  function initializeCharts() {
+    if (typeof echarts === 'undefined') {
+      /* Show error in all chart containers */
+      document.querySelectorAll('.chart-container').forEach(function(dom) {
+        dom.innerHTML = '<div class="chart-error">ECharts 库未加载，无法渲染图表</div>';
+      });
+      return;
+    }
+
+    if (data.sections && data.sections.length) {
+      data.sections.forEach(function(section, sIdx) {
+        if (section.type !== 'chart-with-analysis') return;
+        var tabId = 'tab-' + sIdx;
+        var charts = section.chart ? (Array.isArray(section.chart) ? section.chart : [section.chart]) : [];
+
+        charts.forEach(function(ch, cIdx) {
+          var chId = tabId + '-chart-' + cIdx;
+          var dom = document.getElementById(chId);
+          if (!dom) return;
+          try {
+            var mergedOption = deepMerge(darkBase, ch.option || {});
+            mergedOption = reviveFunctions(mergedOption);
+            var instance = echarts.init(dom);
+            instance.setOption(mergedOption);
+            chartInstances.push(instance);
+            chartInstanceMap[chId] = instance;
+          } catch(e) {
+            dom.innerHTML = '<div class="chart-error">图表初始化失败：' + escapeHTML(String(e.message || e)) + '</div>';
+          }
+        });
+      });
+    }
+
+    /* Window resize handler */
+    window.addEventListener('resize', function() {
+      chartInstances.forEach(function(inst) {
+        try { inst.resize(); } catch(e) {}
+      });
+    });
+  }
+
+  /* ---- Render provenance section ---- */
+  var provSection = document.querySelector('.provenance-section');
+  if (data.provenance) {
+    var p = data.provenance;
+    var html = '<div class="provenance-title">数据来源与追溯</div>';
+
+    /* Key-value grid */
+    html += '<div class="provenance-grid">';
+    if (p.source) html += '<div class="provenance-item"><span class="provenance-label">数据来源</span><span class="provenance-value">' + escapeHTML(p.source) + '</span></div>';
+    if (p.lastUpdate) html += '<div class="provenance-item"><span class="provenance-label">最后更新</span><span class="provenance-value">' + escapeHTML(p.lastUpdate) + '</span></div>';
+    if (p.skillVersion) html += '<div class="provenance-item"><span class="provenance-label">Skill 版本</span><span class="provenance-value">' + escapeHTML(p.skillVersion) + '</span></div>';
+    if (p.table) html += '<div class="provenance-item"><span class="provenance-label">数据表</span><span class="provenance-value">' + escapeHTML(p.table) + '</span></div>';
+    html += '</div>';
+
+    /* SQL */
+    if (p.query || p.sql) {
+      html += '<div class="provenance-sql">' + escapeHTML(p.query || p.sql) + '</div>';
+    }
+
+    /* Filters as tags */
+    if (p.filters && p.filters.length) {
+      html += '<div class="tag-list">';
+      p.filters.forEach(function(f) {
+        html += '<span class="tag">' + escapeHTML(f) + '</span>';
+      });
+      html += '</div>';
+    }
+
+    /* Limitations as warning tags */
+    if (p.limitations && p.limitations.length) {
+      html += '<div class="tag-list" style="margin-top:8px;">';
+      p.limitations.forEach(function(l) {
+        html += '<span class="tag warn">限制: ' + escapeHTML(l) + '</span>';
+      });
+      html += '</div>';
+    }
+
+    /* Data quality as warning tags */
+    if (p.dataQuality && p.dataQuality.length) {
+      html += '<div class="tag-list" style="margin-top:8px;">';
+      p.dataQuality.forEach(function(d) {
+        html += '<span class="tag warn">数据质量: ' + escapeHTML(d) + '</span>';
+      });
+      html += '</div>';
+    }
+
+    provSection.innerHTML = html;
+  } else {
+    provSection.style.display = 'none';
+  }
+
+})();
+</script>
+</body>
+</html>

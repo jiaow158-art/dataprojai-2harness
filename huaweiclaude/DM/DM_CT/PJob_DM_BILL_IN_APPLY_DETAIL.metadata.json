@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_BILL_IN_APPLY_DETAIL",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "隐形码入库明细",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

@@ -1,0 +1,113 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 14:58:08 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--强商收入ZB73
+delete from 
+DM.DM_NORTH_SM_T 
+where  
+calmonth = '${PERIOD_ID_M}'  and zb_code ='ZB73';
+with strong_customer as (
+    select distinct "ACCOUNT_NUMBER", "NAME"
+    from dm.dm_rpt_zmaster_cus_t
+    where accnt_group8code = '01'
+    order by "ACCOUNT_NUMBER"
+)
+,qssr as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB73' as zb_code,
+SUM(A.AMBPERFORMANCE) as 当月实绩,
+0 as 累计实绩,
+0 as 季度累计实绩
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join dwipi.dwi_wf_zsd_zmkb_t c
+                   on a.salesorg = c.vkorg and a.zsales_channel = c.vtweg and
+                      a.customer = c.kunnr
+         join strong_customer d on coalesce(c.zzkunnr, a.customer) = d."ACCOUNT_NUMBER"
+where  B.NODE_DESC3  ='国内营销系统'
+and a.calmonth = '${PERIOD_ID_M}'
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB73' as zb_code,
+0 as 当月实绩,
+SUM(A.AMBPERFORMANCE) as 累计实绩,
+0 as 季度累计实绩
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join dwipi.dwi_wf_zsd_zmkb_t c
+                   on a.salesorg = c.vkorg and a.zsales_channel = c.vtweg and
+                      a.customer = c.kunnr
+         join strong_customer d on coalesce(c.zzkunnr, a.customer) = d."ACCOUNT_NUMBER"
+where  B.NODE_DESC3  ='国内营销系统'
+and  A.CALMONTH between substr('${PERIOD_ID_M}',1,4)||'-01' and '${PERIOD_ID_M}'
+
+
+union all 
+
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB73' as zb_code,
+0 as 当月实绩,
+0 as 累计实绩,
+SUM(A.AMBPERFORMANCE) as 季度累计实绩
+from dm.dm_ambv2_zzt_xssr_t a
+         join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+         left join dwipi.dwi_wf_zsd_zmkb_t c
+                   on a.salesorg = c.vkorg and a.zsales_channel = c.vtweg and
+                      a.customer = c.kunnr
+         join strong_customer d on coalesce(c.zzkunnr, a.customer) = d."ACCOUNT_NUMBER"
+where  B.NODE_DESC3  ='国内营销系统'
+and
+to_char((SUBSTRING(a.calmonth,1,7) || '-01')::date, 'yyyyQ') = to_char(('${PERIOD_ID_M}' || '-01')::date, 'yyyyQ') 
+and (SUBSTRING(a.calmonth,1,7) || '-01') <= SUBSTRING(concat('${PERIOD_ID_M}' ,'-01')+ INTERVAL '1 MONTH' - INTERVAL '1 day', 1, 10)
+
+
+)
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) /10000 as CM_STAT_AMT,
+sum(累计实绩) /10000  as ACC_STAT_AMT,
+sum(季度累计实绩) /10000 as QTR_TGT_AMT
+from 
+qssr
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+T2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month

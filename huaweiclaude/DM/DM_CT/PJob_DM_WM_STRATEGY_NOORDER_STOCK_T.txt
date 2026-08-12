@@ -1,0 +1,61 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/08/05 11:01:57 GMT+08:00
+-- ******************************************************************** --
+--战略专属仓库库存明细
+with tem as(
+select 
+	'国内营销系统' as lev3_name,
+	'工程市场中心' as lev4_name,
+	'工程市场中心' as lev5_name,
+	'战略专属仓库' as lb_type,
+	t1.material_num,
+	t1.material_name,
+	t1.sal_vch_num,
+	t1.sal_vch_item_num,
+	t1.wbs_element,
+	t1.available_inventory_area*t3.length_1*t3.width/1000000 as strategy_noorder_stock_qty --as strategy_noorder_stock_qty--,
+from dm.DM_WM_ALL_TYPE_STOCK_T t1
+left join dm.dm_rpt_prod_level_t  t2 On t1.product_level_code3  = t2.prod_code3 
+left join dwimd.dwi_md_data_material_general_t t3 on t1.material_num = t3.material_num
+where 1=1 
+and inv_location in ('GCDZ','GCCA','GCPA','GCTA','GCSA','GCQA', 'GCSD','BJ','BJ01' )
+and t3.matl_group_code = '1000010' and t3.external_matl_group_code = '10010'
+
+union all
+
+--无订单占用库存明细
+select 
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end lev3_name,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end as lev4_name,
+	case when t1.factory_werks_code like '%10' then '国际营销系统' when  t1.material_num like 'Z%' then '梦之家事业部' end as lev5_name,
+	'无订单占用库存' as lb_type,
+	t1.material_num,
+	t1.material_name,
+	t1.sal_vch_num,
+	t1.sal_vch_item_num,
+	t1.wbs_element,
+	case when t1.factory_werks_code like '%10' then t1.available_inventory_area*t3.length_1*t3.width/1000000 
+		when t1.material_num like 'Z%' then t1.available_inventory_area*t3.length_1*t3.width/1000000 end as strategy_noorder_stock_qty
+from dm.DM_WM_ALL_TYPE_STOCK_T t1
+left join dwimd.dwi_md_data_material_general_t t3
+on t1.material_num = t3.material_num
+)
+INSERT OVERWRITE TABLE dm.dm_wm_strategy_noorder_stock_t
+select 
+lev3_name,
+lev4_name,
+lev5_name,
+lb_type,
+material_num,
+material_name,
+sal_vch_num,
+sal_vch_item_num,
+wbs_element,
+strategy_noorder_stock_qty,
+current_timestamp() as dw_last_update_date
+from tem
+where 1=1 
+and lev5_name is not null
+and strategy_noorder_stock_qty > 0

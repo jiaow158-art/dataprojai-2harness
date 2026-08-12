@@ -1,0 +1,8 @@
+{
+    "name": "DWR_TRA_TMS_TRANSPORT_PLAN_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PLAN",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_OTD_SO_PICKUP_ORDERS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/PLAN",
+    "description": "提货申请单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

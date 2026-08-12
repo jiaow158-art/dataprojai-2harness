@@ -1,0 +1,43 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/06/30 14:13:39 GMT+08:00
+-- ******************************************************************** --
+DROP VIEW dwrfin.dwr_gl_sales_group_v;
+create view dwrfin.dwr_gl_sales_group_v
+            (sales_group, sales_group_name, utilities_dept, utilities_dept_name, system, system_name,
+             subcompany_big_area, subcompany_big_area_name, sales_dept, sales_dept_name, object_versions, update_flag,
+             cost_control_field, sales_group_in_cost, revenue_account, cost_account, accounting_unit, group_num)
+as
+SELECT a."SALES_GRP"                                                                                                 AS sales_group,
+       b.txtsh                                                                                                       AS sales_group_name,
+       a."/BIC/ZDPSYB"                                                                                               AS utilities_dept,
+       c."TXTSH"                                                                                                     AS utilities_dept_name,
+       a."/BIC/ZDPXT"                                                                                                AS system,
+       case a."/BIC/ZDPXT" when '22000001' then '区域运营中心' else d."TXTSH" end                                                                                                    AS system_name,
+       case
+           when a."/BIC/ZDPXT" = '11000002' and a."/BIC/ZDPZGSDQ" = '00000000' then g.node_name4
+           else a."/BIC/ZDPZGSDQ" end                                                                                AS subcompany_big_area,
+       case
+           when a."/BIC/ZDPXT" = '11000002' and a."/BIC/ZDPZGSDQ" = '00000000' then g.node_name4
+           else e."TXTSH" end                                                                                        AS subcompany_big_area_name,
+       a."SALES_OFF"                                                                                                 AS sales_dept,
+       f."TXTSH"                                                                                                     AS sales_dept_name,
+       a."OBJVERS"                                                                                                   AS object_versions,
+       a."CHANGED"                                                                                                   AS update_flag,
+       a."CO_AREA"                                                                                                   AS cost_control_field,
+       a."/BIC/ZAMB_INCO"                                                                                            AS sales_group_in_cost,
+       a."/BIC/ZAMB_ACSR"                                                                                            AS revenue_account,
+       a."/BIC/ZAMB_ACCB"                                                                                            AS cost_account,
+       a."/BIC/ZAMB_CELL"                                                                                            AS accounting_unit,
+       a."/BIC/ZDPJT"                                                                                                AS group_num
+FROM dm.dm_rpt_bi0_psales_grp_t a
+         LEFT JOIN dm.dm_rpt_bi0_tsales_grp_t b ON
+        a."SALES_GRP"::text = b.sales_grp::text AND
+        b.langu::text = '1'::text
+         LEFT JOIN dm.dm_rpt_bic_tzdpsyb_t c ON a."/BIC/ZDPSYB"::text = c."/BIC/ZDPSYB"::text
+         LEFT JOIN dm.dm_rpt_bic_tzdpxt_t d ON a."/BIC/ZDPXT"::text = d."/BIC/ZDPXT"::text
+         LEFT JOIN dm.dm_rpt_bic_tzdpzgsdq_t e ON a."/BIC/ZDPZGSDQ"::text = e."/BIC/ZDPZGSDQ"::text
+         LEFT JOIN dm.dm_rpt_bi0_tsales_off_t f
+                   ON a."SALES_OFF"::text = f."SALES_OFF"::text AND f."LANGU"::text = '1'::text
+         left join dm.DM_SO_SALES_GROUP_LEVEL_T g on a."SALES_GRP" = g.node_name9

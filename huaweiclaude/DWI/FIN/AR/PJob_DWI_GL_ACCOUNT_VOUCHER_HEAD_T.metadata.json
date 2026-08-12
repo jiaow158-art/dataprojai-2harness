@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_GL_ACCOUNT_VOUCHER_HEAD_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "会计凭证抬头",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

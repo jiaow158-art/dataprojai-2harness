@@ -1,0 +1,22 @@
+-- UPDATE FROM CHENZHIYONG 20221123 14:30 新增字段PRODUCT_AREA_NEW
+insert overwrite table sdi.sdi_res_enterprise_1007
+select 
+id,
+code,
+create_by,
+create_date,
+erp_org_id,
+inv_org_id,
+is_by_hand,
+is_phantom,
+is_resource,
+level_id,
+name,
+sync_id,
+tree_pid,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE,
+PRODUCT_AREA_NEW
+from stg.stg_res_enterprise_1007;

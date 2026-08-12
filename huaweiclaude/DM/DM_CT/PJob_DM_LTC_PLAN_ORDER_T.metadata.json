@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_LTC_PLAN_ORDER_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "OSS销售计划单表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

@@ -1,0 +1,68 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/09/19 14:12:22 GMT+08:00
+-- description:外包结算单报表 DWRHR.DWR_HR_OUTSOURCE_SETTLEMENT_T
+-- history list:songquanchen
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+CREATE TABLE IF NOT EXISTS DWRHR.DWR_HR_OUTSOURCE_SETTLEMENT_T(
+	PROCESSED_BY_ID STRING COMMENT '处理人id',
+	PROCESSED_BY STRING COMMENT '处理人',
+	WORK_ORDER_NUM STRING COMMENT '单号',
+	WORK_ORDER_TITLE STRING COMMENT '工单标题',
+	WORK_ORDER_RECEIV_DATE DATE COMMENT '开始时间',
+	WORK_ORDER_1ST_SUBMIT_DATE DATE COMMENT '结束时间',
+	WORK_ORDER_STATUS STRING COMMENT '状态',
+	PROJECT_NAME STRING COMMENT '项目名称',
+	DELIVERABLES STRING COMMENT '交付物',
+	P_D_UNIT_PRICE_AMT DECIMAL(26,2) COMMENT '单价',
+	PERSONNEL_CLASSIFICATION STRING COMMENT '数据分类',
+	PRODUCT_DEPT STRING COMMENT '所属产品部',
+	IS_OUTSOURCE STRING COMMENT '人员性质',
+	ROLE_ID STRING COMMENT '角色',
+	RESIDENT_WAY STRING COMMENT '驻场方式',
+	SYSTEM STRING COMMENT '系统',
+	TECHNOLOGY_TYPE STRING COMMENT '技术类型',
+	TECHNOLOGY_LEVEL STRING COMMENT '技术级别',
+	SUPPLIER STRING COMMENT '供应商',
+	CONTRACT_NUM STRING COMMENT '合同号',
+	BILLING_METHOD STRING COMMENT '计费方式',
+	PIECEWORK_OR_TIMING STRING COMMENT '计件/计时',
+	DW_LAST_UPDATE_DATE TIMESTAMP COMMENT '数据同步时间'
+)COMMENT '外包结算单报表'
+;
+
+INSERT OVERWRITE TABLE DWRHR.DWR_HR_OUTSOURCE_SETTLEMENT_T
+SELECT 
+	T.`处理人id`			AS PROCESSED_BY_ID				-- 处理人id
+	,T.`处理人`             AS PROCESSED_BY					-- 处理人
+	,T.`单号`               AS WORK_ORDER_NUM				-- 单号
+	,T.`工单标题`           AS WORK_ORDER_TITLE				-- 工单标题
+	,to_date(from_unixtime(unix_timestamp(T.`开始时间`,'yyyy-MM-dd')))
+							AS WORK_ORDER_RECEIV_DATE		-- 开始时间
+	,to_date(from_unixtime(unix_timestamp(T.`结束时间`,'yyyy-MM-dd')))
+							AS WORK_ORDER_1ST_SUBMIT_DATE	-- 结束时间
+	,T.`状态`               AS WORK_ORDER_STATUS			-- 状态
+	,T.`项目名称`           AS PROJECT_NAME					-- 项目名称
+	,T.`交付物`             AS DELIVERABLES					-- 交付物
+	,D.`rtdj75h`            AS P_D_UNIT_PRICE_AMT			-- 人天单价
+	,T.`数据分类`           AS PERSONNEL_CLASSIFICATION		-- 数据分类
+	,D.`sscpb`              AS PRODUCT_DEPT					-- 所属产品部
+	,D.`sfwb`               AS IS_OUTSOURCE					-- 人员性质
+	,D.`js`                 AS ROLE_ID						-- 角色
+	,D.`zcfs`               AS RESIDENT_WAY					-- 驻场方式
+	,D.`xt`                 AS SYSTEM						-- 系统
+	,D.`jslx`               AS TECHNOLOGY_TYPE				-- 技术类型
+	,D.`jsjb`               AS TECHNOLOGY_LEVEL				-- 技术级别
+	,D.`gys`                AS SUPPLIER						-- 供应商
+	,D.`hth`                AS CONTRACT_NUM					-- 合同号
+	,D.`jffs`               AS BILLING_METHOD				-- 计费方式
+	,D.`jjjs`               AS PIECEWORK_OR_TIMING			-- 计件/计时
+	,CURRENT_TIMESTAMP()	AS DW_LAST_UPDATE_DATE			-- 数据同步时间
+FROM 
+	SDI.SDI_CUS_BIT019WBJSSJ_1004 T
+	
+LEFT JOIN SDI.SDI_UF_ITRYJG_1004 D	
+	   ON T.`处理人id` = D.`ryxm`
+;	

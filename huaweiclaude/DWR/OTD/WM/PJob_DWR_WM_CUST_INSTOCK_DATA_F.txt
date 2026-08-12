@@ -1,0 +1,386 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/07/27 09:55:45 GMT+08:00
+-- description:卫浴客户入库数
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from chenzhiyong 20230804 调整入库逻辑
+-- update from chenzhiyong 20230823 4号为定稿日(跑数日)
+-- update from chenzhiyong 20230828 B1的入库数先取出别名，然后在取出主客编的编码
+-- update from chenzhiyong 20230904 入库数据看简称
+-- update form huangwenbin 20241108 修复RTM跟B1的入库数的逻辑：取消按照入库时间倒序拿第一条数据的逻辑，改为向上累计求和入库数
+-- update form YJY 20250106 新增退货数量和退货日期字段
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with operation_center_data as(  -- 客户数据
+     select case when length(cust_code) <=6 then concat('0000',cust_code) else cust_code end as cust_code  ,
+        abbreviation as cust_short_name
+     from sdi.sdi_b1_customer_data_1037
+     where cust_type = 'SW'
+),
+rtm_operation_center_data as(  -- RTM客户数据
+     select case when length(cust_code) <=6 then concat('0000',cust_code) else cust_code end as cust_code  ,
+            rtm_cust_code ,
+            abbreviation as cust_short_name
+     from sdi.sdi_b1_customer_data_1037
+     where cust_type = 'SW'
+     and is_main = '是'
+),
+rtm_instock_data as(   -- RTM入库数据 --注意：1条
+select t1.in_stock_date,
+	   t1.sap_delivery_num,
+	   --t2.cust_short_name,
+	   t2.rtm_cust_code,
+	   t1.material_num,
+	   sum(t1.in_stock_qty) as in_stock_qty,
+	   t1.max_return_date as return_date,
+	   sum(t1.return_qty) as return_qty
+from(
+	SELECT --substring(t1.creation_date,1,10) as in_stock_date, -- 入库时间
+		   substring(max(case when t1.order_type = 'IN_TYPE' then t1.creation_date end),1,10)  as in_stock_date, -- 入库时间
+	       --t1.order_type,
+	       t1.source_code as sap_delivery_num, -- 提货凭证
+	       t1.distributor_code as cust_code,  -- 客户编码
+	       t2.product_code as material_num,  -- 物料
+	       nvl(sum(case when t1.order_type in ('IN_TYPE','RETURN_REVERSE') then + t2.qty 
+	       			    when t1.order_type in ('IN_REVERSE','RETURN_TYPE') then - t2.qty 
+	       			 end),0) as in_stock_qty, -- 入库数量
+	       substring(max(case when t1.order_status = 'COMPLETED'  and 
+	                    t1.order_type in ('RETURN_TYPE','RETURN_REVERSE','IN_REVERSE') then t1.creation_date end),1,10)  as max_return_date,--退货时间
+	       nvl(sum(case when t1.order_status = 'COMPLETED' then 
+   	       				case when t1.order_type ='RETURN_TYPE' then + t2.qty --采购退货
+   	       					when t1.order_type ='RETURN_REVERSE' then - t2.qty --退货红冲
+   	       					when t1.order_type ='IN_REVERSE' then t2.qty else 0 end --入库红冲
+   			 	end),0) as return_qty --退货数量
+	from SDI.SDI_DTWMS_PO_INVENTORY_HEADERS_1031 t1    -- 入库头
+	left join SDI.SDI_DTWMS_PO_INVENTORY_LINE_1031 t2   -- 入库行
+	ON t1.header_id = t2.header_id
+	where t1.source_code like ('80%')
+	--and substring(t1.creation_date,1,10) >= ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3) --'2023-01-01'
+	and substring(t1.creation_date,1,10) >= '2023-01-01'
+	group by --substring(t1.creation_date,1,10),
+	         t1.source_code,
+	         t1.distributor_code,
+	         t2.product_code--,
+	        -- t1.order_type
+	) t1
+	left join rtm_operation_center_data t2
+	on t1.cust_code = t2.rtm_cust_code
+	group by t1.in_stock_date,
+			 t1.sap_delivery_num,
+			 --t2.cust_short_name,
+			 t2.rtm_cust_code,
+			 t1.material_num,
+			 t1.max_return_date
+),
+b1_instock_data as(     -- B1入库数 --注意：多条
+select t1.in_stock_date,
+	   t2.cust_code,
+	   t1.sap_delivery_num,
+	   t1.material_num,
+	   t1.in_stock_qty
+from(
+	select t1.in_stock_date,
+	   t2.cust_short_name,
+	   --t2.cust_code,
+	   t1.sap_delivery_num,
+	   t1.material_num,
+	   sum(in_stock_qty) as in_stock_qty
+	from(
+		select t.in_stock_date,
+			   t.sap_delivery_num,
+			   t.cust_code,
+			   t.material_num,
+			   t.in_instock_qty as in_stock_qty
+		from(
+				select t.in_stock_date,
+					   t.sap_delivery_num,
+					   t.cust_code,
+					   t.material_num,
+					   t.in_instock_qty as src_in_instock_qty,
+					   sum(COALESCE(t.in_instock_qty,0)) over(partition by t.sap_delivery_num,t.cust_code,t.material_num order by t.in_stock_date asc) as in_instock_qty
+					   --row_number() over(partition by t.sap_delivery_num,t.cust_code,t.material_num order by t.in_stock_date desc) rn
+				from(
+					SELECT substring(cast(t1.receipt_date as string),1,10) as in_stock_date, -- 收货日期
+						   --max(substring(cast(t1.receipt_date as string),1,10)) as in_stock_date, -- 收货日期
+						   t1.sap_delivery_num ,-- SAP提货单号
+						   case when length(t1.customer_code) <= 6 then concat('0000',t1.customer_code) else t1.customer_code end as cust_code, -- 客户编码
+						   t1.material_code as material_num,  -- 物料
+						   sum(nvl(quantity,0)) as in_instock_qty  -- 入库数量
+					FROM DM.DM_B1_PUR_INTOWH_T t1  -- B1采购入库
+					WHERE t1.sap_delivery_num like '80%'
+					AND t1.customer_code IS NOT NULL
+					and t1.receipt_date is not null
+					--and substring(cast(t1.receipt_date as string),1,10) >= ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3) --'2023-01-01'
+					and substring(cast(t1.receipt_date as string),1,10) >= '2023-01-01'
+					group by substring(cast(t1.receipt_date as string),1,10),
+							 t1.sap_delivery_num,
+							 case when length(t1.customer_code) <= 6 then concat('0000',t1.customer_code) else t1.customer_code end,
+							 t1.material_code
+					) t
+			 ) t
+		   ) t1
+		   left join operation_center_data t2
+			on t1.cust_code = t2.cust_code
+			group by t1.in_stock_date,
+					 t2.cust_short_name,
+					 --t2.cust_code,
+					 t1.sap_delivery_num,
+					 t1.material_num
+	) t1
+	left join (
+	    SELECT case when length(cust_code) <=6 then concat('0000',cust_code) else cust_code end as cust_code  ,
+		        abbreviation as cust_short_name
+		from sdi.sdi_b1_customer_data_1037 T
+		where is_main = '是'
+	) t2
+	ON t1.cust_short_name = t2.cust_short_name
+),
+sap_b1_return_qty as  
+(
+select 
+t2.vgbel, --提货单号
+case when length(t0.customer_code) <=6 then concat('0000',t0.customer_code) else t0.customer_code end customer_code,--客户编码
+t0.itemcode as material_num,--物料编码
+max(substring(t0.docdate,1,10)) as return_date,
+sum(t0.Quantity) as return_qty --退货数量
+from  DWIOTD.DWI_WM_B1_RPC1_T  t0 
+join DWIOTD.DWI_WM_B1_pch1_T t1  on t0.BaseEntry=t1.DocEntry and t0.baseline = t1.linenum and t0.customer_code = t1.customer_code
+join (select vbrp.vbeln,vbrp.vgbel From sdi.sdi_vbrp_1001 vbrp  join SDI.sdi_vbrk_1001 vbrk on vbrp.vbeln = vbrk.vbeln and vbrk.fkart <> 'ZIV'
+	    group by vbrp.vbeln,vbrp.vgbel
+	) t2 on t1.u_a1_basenum = t2.vbeln
+where t0.customer_type = 'SW'
+group by 
+t2.vgbel,
+case when length(t0.customer_code) <=6 then concat('0000',t0.customer_code) else t0.customer_code end,
+t0.itemcode 
+),
+instock_data_01 as(   --RTM跟B1的入库数 --注意：合在一起要最新那条
+	select t2.in_stock_date,
+	       t2.sap_delivery_num,
+	       t2.cust_code,
+	       t2.material_num,
+	       t2.in_stock_qty,
+           t2.return_date,
+	       t2.return_qty
+	from(
+		select t1.*,
+		       row_number() over(PARTITION by t1.sap_delivery_num,t1.cust_code,t1.material_num order by t1.in_stock_date desc) rn
+		from(
+			select t.in_stock_date,
+			       t.sap_delivery_num,
+			       t.cust_code,
+			       t.material_num,
+			       sum(t.in_stock_qty) as in_stock_qty,
+                   t.return_date,
+			       sum(t.return_qty) as return_qty
+			from(
+				select t.in_stock_date,
+				       t.sap_delivery_num,
+				       t.rtm_cust_code as cust_code,
+				       t.material_num,
+				       t.in_stock_qty,
+				       t.return_date,
+                	   t.return_qty
+				from rtm_instock_data t
+				union all
+				select COALESCE(t.in_stock_date,t11.return_date) as in_stock_date,-- 出现不入库，直接采购贷项退货情况
+				       COALESCE(t.sap_delivery_num,t11.vgbel) as sap_delivery_num,
+				       COALESCE(t.cust_code,t11.customer_code) as cust_code,
+				       COALESCE(t.material_num,t11.material_num) as material_num,
+				       COALESCE(t.in_stock_qty,0) as in_stock_qty,
+				       t11.return_date,
+				       t11.return_qty 
+				from b1_instock_data t
+				full outer join sap_b1_return_qty t11 on t.sap_delivery_num = t11.vgbel
+				    and t.cust_code = t11.customer_code and t.material_num = t11.material_num
+			) t      
+			group by t.in_stock_date,
+				     t.sap_delivery_num,
+				     t.cust_code,
+				     t.material_num,
+				     t.return_date
+		  )t1
+		)t2
+		where t2.rn = 1
+),
+dim_data as(   -- 数据发散，从2021年1月开始
+  select day_dt
+  from DM.dm_dim_date_d T
+  where day_dt >='2023-01-01' --between ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3) 
+  and day_dt<= '${PERIOD_ID_D}' -- '2023-01-01' and  '${PERIOD_ID_D}'
+  --group by day_dt
+),
+hn_jx_fj_gx_instock_data as(--注意：单独几个经销商每天的进库情况
+	select  day_dt as begin_in_stock_date,
+			date_sub(day_dt,-89) as end_in_stock_date, -- 90后天的入库时间
+			customer_code as cust_code,
+			material_num,
+			pur_qty as in_stock_qty,
+			qj_pp_return_qty as return_qty
+	from DWROTD.DWR_WM_CUST_INSTOCK_DATA01_F t
+	where pur_qty <> 0 OR qj_pp_return_qty <> 0
+),
+hn_jx_fj_gx_instock_data01 as(  -- 湖南 0000310635 江西 0000321104 福建 0000353879 广西 0000318683 入库数 --注意：几个经销商，截止当前日期 + 笛卡尔积 + 最近90天的入库情况
+	SELECT t1.in_stock_date,
+		   t1.cust_code,
+		   t1.material_num,
+		   sum(t1.in_stock_qty) over(PARTITION by t1.cust_code,t1.material_num order by t1.in_stock_date rows  BETWEEN 89 PRECEDING AND CURRENT ROW) as in_stock_qty,
+		   sum(t1.return_qty) over(PARTITION by t1.cust_code,t1.material_num order by t1.in_stock_date rows  BETWEEN 89 PRECEDING AND CURRENT ROW) as return_qty
+	from(
+	   select t1.day_dt as in_stock_date,
+			  t2.cust_code,
+			  t2.material_num,
+			  nvl(t3.in_stock_qty,0) as in_stock_qty,
+			  nvl(t3.return_qty,0) as return_qty
+	   from dim_data t1
+	   left join (select distinct cust_code, material_num from hn_jx_fj_gx_instock_data) t2
+	   on 1 = 1
+	   left join hn_jx_fj_gx_instock_data t3
+	   on t1.day_dt = t3.begin_in_stock_date
+	   and t2.cust_code = t3.cust_code
+	   and t2.material_num = t3.material_num
+	   )t1
+),
+hn_jx_fj_gx_instock_data02 as(  --  取最晚的 --注意：几个经销商，截止当前日期 + 笛卡尔积 + 最近90天的入库情况
+	select t1.in_stock_date, 
+		   t1.cust_code, 
+		   t1.material_num,
+		   max(t1.in_stock_qty) as in_stock_qty,  
+		   '' as begin_in_stock_date,--max(t2.begin_in_stock_date) as begin_in_stock_date--,t2.end_pickup_goods_date
+		   max(t1.return_qty) as return_qty
+	from hn_jx_fj_gx_instock_data01 t1
+	left join hn_jx_fj_gx_instock_data t2
+	on t1.cust_code = t2.cust_code
+	and t1.material_num = t2.material_num
+	where t1.in_stock_date >= t2.begin_in_stock_date--ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3)
+	and t1.in_stock_date <= t2.end_in_stock_date
+	group by t1.in_stock_date, 
+			 t1.cust_code, 
+			 t1.material_num
+),
+no_hn_jx_fj_gx_instock_data as( -- 非 湖南 0000310635 江西 0000321104 福建 0000353879 广西 0000318683 入库数：sap b1和RTM的入库明细
+	select in_stock_date AS begin_in_stock_date,
+		   date_sub(in_stock_date,-89) as end_in_stock_date, -- 90后天的入库时间
+		   cust_code, 
+		   sap_delivery_num,
+		   material_num,
+		   sum(in_stock_qty) as in_stock_qty,
+           return_date,
+		   sum(return_qty) as return_qty
+	from instock_data_01 t
+	where t.cust_code not in ('0000310635','0000353879','0000321104','0000318683')
+	group by in_stock_date, 
+			 cust_code, 
+			 sap_delivery_num,
+			 material_num,
+             return_date
+),
+no_hn_jx_fj_gx_instock_data01 as(  -- 非 湖南 0000310635 江西 0000321104 福建 0000353879 广西 0000318683 入库数 --注意：SAP b1 和RTM的入库明细，笛卡尔积+最近90天
+	SELECT t1.in_stock_date,
+		   t1.cust_code,
+		   t1.sap_delivery_num,
+		   t1.material_num,
+		   t1.return_date,
+		   sum(t1.in_stock_qty) over(PARTITION by t1.cust_code,t1.sap_delivery_num,t1.material_num order by t1.in_stock_date rows  BETWEEN 89 PRECEDING AND CURRENT ROW) as in_stock_qty,
+		   sum(t1.return_qty) over(PARTITION by t1.cust_code,t1.sap_delivery_num,t1.material_num order by t1.in_stock_date rows  BETWEEN 89 PRECEDING AND CURRENT ROW) as return_qty
+	from(
+	   select t1.day_dt as in_stock_date,
+			  t2.cust_code,
+			  t2.sap_delivery_num,
+			  t2.material_num,
+			  nvl(t3.in_stock_qty,0) as in_stock_qty,
+              t3.return_date,
+			  nvl(t3.return_qty,0) as return_qty
+	   from dim_data t1
+	   left join (select distinct cust_code, sap_delivery_num,material_num from no_hn_jx_fj_gx_instock_data) t2
+	   on 1 = 1
+	   left join no_hn_jx_fj_gx_instock_data t3
+	   on t1.day_dt = t3.begin_in_stock_date
+	   and t2.cust_code = t3.cust_code
+	   and t2.sap_delivery_num = t3.sap_delivery_num
+	   and t2.material_num = t3.material_num
+	   )t1
+),
+no_hn_jx_fj_gx_instock_data02 as( --注意：SAP b1 和RTM的入库明细，笛卡尔积+最近90天
+	select t1.in_stock_date, 
+		 	t1.cust_code, 
+		 	t1.sap_delivery_num, 
+		 	t1.material_num,
+		 	max(t1.in_stock_qty) as in_stock_qty,
+		    max(t2.begin_in_stock_date) as begin_in_stock_date,--,t2.end_pickup_goods_date
+            t1.return_date,
+		    max(t1.return_qty) as return_qty
+	from no_hn_jx_fj_gx_instock_data01 t1
+	left join no_hn_jx_fj_gx_instock_data t2
+	on t1.cust_code = t2.cust_code
+	and t1.sap_delivery_num = t2.sap_delivery_num
+	and t1.material_num = t2.material_num
+	where t1.in_stock_date >= t2.begin_in_stock_date--ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3)
+	and t1.in_stock_date <= t2.end_in_stock_date
+	group by t1.in_stock_date, 
+			 t1.cust_code, 
+			 t1.sap_delivery_num, 
+			 t1.material_num,
+             t1.return_date
+),
+cust_instock_data as(
+    select t1.in_stock_date, 
+		   t2.cust_short_name as cust_code, 
+		   '' as sap_delivery_num, 
+		   t1.material_num, 
+		   sum(t1.in_stock_qty) as in_stock_qty,
+		   t1.begin_in_stock_date,
+           t1.in_stock_date as return_date,
+		   sum(t1.return_qty) as return_qty
+	from hn_jx_fj_gx_instock_data02 t1
+	left join operation_center_data t2
+	on t1.cust_code = t2.cust_code
+	group by t1.in_stock_date,
+			 t2.cust_short_name,
+			 t1.material_num,
+			 t1.begin_in_stock_date
+	union all
+	select t1.in_stock_date, 
+		   t2.cust_short_name as cust_code, 
+		   t1.sap_delivery_num, 
+		   t1.material_num, 
+		   sum(t1.in_stock_qty) as in_stock_qty,
+		   t1.begin_in_stock_date,
+           t1.return_date,
+		   sum(t1.return_qty) as return_qty
+	from no_hn_jx_fj_gx_instock_data02 t1
+	left join operation_center_data t2
+	on t1.cust_code = t2.cust_code
+	group by t1.in_stock_date,
+			 t2.cust_short_name,
+			 t1.sap_delivery_num,
+			 t1.material_num,
+			 t1.begin_in_stock_date,
+             t1.return_date
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_WM_CUST_INSTOCK_DATA_F PARTITION(STAT_MONTH)
+select in_stock_date,
+		cust_code,
+		sap_delivery_num,
+		material_num,
+		in_stock_qty,
+	   current_timestamp() as dw_last_update_date ,
+	   t.begin_in_stock_date,
+       t.return_date,
+       t.return_qty,
+	   substring(t.in_stock_date,1,7) as stat_month
+from cust_instock_data t
+where in_stock_date >= CASE WHEN substring('${PERIOD_ID_D}',-2) IN ('01','02','03') THEN 
+                               ADD_MONTHS(CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01'),-3) -- 传昨天，所在月份1号的前3个月
+                           ELSE
+                    		   CONCAT(SUBSTRING('${PERIOD_ID_D}',1,7),'-01')  -- 传昨天，当月
+                       END

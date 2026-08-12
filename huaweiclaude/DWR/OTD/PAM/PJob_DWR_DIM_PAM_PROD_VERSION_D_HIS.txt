@@ -1,0 +1,44 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/09/13 09:36:22 GMT+08:00
+-- description:生产版本与产线对应关系表（快照）
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- CREATE TABLE DWRDIM.DWR_DIM_PAM_PROD_VERSION_D_HIS (
+--  site_code string comment '基地代码'
+-- ,site_name string comment '基地名称'
+-- ,work_shop_code string comment '车间编码'
+-- ,work_shop_name string comment '车间名称'
+-- ,product_line_code string comment '产线代码'
+-- ,product_line_name string comment '产线名称'
+-- ,verid_code string comment '版本号'
+-- ,verid_name string comment '版本名称'
+-- ,creater string comment '创建人'
+-- ,updater string comment '修改者'
+-- ,create_time timestamp comment '创建时间'
+-- ,update_time timestamp comment '修改时间'
+-- ,dw_last_update_date timestamp comment '最后修改时间'
+-- )
+-- PARTITIONED BY (
+-- `query_date` string)
+
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_PAM_PROD_VERSION_D_HIS
+SELECT 
+ site AS site_code 
+,site_describe as site_name
+,work_shop as work_shop_code
+,work_shop_desc as work_shop_name
+,product_line as product_line_code
+,product_line_desc as product_line_name
+,verid as verid_code
+,ver_desc as verid_name
+,creater
+,updater
+,create_time
+,update_time
+,current_timestamp() as dw_last_update_date
+,'${start_date}' as query_date
+FROM  SDI.SDI_DP_PRODUCTION_VERSION_MAINT_1006 
+where delete_flag = 1

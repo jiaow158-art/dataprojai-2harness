@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CMP_CUST_COMPENSATE_PROD_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CMP",
+    "description": "申诉产品信息表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

@@ -1,0 +1,196 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2026/03/04 08:53:29 GMT+08:00
+-- description:经营利润预测表底表
+-- history list:
+-- UPDATE FROM wjh 时间<2026/04/09> 费用逻辑调整
+-- ******************************************************************** -- --
+do
+$$
+    declare
+        P_DATE varchar(500) ;
+  begin
+        for P_DATE in (--7号前都会跑上月预测数
+select   TO_CHAR(('${PERIOD_ID_D}'::DATE - INTERVAL '1 day'), 'YYYY-MM') as P_MONTH
+union all 
+select TO_CHAR(('${PERIOD_ID_D}'::DATE - INTERVAL '8 days'), 'YYYY-MM')
+)
+loop
+	 DELETE
+                from dm.dm_profit_forecast_fill_t where cal_month  =P_DATE ;
+with YC_MX as (
+select 
+ D.node_name2,
+ D.node_desc2,
+sum(case when functional_scope_reclass = '5501' and ledger_account not like '005%' then coalesce(amount,0) else 0 end)/10000 as "销售费用",
+sum(case when functional_scope_reclass = '5504' and ledger_account not like '005%' then coalesce(amount,0) else 0 end)/10000 as "物流费用",
+sum(case when functional_scope_reclass = '5502' and ledger_account not like '005%' then coalesce(amount,0) else 0 end)/10000 as "管理费用",
+sum(case when functional_scope_reclass = '4110' and ledger_account not like '005%' then coalesce(amount,0) else 0 end)/10000 as "研发费用",
+sum(case when functional_scope_reclass = '5503' and ledger_account not like '005%' then coalesce(amount,0) else 0 end)/10000 as "财务费用",
+sum(case when lpad(ledger_account,10,'0') in ('0054010600','0054010700') then coalesce(amount,0) else 0 end)/10000  as "物流成本"
+from 
+dm.dm_expense_prediction_fsreclass_t t1
+  LEFT JOIN DWIMD.DWI_MD_COST_CENTER_INFO_T B
+    ON t1.COST_CENTER = REPLACE(B.ZCOST_CENTER,'DP00','')  
+  LEFT JOIN DM.DM_RPT_SALES_GROUP_T D
+    ON B.SALES_GRP_CODE = D.NODE_NAME9
+    where  substr(t1.stat_date,1,7) = p_date
+group by 
+ D.node_name2,
+ D.node_desc2
+)
+,YJ_MX AS (
+select
+D.NODE_NAME2
+,D.NODE_DESC2
+,sum(case 
+--	when 'H99000000' in ('${P_node_name}') then 0 
+	when coalesce(A.data_source,'NAL') in ('D','NAL') then coalesce(prediction, 0) 
+	else 0
+end
+) as tax_inclusive_sales_revenue_in
+,sum(case when coalesce(A.data_source,'NAL') in ('S','NAL') then coalesce(prediction, 0) else 0 end) as tax_inclusive_sales_revenue_out
+from upload.upload_achievement_prediction_t A
+left join  dm.dm_rpt_sales_group_t D
+on  A.org_code = D.node_name9
+where  substr(A.stat_month,1,7) = p_date
+group by 
+ D.node_name2,
+ D.node_desc2
+)
+
+,sales_tree as (
+select  
+A.node_name2,
+A.node_desc2
+from 
+DM.DM_RPT_SALES_GROUP_T A 
+where node_name2 <>  'H99000000'
+group by A.node_name2,
+A.node_desc2
+)
+, yc_sum as (
+select 
+A.node_name2,
+A.node_desc2,
+coalesce(d.tax_inclusive_sales_revenue_in,c.tax_inclusive_sales_revenue_in) as tax_inclusive_sales_revenue_in,
+coalesce(d.tax_inclusive_sales_revenue_out,c.tax_inclusive_sales_revenue_out) as tax_inclusive_sales_revenue_out,
+0 as tax_exclusive_net_sales_in,
+0 as tax_exclusive_net_sales_out,
+0 as add_use_points,
+0 as red_use_points,
+0 as sales_cost_in,
+0 as sales_cost_out,
+0 as taxes,
+case when B."销售费用" is null or B."销售费用" = 0 then C.sales_expense else B."销售费用" end  as sales_expense,
+case when B."物流费用" is null or B."物流费用" = 0 then C.logistics_expense else B."物流费用" end logistics_expense,
+case when B."管理费用" is null or B."管理费用" = 0 then C.administrative_expense else B."管理费用" end administrative_expense,
+case when B."研发费用" is null or B."研发费用" = 0 then C.research_expense else B."研发费用" end research_expense,
+case when B."财务费用" is null or B."财务费用" = 0 then C.financial_expense else B."财务费用" end financial_expense,
+case when B."物流成本" is null or B."物流成本" = 0 then C.logistics_cost else B."物流成本" end logistics_cost,
+0 as other_income,
+0 as inv_income,
+0 as credit_impairment_gain,
+0 as asset_impairment_gain,
+0 as asset_disposal_income,
+0 as other_business_income,
+0 as other_business_costs,
+0 as non_operating_income,
+0 as non_operating_expenses,
+0 as fund_cost,
+0 as commission_expense,
+0 as income_tax_expense
+
+from 
+sales_tree  A
+left join YC_MX B  
+on A.node_name2 = B.node_name2  
+left  join upload.upload_prediction_profit_t C 
+on A.node_name2  = C.sales_org
+and C.cal_month =   p_date
+left join  YJ_MX D
+on a.node_name2 = d.node_name2
+
+union all 
+
+select  
+t1.node_name2 ,
+t1.node_desc2 ,
+0 as tax_inclusive_sales_revenue_in,
+0 as tax_inclusive_sales_revenue_out,
+tax_exclusive_net_sales_in,
+tax_exclusive_net_sales_out,
+add_use_points,
+red_use_points,
+sales_cost_in,
+sales_cost_out,
+taxes,
+0 as sales_expense,
+0 as logistics_expense,
+0 as administrative_expense,
+0 as research_expense,
+0 as financial_expense,
+0 as logistics_cost,
+other_income,
+inv_income,
+credit_impairment_gain,
+asset_impairment_gain,
+asset_disposal_income,
+other_business_income,
+other_business_costs,
+non_operating_income,
+non_operating_expenses,
+fund_cost,
+commission_expense,
+income_tax_expense
+
+from 
+sales_tree t1 
+left join upload.upload_prediction_profit_t  t2
+on t1.node_name2 = t2.sales_org 
+where cal_month =   p_date
+)
+insert into  dm.dm_profit_forecast_fill_t
+select
+p_date as cal_month 
+,node_name2
+,node_desc2
+,sum(tax_inclusive_sales_revenue_in) as  tax_inclusive_sales_revenue_in
+,sum(tax_inclusive_sales_revenue_out) as tax_inclusive_sales_revenue_out
+,sum(tax_exclusive_net_sales_in) as tax_exclusive_net_sales_in
+,sum(tax_exclusive_net_sales_out) as tax_exclusive_net_sales_out
+,sum(add_use_points) as add_use_points
+,sum(red_use_points) as red_use_points
+,sum(sales_cost_in) as sales_cost_in
+,sum(sales_cost_out) as sales_cost_out
+,sum(taxes) as taxes
+,sum(sales_expense) as sales_expense
+,sum(logistics_expense) as logistics_expense
+,sum(administrative_expense) as administrative_expense
+,sum(research_expense) as research_expense
+,sum(financial_expense) as financial_expense
+,sum(logistics_cost) as logistics_cost
+,sum(other_income) as other_income
+,sum(inv_income) as inv_income
+,sum(credit_impairment_gain) as credit_impairment_gain
+,sum(asset_impairment_gain) as asset_impairment_gain
+,sum(asset_disposal_income) as asset_disposal_income
+,sum(other_business_income) as other_business_income
+,sum(other_business_costs) as other_business_costs
+,sum(non_operating_income) as non_operating_income
+,sum(non_operating_expenses) as non_operating_expenses
+,sum(fund_cost) as fund_cost
+,sum(commission_expense) as commission_expense
+,sum(income_tax_expense) as income_tax_expense
+,current_timestamp  as dw_last_update_date 
+from 
+yc_sum
+group by 
+node_name2,
+node_desc2;
+
+
+       end loop;
+    end ;
+$$

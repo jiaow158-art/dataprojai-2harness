@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_MD_ORG_COMPANY_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/ORG",
+    "description": "组织-公司对应数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

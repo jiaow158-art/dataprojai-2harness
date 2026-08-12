@@ -1,0 +1,8 @@
+{
+    "name": "PJob_SDI_SAMPLE_CONFIRMATION_1007",
+    "type": "HiveSQL",
+    "directory": "/SDI/APS/TOTAL",
+    "description": "aps复板",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

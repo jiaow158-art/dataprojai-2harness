@@ -1,0 +1,122 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/05/10 09:26:18 GMT+08:00
+-- ******************************************************************** --
+with tmp as(
+	-- 剩余有批次可用库存
+	select material_num ,
+		   batch_num ,
+		   factory_code,
+		   inv_location, 
+		   sum(left_zkkc) as  left_zkkc
+	from dm.dm_wm_stock_responsibility_left_1 a 
+	where left_zkkc>0 
+	and batch_num is not null
+	group by material_num ,
+		   batch_num ,
+		   factory_code,
+		   inv_location
+),
+tmp2 as(
+	-- 按物料、批次聚合
+	select material_num ,
+		   batch_num, 
+		   sum(left_zkkc) as left_zkkc  
+	from tmp 
+	group by material_num ,batch_num
+),
+tmp3 as(
+	select close_time,
+		   item_code,
+		   factory,
+		   workshop_name,
+		   sum(abnormal_overproduct)/t2.area as abnormal_overproduct_qty
+	from dm.dm_product_overflow_base_t t1 
+	join dm.dm_wm_stock_responsibility_mat_tmp t2 
+	ON t1.item_code  = t2.material_num 
+	where close_time  is not null
+	and abnormal_overproduct>0
+	group by close_time,
+			 item_code,
+			 factory,
+			 workshop_name,
+			 t2.area
+),
+tmp4 as (
+	select a.factory,
+		   a.workshop_name ,
+		   a.item_code as material_num  , 
+		   a.batch_no as batch_num,
+		   a.close_time,
+		   --c.left_zkkc, 
+		   b.abnormal_overproduct_qty,
+		   c.left_zkkc*(b.abnormal_overproduct_qty/sum(b.abnormal_overproduct_qty) over(partition by a.item_code,a.batch_no)) as left_zkkc  -- 把物料批次剩余库存摊分到不同的月份（按各月溢出摊分）
+		   ---sum(c.left_zkkc)over(partition by a.item_code,a.factory,a.workshop_name,a.close_time) as left_zkkc_sum
+		   from 
+		   (SELECT FACTORY,
+				   workshop_name,
+				   ITEM_CODE,
+				   substr(close_time,1,7) AS CLOSE_TIME,
+				   BATCH_NO 
+		   FROM dm.dm_aps_daily_schedule_dtl
+		   GROUP BY FACTORY,
+					workshop_name,
+					ITEM_CODE,
+					substr(close_time,1,7),BATCH_NO) a 
+	join  tmp3 b 
+	ON a.factory  = b.factory  
+	and a.workshop_name  = b.workshop_name 
+	and a.item_code = b.item_code  
+	and a.close_time = b.close_time
+	join tmp2 c 
+	ON a.item_code = c.material_num 
+	and a.batch_no = c.batch_num 
+),
+tmp41 as (
+    select a.factory,
+		   a.workshop_name ,
+		   a.material_num  , 
+		   a.batch_num,
+		   a.close_time,
+		   a.left_zkkc, 
+		   a.abnormal_overproduct_qty,
+		   sum(a.left_zkkc)over(partition by a.material_num,a.factory,a.workshop_name,a.close_time) as left_zkkc_sum  -- 统计同一物料、基地、车间、关单月份的剩余库存；用于将溢出摊分到批次的摊分
+    from tmp4 a
+    
+)
+,
+tmp5 as (
+	select a.factory,
+		   a.workshop_name ,
+		   a.material_num  , 
+		   a.batch_num,
+		   a.close_time,
+		   a.left_zkkc, 
+		   a.abnormal_overproduct_qty,
+		   a.left_zkkc_sum,
+		   case when a.left_zkkc_sum<=abnormal_overproduct_qty then left_zkkc
+				else left_zkkc/left_zkkc_sum*abnormal_overproduct_qty end as overflow_stock_qty   -- 溢出量摊分
+	from tmp41 a 
+)
+insert overwrite table DM.DM_WM_STOCK_RESPONSIBILITY_OVERPRODUCT_TMP
+select a.factory,
+	   a.workshop_name ,
+	   a.material_num  , 
+	   a.batch_num,
+	   a.close_time,
+	   a.left_zkkc, 
+	   a.abnormal_overproduct_qty,
+	   a.left_zkkc_sum,
+	   a.overflow_stock_qty,
+	   b.factory_code , 
+	   b.inv_location,
+       b.left_zkkc/c.left_zkkc*overflow_stock_qty as dist_overflow_stock_qty,   -- 摊分到库存地点和工厂
+	   current_timestamp() as dw_last_update_date
+from tmp5 a
+join tmp b 
+ON a.material_num  = b.material_num  
+and a.batch_num = b.batch_num 
+join tmp2 c 
+On a.material_num = c.material_num
+and a.batch_num = c.batch_num;

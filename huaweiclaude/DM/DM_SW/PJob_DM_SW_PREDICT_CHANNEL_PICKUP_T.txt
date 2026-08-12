@@ -1,0 +1,234 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/05/23 11:48:35 GMT+08:00
+-- description:渠道接口的预测建议数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with SALES_FORECAST_FACT_DATA as(  -- 销售预测的实际数据
+	SELECT t1.stat_month ,
+		   t1.def_channnel,
+		   t1.material_num,
+		   sum(t1.actual_billed_qty) as actual_billed_qty
+	FROM DM_SW.DM_OTD_SALES_FORECAST_FACT_T t1
+	where t1.material_num is not null
+	and t1.stat_month <= substring('${PERIOD_ID_D}',1,7)
+	GROUP BY t1.stat_month ,
+			 t1.def_channnel,
+		     t1.material_num
+),
+SALES_FORECAST_DIM_DATA as(   -- 预测数据发散，为了用函数算近12个月的数据,从预测近13个月开发散
+  select SUBSTRING(day_dt,1,7) as stat_month
+  from DM.dm_dim_date_d T
+  where day_dt between add_months('${PERIOD_ID_D}',-13) and '${PERIOD_ID_D}' 
+  group by SUBSTRING(day_dt,1,7)
+),
+SALES_FORECAST_FACT_DATA_01 as( -- 预测实际明细数据
+	SELECT t1.stat_month,
+	       t2.def_channnel,
+	       t2.material_num,
+	       nvl(t3.actual_billed_qty,0) as actual_billed_qty
+	FROM SALES_FORECAST_DIM_DATA t1
+	left join(
+		select distinct 
+		       def_channnel,
+		       material_num
+		from SALES_FORECAST_FACT_DATA
+	) t2
+	on 1 = 1
+	left join SALES_FORECAST_FACT_DATA t3
+	on t1.stat_month = t3.stat_month
+	and nvl(t2.def_channnel,'ISNULL') = nvl(t3.def_channnel,'ISNULL')
+	and nvl(t2.material_num,'ISNULL') = nvl(t3.material_num,'ISNULL')
+),
+SALES_FORECAST_FACT_DATA_02 as(  -- 预测明细数据(N1~N3)
+	SELECT substring('${PERIOD_ID_D}',1,7) as stat_month, 
+		   t1.def_channnel,
+		   t1.material_num,
+		   sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-23),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ) as n1_lj_actual_qty,  -- 最近24个月
+		   sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-22),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ) as n2_lj_actual_qty,  -- 最近23个月
+		   sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-21),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ) as n3_lj_actual_qty,  -- 最近22个月
+		   (sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ) 
+		   - max(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ) 
+		   - min(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-11),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end ))/10 as near12_avg_sendout_goods_qty,  -- 最近12个月
+		   sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-5),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end )/6 as near6_avg_sendout_goods_qty,  -- 最近6个月
+		   sum(case when t1.stat_month between substring(add_months('${PERIOD_ID_D}',-2),1,7) and substring('${PERIOD_ID_D}',1,7) then t1.actual_billed_qty else 0 end )/3 as near3_avg_sendout_goods_qty  -- 最近3个月
+	FROM SALES_FORECAST_FACT_DATA_01 t1
+	group by --t1.stat_month, 
+			 t1.def_channnel,
+			 t1.material_num
+),
+MATERIAL_MIN_DATE AS (
+SELECT T.material_num,MIN(stat_date_d) AS material_min_date FROM DM_SW.DM_OTD_SALES_FORECAST_FACT_T T
+WHERE actual_billed_qty >0
+GROUP BY T.material_num
+),
+WORKDAY  as (
+	SELECT distinct stat_date_d
+	FROM DM_SW.DM_OTD_SALES_FORECAST_FACT_T T
+	where actual_billed_qty >0
+	  and stat_date_d >= add_months('${PERIOD_ID_D}',-36) 
+),
+ACTUAL_YXTS_DATA as(  -- 实际的有效天数
+	SELECT substring('${PERIOD_ID_D}',1,7) as stat_month,
+	       T2.material_num,
+		   count(distinct case when stat_date_d >= add_months('${PERIOD_ID_D}',-23) and stat_date_d <= '${PERIOD_ID_D}' and stat_date_d>= t2.material_min_date then stat_date_d else null end) as n1_actual_ts_cnt,
+		   count(distinct case when stat_date_d >= add_months('${PERIOD_ID_D}',-22) and stat_date_d <= '${PERIOD_ID_D}' and stat_date_d>= t2.material_min_date then stat_date_d else null end) as n2_actual_ts_cnt,
+		   count(distinct case when stat_date_d >= add_months('${PERIOD_ID_D}',-21) and stat_date_d <= '${PERIOD_ID_D}' and stat_date_d>= t2.material_min_date then stat_date_d else null end) as n3_actual_ts_cnt
+	FROM WORKDAY T1
+	JOIN MATERIAL_MIN_DATE T2 ON 1=1 
+	GROUP BY T2.material_num
+),
+holiday_detail_data as( -- 假期明细数据
+	select substring(t.day_dt,1,7) as stat_month, -- 月份
+		   max(substring(t.day_dt,9,2)) as month_days,--月份天数,
+	       sum(case when t.holiday_name is null then 1 else 0 end ) as valid_days,--有效天数,
+	       sum(case when t.holiday_name is not null then 1 else 0 end ) as holiday_days -- 假期天数
+	from (
+		select t1.day_dt ,t2.holiday_date,t2.holiday_name
+		from dm.dm_dim_date_d t1
+		left join SDI.SDI_SALES_FORECAST_HOLIDAY_1037 t2
+		on t1.day_dt = t2.holiday_date
+		and t2.del_flag = 'N'
+	   )t
+	   group by substring(t.day_dt,1,7)
+),
+holiday_detail_data01 as(  -- 假期数据，如：5月1日，跑4月30日的数据，日期存4月，预测5月，N+1是6月，以此内推
+select t.stat_month,
+       t1.valid_days as n1_valid_days,
+       t2.valid_days as n2_valid_days,
+       t3.valid_days as n3_valid_days
+from holiday_detail_data t
+left join holiday_detail_data t1
+on substring(add_months(concat(t.stat_month,'-01'),2),1,7) = t1.stat_month
+left join holiday_detail_data t2
+on substring(add_months(concat(t.stat_month,'-01'),3),1,7) = t2.stat_month
+left join holiday_detail_data t3
+on substring(add_months(concat(t.stat_month,'-01'),4),1,7) = t3.stat_month
+where t.stat_month = substring('${PERIOD_ID_D}',1,7)  -- 每月1号传昨天
+),
+leaveing_goods_no_sendout_data_01 as(
+	SELECT T2.stat_month ,
+		   b.def_channel as channel_name,
+		   T2.material_num ,
+		   sum(T2.total_prepare_qty) as leaveing_goods_no_sendout_qty
+	FROM SDI.SDI_VBAK_1001 T1
+	JOIN dm_sw.dm_wm_prepare_stock_dtl_month T2
+	ON T1.vbeln = T2.reference_bill_num
+	left join DM_SW.DM_SW_PREDICT_DEF_CHANNEL_D b
+	On t2.cust_num  = b.cust_num 
+	and t2.sales_org_code = b.sales_org_code 
+	and t1.vtweg = b.distribution_chnl_code
+	where t2.order_source ='SALES'
+	and t2.stat_month = substring('${PERIOD_ID_D}',1,7)
+	GROUP BY T2.stat_month ,
+			 b.def_channel,
+			 T2.material_num
+	union all
+	select t.stat_month ,
+		   b.def_channel as  channel_name,
+		   t.material_num ,
+		   sum(t.total_sku_confirm_qty) as leaveing_goods_no_sendout_qty
+	from dm_sw.dm_wm_res_stock_dtl_month t 
+	left join DM_SW.DM_SW_PREDICT_DEF_CHANNEL_D b
+	On t.cust_num  = b.cust_num 
+	and t.sales_org_code = b.sales_org_code 
+	and t.distribution_channel_code = b.distribution_chnl_code
+	where t.order_source ='SALES'
+	and t.stat_month = substring('${PERIOD_ID_D}',1,7)
+	group by t.stat_month ,
+			 b.def_channel,
+			 t.material_num 
+),
+leaveing_goods_no_sendout_data_02 as( -- 当月已留货未发货
+	select stat_month,
+			 channel_name,
+			 material_num,
+			 sum(leaveing_goods_no_sendout_qty) as leaveing_goods_no_sendout_qty
+	from leaveing_goods_no_sendout_data_01
+	where channel_name is not null
+	group by stat_month,
+			 channel_name,
+			 material_num
+),
+near3month_pick as (
+SELECT
+		   t1.material_num,
+		   sum(t1.actual_billed_qty) as near3_lj_pickup_goods_qty
+	FROM DM_SW.DM_OTD_SALES_FORECAST_FACT_T t1
+	where t1.operation_center_name is not null
+	and t1.material_num is not null
+	and t1.stat_month <= substring('${PERIOD_ID_D}',1,7)
+	and t1.stat_month >=substring(add_months('${PERIOD_ID_D}',-2),1,7)
+	GROUP BY 
+		     t1.material_num
+)
+INSERT OVERWRITE TABLE DM_SW.DM_SW_PREDICT_CHANNEL_PICKUP_T PARTITION(STAT_MONTH)
+select t1.def_channnel,  -- 渠道
+	   t1.material_num,  -- 物料
+	   t1.n1_lj_actual_qty,  -- 3年前36个月到昨天
+	   t2.n1_actual_ts_cnt,  -- 3年前36个月到昨天的有效天数
+	   t3.n1_valid_days,	 -- N1的有效假期天数
+	   t1.n2_lj_actual_qty,  -- 3年前35个月到昨天
+	   t2.n2_actual_ts_cnt,  -- 3年前35个月到昨天的有效天数
+	   t3.n2_valid_days,	 -- N2的有效假期天数
+	   t1.n3_lj_actual_qty,  -- 3年前34个月到昨天
+	   t2.n3_actual_ts_cnt,	-- 3年前34个月到昨天的有效天数
+	   t3.n3_valid_days	, -- N3的有效假期天数
+	   t1.near12_avg_sendout_goods_qty  , -- 近12个月月均发货数
+	   t1.near6_avg_sendout_goods_qty  ,	-- 近6个月月均发货数
+       t1.near3_avg_sendout_goods_qty  ,	-- 近3个月月均发货数
+       null as in_transit_qty, -- N月在途订单 （已发货未接收）
+       t6.leaveing_goods_no_sendout_qty ,--	当月已留货未发货 	
+	   -- 向上取整((N+1的累计数 除以 N+1的有效天数) 乘以 N+1 的假期天数)  增加箱容校验
+   	   ceil( 
+   	        (t1.n1_lj_actual_qty / t2.n1_actual_ts_cnt) * t3.n1_valid_days/NVL(t7.pack_num,1)
+   	       )*NVL(t7.pack_num,1) as n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+   	   -- 向上取整(( (N+2的累计数 + N+1月系统提货预测建议值 ) 除以 (N+2 的有效天数 + N+1 的假期天数) ) 乘以 N+2 的假期天数) 
+   	   ceil ( 
+   			  (
+                (t1.n2_lj_actual_qty 
+                 + ( 
+                    (t1.n1_lj_actual_qty/t2.n1_actual_ts_cnt) * t3.n1_valid_days
+                   ) 
+                ) / (t2.n2_actual_ts_cnt + t3.n1_valid_days) 
+              ) * t3.n2_valid_days/NVL(t7.pack_num,1)
+   	        )*NVL(t7.pack_num,1) as n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+   	   /*
+   	    * 向上取整(((N+3的累计数 + N+1月系统提货预测建议值  + N+2月系统提货预测建议值) 
+   	    * 除以 (N+3 的有效天数 + N+1 的假期天数 + N+2 的假期天数)) 乘以 N+3 的假期天数) 
+   	    * */ 
+	  	ceil( 
+  	          ( 
+  	            ( 
+  	              (t1.n3_lj_actual_qty 
+  	                + ((t1.n1_lj_actual_qty/t2.n1_actual_ts_cnt) * t3.n1_valid_days)
+  	              ) 	  	    
+                   + ( ((t1.n2_lj_actual_qty + ( (t1.n1_lj_actual_qty/t2.n1_actual_ts_cnt) * t3.n1_valid_days) 
+		   	              )/ (t2.n2_actual_ts_cnt + t3.n1_valid_days) 
+		   	            ) * t3.n2_valid_days
+                     )
+                ) / (t2.n3_actual_ts_cnt + t3.n1_valid_days + t3.n2_valid_days)
+              ) * t3.n3_valid_days/NVL(t7.pack_num,1)
+   	        )*NVL(t7.pack_num,1) as n3_pickup_forecast_suggest_qty,-- N+3月系统提货预测建议值
+   	      current_timestamp() as dw_last_update_date,  -- 数据同步时间
+   	      t1.stat_month
+from SALES_FORECAST_FACT_DATA_02 t1
+left join ACTUAL_YXTS_DATA t2
+on t1.stat_month =  t2.stat_month and t1.material_num = t2.material_num
+left join holiday_detail_data01 t3
+on t1.stat_month = t3.stat_month
+left join leaveing_goods_no_sendout_data_02 t6
+on t1.stat_month = t6.stat_month
+and t1.def_channnel = t6.channel_name
+and t1.material_num = t6.material_num
+left join (select product_code AS material_num,max(pack_num) as pack_num from SDI.SDI_ZTMM001_1001 group by product_code)  t7 ON t1.material_num = t7.material_num;

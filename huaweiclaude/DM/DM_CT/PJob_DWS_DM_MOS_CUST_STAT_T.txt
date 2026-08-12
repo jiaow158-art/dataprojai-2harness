@@ -1,0 +1,125 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2026/04/13 17:30:18 GMT+08:00
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_MOS_CUST_STAT_T;
+
+WITH T AS(
+SELECT SUBSTR(FST_CREATE_TIME,1,7) AS STAT_MONTH --统计月份
+      ,SUBSTR(FST_CREATE_TIME - INTERVAL '1 MONTH',1,7) AS LAST_MONTH --上月
+      ,SUBSTR(FST_CREATE_TIME,1,10) AS STAT_DATE --统计日期
+      ,SUBSTR(FST_CREATE_TIME - INTERVAL '1 MONTH',1,10) AS LAST_DATE --统计上月日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,SUM(COALESCE(A.SALE_AMT,0)) AS SALE_AMT --销售总金额
+	  ,SUM(COALESCE(A.RECV_AMT,0)) AS RECV_AMT --收款总金额
+	  ,SUM(CASE WHEN COALESCE(A.ORDER_AMT,0) >= 1000 THEN COALESCE(A.SALE_AMT,0) ELSE 0 END) AS ORDER_AMT --订单金额大于1000的订单总金额（客单值分母）
+	  ,COUNT(DISTINCT CASE WHEN COALESCE(A.ORDER_AMT,0) >= 1000 THEN A.CUST_ID ELSE NULL END) AS ORDER_CNT --订单金额大于1000的订单总单数（客单值分子）
+	  ,SUM(CASE WHEN A.IS_NOT_MEAS_NAME = '是' THEN COALESCE(A.SALE_AMT,0) ELSE 0 END) AS NOT_MEAS_SALE_AMT --测未定销售总金额
+	  ,SUM(CASE WHEN A.IS_NOT_MEAS_NAME = '是' THEN COALESCE(A.RECV_AMT,0) ELSE 0 END) AS NOT_MEAS_RECV_AMT --测未定收款总金额
+	  ,SUM(CASE WHEN A.IS_NOT_MEAS_NAME = '是' AND COALESCE(A.ORDER_AMT,0) >= 1000 THEN COALESCE(A.SALE_AMT,0) ELSE 0 END) AS NOT_MEAS_ORDER_AMT --测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,COUNT(DISTINCT CASE WHEN A.IS_NOT_MEAS_NAME = '是' AND COALESCE(A.ORDER_AMT,0) >= 1000 THEN A.CUST_ID ELSE NULL END) AS NOT_MEAS_ORDER_CNT --测未定订单金额大于1000的订单总单数（客单值分子）
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM DM.DM_MOS_CUST_ORDER_INFO_T A
+ WHERE SUBSTR(FST_CREATE_TIME,1,10) >= '2026-04-01'
+   AND SUBSTR(FST_CREATE_TIME,1,10) < CURRENT_DATE
+ GROUP BY SUBSTR(FST_CREATE_TIME,1,7) --统计月份
+      ,SUBSTR(FST_CREATE_TIME - INTERVAL '1 MONTH',1,7)  --上月
+      ,SUBSTR(FST_CREATE_TIME,1,10) --统计日期
+      ,SUBSTR(FST_CREATE_TIME - INTERVAL '1 MONTH',1,10) --统计上月日期      
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+)
+INSERT INTO DM.DM_MOS_CUST_STAT_T
+(
+       STAT_MONTH --统计月份
+      ,STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,SALE_AMT --销售总金额
+	  ,RECV_AMT --收款总金额
+	  ,ORDER_AMT --订单金额大于1000的订单总金额（客单值分母）
+	  ,ORDER_CNT --订单金额大于1000的订单总单数（客单值分子）
+	  ,NOT_MEAS_SALE_AMT --测未定销售总金额
+	  ,NOT_MEAS_RECV_AMT --测未定收款总金额
+	  ,NOT_MEAS_ORDER_AMT --测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,NOT_MEAS_ORDER_CNT --测未定订单金额大于1000的订单总单数（客单值分子）
+	  ,LM_SALE_AMT --上月销售总金额
+	  ,LM_RECV_AMT --上月收款总金额
+	  ,LM_ORDER_AMT --上月订单金额大于1000的订单总金额（客单值分母）
+	  ,LM_ORDER_CNT --上月订单金额大于1000的订单总单数（客单值分子）
+	  ,LM_NOT_MEAS_SALE_AMT --上月测未定销售总金额
+	  ,LM_NOT_MEAS_RECV_AMT --上月测未定收款总金额
+	  ,LM_NOT_MEAS_ORDER_AMT --上月测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,LM_NOT_MEAS_ORDER_CNT --上月测未定订单金额大于1000的订单总单数（客单值分子）	  
+	  ,DW_LAST_UPDATE_DATE --DW数据同步时间
+)
+SELECT STAT_MONTH --统计月份
+      ,STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,SALE_AMT --销售总金额
+	  ,RECV_AMT --收款总金额
+	  ,ORDER_AMT --订单金额大于1000的订单总金额（客单值分母）
+	  ,ORDER_CNT --订单金额大于1000的订单总单数（客单值分子）
+	  ,NOT_MEAS_SALE_AMT --测未定销售总金额
+	  ,NOT_MEAS_RECV_AMT --测未定收款总金额
+	  ,NOT_MEAS_ORDER_AMT --测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,NOT_MEAS_ORDER_CNT --测未定订单金额大于1000的订单总单数（客单值分子）
+	  ,0 AS LM_SALE_AMT --上月销售总金额
+	  ,0 AS LM_RECV_AMT --上月收款总金额
+	  ,0 AS LM_ORDER_AMT --上月订单金额大于1000的订单总金额（客单值分母）
+	  ,0 AS LM_ORDER_CNT --上月订单金额大于1000的订单总单数（客单值分子）
+	  ,0 AS LM_NOT_MEAS_SALE_AMT --上月测未定销售总金额
+	  ,0 AS LM_NOT_MEAS_RECV_AMT --上月测未定收款总金额
+	  ,0 AS LM_NOT_MEAS_ORDER_AMT --上月测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,0 AS LM_NOT_MEAS_ORDER_CNT --上月测未定订单金额大于1000的订单总单数（客单值分子）	  
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM T
+  
+ UNION ALL
+ 
+SELECT LAST_MONTH AS STAT_MONTH --统计月份
+      ,LAST_DATE AS STAT_DATE --统计日期
+      ,MKT_NAME --运营中心
+      ,SALE_GRP_NAME --线组名称
+      ,DEALER_NUM --经销商编码
+      ,DEALER_NAME --经销商名称
+      ,STORE_CODE --门店编码
+      ,STORE_NAME --门店名称
+	  ,0 AS SALE_AMT --销售总金额
+	  ,0 AS RECV_AMT --收款总金额
+	  ,0 AS ORDER_AMT --订单金额大于1000的订单总金额（客单值分母）
+	  ,0 AS ORDER_CNT --订单金额大于1000的订单总单数（客单值分子）
+	  ,0 AS NOT_MEAS_SALE_AMT --测未定销售总金额
+	  ,0 AS NOT_MEAS_RECV_AMT --测未定收款总金额
+	  ,0 AS NOT_MEAS_ORDER_AMT --测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,0 AS NOT_MEAS_ORDER_CNT --测未定订单金额大于1000的订单总单数（客单值分子）
+	  ,SALE_AMT AS LM_SALE_AMT --上月销售总金额
+	  ,RECV_AMT AS LM_RECV_AMT --上月收款总金额
+	  ,ORDER_AMT AS LM_ORDER_AMT --上月订单金额大于1000的订单总金额（客单值分母）
+	  ,ORDER_CNT AS LM_ORDER_CNT --上月订单金额大于1000的订单总单数（客单值分子）
+	  ,NOT_MEAS_SALE_AMT AS LM_NOT_MEAS_SALE_AMT --上月测未定销售总金额
+	  ,NOT_MEAS_RECV_AMT AS LM_NOT_MEAS_RECV_AMT --上月测未定收款总金额
+	  ,NOT_MEAS_ORDER_AMT AS LM_NOT_MEAS_ORDER_AMT --上月测未定订单金额大于1000的订单总金额（客单值分母）
+	  ,NOT_MEAS_ORDER_CNT AS LM_NOT_MEAS_ORDER_CNT --上月测未定订单金额大于1000的订单总单数（客单值分子）
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM T
+ WHERE LAST_MONTH >= '2026-04'

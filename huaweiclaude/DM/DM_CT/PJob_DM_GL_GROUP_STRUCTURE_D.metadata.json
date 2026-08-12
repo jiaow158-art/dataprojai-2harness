@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_GL_GROUP_STRUCTURE_D",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

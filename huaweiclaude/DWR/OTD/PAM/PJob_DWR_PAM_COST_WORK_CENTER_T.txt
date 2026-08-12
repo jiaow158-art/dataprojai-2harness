@@ -1,0 +1,230 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/09/12 09:52:28 GMT+08:00
+-- description:成本中心与工作中心关系表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+-- CREATE TABLE DWROTD.DWR_PAM_COST_WORK_CENTER_T (
+--  PLANT_CODE STRING comment '工厂编码'
+-- ,PLANT_NAME STRING comment '工厂名称'
+-- ,WORK_CTR_TYPE_CODE STRING comment '工作中心类别编码'
+-- ,WORK_CTR_TYPE_NAME STRING comment '工作中心类别名称'
+-- ,WORK_CTR_CODE STRING comment '工作中心编码'
+-- ,WORK_CTR_NAME STRING comment '工作中心名称'
+-- ,PCL_CODE STRING comment '负责人编码'
+-- ,PCL_NAME STRING comment '负责人名称'
+-- ,PPE_CODE STRING comment '用途编码'
+-- ,PPE_NAME STRING comment '用途名称'
+-- ,STD_VALUE_CODE STRING comment '标准值码'
+-- ,STD_VALUE_NAME STRING comment '标准值码'
+-- ,CTL_KEY_CODE STRING comment '控制键值'	
+-- ,CTL_KEY_NAME STRING comment '控制键值描述'
+-- ,REF_CTL_FILE STRING comment '参考控制参数文件'
+-- ,CBY_TYPE_CODE STRING comment '能力类别编码'
+-- ,CBY_TYPE_NAME STRING comment '能力类别名称'
+-- ,CPY_PLANER_CODE STRING comment '产能负责计划员编码'
+-- ,CPY_PLANER_NAME STRING comment '产能负责计划员名称'
+-- ,START_DATE timestamp comment '开始日期'
+-- ,END_DATE timestamp comment '结束日期'
+-- ,S_START_TIME INT comment '秒表示的开始时间(内部)'
+-- ,S_END_TIME INT comment '以秒计的结束时间(内部)'
+-- ,CPY_RATE numeric(38,10) comment '能力利用率'
+-- ,PAUSE_PERIOD INT comment '中断期间'
+-- ,SGL_CPY_QTY INT comment '单个产能数'
+-- ,CPY_UNIT STRING comment '产能基本单位'
+-- ,IS_LONG_PLAN STRING comment '是否长期计划'
+-- ,COST_CENTER STRING comment '成本中心'
+-- ,ACY_TYPE_CODE1 STRING comment '活动类型编码(人工)'
+-- ,ACY_TYPE_NAME1 STRING comment '活动类型名称(人工)'
+-- ,ACY_TYPE_CODE2 STRING comment '活动类型编码(燃料动力)'
+-- ,ACY_TYPE_NAME2 STRING comment '活动类型名称(燃料动力)'
+-- ,ACY_TYPE_CODE3 STRING comment '活动类型编码(电费)'
+-- ,ACY_TYPE_NAME3 STRING comment '活动类型名称(电费)'
+-- ,ACY_TYPE_CODE4 STRING comment '活动类型编码(折旧及摊销)'
+-- ,ACY_TYPE_NAME4 STRING comment '活动类型名称(折旧及摊销)'
+-- ,ACY_TYPE_CODE5 STRING comment '活动类型编码(抛光费)'
+-- ,ACY_TYPE_NAME5 STRING comment '活动类型名称(抛光费)'
+-- ,ACY_TYPE_CODE6 STRING comment '活动类型编码(其他制造费用)'
+-- ,ACY_TYPE_NAME6 STRING comment '活动类型名称(其他制造费用)'
+-- ,ACY_UNIT1 STRING comment '活动单位(人工)'
+-- ,ACY_UNIT2 STRING comment '活动单位(燃料动力)'
+-- ,ACY_UNIT3 STRING comment '活动单位(电费)'
+-- ,ACY_UNIT4 STRING comment '活动单位(折旧及摊销)'
+-- ,ACY_UNIT5 STRING comment '活动单位(抛光费)'
+-- ,ACY_UNIT6 STRING comment '活动单位(其他制造费用)'
+-- ,FORML_CODE1 STRING comment '公式码成本核算编码(人工)'
+-- ,FORML_NAME1 STRING comment '公式码成本核算名称(人工)'
+-- ,FORML_CODE2 STRING comment '公式码成本核算编码(燃料动力)'
+-- ,FORML_NAME2 STRING comment '公式码成本核算名称(燃料动力)'
+-- ,FORML_CODE3 STRING comment '公式码成本核算编码(电费)'
+-- ,FORML_NAME3 STRING comment '公式码成本核算名称(电费)'
+-- ,FORML_CODE4 STRING comment '公式码成本核算编码(折旧及摊销)'
+-- ,FORML_NAME4 STRING comment '公式码成本核算名称(折旧及摊销)'
+-- ,FORML_CODE5 STRING comment '公式码成本核算编码(抛光费)'
+-- ,FORML_NAME5 STRING comment '公式码成本核算名称(抛光费)'
+-- ,FORML_CODE6 STRING comment '公式码成本核算编码(其他制造费用)'
+-- ,FORML_NAME6 STRING comment '公式码成本核算名称(其他制造费用)'
+-- ,PCS_SEG_CODE STRING comment '工序段编码'
+-- ,PCS_SEG_NAME STRING comment '工序段名称'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+
+WITH CRCO AS (
+select 
+ A.OBJTY
+,A.OBJID
+,MAX(CASE WHEN A.LANUM = '0001' THEN A.KOSTL ELSE '' END) AS COST_CENTER 
+,MAX(CASE WHEN A.LANUM = '0001' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE1
+,MAX(CASE WHEN A.LANUM = '0001' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME1
+,MAX(CASE WHEN A.LANUM = '0002' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE2
+,MAX(CASE WHEN A.LANUM = '0002' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME2
+,MAX(CASE WHEN A.LANUM = '0003' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE3
+,MAX(CASE WHEN A.LANUM = '0003' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME3
+,MAX(CASE WHEN A.LANUM = '0004' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE4
+,MAX(CASE WHEN A.LANUM = '0004' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME4
+,MAX(CASE WHEN A.LANUM = '0005' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE5
+,MAX(CASE WHEN A.LANUM = '0005' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME5
+,MAX(CASE WHEN A.LANUM = '0006' THEN A.LSTAR ELSE '' END) AS ACY_TYPE_CODE6
+,MAX(CASE WHEN A.LANUM = '0006' THEN B.TXT ELSE '' END) AS ACY_TYPE_NAME6
+,MAX(CASE WHEN A.LANUM = '0001' THEN A.LEINH ELSE '' END) AS ACY_UNIT1
+,MAX(CASE WHEN A.LANUM = '0002' THEN A.LEINH ELSE '' END) AS ACY_UNIT2
+,MAX(CASE WHEN A.LANUM = '0003' THEN A.LEINH ELSE '' END) AS ACY_UNIT3
+,MAX(CASE WHEN A.LANUM = '0004' THEN A.LEINH ELSE '' END) AS ACY_UNIT4
+,MAX(CASE WHEN A.LANUM = '0005' THEN A.LEINH ELSE '' END) AS ACY_UNIT5
+,MAX(CASE WHEN A.LANUM = '0006' THEN A.LEINH ELSE '' END) AS ACY_UNIT6
+,MAX(CASE WHEN A.LANUM = '0001' THEN A.FORML ELSE '' END) AS FORML_CODE1
+,MAX(CASE WHEN A.LANUM = '0001' THEN C.TXT ELSE '' END) AS FORML_NAME1
+,MAX(CASE WHEN A.LANUM = '0002' THEN A.FORML ELSE '' END) AS FORML_CODE2
+,MAX(CASE WHEN A.LANUM = '0002' THEN C.TXT ELSE '' END) AS FORML_NAME2
+,MAX(CASE WHEN A.LANUM = '0003' THEN A.FORML ELSE '' END) AS FORML_CODE3
+,MAX(CASE WHEN A.LANUM = '0003' THEN C.TXT ELSE '' END) AS FORML_NAME3
+,MAX(CASE WHEN A.LANUM = '0004' THEN A.FORML ELSE '' END) AS FORML_CODE4
+,MAX(CASE WHEN A.LANUM = '0004' THEN C.TXT ELSE '' END) AS FORML_NAME4
+,MAX(CASE WHEN A.LANUM = '0005' THEN A.FORML ELSE '' END) AS FORML_CODE5
+,MAX(CASE WHEN A.LANUM = '0005' THEN C.TXT ELSE '' END) AS FORML_NAME5
+,MAX(CASE WHEN A.LANUM = '0006' THEN A.FORML ELSE '' END) AS FORML_CODE6
+,MAX(CASE WHEN A.LANUM = '0006' THEN C.TXT ELSE '' END) AS FORML_NAME6
+from SDI.SDI_CRCO_1001 A
+LEFT JOIN SDI.SDI_TC25T_1001 B
+ON A.LSTAR = B.IDENT AND B.SPRAS = '1'
+LEFT JOIN SDI.SDI_TC25T_1001 C
+ON A.FORML = C.IDENT AND C.SPRAS = '1'
+WHERE TRIM(A.LASET) = '1' AND A.ENDDA = '99991231' 
+GROUP BY 
+ A.OBJTY
+,A.OBJID
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_COST_WORK_CENTER_T
+select 
+ T.WERKS AS PLANT_CODE 
+,A.NAME1 AS PLANT_NAME
+,T.VERWE AS WORK_CTR_TYPE_CODE ---工作中心类别编码 
+,B.KTEXT AS WORK_CTR_TYPE_NAME -- 工作中心类别名称
+,T.ARBPL AS WORK_CTR_CODE -- 工作中心编码
+,C.KTEXT AS WORK_CTR_NAME -- 工作中心名称
+,T.VERAN AS PCL_CODE -- 负责人编码
+,D.KTEXT AS PCL_NAME --负责人名称
+,T.PLANV AS PPE_CODE -- 用途编码
+,E.TXT AS PPE_NAME -- 用途名称
+,T.VGWTS AS STD_VALUE_CODE -- 标准值码
+,F.TXT AS STD_VALUE_NAME -- 标准值码
+,T.STEUS AS CTL_KEY_CODE -- 控制键值	
+,G.TXT AS CTL_KEY_NAME -- 控制键值描述
+,T.STEUS_REF AS REF_CTL_FILE -- 参考控制参数文件
+,T1.KAPAR AS CBY_TYPE_CODE -- 能力类别编码
+,H.TXT AS CBY_TYPE_NAME -- 能力类别名称
+,T1.PLANR AS CPY_PLANER_CODE --产能负责计划员编码
+,I.TXT AS CPY_PLANER_NAME --产能负责计划员名称
+,FROM_UNIXTIME(UNIX_TIMESTAMP(T.BEGDA,'yyyyMMdd'),'yyyy-MM-dd') AS START_DATE -- 开始日期
+,FROM_UNIXTIME(UNIX_TIMESTAMP(T.ENDDA,'yyyyMMdd'),'yyyy-MM-dd') AS END_DATE  --结束日期
+,T1.BEGZT AS S_START_TIME --秒表示的开始时间 (内部)
+,T1.ENDZT AS S_END_TIME  -- 以秒计的结束时间（内部）
+,T1.NGRAD AS CPY_RATE --能力利用率
+,T1.PAUSE AS PAUSE_PERIOD --中断期间
+,T1.AZNOR AS SGL_CPY_QTY --单个产能数
+,T1.MEINS AS CPY_UNIT --产能基本单位 
+,CASE WHEN T1.KAPLPL = 'X' THEN '是' ELSE '否' END AS IS_LONG_PLAN --是否长期计划
+,T2.COST_CENTER --成本中心
+,T2.ACY_TYPE_CODE1 --活动类型编码(人工)
+,T2.ACY_TYPE_NAME1 --活动类型名称(人工)
+,T2.ACY_TYPE_CODE2 --活动类型编码(燃料动力)
+,T2.ACY_TYPE_NAME2 --活动类型名称(燃料动力)
+,T2.ACY_TYPE_CODE3 --活动类型编码(电费)
+,T2.ACY_TYPE_NAME3 --活动类型名称(电费)
+,T2.ACY_TYPE_CODE4 --活动类型编码(折旧及摊销)
+,T2.ACY_TYPE_NAME4 --活动类型名称(折旧及摊销)
+,T2.ACY_TYPE_CODE5 --活动类型编码(抛光费)
+,T2.ACY_TYPE_NAME5 --活动类型名称(抛光费)
+,T2.ACY_TYPE_CODE6 --活动类型编码(其他制造费用)
+,T2.ACY_TYPE_NAME6 --活动类型名称(其他制造费用)
+,T2.ACY_UNIT1 --活动单位(人工)
+,T2.ACY_UNIT2 --活动单位(燃料动力)
+,T2.ACY_UNIT3 --活动单位(电费)
+,T2.ACY_UNIT4 --活动单位(折旧及摊销)
+,T2.ACY_UNIT5 --活动单位(抛光费)
+,T2.ACY_UNIT6 --活动单位(其他制造费用)
+,T2.FORML_CODE1 --公式码成本核算编码(人工)
+,T2.FORML_NAME1 --公式码成本核算名称(人工)
+,T2.FORML_CODE2 --公式码成本核算编码(燃料动力)
+,T2.FORML_NAME2 --公式码成本核算名称(燃料动力)
+,T2.FORML_CODE3 --公式码成本核算编码(电费)
+,T2.FORML_NAME3 --公式码成本核算名称(电费)
+,T2.FORML_CODE4 --公式码成本核算编码(折旧及摊销)
+,T2.FORML_NAME4 --公式码成本核算名称(折旧及摊销)
+,T2.FORML_CODE5 --公式码成本核算编码(抛光费)
+,T2.FORML_NAME5 --公式码成本核算名称(抛光费)
+,T2.FORML_CODE6 --公式码成本核算编码(其他制造费用)
+,T2.FORML_NAME6 --公式码成本核算名称(其他制造费用)
+,CASE WHEN SUBSTR(T.ARBPL,5,2) IN ('MJ','QJ','BF','MF','ZF') THEN 'A' 
+      WHEN SUBSTR(T.ARBPL,5,2) IN ('ZY','QY') THEN 'B'
+      ELSE 'C' END AS PCS_SEG_CODE --工序段编码
+,CASE WHEN SUBSTR(T.ARBPL,5,2) IN ('MJ','QJ','BF','MF','ZF') THEN '原料段' 
+      WHEN SUBSTR(T.ARBPL,5,2) IN ('ZY','QY') THEN '釉料段'
+      ELSE '成型段' END AS PCS_SEG_NAME --工序段名称
+,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+from SDI.SDI_CRHD_1001 T
+LEFT JOIN SDI.SDI_KAKO_1001 T1
+ON T.KAPID = T1.KAPID 
+LEFT JOIN CRCO T2
+ON T.OBJTY = T2.OBJTY
+AND T.OBJID = T2.OBJID
+LEFT JOIN SDI.SDI_T001W_1001 A  
+ON T.WERKS = A.WERKS
+AND A.MANDT = '800'
+LEFT JOIN SDI.SDI_TC30T_1001 B  
+ON T.VERWE = B.VERWE
+AND B.SPRAS = '1'
+AND B.MANDT = '800'
+LEFT JOIN SDI.SDI_CRTX_1001 C 
+ON T.OBJTY = C.OBJTY
+AND T.OBJID = C.OBJID 
+AND C.SPRAS = '1'
+AND C.MANDT = '800'
+LEFT JOIN SDI.SDI_TC24_1001 D  
+ON T.WERKS = D.WERKS
+AND T.VERAN = D.VERAN
+AND D.MANDT = '800'
+LEFT JOIN SDI.SDI_TC23T_1001 E
+ON T.PLANV = E.PLANV
+AND E.SPRAS = '1'
+AND E.MANDT = '800'
+LEFT JOIN SDI.SDI_TC21T_1001 F  
+ON T.VGWTS = F.VGWTS
+AND F.SPRAS = '1'
+AND F.MANDT = '800'
+LEFT JOIN SDI.SDI_T430T_1001 G 
+ON T.STEUS = G.STEUS 
+AND G.SPRAS = '1'
+AND G.MANDT = '800'
+LEFT JOIN SDI.SDI_TC26T_1001 H  
+ON T1.KAPAR = H.KAPAR
+AND H.SPRAS = '1'
+AND H.MANDT = '800'
+LEFT JOIN SDI.SDI_TC27T_1001 I  
+ON T1.PLANR = I.PLANR 
+AND I.SPRAS = '1'
+AND I.MANDT = '800'
+
+

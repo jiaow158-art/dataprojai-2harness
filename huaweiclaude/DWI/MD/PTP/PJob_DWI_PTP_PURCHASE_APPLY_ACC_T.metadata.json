@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PTP_PURCHASE_APPLY_ACC_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PTP",
+    "description": "SAP采购申请账户设置表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipur"
+}

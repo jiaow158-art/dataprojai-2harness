@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PRODUCT_INOUT_STOCK_HUNAN_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

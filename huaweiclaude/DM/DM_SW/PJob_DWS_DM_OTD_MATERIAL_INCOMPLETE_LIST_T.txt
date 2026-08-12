@@ -1,0 +1,125 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2022/12/05 15:08:19 GMT+08:00
+--              20230103  yangjunhua  增加订单取消原因不为取消留货（cancal_code=52）条件
+--              20230111  yangjunhua  订单有取消原因都过滤；增加分公司采购单
+--              20230114  yangjunhua  增加31/41几个物料
+-- ******************************************************************** --
+delete from dm_sw.dm_otd_material_incomplete_list_t;
+
+insert into  dm_sw.dm_otd_material_incomplete_list_t
+with mat as(
+select
+	b.material_num,
+	c.matl_group4_code,
+	b.product_level_code,
+	b.material_name ,
+	b.bath_category_name,
+    b.product_level3_code,
+	b.product_level3_name
+from
+	dwimd.dwi_md_data_material_general_t as b
+left join (
+	select
+		material_num,
+		max(matl_group2_code) matl_group2_code,
+		max(matl_group4_code) as matl_group4_code
+	from
+		dwimd.dwi_md_data_material_sales_t
+	group by
+		material_num ) c 
+on
+	b.material_num = c.material_num
+where
+	b.material_num not like 'J%00000'
+	and coalesce(c.matl_group4_code, ' ')<> 'DZ'
+	and (b.product_level1_code in('30','40') or b.material_num in('JS0001B21',
+'JS0002B21',
+'JS0003B21',
+'JS0004B21',
+'JS0005B21',
+'JS0006B21',
+'JS0007B21'))
+),
+ekbe as (
+select
+	t1.PURCHASE_VOUCHER_NUM,
+	t1.PURCHASE_VCH_ITEM_NUM,
+	sum(case when t1.PO_HIS_RECORD_TYPE = 'L' then t1.QUANTITY2 else 0 end) as lmeng,
+	sum(case when t1.PO_HIS_RECORD_TYPE = 'E' and t1.MOVE_TYPE = '101' then t1.QUANTITY2 
+                        when t1.PO_HIS_RECORD_TYPE = 'E' and t1.MOVE_TYPE = '102' then t1.QUANTITY2 else 0 end) as emeng
+from
+	dwrpur.dwr_ptp_purchase_vch_his_f t1
+where
+	1 = 1
+	and t1.QUANTITY2 >0
+group by
+	t1.PURCHASE_VOUCHER_NUM ,
+	t1.PURCHASE_VCH_ITEM_NUM 
+      
+ ),
+ mid as (
+select
+	t1.material_num,
+	-- 物料编码
+	sum(greatest(order_qty - res_stock_qty, 0)) as incomplete_qty
+	-- 未完成数量 
+from
+	dm_sw.dm_otd_sales_order_det_sw t1
+join mat t2 on
+	t1.material_num = t2.material_num
+where
+	t1.order_type_code in('ZA01', 'ZA03', 'ZA05')
+		and t1.factory_code >= '3200'
+		and factory_code <= '3920'
+		and t1.inv_location like 'G%'
+		and coalesce(t1.cancal_code,' ')= ' '
+	group by
+		t1.material_num
+	having
+		sum(greatest(order_qty - res_stock_qty, 0))>0
+union all
+	select
+		ekpo.material_num
+	,
+		sum(ekpo.purchase_order_qty - greatest(coalesce(lmeng, 0), coalesce(emeng, 0))) as incomplete_qty
+	from
+		DWRPUR.dwr_ptp_purchase_vch_header_f as ekko
+	inner join DWRPUR.dwr_ptp_purchase_vch_item_f as ekpo on
+		ekko.purchase_voucher_num = ekpo.purchase_voucher_num
+	left join ekbe as ekbe on
+		ekpo.PURCHASE_VOUCHER_NUM = ekbe.PURCHASE_VOUCHER_NUM
+		and ekpo.PURCHASE_VCH_ITEM_NUM1 = ekbe.PURCHASE_VCH_ITEM_NUM
+	join mat as mat on
+		ekpo.material_num = mat.material_num
+	where
+		1 = 1
+		and (( -- 艺耐
+		     ekpo.purchase_order_qty > 0
+		      and (ekko.DUMP_SUPPLY_FACTORY like '35%'
+			       or ekko.DUMP_SUPPLY_FACTORY like '33%'
+			       or ekko.DUMP_SUPPLY_FACTORY like '36%')
+		      and ekko.PURCHASE_ORG in('3A00')
+			)   
+			or 
+			(  -- 分公司采购单
+			 ekpo.purchase_order_qty > 0
+		      and (ekko.PURCHASE_ORG  in('7900') or ekko.PURCHASE_ORG like '7A%' or ekko.PURCHASE_ORG like '7B%' or ekko.PURCHASE_ORG like '8%' )
+		      and ekko.purchase_voucher_type ='ZSTR'
+		      and substr(ekko.supplier_or_creditor_num,1,8) >='00000030' 
+		      and substr(ekko.supplier_or_creditor_num,1,8) <='00000039'    
+			)
+			)
+		and ekpo.purchase_order_qty - greatest(coalesce(lmeng, 0), coalesce(emeng, 0))>0
+		and coalesce(ekpo.PURCHASE_VCH_FLAG,' ') = ' '
+	group by ekpo.material_num 
+	)
+     select
+	material_num,
+	sum(incomplete_qty) as incomplete_qty,
+	current_timestamp() as dw_last_update_date
+from
+	mid
+group by
+	material_num;

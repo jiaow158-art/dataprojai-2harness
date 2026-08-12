@@ -1,0 +1,98 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2024/09/13 23:57:47 GMT+08:00
+-- ******************************************************************** --
+
+insert overwrite table dwrfin.dwr_fin_budget_operations_f 
+SELECT
+ b.`name` budget_entity   -- 预算主体
+,a.pool_code  budget__pool	-- 预算池
+,case when d.period_category="ANNUAL" then "年度"
+	when d.period_category="MONTHLY" then "月度"
+	when d.period_category="CUSTOMIZE" then "自定义期间"
+	when d.period_category="QUARTER" then "季度"
+	when d.period_category="SEMIANNUAL" then "半年度"
+	else d.period_category end  period_class  -- 期间分类
+,d.`year`  years  -- 年份
+,d.start_date  start_date -- 开始日期
+,d.end_date  end_date 	  -- 截止日期
+,a.internal  is_internal_budget_operation  -- 是否内部操作
+,CASE   when  a.operation_type = "FREED" THEN "释放" 
+		WHEN a.operation_type = "USE" THEN "占用" 
+		WHEN a.operation_type = "RELEASE" THEN "注入" 
+		WHEN a.operation_type = "ADJUST" THEN	"调整" 
+		WHEN a.operation_type = "SPLIT" THEN "分解" 
+		WHEN a.operation_type = "FROZEN" THEN "冻结" 
+		WHEN a.operation_type = "TRUNDLE" THEN "结转" ELSE a.operation_type 
+	END  operation_type   -- 操作类型
+, a.is_pool_amount is_pool_amount  --  是否预算池金额
+, a.amount  amount -- 执行金额,
+, a.before_amount  before_amount -- 执行前金额
+, a.after_amount  after_amount -- 执行后金额
+, a.operation_user_account  operator_account --  操作人账号
+, a.operation_user_name operator_name   -- 操作人名称
+, a.operation_time operation_time --  操作时间
+, a.biz_event business_event --  业务事件代码
+, c.`name` business_event_desc --  业务事件描述
+, a.biz_code business_code  -- 业务单号编码
+, a.biz_remark business_code_desc --  业务描述
+, a.is_freed is_freed  --  是否已释放
+, a.use_strategy use_strategy --  占用执行策略
+, a.use_date use_date --  占用日期
+, a.item_code budget_account -- 预算科目代码
+, a.item_name budget_account_desc --  预算科目名称
+, a.org_code org_code --  组织代码
+, a.org_name org_name --  组织名称
+, a.project_code project_code --  项目代码,
+, a.project_name project_name --  项目名称
+, get_json_object(a.ext_data_json,'$.ExpenseTypeName' ) expense_sub_cate
+, get_json_object(a.ext_data_json,'$.LedgerAccountCode' ) general_ledger_account
+, get_json_object(a.ext_data_json,'$.LedgerAccountName'  ) general_ledger_account_desc
+, current_timestamp() dw_last_update_date
+FROM
+	sdi.sdi_pool_log_1039 a
+	LEFT JOIN sdi.sdi_SUBJECT_1039 b ON b.id = a.subject_id
+	LEFT JOIN sdi.sdi_event_1039 c ON c.CODE = a.biz_event
+	left join sdi.sdi_pool_1039 d on d.attribute_code=a.attribute_code 
+
+	
+	
+-- --	
+-- CREATE TABLE dwrfin.dwr_fin_budget_operations_f (
+--     budget_entity STRING COMMENT '预算主体',
+--     budget_pool STRING COMMENT '预算池',
+--     period_class STRING COMMENT '期间分类',
+--     years STRING COMMENT '年份',
+--     start_date STRING COMMENT '开始日期',
+--     end_date STRING COMMENT '截止日期',
+--     is_internal_budget_operation STRING COMMENT '是否内部操作',
+--     operation_type STRING COMMENT '操作类型',
+--     is_pool_amount STRING COMMENT '是否预算池金额',
+--     amount DECIMAL(38,10) COMMENT '执行金额',
+--     before_amount DECIMAL(38,10) COMMENT '执行前金额',
+--     after_amount DECIMAL(38,10) COMMENT '执行后金额',
+--     operator_account STRING COMMENT '操作人账号',
+--     operator_name STRING COMMENT '操作人名称',
+--     operation_time STRING COMMENT '操作时间',
+--     business_event STRING COMMENT '业务事件代码',
+--     business_event_desc STRING COMMENT '业务事件描述',
+--     business_code STRING COMMENT '业务单号编码',
+--     business_code_desc STRING COMMENT '业务描述',
+--     is_freed STRING COMMENT '是否已释放',
+--     use_strategy STRING COMMENT '占用执行策略',
+--     use_date STRING COMMENT '占用日期',
+--     budget_account STRING COMMENT '预算科目代码',
+--     budget_account_desc STRING COMMENT '预算科目名称',
+--     org_code STRING COMMENT '组织代码',
+--     org_name STRING COMMENT '组织名称',
+--     project_code STRING COMMENT '项目代码',
+--     project_name STRING COMMENT '项目名称',
+--     expense_sub_cate STRING COMMENT '费用小类',
+--     general_ledger_account STRING COMMENT '总账科目',
+--     general_ledger_account_desc STRING COMMENT '总账科目描述',
+--     dw_last_update_date string 
+-- ) COMMENT '预算操作表';
+-- --
+-- --	
+-- --	

@@ -1,0 +1,408 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004182
+-- create time: 2024/09/19 19:03:09 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE dwrfin.dwr_fin_expense_reimbursement_detail_f
+SELECT
+  c.order_no AS `expense_reimbursement_number`, -- 费用报销单号
+  c.corporation_code AS `company_code`, -- 公司代码
+  c.corporation_name AS `company_name`, -- 公司名称
+  CASE
+    WHEN c.form_type = "OVERHEADS" THEN "日常"
+    WHEN c.form_type = "TRIP" THEN "差旅"
+    ELSE c.form_type
+  END AS `form_type`, -- 表单类型
+  c.currency_code AS `currency_code`, -- 业务币种代码
+  c.currency_name AS `currency_name`, -- 业务币种名称
+  c.target_currency_code AS `target_currency_code`, -- 公司本位币代码
+  c.target_currency_name AS `target_currency_name`, -- 公司本位币名称
+  c.unit AS `exchange_rate_unit`, -- 比率
+  c.target_unit AS `target_exchange_rate_unit`, -- 公司本位币比率
+  c.exchange_rate AS `exchange_rate`, -- 汇率
+  c.request_note AS `request_note`, -- 事由
+  c.amount AS `total_amount`, -- 总金额
+  c.travel_amount AS `travel_advance_amount`, -- 商旅代垫金额
+  c.target_amount AS `target_currency_total_amount`, -- 本位币总金额
+  c.budget_use_date AS `budget_usage_date`, -- 预算占用日期
+  CASE
+    WHEN c.expense_borne_type = "PROJECT" THEN "项目"
+    WHEN c.expense_borne_type = "ORGANIZATION" THEN "部门"
+    ELSE c.expense_borne_type
+  END AS `expense_bear_type`, -- 费用承担类型
+  c.expense_borne_code AS `expense_borne_code`, -- 费用承担代码
+  c.expense_borne_name AS `expense_borne_name`, -- 费用承担名称
+  c.organization_code AS `organization_code`, -- 申请部门代码
+  c.organization_name AS `organization_name`, -- 申请部门名称
+  c.organization_name_path AS `organization_name_path`, -- 申请部门名称路径
+  c.bear_organization_code AS `bearing_organization_code`, -- 承担部门代码
+  c.bear_organization_name AS `bearing_organization_name`, -- 承担部门名称
+  c.cost_center_code AS `cost_center_code`, -- 成本中心代码
+  c.cost_center_name AS `cost_center_name`, -- 成本中心名称
+  CASE
+    WHEN c.flow_status = "COMPLETED" THEN "流程已完成"
+    WHEN c.flow_status = "INIT" THEN "草稿状态"
+    WHEN c.flow_status = "INPROCESS" THEN "流程处理中"
+    WHEN c.flow_status = "CANCELLED" THEN "流程已取消"
+    ELSE c.flow_status
+  END AS `flow_status`, -- 流程处理状态
+  c.preprint_number AS `preprint_number`, -- 费用报销单预制印刷号
+  CASE
+    WHEN n.account_status = "SUCCESSFUL" THEN "成功"
+    WHEN n.account_status = "FAILED" THEN "失败"
+    ELSE n.account_status
+  END AS `accounting_status`, -- 记账状态
+  CASE
+    WHEN n.review_status = "SUCCESSFUL" THEN "成功"
+    WHEN n.review_status = "INITIAL" THEN "初始化"
+    ELSE n.review_status
+  END AS `review_status`, -- 复核状态
+  n.erp_voucher_no AS `erp_voucher_number`, -- ERP凭证号
+  n.voucher_date AS `voucher_date`, -- 凭证日期
+  n.posting_date AS `posting_date`, -- 过账日期
+  j.receiver_code AS `receiver_code`, -- 收款方代码
+  j.receiver_name AS `receiver_name`, -- 收款方名称
+  j.receiver_bank_code AS `receiver_bank_code`, -- 收款方银行行号
+  j.receiver_bank_name AS `receiver_bank_name`, -- 收款方银行名称
+  j.receiver_bank_category_code AS `receiver_bank_category_code`, -- 收款方银行类别代码
+  j.receiver_bank_category_name AS `receiver_bank_category_name`, -- 收款方银行类别名称
+  j.receiver_account_name AS `receiver_account_name`, -- 收款方银行户名
+  j.receiver_account_number AS `receiver_account_number`, -- 收款方银行账号
+  j.amount AS `payment_amount`, -- 支付金额
+  j.note AS `payment_note`, -- 支付说明
+  CASE
+    WHEN j.payment_status = "INIT" THEN "初始状态"
+    WHEN j.payment_status = "SUCCESS" THEN "支付成功"
+    WHEN j.payment_status = "PAYING" THEN "支付中"
+    WHEN j.payment_status = "SUBMITTED" THEN "已提交"
+    WHEN j.payment_status = "INVALID" THEN "已注销"
+    WHEN j.payment_status = "FAILED" THEN "支付失败"
+    WHEN j.payment_status = "SUBMIT_FAILED" THEN "提交失败"
+    ELSE j.payment_status
+  END AS `payment_status`, -- 支付状态
+  j.actual_payment_date AS `actual_payment_date`, -- 实际支付时间
+  j.name AS `supplier_title`, -- 标题（一次性供应商）
+  j.city AS `supplier_city`, -- 城市（一次性供应商）
+  j.street AS `supplier_street`, -- 街道（一次性供应商）
+  c.creator_account AS `creator_account`, -- 报销单创建人账号
+  c.creator_name AS `creator_name`, -- 报销单创建人名称
+  c.created_date AS `creation_date`, -- 报销单创建时间
+  c.last_editor_name AS `last_editor_name`, -- 报销单最后修改人名称
+  c.last_edited_date AS `last_edited_date`, -- 报销单最后修改时间
+  c.last_editor_account AS `last_editor_account`, -- 报销单最后修改人账号
+  b.item_number AS `expense_item_number`, -- 费用小类行项目号
+  b.personnel_code AS `employee_code`, -- 实际报销员工编号
+  b.personnel_name AS `employee_name`, -- 实际报销员工姓名
+  e.name AS `expense_category`, -- 费用大类
+  d.name AS `expense_subcategory`, -- 费用小类
+  b.amount AS `expense_amount`, -- 小类行总金额
+  b.consume_amount AS `expense_consume_amount`, -- 小类行消费金额
+  b.subsidy_amount AS `expense_subsidy_amount`, -- 小类行补贴金额
+  b.travel_amount AS `expense_travel_amount`, -- 小类行商旅代垫金额
+  b.activity_note AS `expense_activity_note`, -- 小类行业务活动说明
+  b.exceed_standard_reason AS `expense_exceed_reason`, -- 超标原因
+  get_json_object(b.budget_info, '$[0].poolCode') AS `budget_pool_code`, -- 实际占用预算池
+  get_json_object(b.together_personnel, '$[0].personnelCode') AS `together_personnel_code`, -- 同行人账号
+  get_json_object(b.together_personnel, '$[0].personnelName') AS `together_personnel_name`, -- 同行人姓名
+  b.supplier_code AS `supplier_code`, -- 供应商代码
+  b.supplier_name AS `supplier_name`, -- 供应商名称
+  b.no_ticket_amount AS `expense_no_ticket_amount`, -- 无票金额
+  b.sales_group_code AS `sales_group_code`, -- 销售组代码
+  b.sales_group_name AS `sales_group_name`, -- 销售组名称
+  m.contract_no AS `contract_number`, -- 合同编号
+  m.contract_name AS `contract_name`, -- 合同名称
+  k.application_order_no AS `application_order_number`, -- 小类行对应费用申请单号
+  l.item_number AS `application_item_number`, -- 小类行对应费用申请单行项目号
+  CASE
+    WHEN g.apportionment_subject_type = "ORGANIZATION" THEN "部门"
+    WHEN g.apportionment_subject_type = "PROJECT" THEN "项目"
+    ELSE g.apportionment_subject_type
+  END AS `apportionment_subject_type`, -- 分摊主体类型
+  g.corporation_code AS `apportionment_corporation_code`, -- 分摊公司代码
+  g.corporation_name AS `apportionment_corporation_name`, -- 分摊公司名称
+  g.organization_code AS `apportionment_organization_code`, -- 分摊部门代码
+  g.organization_name AS `apportionment_organization_name`, -- 分摊部门名称
+  g.cost_center_code AS `apportionment_cost_center_code`, -- 分摊成本中心代码
+  g.cost_center_name AS `apportionment_cost_center_name`, -- 分摊成本中心名称
+  g.project_code AS `apportionment_project_code`, -- 分摊项目代码
+  g.project_name AS `apportionment_project_name`, -- 分摊项目名称
+  g.amount AS `apportionment_amount`, -- 分摊金额
+  g.note AS `apportionment_note`, -- 分摊说明
+  g.sales_group_code AS `apportionment_sales_group_code`, -- 分摊销售组代码
+  g.sales_group_name AS `apportionment_sales_group_name`, -- 分摊销售组名称
+  h.amount AS `deduction_amount`, -- 报销扣款金额
+  h.cause AS `deduction_reason`, -- 报销扣款原因
+  i.order_no AS `borrow_order_number`, -- 报销扣款对应借款单号
+  h.borrow_amount AS `borrow_amount`, -- 借款单金额
+  a.item_number AS `expense_detail_item_number`, -- 费用明细行项目号
+  CASE
+    WHEN a.expense_detail_type_id = "0F587B92-28D7-11ED-8DCC-0242AC120002" THEN ""
+    ELSE f.name
+  END AS `expense_detail_type_name`, -- 费用明细类型
+  CASE
+    WHEN a.invoice_type = "VatInvoice01" THEN "增值税专用发票"
+    WHEN a.invoice_type = "VatInvoice02" THEN "增值税货运发票"
+    WHEN a.invoice_type = "VatInvoice03" THEN "机动车销售统一发票(纸质)"
+    WHEN a.invoice_type = "VatInvoice04" THEN "增值税普通发票"
+    WHEN a.invoice_type = "VatInvoice08" THEN "增值税专用发票(电子)"
+    WHEN a.invoice_type = "VatInvoice10" THEN "增值税普票发票(电子)"
+    WHEN a.invoice_type = "VatInvoice11" THEN "增值税普票发票(卷票)"
+    WHEN a.invoice_type = "VatInvoice14" THEN "增值税通行费发票"
+    WHEN a.invoice_type = "VatInvoice15" THEN "二手车统一销售发票(纸质)"
+    WHEN a.invoice_type = "VatInvoice17" THEN "海关进口增值税专用缴款书"
+    WHEN a.invoice_type = "Blockchain" THEN "区块链发票"
+    WHEN a.invoice_type = "VatInvoice24" THEN "出口转内销发票"
+    WHEN a.invoice_type = "VatInvoice30" THEN "海关缴款书出口转内销"
+    WHEN a.invoice_type = "VatInvoice80" THEN "出口转内销电子专票"
+    WHEN a.invoice_type = "VatInvoice31" THEN "电子发票（增值税专用发票）"
+    WHEN a.invoice_type = "VatInvoice32" THEN "电子发票（普通发票）"
+    WHEN a.invoice_type = "VatInvoice81" THEN "电子发票（增值税专用发票）"
+    WHEN a.invoice_type = "VatInvoice82" THEN "电子发票（普通发票）"
+    WHEN a.invoice_type = "VatInvoice83" THEN "机动车销售电子统一发票"
+    WHEN a.invoice_type = "VatInvoice84" THEN "二手车销售电子统一发票"
+    WHEN a.invoice_type = "VatInvoice85" THEN "电子发票（增值税专用发票）"
+    WHEN a.invoice_type = "VatInvoice86" THEN "电子发票（普通发票）"
+    WHEN a.invoice_type = "VatInvoiceSalesList" THEN "增值税销货清单"
+    WHEN a.invoice_type = "GeneralElectronicInvoice" THEN "通用电子发票"
+    WHEN a.invoice_type = "GeneralInvoice" THEN "通用机打发票"
+    WHEN a.invoice_type = "QuotaInvoice" THEN "定额发票"
+    WHEN a.invoice_type = "VehicleTollTicket" THEN "过路过桥费发票"
+    WHEN a.invoice_type = "TrainTicket" THEN "火车票"
+    WHEN a.invoice_type = "TaxiTicket" THEN "出租车发票"
+    WHEN a.invoice_type = "FlightTicket" THEN "机票行程单"
+    WHEN a.invoice_type = "BusTicket" THEN "汽车票"
+    WHEN a.invoice_type = "ShipTicket" THEN "轮船票"
+    WHEN a.invoice_type = "ParkingInvoice" THEN "停车费发票"
+    WHEN a.invoice_type = "NonTaxInvoice" THEN "非税收入票据"
+    WHEN a.invoice_type = "Other" THEN "其他"
+    ELSE a.invoice_type
+  END AS `invoice_type`, -- 发票类型
+  CASE
+    WHEN a.input_mode = "RECOGNITION" THEN "智能识票"
+    WHEN a.input_mode = "TRAVEL_AUTOMATIC" THEN "商旅代垫（自动）"
+    WHEN a.input_mode = "MANUAL" THEN "手工录入"
+    WHEN a.input_mode = "BILL_FOLDER" THEN "票夹导入"
+    WHEN a.input_mode = "AUTOMATIC" THEN "自动无票行程"
+    WHEN a.input_mode = "TRAVEL_MANUAL" THEN "商旅代垫（人工）"
+    ELSE a.input_mode
+  END AS `input_mode`, -- 输入方式
+  a.amount AS `expense_detail_amount`, -- 细类行金额
+  a.no_ticket_amount AS `expense_detail_no_ticket_amount`, -- 细类行无票报销金额
+  a.end_tag AS `expense_detail_end_tag`, -- 结束标识
+  CASE
+    WHEN a.travel_detail_type = "RESERVATION" THEN "预订"
+    WHEN a.travel_detail_type = "REFUND" THEN "退订"
+    WHEN a.travel_detail_type = "REFUNDED" THEN "已退"
+    WHEN a.travel_detail_type = "CHANGE" THEN "改签"
+    WHEN a.travel_detail_type = "CHANGED" THEN "已改签"
+    ELSE a.travel_detail_type
+  END AS `travel_detail_type`, -- 商旅明细类型
+  get_json_object(a.form_element_value, '$.HospitalityLevel') AS `hospitality_level`, -- 招待等级
+  get_json_object(a.form_element_value, '$.ProductName') AS `product_name`, -- 商品名称
+  get_json_object(a.form_element_value, '$.StartRegion_code') AS `start_region_code`, -- 出发城市代码
+  get_json_object(a.form_element_value, '$.StartRegion_name') AS `start_region_name`, -- 出发城市名称
+  get_json_object(a.form_element_value, '$.StartRegion_namePath') AS `start_region_name_path`, -- 出发城市名称路径
+  get_json_object(a.form_element_value, '$.StartRegion_ocr') AS `start_region_ocr`, -- 票面识别出发地点
+  get_json_object(a.form_element_value, '$.EndRegion_code') AS `end_region_code`, -- 到达城市代码
+  get_json_object(a.form_element_value, '$.EndRegion_name') AS `end_region_name`, -- 到达城市名称
+  get_json_object(a.form_element_value, '$.EndRegion_namePath') AS `end_region_name_path`, -- 到达城市名称路径
+  get_json_object(a.form_element_value, '$.EndRegion_ocr') AS `end_region_ocr`, -- 票面识别到达地点
+  get_json_object(a.form_element_value, '$.Region_code') AS `region_code`, -- 消费城市代码
+  get_json_object(a.form_element_value, '$.Region_name') AS `region_name`, -- 消费城市
+  get_json_object(a.form_element_value, '$.Region_namePath') AS `region_name_path`, -- 消费城市名称路径
+  get_json_object(a.form_element_value, '$.BusinessCompletionDate') AS `business_completion_date`, -- 业务预估完结日期
+  get_json_object(a.form_element_value, '$.StartDate') AS `start_date`, -- 开始时间
+  get_json_object(a.form_element_value, '$.EndDate') AS `end_date`, -- 结束时间
+  get_json_object(a.form_element_value, '$.StartYearMonth') AS `start_year_month`, -- 开始年月
+  get_json_object(a.form_element_value, '$.EndYearMonth') AS `end_year_month`, -- 截止年月
+  get_json_object(a.form_element_value, '$.Date') AS `consumption_date`, -- 消费时间
+  get_json_object(a.form_element_value, '$.Transport') AS `transport_mode`, -- 交通方式
+  get_json_object(a.form_element_value, '$.AttendanceDays') AS `attendance_days`, -- 出勤天数
+  get_json_object(a.form_element_value, '$.InnerOrder') AS `inner_order`, -- 内部订单
+  get_json_object(a.form_element_value, '$.PeopleNumber') AS `people_number`, -- 人数
+  get_json_object(a.form_element_value, '$.TelephoneNumber') AS `telephone_number`, -- 电话号码
+  get_json_object(a.form_element_value, '$.Hotel') AS `hotel_name`, -- 酒店名称
+  get_json_object(a.form_element_value, '$.DaysNumber') AS `days_number`, -- 天数
+  a.invoice_code AS `invoice_code`, -- 发票代码
+
+  a.invoice_number AS `invoice_number`, -- 发票号码
+  a.deductible AS `deductible`, -- 进项税可抵扣
+  a.tax_rate AS `tax_rate`, -- 税率
+  a.invoice_tax AS `invoice_tax`, -- 发票税金
+  a.deduction_tax AS `deduction_tax`, -- 抵扣税金
+  a.transfer_tax AS `transfer_tax`, -- 转出税金
+  a.transfer_type_code AS `transfer_type_code`, -- 转出类型代码
+  a.transfer_type_name AS `transfer_type_name`, -- 转出类型名称
+  CASE
+    WHEN a.invoice_checking_status = "PASSED" THEN "查验通过"
+    WHEN a.invoice_checking_status = "INIT" THEN "未查验"
+    WHEN a.invoice_checking_status = "WARNING" THEN "查验警告"
+    WHEN a.invoice_checking_status = "NOT_PASS" THEN "查验不通过"
+    ELSE a.invoice_checking_status
+  END AS `invoice_checking_status` -- 发票查验状态
+FROM
+  sdi.sdi_reim_activity_expense_detail_1039 a
+  LEFT JOIN sdi.sdi_reimbursement_activity_1039 b ON a.reimbursement_activity_id = b.id
+  LEFT JOIN sdi.sdi_reimbursement_head_1039 c ON b.head_id = c.id
+  LEFT JOIN sdi.sdi_expense_type_1039 d ON b.expense_type_id = d.id
+  LEFT JOIN sdi.sdi_expense_type_category_1039 e ON d.expense_type_category_id = e.id
+  LEFT JOIN sdi.sdi_expense_detail_type_1039 f ON a.expense_detail_type_id = f.id
+  LEFT JOIN sdi.sdi_reim_activity_apportionment_1039 g ON g.apportionment_source_id = b.id
+  LEFT JOIN sdi.sdi_reim_activity_deduction_1039 h ON h.reimbursement_activity_id = b.id
+  LEFT JOIN sdi.sdi_borrow_head_1039 i ON i.id = h.borrow_order_id
+  LEFT JOIN sdi.sdi_erms_payment_item_1039 j ON j.source_id = c.id
+  LEFT JOIN sdi.sdi_application_activity_reim_detail_1039 k ON k.reimbursement_activity_id = b.id
+  LEFT JOIN sdi.sdi_application_activity_1039 l ON l.id = k.application_activity_id
+  LEFT JOIN sdi.sdi_activity_contract_info_1039 m ON m.source_id = b.id
+  LEFT JOIN sdi.sdi_order_accounting_info_1039 n ON n.order_id = c.id
+WHERE
+  c.deleted = 0
+
+
+
+
+
+
+
+
+-- CREATE TABLE dwrfin.dwr_fin_expense_reimbursement_detail_f (
+--   expense_report_number STRING COMMENT '费用报销单号',
+--   company_code STRING COMMENT '公司代码',
+--   company_name STRING COMMENT '公司名称',
+--   form_type STRING COMMENT '表单类型',
+--   currency_code STRING COMMENT '业务币种代码',
+--   currency_name STRING COMMENT '业务币种名称',
+--   target_currency_code STRING COMMENT '公司本位币代码',
+--   target_currency_name STRING COMMENT '公司本位币名称',
+--   exchange_rate_unit DOUBLE COMMENT '比率',
+--   target_exchange_rate_unit DOUBLE COMMENT '公司本位币比率',
+--   exchange_rate DOUBLE COMMENT '汇率',
+--   request_note STRING COMMENT '事由',
+--   total_amount DOUBLE COMMENT '总金额',
+--   travel_advance_amount DOUBLE COMMENT '商旅代垫金额',
+--   target_currency_total_amount DOUBLE COMMENT '本位币总金额',
+--   budget_usage_date STRING COMMENT '预算占用日期',
+--   expense_bear_type STRING COMMENT '费用承担类型',
+--   expense_borne_code STRING COMMENT '费用承担代码',
+--   expense_borne_name STRING COMMENT '费用承担名称',
+--   organization_code STRING COMMENT '申请部门代码',
+--   organization_name STRING COMMENT '申请部门名称',
+--   organization_name_path STRING COMMENT '申请部门名称路径',
+--   bearing_organization_code STRING COMMENT '承担部门代码',
+--   bearing_organization_name STRING COMMENT '承担部门名称',
+--   cost_center_code STRING COMMENT '成本中心代码',
+--   cost_center_name STRING COMMENT '成本中心名称',
+--   flow_status STRING COMMENT '流程处理状态',
+--   preprint_number STRING COMMENT '费用报销单预制印刷号',
+--   accounting_status STRING COMMENT '记账状态',
+--   review_status STRING COMMENT '复核状态',
+--   erp_voucher_number STRING COMMENT 'ERP凭证号',
+--   voucher_date STRING COMMENT '凭证日期',
+--   posting_date STRING COMMENT '过账日期',
+--   receiver_code STRING COMMENT '收款方代码',
+--   receiver_name STRING COMMENT '收款方名称',
+--   receiver_bank_code STRING COMMENT '收款方银行行号',
+--   receiver_bank_name STRING COMMENT '收款方银行名称',
+--   receiver_bank_category_code STRING COMMENT '收款方银行类别代码',
+--   receiver_bank_category_name STRING COMMENT '收款方银行类别名称',
+--   receiver_account_name STRING COMMENT '收款方银行户名',
+--   receiver_account_number STRING COMMENT '收款方银行账号',
+--   payment_amount DOUBLE COMMENT '支付金额',
+--   payment_note STRING COMMENT '支付说明',
+--   payment_status STRING COMMENT '支付状态',
+--   actual_payment_date STRING COMMENT '实际支付时间',
+--   supplier_title STRING COMMENT '标题（一次性供应商）',
+--   supplier_city STRING COMMENT '城市（一次性供应商）',
+--   supplier_street STRING COMMENT '街道（一次性供应商）',
+--   creator_account STRING COMMENT '报销单创建人账号',
+--   creator_name STRING COMMENT '报销单创建人名称',
+--   creation_date STRING COMMENT '报销单创建时间',
+--   last_editor_name STRING COMMENT '报销单最后修改人名称',
+--   last_edited_date STRING COMMENT '报销单最后修改时间',
+--   last_editor_account STRING COMMENT '报销单最后修改人账号',
+--   expense_item_number STRING COMMENT '费用小类行项目号',
+--   employee_code STRING COMMENT '实际报销员工编号',
+--   employee_name STRING COMMENT '实际报销员工姓名',
+--   expense_category STRING COMMENT '费用大类',
+--   expense_subcategory STRING COMMENT '费用小类',
+--   expense_amount DOUBLE COMMENT '小类行总金额',
+--   expense_consume_amount DOUBLE COMMENT '小类行消费金额',
+--   expense_subsidy_amount DOUBLE COMMENT '小类行补贴金额',
+--   expense_travel_amount DOUBLE COMMENT '小类行商旅代垫金额',
+--   expense_activity_note STRING COMMENT '小类行业务活动说明',
+--   expense_exceed_reason STRING COMMENT '超标原因',
+--   budget_pool_code STRING COMMENT '实际占用预算池',
+--   together_personnel_code STRING COMMENT '同行人账号',
+--   together_personnel_name STRING COMMENT '同行人姓名',
+--   supplier_code STRING COMMENT '供应商代码',
+--   supplier_name STRING COMMENT '供应商名称',
+--   expense_no_ticket_amount DOUBLE COMMENT '无票金额',
+--   sales_group_code STRING COMMENT '销售组代码',
+--   sales_group_name STRING COMMENT '销售组名称',
+--   contract_number STRING COMMENT '合同编号',
+--   contract_name STRING COMMENT '合同名称',
+--   application_order_number STRING COMMENT '小类行对应费用申请单号',
+--   application_item_number STRING COMMENT '小类行对应费用申请单行项目号',
+--   apportionment_subject_type STRING COMMENT '分摊主体类型',
+--   apportionment_corporation_code STRING COMMENT '分摊公司代码',
+--   apportionment_corporation_name STRING COMMENT '分摊公司名称',
+--   apportionment_organization_code STRING COMMENT '分摊部门代码',
+--   apportionment_organization_name STRING COMMENT '分摊部门名称',
+--   apportionment_cost_center_code STRING COMMENT '分摊成本中心代码',
+--   apportionment_cost_center_name STRING COMMENT '分摊成本中心名称',
+--   apportionment_project_code STRING COMMENT '分摊项目代码',
+--   apportionment_project_name STRING COMMENT '分摊项目名称',
+--   apportionment_amount DOUBLE COMMENT '分摊金额',
+--   apportionment_note STRING COMMENT '分摊说明',
+--   apportionment_sales_group_code STRING COMMENT '分摊销售组代码',
+--   apportionment_sales_group_name STRING COMMENT '分摊销售组名称',
+--   deduction_amount DOUBLE COMMENT '报销扣款金额',
+--   deduction_reason STRING COMMENT '报销扣款原因',
+--   borrow_order_number STRING COMMENT '报销扣款对应借款单号',
+--   borrow_amount DOUBLE COMMENT '借款单金额',
+--   expense_detail_item_number STRING COMMENT '费用明细行项目号',
+--   expense_detail_type_name STRING COMMENT '费用明细类型',
+--   invoice_type STRING COMMENT '发票类型',
+--   input_mode STRING COMMENT '输入方式',
+--   expense_detail_amount DOUBLE COMMENT '细类行金额',
+--   expense_detail_no_ticket_amount DOUBLE COMMENT '细类行无票报销金额',
+--   expense_detail_end_tag STRING COMMENT '结束标识',
+--   travel_detail_type STRING COMMENT '商旅明细类型',
+--   hospitality_level STRING COMMENT '招待等级',
+--   product_name STRING COMMENT '商品名称',
+--   start_region_code STRING COMMENT '出发城市代码',
+--   start_region_name STRING COMMENT '出发城市名称',
+--   start_region_name_path STRING COMMENT '出发城市名称路径',
+--   start_region_ocr STRING COMMENT '票面识别出发地点',
+--   end_region_code STRING COMMENT '到达城市代码',
+--   end_region_name STRING COMMENT '到达城市名称',
+--   end_region_name_path STRING COMMENT '到达城市名称路径',
+--   end_region_ocr STRING COMMENT '票面识别到达地点',
+--   region_code STRING COMMENT '消费城市代码',
+--   region_name STRING COMMENT '消费城市',
+--   region_name_path STRING COMMENT '消费城市名称路径',
+--   business_completion_date STRING COMMENT '业务预估完结日期',
+--   start_date STRING COMMENT '开始时间',
+--   end_date STRING COMMENT '结束时间',
+--   start_year_month STRING COMMENT '开始年月',
+--   end_year_month STRING COMMENT '截止年月',
+--   consumption_date STRING COMMENT '消费时间',
+--   transport_mode STRING COMMENT '交通方式',
+--   attendance_days INT COMMENT '出勤天数',
+--   inner_order STRING COMMENT '内部订单',
+--   people_number INT COMMENT '人数',
+--   telephone_number STRING COMMENT '电话号码',
+--   hotel_name STRING COMMENT '酒店名称',
+--   days_number INT COMMENT '天数',
+--   invoice_code STRING COMMENT '发票代码',
+--   invoice_number STRING COMMENT '发票号码',
+--   deductible BOOLEAN COMMENT '进项税可抵扣',
+--   tax_rate DOUBLE COMMENT '税率',
+--   invoice_tax DOUBLE COMMENT '发票税金',
+--   deduction_tax DOUBLE COMMENT '抵扣税金',
+--   transfer_tax DOUBLE COMMENT '转出税金',
+--   transfer_type_code STRING COMMENT '转出类型代码',
+--   transfer_type_name STRING COMMENT '转出类型名称',
+--   invoice_checking_status STRING COMMENT '发票查验状态'
+-- )
+-- COMMENT '费用报销明细表';

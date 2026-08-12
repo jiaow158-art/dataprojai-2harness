@@ -1,0 +1,174 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/12/19 14:34:57 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert overwrite into DM.DM_SFA_DATA_DICT_T
+with tmp as (
+-- 1 店面渠道        
+                select distinct 
+                    '1' as field_vsc3g__c,  
+                    to_char(t1.selectvalue)  as field_wMkus__c,  
+                    t1.selectname as field_NAME ,
+                    t2._id
+                from  dwipi.dwi_wf_workflow_selectitem_t t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.selectvalue = t2.field_wmkus__c and t2.field_vsc3g__c = 1  
+                where 1=1  
+                and t1.selectvalue is not null and t1.selectname is not null  
+                and t1.fieldid IN  
+                    ( 
+                        SELECT id 
+                        FROM DWIPI.DWI_WORKFLOW_BILLFIELD_T 
+                        WHERE billid = '-1018' 
+                        AND fieldname = 'DMQD'  
+                    ) 
+-- 2 店态                    
+                union all 
+					select distinct   
+					'2' as field_vsc3g__c,  
+                    to_char(t1.selectvalue)  as field_wMkus__c,  
+                    t1.selectname as field_NAME,
+                    t2._id
+                from dwipi.dwi_wf_workflow_selectitem_t t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.selectvalue = t2.field_wmkus__c and t2.field_vsc3g__c = 2  
+                where 1=1
+                and t1.selectvalue is not null and t1.selectname is not null  
+                and t1.fieldid IN 
+                    ( 
+                    SELECT id 
+                    FROM DWIPI.DWI_WORKFLOW_BILLFIELD_T 
+                    WHERE billid = '-1018' 
+                    AND fieldname = 'DT'  
+                    )	
+--3 市场业态                    
+                union all 
+					select distinct 
+					'3' as field_vsc3g__c, 
+                    t1.scyt as field_wMkus__c,  
+                    t1.scyt_name as field_NAME,
+                    t2._id
+                from  dwimd.dwi_md_shop_info_oa_t t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.scyt = t2.field_wmkus__c and t2.field_vsc3g__c = 3 
+                where 1 = 1
+                and  t1.scyt is not null and t1.scyt_name is not null 
+--4 客户等级 
+               union all 
+					select distinct 
+					'4' as field_vsc3g__c, 
+                    t1.kdgrp as field_wMkus__c, 
+                    t1.ktext as field_NAME ,
+                    t2._id	
+                from dwrdim.dwr_dim_cust_t151t_d t1 
+                left join api_log.api_sfa_data_dict_id t2 on t1.kdgrp = t2.field_wmkus__c and t2.field_vsc3g__c = 4 
+                where 1 = 1
+                and t1.kdgrp is not null and t1.ktext is not null
+                and t1.mandt = '800' and t1.spras = '1'
+--5 销售渠道                
+                union all 
+					select distinct 
+					'5' as field_vsc3g__c, 
+                    t1.vtweg as field_wMkus__c, 
+                    t1.vtext as field_NAME ,
+                    t2._id	
+                from dm.dm_sdi_tvtwt_1001_t t1 
+                left join api_log.api_sfa_data_dict_id t2 on t1.vtweg = t2.field_wmkus__c and t2.field_vsc3g__c = 5 
+                where 1 = 1
+                and  t1.vtweg is not null and t1.vtext is not null
+                and t1.mandt = '800' and t1.spras = '1'     
+--7 系列                
+                union all 
+				select distinct 
+					'7' as field_vsc3g__c,   
+                    t1.value_code as field_wMkus__c,   
+                    t1.value_desc as field_NAME,
+                    t2._id
+                from DWRDIM.DIM_MATERIAL_CONFIG_T t1   
+                left join api_log.api_sfa_data_dict_id t2 on t1.value_code = t2.field_wmkus__c and t2.field_vsc3g__c = 7   
+                where 1 = 1
+                and t1.mandt = 800   
+                and t1.tabname = 'MARA'    
+                and t1.fieldname = 'WLPP'   
+                and t1.del_flag is null
+--8 品类                
+                union all 
+				select distinct 
+					'8' as field_vsc3g__c,  
+                    t1.value_code as field_wMkus__c,  
+                    t1.value_desc as field_NAME,
+                    t2._id
+                from DWRDIM.DIM_MATERIAL_CONFIG_T t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.value_code = t2.field_wmkus__c and t2.field_vsc3g__c = 8  
+                where 1 = 1
+                and t1.mandt = 800 
+                and t1.tabname = 'MARA'  
+                and t1.fieldname = 'YL10'  
+                and t1.del_flag is null
+--9 外部物料组(产品品牌)                
+                union all 
+				select distinct 
+				    '9' as field_vsc3g__c,  
+                    t1.src_sys_config_code as field_wMkus__c,  
+                    t1.config_name as field_NAME,  
+                    t2._id
+                from DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.src_sys_config_code = t2.field_wmkus__c and t2.field_vsc3g__c = 9  
+                where 1 = 1
+                and t1.source_code = 'TWEWT'  
+                and t1.lang_code = '1' 
+                and t1.group_num = 800
+--10 产品所有权                
+                union all 
+				select distinct 
+					'10' as field_vsc3g__c,  
+                    t1.value_code as field_wMkus__c,  
+                    t1.value_desc as field_NAME,  
+                    t2._id
+                from DWRDIM.DIM_MATERIAL_CONFIG_T  t1  
+                left join api_log.api_sfa_data_dict_id t2 on t1.value_code = t2.field_wmkus__c and t2.field_vsc3g__c = 10  
+                where 1 = 1 
+                and t1.mandt = 800  
+                and t1.tabname = 'MARA'  
+                and t1.fieldname = 'YL09' 
+                and t1.del_flag is null  
+)
+,tmp1 as (
+select distinct 
+ a.field_vsc3g__c
+,a.field_wMkus__c
+,case when concat(a.field_vsc3g__c,a.field_wMkus__c,a.field_NAME) = concat(b.field_vsc3g__c,b.field_wMkus__c,b.field_NAME)
+ then 'N' else 'Y' end as UPDATE_FLAG
+from dm.dm_sfa_data_dict_t a
+left join tmp b
+on a.field_wMkus__c = b.field_wMkus__c
+and a.field_vsc3g__c = b.field_vsc3g__c
+)
+select 
+ tmp.field_vsc3g__c
+,tmp.field_wMkus__c
+,tmp.field_NAME
+,tmp._id
+--,'' as update_date 
+,tmp1.update_flag
+,current_timestamp as dw_last_update_date 
+from tmp
+left join tmp1
+on tmp.field_vsc3g__c = tmp1.field_vsc3g__c
+and tmp.field_wMkus__c = tmp1.field_wMkus__c
+where tmp1.update_flag = 'N'
+union all 
+select 
+ tmp.field_vsc3g__c
+,tmp.field_wMkus__c
+,tmp.field_NAME
+,tmp._id
+--,current_date() as update_date 
+,tmp1.update_flag
+,current_timestamp as dw_last_update_date 
+from tmp
+left join tmp1
+on tmp.field_vsc3g__c = tmp1.field_vsc3g__c
+and tmp.field_wMkus__c = tmp1.field_wMkus__c
+where tmp1.update_flag = 'Y' or tmp1.update_flag is null 

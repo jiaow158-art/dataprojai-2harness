@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_BUSI_CONT_TRAN_DEMO_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/LTC",
+    "description": "商机合同价审转化跟踪模型",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

@@ -1,0 +1,1974 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2023/07/03 10:05:11 GMT+08:00
+-- ******************************************************************** --
+--zhz 2023-07-14 瓷砖事业部加上R40保底
+--zhz 2023-08-18 注释c.sales_grp
+--zhz 2023-09-11 按年度预算比例划分
+--zhz 2023-09-18 修改卫浴事业部分摊逻辑
+--杨俊华  2024-03-14 家居事业部逻辑调整：写死子公司大区字段
+--zhz 2024-03-25 新增产品层次字段
+--zhz 2024-04-03 卫浴分摊逻辑修改
+--ZHZ 2024-04-18 卫浴产品渠道分摊逻辑增加，瓷砖库存地点对应公司关系更换为外挂表
+--qyj 2024-07-09 粒度下沉到渠道;年度的预算不存在时，则读取上一年度的预算作为分摊;新增资金成本、累计资金成本等字段
+--qyj 2024-08-05 资金成本逻辑修复
+--zhz 2025-01-07 修复渠道优先读取顺序以及高明基地、浴室柜厂合并
+--WJH 2026-05-05 事业部和子公司大区逻辑调整
+delete from dm.dm_ambv2_chdj_grp_t WHERE stat_month = '${PERIOD_ID_M}';
+insert into dm.dm_ambv2_chdj_grp_t
+with dis_up_years as 
+(
+select distinct substr(stat_month,1,4) as up_years from upload.upload_achievement_budget_t
+)
+,base as (
+-- select 
+-- 'R2X' as sales_grp,
+-- '浴室柜厂' as base_name 
+-- union all
+SELECT 
+'R2B' as sales_grp,
+'江西基地' as base_name 
+union all 
+select 
+'ZQ7' as sales_grp,
+'高明基地' as base_name 
+union all 
+select 
+'R2A' as sales_grp,
+'江门陶瓷基地' as base_name 
+union all 
+select 
+'R4X' as sales_grp,
+'佛山基地' as base_name 
+union all 
+select 
+'R4J' as sales_grp,
+'淋浴房厂' as base_name 
+union all 
+select 
+'R4I' as sales_grp,
+'江门水龙头厂' as base_name 
+union all 
+select 
+'R6X' as sales_grp,
+'外协' as base_name
+union all 
+select 
+'R4I' as sales_grp,
+'水龙头厂' as base_name 
+union all 
+select 
+'ZQ7' as sales_grp,
+'浴室柜厂' as base_name 
+union all 
+select 
+'R6X' as sales_grp,
+'东鹏卫浴（虚拟）' as base_name
+)
+
+
+
+
+,loc as (
+--select 
+--loc_code,
+--case when loc_code in ('A000','A002','A003','FA01','FA02','FA03','FA05','FA06','FA09','FB04','FB08','GFZ','0019') then '7900'
+--	 when loc_code in ('EA01','EA03','EA05','EA1','EB02','EB04','EB05','EC01','EX02','EX03','EX04','0020') then '8100'
+--	 when loc_code in ('LA01','0018') then '8500'
+--	 when loc_code in ('MA01','MA03','MA08','0026') then '8800'
+--	 when loc_code in ('HA09','0030') then '8300' end as comp_code
+--from (select distinct invent_loc_code as loc_code from dwrdim.dwr_dim_matl_invent_loc_d where end_date = '4712-12-31' and del_flag = 'N') l
+select LOC_CODE,COMP_CODE 
+FROM upload.upload_loc_comp_relate_t 
+where END_DATE = '9999-12-31'
+)
+,prop as ( 
+select 
+'33000014' as zdpzgsdq,
+ 'RR5' as sales_grp
+ union all 
+ select 
+'33000033' as zdpzgsdq,
+ 'R8R' as sales_grp
+ union all 
+ select 
+ '33000001' as zdpzgsdq,
+ 'RY9' as sales_grp
+ union all 
+ select 
+ '33000018' as zdpzgsdq,
+ 'RY9' as sales_grp
+ union all 
+ select 
+ '33000016' as zdpzgsdq,
+ 'P76' as sales_grp
+ union all 
+ select 
+ '33000055' as zdpzgsdq,
+ 'RT4' as sales_grp
+ union all 
+ select  
+ '33000056' as zdpzgsdq,
+ 'REE' as sales_grp
+)
+,ext as (
+select 
+'10010' as ext_grp --东鹏
+union all 
+select 
+'90010' as ext_grp --其他
+
+)
+,prod_chan as (
+select distinct reserved_field_1 as prod_channal
+from dwimd.dwi_md_data_material_general_t 
+where reserved_field_1 not in ('G001','G002','G003','G004','G005','G006') or reserved_field_1 is null 
+)
+,AA1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,'G115' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230613' and coalesce(distribution_channel,prod_channel_name) = '06' --商用中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name
+,distribution_channel
+),
+AA2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,'G115' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230613' and coalesce(distribution_channel,prod_channel_name) = '06'
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+)
+,AA as (
+select 
+AA1.stat_month,
+AA1.prod_channal,
+ext_grp,
+AA1.sales_grp,
+AA1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" else 1/cnt end "销售/工厂比例"
+from AA1
+left join AA2 
+on AA1.stat_month = AA2.stat_month
+left join base on 1=1
+left join ext on 1=1
+)
+--,BB1 as (
+--select 
+-- '${PERIOD_ID_M}' as stat_month
+-- ,sale_grp_name as sales_grp
+-- ,'G107' as prod_channal
+-- ,sum(prod_it_amt1) "线组汇总"
+--from upload.upload_achievement_budget_t A
+--left join dm.dm_rpt_sales_group_t B
+--on A.sale_grp_name = B.node_name9 
+--where node_name2 = 'H11000002' and node_name4 = 'H04230636' --国贸
+--and substr(stat_month,1,4) = substr('${PERIOD_ID_M}',1,4)
+--group by 
+--sale_grp_name 
+--),
+--BB2 as (
+--select 
+-- '${PERIOD_ID_M}' as stat_month
+-- ,'G107' as prod_channal
+-- ,sum(prod_it_amt1) "中心汇总"
+--from upload.upload_achievement_budget_t A
+--left join dm.dm_rpt_sales_group_t B
+--on A.sale_grp_name = B.node_name9 
+--where node_name2 = 'H11000002' and node_name4 = 'H04230636' 
+--and substr(stat_month,1,4) = substr('${PERIOD_ID_M}',1,4)
+--)
+--,BB as (
+--select 
+--BB1.stat_month,
+--BB1.prod_channal,
+--ext_grp,
+--BB1.sales_grp,
+--base_name,
+--"线组汇总",
+--"中心汇总",
+--case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" else 0 end "销售/工厂比例"
+--from BB1
+--left join BB2 
+--on BB1.stat_month = BB2.stat_month
+--left join base on 1=1
+--left join ext on 1=1
+--)
+,BB as (
+select 
+'${PERIOD_ID_M}' as stat_month,
+'G107' as prod_channal,
+ext_grp,
+'R2T' as sales_grp,
+'' as distribution_channel,
+base_name,
+0 as "线组汇总",
+0 as "中心汇总",
+1 as "销售/工厂比例"
+from ext 
+left join base on 1=1
+)
+,CC1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,'G109' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name6 = 'H05230603' --OEM
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name 
+,distribution_channel
+),
+CC2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,'G109' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9
+where node_name2 = 'H11000002' and node_name6 = 'H05230603' 
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+)
+,CC as (
+select 
+CC1.stat_month,
+CC1.prod_channal,
+ext_grp,
+CC1.sales_grp,
+CC1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" else 1/cnt end "销售/工厂比例"
+from CC1
+left join CC2 
+on CC1.stat_month = CC2.stat_month 
+left join base on 1=1
+left join ext on 1=1
+)
+,DD1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9
+left join (select 'G110' as prod_channal union all select 'G114' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name 
+,prod.prod_channal
+,distribution_channel
+)
+,DD2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G110' as prod_channal union all select 'G114' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by prod.prod_channal
+)
+--,DD as (
+--select 
+--'${PERIOD_ID_M}' as stat_month
+-- ,'G110' as prod_channal
+-- ,ext_grp 
+-- ,sales_grp
+-- ,base_name
+-- ,0 as "线组汇总"
+-- ,0 as "中心汇总"
+-- ,1 as "销售/工厂比例"
+-- from base
+-- left join ext on 1=1
+--)
+,DD as (
+select 
+DD1.stat_month,
+DD1.prod_channal,
+ext_grp,
+DD1.sales_grp,
+DD1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from DD1
+left join DD2 
+on DD1.stat_month = DD2.stat_month and DD1.prod_channal = DD2.prod_channal
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join ext on 1=1
+ left join (select 'G110' as prod_channal union all select 'G114' as prod_channal) as prod on 1=1
+)
+,EE1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod.prod_channal as prod_channal --零售
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G101' as prod_channal union all select 'G111' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('01','02')--商用中心+营销中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name 
+,prod.prod_channal
+,distribution_channel
+),
+EE2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G101' as prod_channal union all select 'G111' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('01','02')--商用中心+营销中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by prod.prod_channal
+)
+,EE as (
+select 
+EE1.stat_month,
+EE1.prod_channal,
+ext_grp,
+EE1.sales_grp,
+EE1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from EE1
+left join EE2 
+on EE1.stat_month = EE2.stat_month and EE1.prod_channal = EE2.prod_channal
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join ext on 1=1
+ left join (select 'G101' as prod_channal union all select 'G111' as prod_channal) as prod on 1=1
+)
+,FF1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod.prod_channal as prod_channal --工程
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G102' as prod_channal union all select 'G112' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('06')--商用中心+营销中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+ sale_grp_name 
+,prod.prod_channal
+,distribution_channel
+),
+FF2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G102' as prod_channal union all select 'G112' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('06')
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by prod.prod_channal
+)
+,FF as (
+select 
+FF1.stat_month,
+FF1.prod_channal,
+ext_grp,
+FF1.sales_grp,
+FF1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from FF1
+left join FF2 
+on FF1.stat_month = FF2.stat_month and FF1.prod_channal = FF2.prod_channal
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join ext on 1=1
+ left join (select 'G102' as prod_channal union all select 'G112' as prod_channal) as prod on 1=1
+)
+,GG1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod.prod_channal as prod_channal-- 家装大包
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G103' as prod_channal union all select 'G113' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('08')--商用中心+营销中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+ sale_grp_name 
+,prod.prod_channal
+,distribution_channel
+),
+GG2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G103' as prod_channal union all select 'G113' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('08')
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+prod.prod_channal
+)
+,GG as (
+select 
+GG1.stat_month,
+GG1.prod_channal,
+ext_grp,
+GG1.sales_grp,
+GG1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from GG1
+left join GG2 
+on GG1.stat_month = GG2.stat_month and GG1.prod_channal = GG2.prod_channal
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join ext on 1=1
+ left join (select 'G103' as prod_channal union all select 'G113' as prod_channal) as prod on 1=1
+)
+,HH1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod.prod_channal as prod_channal-- 乡镇
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G104' as prod_channal union all select 'G116' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('10')--商用中心+营销中心
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+ sale_grp_name 
+,prod.prod_channal
+,distribution_channel
+)
+,HH2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join (select 'G104' as prod_channal union all select 'G116' as prod_channal) as prod on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('10')
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by prod.prod_channal
+)
+,HH as (
+select 
+HH1.stat_month,
+HH1.prod_channal,
+ext_grp,
+HH1.sales_grp,
+HH1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from HH1
+left join HH2 
+on HH1.stat_month = HH2.stat_month and HH1.prod_channal = HH2.prod_channal
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod.prod_channal as prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join ext on 1=1
+ left join (select 'G104' as prod_channal union all select 'G116' as prod_channal) as prod on 1=1
+)
+,II1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join prod_chan on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('01','02','05','06','08','09','10')--商用中心+营销中心
+and (prod_channal not in ('G115','G107','G109','G110','G114','G101','G111','G102','G112','G103','G113','G104','G116') or prod_channal is null)
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name,
+prod_channal,
+distribution_channel
+)
+,II2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+left join prod_chan on 1=1
+where node_name2 = 'H11000002' and node_name4 in ('H03230613','H03230643') and coalesce(distribution_channel,prod_channel_name) in ('01','02','05','06','08','09','10')--商用中心+营销中心
+and (prod_channal not in ('G115','G107','G109','G110','G114','G101','G111','G102','G112','G103','G113','G104','G116') or prod_channal is null)
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by prod_channal
+)
+,II as (
+select 
+II1.stat_month,
+II1.prod_channal,
+ext_grp,
+II1.sales_grp,
+II1.distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" * 0.5 else 0.5/cnt end "销售/工厂比例"
+from II1
+left join II2 
+on II1.stat_month = II2.stat_month and coalesce(II1.prod_channal,'#') = coalesce(II2.prod_channal,'#')
+left join base on 1=1
+left join ext on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod_channal
+ ,ext_grp 
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+ left join prod_chan on 1=1
+ left join ext on 1=1
+ where prod_channal not in ('G115','G107','G109','G110','G114','G101','G111','G102','G112','G103','G113','G104','G116') or prod_channal is null
+)
+
+,JJ1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name
+,distribution_channel
+)
+,JJ2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+)
+,JJ as (
+select 
+JJ1.stat_month,
+prod_chan.prod_channal,
+'10030' as ext_grp,
+JJ1.sales_grp,
+JJ1.distribution_channel,
+base.base_name,
+JJ1."线组汇总",
+JJ2."中心汇总",
+case when JJ2."中心汇总" <> 0 then JJ1."线组汇总" / JJ2."中心汇总" * 0.5 else 0.5 / JJ2.cnt end "销售/工厂比例"
+from JJ1
+left join JJ2 
+on JJ1.stat_month = JJ2.stat_month
+left join base on 1=1
+--left join ext on 1=1
+left join prod_chan on 1=1
+union all 
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod_chan.prod_channal as prod_channal
+ ,'10030' as ext_grp
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,0.5 as "销售/工厂比例"
+ from base
+-- left join ext on 1=1
+ left join prod_chan on 1=1
+)
+--,JJ as (
+--select 
+--'${PERIOD_ID_M}' as stat_month
+-- ,prod_channal
+-- ,'10030' as ext_grp --互联网
+-- ,sales_grp
+-- ,base_name
+-- ,0 as "线组汇总"
+-- ,0 as "中心汇总"
+-- ,1 as "销售/工厂比例"
+-- from base
+-- left join prod_chan on 1=1
+--)
+
+,KK as (
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod_channal
+ ,'10050' as ext_grp --艺耐
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,1 as "销售/工厂比例"
+ from base
+ left join prod_chan on 1=1
+)
+,LL as (
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod_channal
+ ,'10070' as ext_grp --生态新材
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,1 as "销售/工厂比例"
+ from base
+ left join prod_chan on 1=1
+)
+,MM as (
+select 
+'${PERIOD_ID_M}' as stat_month
+ ,prod_channal
+ ,'10090' as ext_grp --鹏住
+ ,sales_grp
+ ,'' as distribution_channel
+ ,base_name
+ ,0 as "线组汇总"
+ ,0 as "中心汇总"
+ ,1 as "销售/工厂比例"
+ from base
+ left join prod_chan on 1=1
+)
+,NN1 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,sale_grp_name as sales_grp
+ ,distribution_channel
+ ,'' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "线组汇总"
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+group by 
+sale_grp_name 
+,distribution_channel
+)
+,NN2 as (
+select 
+ '${PERIOD_ID_M}' as stat_month
+ ,'' as prod_channal
+ ,sum(COALESCE(prod_it_amt1,0)) "中心汇总"
+ ,count(distinct sale_grp_name) cnt
+from upload.upload_achievement_budget_t A
+left join dm.dm_rpt_sales_group_t B
+on A.sale_grp_name = B.node_name9 
+where node_name2 = 'H11000002' and node_name4 = 'H03230643' and coalesce(distribution_channel,prod_channel_name) = '07' --营销中心 07渠道
+and substr(stat_month,1,4) = case when substr('${PERIOD_ID_M}',1,4)  in (select up_years from dis_up_years)
+		then substr('${PERIOD_ID_M}',1,4) else cast(substr('${PERIOD_ID_M}',1,4) -1 as text) end
+)
+,NN as (
+select 
+NN1.stat_month,
+prod.prod_channal,
+ext_grp,
+NN1.sales_grp,
+NN1.distribution_channel,
+base_name,
+NN1."线组汇总",
+NN2."中心汇总",
+case when "中心汇总" <> 0 then "线组汇总" / "中心汇总" else 1/cnt end "销售/工厂比例"
+from NN1
+left join NN2 
+on NN1.stat_month = NN2.stat_month
+left join prod_chan as prod on 1=1
+left join base on 1=1
+left join (select distinct external_matl_group_code as ext_grp
+from dwimd.dwi_md_data_material_general_t 
+where external_matl_group_code in ('10090','10070','10050','10030','10010','90010')) ext on 1=1
+)
+,tmp as (
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from AA
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from BB
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from CC
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from DD
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from EE
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from FF
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from GG
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from HH
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from II
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from JJ
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from KK
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from LL
+union all 
+select 
+stat_month,
+prod_channal,
+ext_grp,
+sales_grp,
+distribution_channel,
+base_name,
+"线组汇总",
+"中心汇总",
+"销售/工厂比例"
+from MM
+)
+,tmp1 as (--卫浴事业部全资
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where  substr(plant,1,2) not in ('3A','3B','3C','39') and extmatlgrp <> '10050'
+and zdpsyb in ('11000002','11000011','11000012')  and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+ and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where 1=1
+and substr(A.factory_code,1,2) not in('3A','3B','3C','39') and B.external_matl_group_code <> '10050'
+and A.business_department in ('11000002','11000011','11000012')  
+and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+group by 
+SUBSTR(A.month,1,4)||'-'||SUBSTR(A.month,5,2) 
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp11 as (--卫浴事业部非全资
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where  (plant like '3A%' or plant like '3C%' or extmatlgrp = '10050')
+and zdpsyb in ('11000002','11000011','11000012')  -- 卫浴之前的组织 
+ and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+ and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+group by 
+SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2)
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where  (A.factory_code like '3A%' or A.factory_code like '3C%' or B.external_matl_group_code = '10050')
+and A.business_department in ('11000002','11000011','11000012')  -- 卫浴之前的组织 
+and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+group by 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp12 as (--卫浴事业部全资
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where  (plant like '3B%' or plant like '39%')
+and zdpsyb in ('11000002','11000011','11000012')  -- 卫浴之前的组织 
+and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,case when product_base = '浴室柜厂' then '高明基地' else product_base end
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where  (A.factory_code like '3B%' or A.factory_code like '39%')
+and A.business_department in ('11000002','11000011','11000012')  -- 卫浴之前的组织 
+and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}'
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055') 
+ group by 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp2 as (--家居事业部
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,product_base as base_name
+,zdpzgsdq
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where zdpzgsdq in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,product_base
+,zdpzgsdq
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.zdpzgsdq
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where zdpzgsdq in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}'
+group by 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.zdpzgsdq
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp3 as (--生态新材事业部
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,product_base as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where zdpsyb = '11000010'  and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,product_base
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where A.business_department = '11000010'  and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}'
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+group by 
+SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp4 as (--瓷砖事业部
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,product_base as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,sum(coalesce(ybzq_jc_aging,0)+coalesce(wbzq_jc_aging,0)) as "存货价值(阿米巴)"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where zdpsyb in ('11000001')  and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056') 
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,product_base
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值(阿米巴)"
+,0 as "存货价值"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where A.business_department = '11000001'  and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}'
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056') 
+ group by 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp5 as (--国贸事业部
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,product_base as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,sum(coalesce(ybzq_jc_aging,0)+coalesce(wbzq_jc_aging,0)) as "存货价值(阿米巴)"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where zdpsyb in ('11240102')  and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,product_base
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+union all 
+select 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) as stat_month
+,A.material_code as material_num 
+,A.material_name as material_name
+,B.external_matl_group_code as ext_grp
+,B.reserved_field_1 as prod_channal
+,B.reserved_field1_name as prod_channal_name
+,A.product_base as base_name
+,A.factory_code as plant 
+,A.plant___t as plant___t
+,'' as zww010
+,'' as zww010___t
+,A.stock_location as stor_loc
+,A.stor_loc___t as stor_loc___t
+,A.comp_code as comp_code
+,A.stock_type as stockcat
+,A.business_department as zdpsyb
+,0 as "存货价值"
+,0 as "存货价值(阿米巴)"
+,sum(A.capital_cost) as capital_cost
+,sum(A.capital_cost_sum) as capital_cost_sum
+from DM.DM_FIN_STOCK_CAPITAL_COST_T A
+left join dwimd.dwi_md_data_material_general_t B on A.material_code = B.material_num 
+where A.business_department = '11240102'  and SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2) = '${PERIOD_ID_M}'
+and coalesce(zdpzgsdq,'#') not in('33000014','33000033','33000001','33000018','33000016','33000055','33000056')  
+ group by 
+ SUBSTR(A."month",1,4)||'-'||SUBSTR(A."month",5,2)
+,A.material_code
+,A.material_name
+,B.external_matl_group_code
+,B.reserved_field_1
+,B.reserved_field1_name
+,A.product_base
+,A.factory_code
+,A.plant___t
+,A.stock_location
+,A.stor_loc___t
+,A.comp_code
+,A.stock_type
+,A.business_department
+)
+,tmp6 as ( --丽适
+select 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) as stat_month
+,material as material_num 
+,material___t as material_name
+,extmatlgrp as ext_grp
+,zyl01 as prod_channal
+,zyl01___t as prod_channal_name
+,product_base as base_name
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+,sum(coalesce(wbzq_jc_amt,0)+coalesce(ybzq_jc_amt,0)) as "存货价值"
+,sum(coalesce(ybzq_jc_aging,0)+coalesce(wbzq_jc_aging,0)) as "存货价值(阿米巴)"
+,0 as capital_cost
+,0 as capital_cost_sum
+from DM.dm_fin_stock_detail_accage_t_2023 A
+where zdpsyb in ('11250401')  and SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) = '${PERIOD_ID_M}' 
+group by 
+ SUBSTR(A.calmonth,1,4)||'-'||SUBSTR(A.calmonth,5,2) 
+,material 
+,material___t 
+,extmatlgrp 
+,zyl01 
+,zyl01___t
+,product_base
+,plant 
+,plant___t
+,zww010
+,zww010___t
+,stor_loc
+,stor_loc___t
+,comp_code
+,stockcat
+,zdpsyb
+)
+,tmpp as (
+select -- 卫浴全资
+ tmp1.stat_month "年月"
+,tmp1.material_num "物料编码"
+,tmp1.material_name "物料描述"
+,tmp1.ext_grp "外部物料组"
+,tmp1.prod_channal "产品渠道"
+,tmp1.prod_channal_name "产品渠道描述"
+,tmp1.plant "工厂"
+,tmp1.plant___t "工厂描述"
+,tmp1.base_name "基地"
+,tmp1.zww010 "产区"
+,tmp1.zww010___t "产区描述"
+,tmp1.stor_loc "库存地点"
+,tmp1.stor_loc___t "库存地点描述"
+,tmp1.comp_code "公司代码"
+,tmp1.stockcat "库存类型"
+,tmp1.zdpsyb "事业部"
+,tmp.sales_grp "线组"
+,tmp."线组汇总"
+,tmp."中心汇总"
+--,case when tmp."中心汇总" <> 0 then tmp."线组汇总" / tmp."中心汇总" else 0 end 
+,coalesce(tmp."销售/工厂比例",0) "比例"
+,tmp1."存货价值"
+,tmp1."存货价值" *   (case when tmp."销售/工厂比例" is null then 1 else tmp."销售/工厂比例" end)  as "分摊价值"
+,current_timestamp 
+,0 as "存货价值(阿米巴)"
+,tmp.distribution_channel
+,tmp1.capital_cost
+,tmp1.capital_cost *   (case when tmp."销售/工厂比例" is null then 1 else tmp."销售/工厂比例" end)  as "分摊资金成本"
+,tmp1.capital_cost_sum
+,tmp1.capital_cost_sum *   (case when tmp."销售/工厂比例" is null then 1 else tmp."销售/工厂比例" end)  as "分摊累计资金成本"
+from tmp1 
+left join tmp 
+on tmp1.stat_month = tmp.stat_month 
+and tmp1.ext_grp = tmp.ext_grp
+and coalesce(tmp1.prod_channal,'#') = coalesce(tmp.prod_channal,'#')
+and coalesce(tmp1.base_name,'#') = coalesce(tmp.base_name,'#')
+where "存货价值" <> 0  or ( "存货价值" = 0 and tmp1.capital_cost <> 0 )--and tmp1.material_num = 'W03430500X' and tmp1.prod_channal = 'G112' and tmp1.plant = '3620'
+union all
+select -- 卫浴全资
+ tmp12.stat_month "年月"
+,tmp12.material_num "物料编码"
+,tmp12.material_name "物料描述"
+,tmp12.ext_grp "外部物料组"
+,tmp12.prod_channal "产品渠道"
+,tmp12.prod_channal_name "产品渠道描述"
+,tmp12.plant "工厂"
+,tmp12.plant___t "工厂描述"
+,tmp12.base_name "基地"
+,tmp12.zww010 "产区"
+,tmp12.zww010___t "产区描述"
+,tmp12.stor_loc "库存地点"
+,tmp12.stor_loc___t "库存地点描述"
+,tmp12.comp_code "公司代码"
+,tmp12.stockcat "库存类型"
+,tmp12.zdpsyb "事业部"
+,NN.sales_grp "线组"
+,NN."线组汇总"
+,NN."中心汇总"
+--,case when tmp."中心汇总" <> 0 then tmp."线组汇总" / tmp."中心汇总" else 0 end 
+,coalesce(NN."销售/工厂比例",0) "比例"
+,tmp12."存货价值"
+,tmp12."存货价值" *  (case when NN."销售/工厂比例" is null then 1 else NN."销售/工厂比例" end)  as "分摊价值"
+,current_timestamp 
+,0 as "存货价值(阿米巴)"
+,NN.distribution_channel
+,tmp12.capital_cost
+,tmp12.capital_cost *   (case when NN."销售/工厂比例" is null then 1 else NN."销售/工厂比例" end)  as "分摊资金成本"
+,tmp12.capital_cost_sum
+,tmp12.capital_cost_sum *   (case when NN."销售/工厂比例" is null then 1 else NN."销售/工厂比例" end)  as "分摊累计资金成本"
+from tmp12 
+left join NN 
+on tmp12.stat_month = NN.stat_month 
+and tmp12.ext_grp = NN.ext_grp
+and coalesce(tmp12.prod_channal,'#') = coalesce(NN.prod_channal,'#')
+and coalesce(tmp12.base_name,'#') = coalesce(NN.base_name,'#')
+where "存货价值" <> 0  or ( "存货价值" = 0 and tmp12.capital_cost <> 0 )
+union all
+select -- 卫浴非全资
+ tmp11.stat_month "年月"
+,tmp11.material_num "物料编码"
+,tmp11.material_name "物料描述"
+,tmp11.ext_grp "外部物料组"
+,tmp11.prod_channal "产品渠道"
+,tmp11.prod_channal_name "产品渠道描述"
+,tmp11.plant "工厂"
+,tmp11.plant___t "工厂描述"
+,tmp11.base_name "基地"
+,tmp11.zww010 "产区"
+,tmp11.zww010___t "产区描述"
+,tmp11.stor_loc "库存地点"
+,tmp11.stor_loc___t "库存地点描述"
+,tmp11.comp_code "公司代码"
+,tmp11.stockcat "库存类型"
+,tmp11.zdpsyb "事业部"
+,case when comp_code = '3A00' or ext_grp = '10050' then 'R1X' else '' end "线组"
+,0 as "线组汇总"
+,0 as "中心汇总"
+,1 "比例"
+,tmp11."存货价值"
+,tmp11."存货价值" * 1 as "分摊价值"
+,current_timestamp 
+,0 as "存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp11.capital_cost
+,tmp11.capital_cost *  1  as "分摊资金成本"
+,tmp11.capital_cost_sum
+,tmp11.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp11 
+where "存货价值" <> 0  or ( "存货价值" = 0 and tmp11.capital_cost <> 0 )
+union all 
+select 
+ tmp2.stat_month "年月"
+,tmp2.material_num "物料编码"
+,tmp2.material_name "物料描述"
+,tmp2.ext_grp "外部物料组"
+,tmp2.prod_channal "产品渠道"
+,tmp2.prod_channal_name "产品渠道描述"
+,tmp2.plant "工厂"
+,tmp2.plant___t "工厂描述"
+,tmp2.base_name "基地"
+,tmp2.zww010 "产区"
+,tmp2.zww010___t "产区描述"
+,tmp2.stor_loc "库存地点"
+,tmp2.stor_loc___t "库存地点描述"
+,tmp2.comp_code "公司代码"
+,tmp2.stockcat "库存类型"
+,tmp2.zdpsyb "事业部"
+,prop.sales_grp "线组"
+,0
+,0
+,1 "比例" 
+,tmp2."存货价值"
+,tmp2."存货价值" * 1 as "分摊价值"
+,current_timestamp 
+,0 as "存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp2.capital_cost
+,tmp2.capital_cost *  1  as "分摊资金成本"
+,tmp2.capital_cost_sum
+,tmp2.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp2 
+left join prop on tmp2.zdpzgsdq = prop.zdpzgsdq
+where "存货价值" <> 0  or ( "存货价值" = 0 and tmp2.capital_cost <> 0 )
+union all 
+select 
+ tmp3.stat_month "年月"
+,tmp3.material_num "物料编码"
+,tmp3.material_name "物料描述"
+,tmp3.ext_grp "外部物料组"
+,tmp3.prod_channal "产品渠道"
+,tmp3.prod_channal_name "产品渠道描述"
+,tmp3.plant "工厂"
+,tmp3.plant___t "工厂描述"
+,tmp3.base_name "基地"
+,tmp3.zww010 "产区"
+,tmp3.zww010___t "产区描述"
+,tmp3.stor_loc "库存地点"
+,tmp3.stor_loc___t "库存地点描述"
+,tmp3.comp_code "公司代码"
+,tmp3.stockcat "库存类型"
+,tmp3.zdpsyb "事业部"
+,'R4U' "线组"
+,0
+,0
+,1 "比例" 
+,tmp3."存货价值"
+,tmp3."存货价值" * 1 as "分摊价值"
+,current_timestamp
+,0 as "存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp3.capital_cost
+,tmp3.capital_cost *  1  as "分摊资金成本"
+,tmp3.capital_cost_sum
+,tmp3.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp3 
+where "存货价值" <> 0  or ( "存货价值" = 0 and tmp3.capital_cost <> 0 )
+union all 
+select 
+ tmp4.stat_month "年月"
+,tmp4.material_num "物料编码"
+,tmp4.material_name "物料描述"
+,tmp4.ext_grp "外部物料组"
+,tmp4.prod_channal "产品渠道"
+,tmp4.prod_channal_name "产品渠道描述"
+,tmp4.plant "工厂"
+,tmp4.plant___t "工厂描述"
+,tmp4.base_name "基地"
+,tmp4.zww010 "产区"
+,tmp4.zww010___t "产区描述"
+,tmp4.stor_loc "库存地点"
+,tmp4.stor_loc___t "库存地点描述"
+,tmp4.comp_code "公司代码"
+,tmp4.stockcat "库存类型"
+,tmp4.zdpsyb "事业部"
+,coalesce(b.sales_grp,'R40') "线组"
+,0
+,0
+,1 "比例" 
+,tmp4."存货价值"
+,tmp4."存货价值" * 1 as "分摊价值"
+,current_timestamp 
+,tmp4."存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp4.capital_cost
+,tmp4.capital_cost *  1  as "分摊资金成本"
+,tmp4.capital_cost_sum
+,tmp4.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp4 
+left join loc 
+on tmp4.stor_loc = loc.loc_code
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on loc.comp_code = b.comp_code and b.end_date = '9999-12-31'
+left join UPLOAD.UPLOAD_DIVISION_COMP_T c
+on tmp4.comp_code = c.comp_code and tmp4.zdpsyb = C.division_code and c.end_date = '9999-12-31'
+where "存货价值" <> 0 or "存货价值(阿米巴)" <> 0 or ( "存货价值" = 0 and "存货价值(阿米巴)" = 0 and tmp4.capital_cost <> 0 )
+union all 
+select 
+ tmp5.stat_month "年月"
+,tmp5.material_num "物料编码"
+,tmp5.material_name "物料描述"
+,tmp5.ext_grp "外部物料组"
+,tmp5.prod_channal "产品渠道"
+,tmp5.prod_channal_name "产品渠道描述"
+,tmp5.plant "工厂"
+,tmp5.plant___t "工厂描述"
+,tmp5.base_name "基地"
+,tmp5.zww010 "产区"
+,tmp5.zww010___t "产区描述"
+,tmp5.stor_loc "库存地点"
+,tmp5.stor_loc___t "库存地点描述"
+,tmp5.comp_code "公司代码"
+,tmp5.stockcat "库存类型"
+,tmp5.zdpsyb "事业部"
+,case when tmp5.plant like '3%' then 'R1T' else 'R9P' end "线组"
+,0
+,0
+,1 "比例" 
+,tmp5."存货价值"
+,tmp5."存货价值" * 1 as "分摊价值"
+,current_timestamp 
+,tmp5."存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp5.capital_cost
+,tmp5.capital_cost *  1  as "分摊资金成本"
+,tmp5.capital_cost_sum
+,tmp5.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp5
+left join loc 
+on tmp5.stor_loc = loc.loc_code
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on loc.comp_code = b.comp_code and b.end_date = '9999-12-31'
+left join UPLOAD.UPLOAD_DIVISION_COMP_T c
+on tmp5.comp_code = c.comp_code and tmp5.zdpsyb = C.division_code and c.end_date = '9999-12-31'
+where ("存货价值" <> 0 or "存货价值(阿米巴)" <> 0) or ( "存货价值" = 0 and "存货价值(阿米巴)" = 0 and tmp5.capital_cost <> 0 )
+union all 
+select 
+ tmp6.stat_month "年月"
+,tmp6.material_num "物料编码"
+,tmp6.material_name "物料描述"
+,tmp6.ext_grp "外部物料组"
+,tmp6.prod_channal "产品渠道"
+,tmp6.prod_channal_name "产品渠道描述"
+,tmp6.plant "工厂"
+,tmp6.plant___t "工厂描述"
+,tmp6.base_name "基地"
+,tmp6.zww010 "产区"
+,tmp6.zww010___t "产区描述"
+,tmp6.stor_loc "库存地点"
+,tmp6.stor_loc___t "库存地点描述"
+,tmp6.comp_code "公司代码"
+,tmp6.stockcat "库存类型"
+,tmp6.zdpsyb "事业部"
+,'RFF' "线组"
+,0
+,0
+,1 "比例" 
+,tmp6."存货价值"
+,tmp6."存货价值" * 1 as "分摊价值"
+,current_timestamp
+,0 as "存货价值(阿米巴)"
+,'' as distribution_channel
+,tmp6.capital_cost
+,tmp6.capital_cost *  1  as "分摊资金成本"
+,tmp6.capital_cost_sum
+,tmp6.capital_cost_sum *  1 as "分摊累计资金成本"
+from tmp6 
+where "存货价值" <> 0  
+)
+select
+ tmpp."年月" as stat_month
+,tmpp."物料编码" as material_num 
+,tmpp."物料描述" as material_name 
+,tmpp."外部物料组" as ext_grp 
+,tmpp."产品渠道" as prod_channal 
+,tmpp."产品渠道描述" as prod_channal_name 
+,tmpp."工厂" as plant 
+,tmpp."工厂描述" as plant___t 
+,tmpp."基地" as base_name 
+,tmpp."产区" as zww010 
+,tmpp."产区描述" as zww010___t 
+,tmpp."库存地点" as stor_loc --
+,tmpp."库存地点描述" as stor_loc___t --
+,tmpp."公司代码" as comp_code --
+,tmpp."库存类型" as stockcat --"库存类型"
+,tmpp."事业部" as zdpsyb --
+,tmpp."线组" as sales_grp --
+,tmpp."线组汇总" as sales_grp_sum --
+,tmpp."中心汇总" as center_sum --
+,tmpp."比例" as percentage --
+,tmpp."存货价值" as inventory_value --
+,tmpp."分摊价值" as contributory_value --
+,current_timestamp as last_update_date
+,tmpp."存货价值(阿米巴)" as inventory_value_amb -- 
+,t.product_level_code -- 产品层次
+,tmpp.distribution_channel -- 渠道
+,case 
+	when tmpp.distribution_channel in ('06','10') and t.product_level4_code in ('3006002002') then '陶瓷'
+	when t1.product_code is not null then '浴室柜'
+	else coalesce(t2.prod_line_name,'其他类')
+end as prod_line_name -- 产品线
+,capital_cost -- tmpp.capital_cost -- 资金成本
+,"分摊资金成本" -- tmpp."分摊资金成本"
+,capital_cost_sum-- tmpp.capital_cost_sum -- 累积资金成本
+,"分摊累计资金成本" --tmpp."分摊累计资金成本"
+from tmpp 
+left join dwimd.dwi_md_data_material_general_t t
+on tmpp."物料描述" = t.material_num
+left join upload.upload_sw_cabinet_basin_t t1 on substr(tmpp."年月",1,4) = t1.stat_year and tmpp."物料描述" = t1.product_code
+left join dm.DM_RPT_PROD_CATEGORY_T t2 on t.product_level3_code = t2.prod_level3_code and t2.prod_level3_code is not null

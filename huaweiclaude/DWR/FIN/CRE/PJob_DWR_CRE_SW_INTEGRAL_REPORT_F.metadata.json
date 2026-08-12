@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CRE_SW_INTEGRAL_REPORT_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/FIN/CRE",
+    "description": "卫浴积分报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

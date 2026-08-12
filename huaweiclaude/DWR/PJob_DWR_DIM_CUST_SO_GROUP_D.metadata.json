@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_CUST_SO_GROUP_D",
+    "type": "HiveSQL",
+    "directory": "/DWR",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrdim"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_DIM_MATERIAL_URL_D",
+    "type": "HiveSQL",
+    "directory": "/DWR/DIM/MM",
+    "description": "物料URL路径主数据",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

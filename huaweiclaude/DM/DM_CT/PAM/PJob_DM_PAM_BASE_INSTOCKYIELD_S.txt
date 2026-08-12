@@ -1,0 +1,40 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/05/31 16:45:23 GMT+08:00
+-- description:瓷砖各基地入库产量表(月)
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20240613 修改片换算面积的逻辑
+-- UPDATE FROM CHENZHIYONG 20240626 拆分表逻辑
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+-- 瓷砖各基地入库产量表（月）
+INSERT OVERWRITE TABLE DM.DM_PAM_BASE_INSTOCKYIELD_S PARTITION(period_id_m)
+SELECT T1.period_id_m AS start_month, -- 月份
+	   T1.site_code, -- 基地
+	   T1.work_shop_code, --  车间编码
+	   T1.product_line_code, -- 产线编码
+	   T1.order_header_code,  -- 生产订单头
+	   T1.unit, -- 单位
+	   T1.batch_code, -- 批次
+	   T1.material_num, --物料编码
+	   T1.stock_place, -- 库存地点 
+	   T1.material_voucher, -- 物料凭证
+	   T1.move_type,-- 移动类型
+	   T1.APS_ORDER_NO, -- 文本(APS订单号)为空情况：一级品 、手工操作
+	   T1.SUBJECT, -- 会计科目
+	   T1.PROD_VERSION_CODE,-- 生产版本
+   	   T1.stock_qty , -- 入库数量
+   	   'N' AS del_flag, -- 删除数据标识
+   	   CURRENT_TIMESTAMP() AS dw_last_update_date , -- 数据同步时间
+   	   period_id_m -- 分区月
+FROM DWROTD.DWR_PAM_BASE_INSTOCKYIELD_F T1   -- 换算面积
+WHERE T1.period_id_m >= SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7);

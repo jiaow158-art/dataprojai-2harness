@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PAM_BASE_FG_DEFECT_JM_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD",
+    "description": "江门缺陷明细表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

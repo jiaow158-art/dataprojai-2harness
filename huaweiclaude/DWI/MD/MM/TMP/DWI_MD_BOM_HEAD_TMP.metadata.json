@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_BOM_HEAD_TMP",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/MM/TMP",
+    "description": "BOM表头临时表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "stg"
+}

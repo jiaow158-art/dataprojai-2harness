@@ -1,0 +1,161 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/05/05 10:47:02 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+insert overwrite table dwrfin.dwr_sap_adjust_data_t partition (period_id_m) 
+select 
+ T.TZBZH		--调整凭证编号
+,T.RLN		--日历年 
+,substr(T.RLNY,1,4)||'-'||substr(T.RLNY,5,2)  AS RLNY	    --日历年/月 
+,T.RLNJD		--日历年 / 季度
+,FROM_UNIXTIME(UNIX_TIMESTAMP(T.POST_DATE, 'yyyyMMdd'),'yyyy-MM-dd') AS POST_DATE	--凭证中的过帐日期
+,T.YWFW	--业务范围
+,case when T.YWFW = 'E000' then '清仓业务' 
+	  when T.YWFW = 'F000' then '补毛利工程项目' 
+	  when T.YWFW = 'J000' then '特惠品定向促销' 
+	  when T.YWFW = 'H000' then '整装头部' 
+	  when T.YWFW = 'I000' then '山西基地平衡方案' 
+	  when T.YWFW = 'L000' then '国补收入成本调整'
+	  when T.YWFW = 'D000' then '总账产成品差异调整' 
+	  when T.YWFW = 'Y000' then '研发费用调整' 
+	  when T.YWFW = 'Q000' then '其他成本调整' 
+	  else '' END AS YWFW_T --业务范围文本
+,T.BUKRS	--公司代码
+,T1.BUTXT AS BUKRS_T  --公司代码文本
+,T.VKORG	--销售组织 
+,T2.VTEXT AS VKORG_T --销售组织文本
+,T.VTWEG	--分销渠道
+,T3.VTEXT AS VTWEG_T --分销渠道的文本
+,T.VKGRP AS VKGRP	--原销售组
+,T6.BEZEI AS VKGRP_T	--原销售组文本
+,T4.sales_grp AS W_VKGRP	--WBS销售组
+,T7.BEZEI AS W_VKGRP_T	--WBS销售组文本
+,T5.sales_group_code AS K_VKGRP --客户销售组
+,T5.sales_group_name AS K_VKGRP_T --客户销售组文本
+,T20.sales_grp_code AS C_VKGRP --成本中心销售组
+,T21.BEZEI AS C_VKGRP_T	--成本中心销售组文本
+,T.ZZKUNNR	--母客户编号 
+,T88.name_1 AS ZZKUNNR_T	--母客户文本
+,T.KUNNR	--客户编号
+,T8.name_1 AS KUNNR_T -- 客户编号文本
+,T.WERKS	--工厂
+,T9.NAME1 AS WERKS_T --工厂文本
+,T.ZCQBM	--产区编码
+,T.YL10	--品类
+,T10.value_desc AS YL10_T	--品类文本
+,T.SJLY	--数据来源
+,T.JYMS	--交易模式2
+,T.SJH	--商机号 
+,T.POSID	--工作分解结构元素 (WBS 元素)
+,T4.wbs_top_level_desc AS POSID_T 
+,T.AUFNR	--订单号 
+,T.KOSTL	--成本中心
+,T11.LTEXT AS KOSTL_T --成本中心文本
+,T.PRCTR	--利润中心
+,T12.KTEXT AS PRCTR_T-- 利润中心文本
+,T.HKONT	--总账科目
+,case when T13.TXT20 <> '' or T13.TXT20 is not null then T13.TXT20
+    else T14.TXT20 end AS HKONT_T	--总账科目文本
+,T.MATNR	--物料编号
+,T.CHARG	--批号
+,T.PERNR	--销售雇员 
+,T15.NCHMC AS PERNR_T	--销售雇员 
+,T.VBTYP	--销售和分销凭证类别
+,T.VBELN	--开票凭证 
+,T.VBEL2	--销售凭证 
+,T.POSN2	--销售凭证项目 
+,T.LAND1	--国家/地区代码
+,T16.LANDX AS LAND1_T --国家/地区文本
+,T.REGIO	--地区（省/自治区/直辖市、市、县） 
+,T17.BEZEI AS REGIO_T --地区（省/自治区/直辖市、市、县）文本
+,T.BZIRK	--销售地区 
+,T18.BZTXT AS BZIRK_T --销售地区文本
+,T.VKBUR	--销售办事处
+,T19.BEZEI AS VKBUR_T --销售办事处文本
+,T.FKIMG	--以销售单位表示的累计订购数量
+,T.VRKME	--销售单位 
+,T.ZAREA	--面积
+,T.MJDW	--面积单位
+,T.YJTZ	--业绩调整值 
+,T.SRTZ	--收入调整值 
+,T.CBTZ	--成本调整值 
+,T.QTSRTZ	--其他收入调整值 
+,T.QTZCTZ	--其他支出调整值 
+,T.FYTZ	--费用调整值 
+,T.YTJF	--预提积分
+,T.VV065	--税率
+,T.ZAMBCB  --阿米巴成本调整值
+,T.ZBACB  --标A成本调整值
+,T.WAERS	--货币码 
+,T.HL		--汇率
+,T.WBMS	--文本描述
+,T.ERNAM	--创建对象的人员名称 
+,T.ERDAT	--记录建立日期
+,T.ERZET	--输入时间
+,current_timestamp() as dw_last_update_date
+,substr(T.RLNY,1,4)||'-'||substr(T.RLNY,5,2)  AS PERIOD_ID_M
+from sdi.sdi_zfit005_1001 T
+left join sdi.sdi_t001_1001 T1
+ON T.BUKRS = T1.BUKRS AND T1.MANDT = '800'
+LEFT JOIN SDI.SDI_TVKOT_1001 T2
+ON T.VKORG = T2.VKORG AND T2.SPRAS = '1'  AND T2.MANDT = '800' 
+LEFT JOIN SDI.SDI_TVTWT_1001 T3
+ON T.VTWEG = T3.VTWEG AND T3.SPRAS = '1' AND T3.MANDT = '800'
+left join DWRDIM.DWR_DIM_WBS_BASIS_INFO_F T4
+on T.POSID= T4.wbs_level3
+-- on substr(T.POSID,1,10) = T4.wbs_top_level
+LEFT JOIN DWRDIM.DWR_DIM_CUST_SALES_AREA_D2 T5
+ON T.KUNNR = T5.cust_num AND T.VTWEG = T5.distribution_chnl_code AND T.VKORG = T5.sales_org_code  
+AND T5.end_date = '4712-12-31' and T5.del_flag = 'N'
+LEFT JOIN SDI.SDI_TVGRT_1001 T6
+ON T.VKGRP = T6.VKGRP AND T6.SPRAS = '1' AND T6.MANDT = '800'
+LEFT JOIN SDI.SDI_TVGRT_1001 T7
+ON T4.sales_grp = T7.VKGRP AND T7.SPRAS = '1' AND T7.MANDT = '800'
+left join (select cust_num,name_1 from dwrdim.dwr_dim_cust_general_d where end_date = '4712-12-31' and del_flag = 'N') as T8
+on T.KUNNR = T8.cust_num
+left join (select cust_num,name_1 from dwrdim.dwr_dim_cust_general_d where end_date = '4712-12-31' and del_flag = 'N') as T88
+on T.ZZKUNNR = T88.cust_num
+LEFT JOIN SDI.SDI_T001W_1001 T9
+ON T.WERKS = T9.WERKS AND T9.MANDT = '800'
+left join sdi.SDI_ZMMT014_1001 T10 
+on T.yl10 = T10.value_code and T10.fieldname = 'YL10'
+left join DWRFIN.DWR_FIN_CSKT_TMP T11 -- 17126
+on T.KOSTL = T11.KOSTL
+left join SDI.SDI_CEPCT_1001 T12 
+on T.PRCTR = T12.PRCTR
+and T12.KOKRS = 'DP00'
+left join SDI.SDI_SKAT_1001 T13 
+on T.HKONT = T13.SAKNR
+and T13.KTOPL = 'CNDP'
+left join SDI.SDI_SKAT_1001 T14 
+on T.HKONT = T14.SAKNR
+and T14.KTOPL = 'CND1'
+LEFT JOIN SDI.SDI_PA0002_1001 T15
+ON T.PERNR = T15.PERNR AND T15.ENDDA = '99991231'
+LEFT JOIN SDI.SDI_T005T_1001 T16
+ON T.LAND1 = T16.LAND1 AND T16.SPRAS = '1' AND T16.MANDT = '800'
+LEFT JOIN SDI.SDI_T005U_1001 T17
+ON T.REGIO = T17.BLAND AND T.LAND1 = T17.LAND1 AND T17.SPRAS = '1' AND T17.MANDT = '800'
+LEFT JOIN SDI.SDI_T171T_1001 T18
+ON T.BZIRK = T18.BZIRK AND T18.SPRAS = '1' AND T18.MANDT = '800'
+LEFT JOIN SDI.SDI_TVKBT_1001 T19
+ON T.VKBUR = T19.VKBUR AND T19.SPRAS = '1' AND T19.MANDT = '800'
+LEFT JOIN DWIMD.DWI_MD_COST_CENTER_INFO_T T20
+on T.KOSTL = SUBSTR(T20.zcost_center,5,99)
+LEFT JOIN SDI.SDI_TVGRT_1001 T21
+ON T20.sales_grp_code = T21.VKGRP AND T21.SPRAS = '1' AND T21.MANDT = '800'
+WHERE T.MANDT = '800' 
+AND substr(T.RLNY,1,4)||'-'||substr(T.RLNY,5,2) BETWEEN '${PERIOD_ID_M1}' AND '${PERIOD_ID_M2}'

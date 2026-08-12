@@ -1,0 +1,54 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2026/05/16 08:57:22 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRHR.DWR_HR_EMP_ABSEN_INFO_F
+SELECT A.PERNR AS EMP_NUM --员工号
+      ,A.ENAME AS EMP_NAME --员工姓名或申请人的格式
+      ,A.LDATE AS ABSEN_DATE --逻辑日期
+      ,A.ORGEH_T AS DEPT_NAME --部门
+      ,A.ZW AS POST_NAME --岗位
+      ,A.TPROG AS WORK_SHFT_CODE --日班次编码
+      ,A.TPROG_T AS WORK_SHFT_NAME --日班次名称
+      ,CASE WHEN A.BEGTT <> '000000' AND A.BEGTT <> ''
+            THEN SUBSTR(A.BEGTT,1,2)||':'||SUBSTR(A.BEGTT,3,2)||':'||SUBSTR(A.BEGTT,5,2)
+             END AS FST_SWIPE_START_TIME --第1对刷卡开始
+      ,CASE WHEN A.ENDTT <> '000000' AND A.ENDTT <> ''
+            THEN SUBSTR(A.ENDTT,1,2)||':'||SUBSTR(A.ENDTT,3,2)||':'||SUBSTR(A.ENDTT,5,2)
+             END AS FST_SWIPE_END_TIME --第1对刷卡结束
+      ,CASE WHEN A.BEGTT2 <> '000000' AND A.BEGTT2 <> ''
+            THEN SUBSTR(A.BEGTT2,1,2)||':'||SUBSTR(A.BEGTT2,3,2)||':'||SUBSTR(A.BEGTT2,5,2)
+             END AS SEC_SWIPE_START_TIME --第2对刷卡开始
+      ,CASE WHEN A.ENDTT2 <> '000000' AND A.ENDTT2 <> ''
+            THEN SUBSTR(A.ENDTT2,1,2)||':'||SUBSTR(A.ENDTT2,3,2)||':'||SUBSTR(A.ENDTT2,5,2)
+             END AS SEC_SWIPE_END_TIME --第2对刷卡结束
+      ,CASE WHEN A.BEGTT3 <> '000000' AND A.BEGTT3 <> ''
+            THEN SUBSTR(A.BEGTT3,1,2)||':'||SUBSTR(A.BEGTT3,3,2)||':'||SUBSTR(A.BEGTT3,5,2)
+             END AS THD_SWIPE_START_TIME --第3对刷卡开始
+      ,CASE WHEN A.ENDTT3 <> '000000' AND A.ENDTT3 <> ''
+            THEN SUBSTR(A.ENDTT3,1,2)||':'||SUBSTR(A.ENDTT3,3,2)||':'||SUBSTR(A.ENDTT3,5,2)
+             END AS THD_SWIPE_END_TIME --第3对刷卡结束
+      ,CASE WHEN A.LTIME1 <> '000000' AND A.LTIME1 <> ''
+            THEN SUBSTR(A.LTIME1,1,2)||':'||SUBSTR(A.LTIME1,3,2)||':'||SUBSTR(A.LTIME1,5,2)
+             END AS FST_SWIPE_TIME --第1次刷卡
+      ,CASE WHEN A.LTIME2 <> '000000' AND A.LTIME2 <> ''
+            THEN SUBSTR(A.LTIME2,1,2)||':'||SUBSTR(A.LTIME2,3,2)||':'||SUBSTR(A.LTIME2,5,2)
+             END AS SEC_SWIPE_TIME --第2次刷卡
+      ,CASE WHEN A.LTIME3 <> '000000' AND A.LTIME3 <> ''
+            THEN SUBSTR(A.LTIME3,1,2)||':'||SUBSTR(A.LTIME3,3,2)||':'||SUBSTR(A.LTIME3,5,2)
+             END AS THD_END_TIME --第3次刷卡
+      ,CASE WHEN A.LTIME4 <> '000000' AND A.LTIME4 <> ''
+            THEN SUBSTR(A.LTIME4,1,2)||':'||SUBSTR(A.LTIME4,3,2)||':'||SUBSTR(A.LTIME4,5,2)
+             END AS FRTH_END_TIME --第4次刷卡
+      ,CASE WHEN A.LTIME5 <> '000000' AND A.LTIME5 <> ''
+            THEN SUBSTR(A.LTIME5,1,2)||':'||SUBSTR(A.LTIME5,3,2)||':'||SUBSTR(A.LTIME5,5,2)
+             END AS FTH_END_TIME --第5次刷卡
+      ,CASE WHEN A.LTIME6 <> '000000' AND A.LTIME6 <> ''
+            THEN SUBSTR(A.LTIME6,1,2)||':'||SUBSTR(A.LTIME6,3,2)||':'||SUBSTR(A.LTIME6,5,2)
+             END AS STH_END_TIME --第6次刷卡
+      ,A.ERROR AS MSG_TYPE_CODE --消息类型号
+      ,A.ETEXT AS MSG_TYPE_NAME --消息长文本
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_ZTHRPT007_1001 A
+ WHERE A.MANDT = 800

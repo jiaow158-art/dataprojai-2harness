@@ -1,0 +1,159 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2025/10/13 15:01:08 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 15000571 时间<2026/01/06> 新增字段子账号
+-- ******************************************************************** -- --
+set
+	hive.exec.max.dynamic.partitions.pernode = 100000;
+
+--可以允许创建的最大动态分区个数
+set
+	hive.exec.max.dynamic.partitions = 100000;
+
+--表示一个动态分区语句可以创建的最大动态分区个数
+set
+	hive.cbo.enable = true;
+
+set
+	hive.mapjoin.smalltable.filesize = 200000000;
+
+set
+	hive.auto.convert.join.noconditionaltask.size = 400000000;
+
+set
+	hive.mapred.local.mem = 4096;
+
+--设置动态分区为非严格模式
+set
+	hive.exec.dynamic.partition = true;
+
+set
+	hive.exec.dynamic.partition.mode = nonstrict;
+
+with
+	base_person as (
+		select
+			source_id,
+			employee_number,
+			row_number() over (
+				PARTITION BY
+					employee_number
+				order by
+					last_update_date desc
+			) AS RN
+		from
+			sdi.sdi_base_person_1029
+	),
+	tmp as (
+		SELECT
+			coalesce(di.distributor_code, a.user_name) as user_name,
+			a.user_id as user_id,
+			b.user_full_name,
+			case
+				when a.login_mode = '1' then 'PC'
+				when a.login_mode = '4' then 'APP'
+			end as loginMode,
+			a.creation_date,
+			'经销商' as prole,
+			a.user_name as son_user_name,
+			substr(a.creation_date, 1, 7) as PERIOD_ID_M
+		FROM
+			SDI.SDI_base_login_log_1029 a
+			left join SDI.SDI_base_users_1029 b on a.user_id = b.user_id
+			LEFT JOIN base_person bp on a.user_name = bp.employee_number
+			and bp.rn = 1
+			left join sdi.sdi_dt_distributor_info_1029 di on bp.source_id = di.distributor_id
+		WHERE
+			substr(a.creation_date, 1, 7) =  '${PERIOD_ID_M}'
+			and a.login_mode in ('1', '4') --
+			AND cast(A.creation_date as timestamp) NOT BETWEEN TIMESTAMP '2025-10-10 22:00:00' AND TIMESTAMP  '2025-10-11 07:00:00'
+			and a.user_name in (
+				select DISTINCT
+					bu.user_name
+				FROM
+					SDI.SDI_base_menu_1029 bm
+					inner JOIN SDI.SDI_base_role_menu_1029 brm ON bm.menu_id = brm.menu_id
+					inner JOIN SDI.SDI_base_role_1029 br ON brm.role_id = br.role_id
+					inner JOIN SDI.SDI_base_responsibility_role_1029 brr ON br.role_id = brr.role_id
+					inner JOIN SDI.SDI_base_responsibility_1029 bresp ON brr.responsibility_id = bresp.responsibility_id
+					inner JOIN SDI.SDI_base_user_responsibility_1029 bur ON bresp.responsibility_id = bur.responsibility_id
+					inner JOIN SDI.SDI_base_users_1029 bu ON bur.user_id = bu.user_id
+					INNER JOIN SDI.SDI_base_organization_grant_1029 g on g.user_id = bu.user_id
+					INNER JOIN SDI.SDI_dt_distributor_info_1029 ddi on ddi.org_id = g.org_id
+					and ddi.DEL_flag = 0
+					and (
+						ddi.end_date is null
+						or ddi.end_date > current_timestamp
+					)
+					inner Join SDI.SDI_sap_distributor_sale_area_1029 sdsa on sdsa.distributor_code = ddi.distributor_code
+				where
+					bm.system_code = 'OSS'
+					and bm.menu_parent_id = 0
+					and bu.delete_flag = 0
+					and bu.user_type = 'OUT'
+					AND SUBSTR(bur.creation_date, 1, 7) <=  '${PERIOD_ID_M}'
+					-- AND  SUBSTR(br.creation_date,1,7) <= '2025-10'
+					and br.role_id <> '272037'
+			)
+		union all
+		SELECT
+			a.user_name as user_name,
+			a.user_id,
+			b.user_full_name,
+			case
+				when a.login_mode = '1' then 'PC'
+				when a.login_mode = '4' then 'APP'
+			end as loginMode,
+			a.creation_date,
+			'内部用户',
+			a.user_name  as son_user_name,
+			substr(a.creation_date, 1, 7) as PERIOD_ID_M
+		FROM
+			SDI.SDI_base_login_log_1029 a
+			left join SDI.SDI_base_users_1029 b on a.user_id = b.user_id
+		WHERE
+			substr(a.creation_date, 1, 7) = '${PERIOD_ID_M}'
+			and a.login_mode in ('1', '4') --
+			AND cast(A.creation_date as timestamp) NOT BETWEEN TIMESTAMP '2025-10-10 22:00:00' AND TIMESTAMP  '2025-10-11 07:00:00'
+			and a.user_name in (
+				select DISTINCT
+					bu.user_name
+				FROM
+					SDI.SDI_base_menu_1029 bm
+					inner JOIN SDI.SDI_base_role_menu_1029 brm ON bm.menu_id = brm.menu_id
+					inner JOIN SDI.SDI_base_role_1029 br ON brm.role_id = br.role_id
+					inner JOIN SDI.SDI_base_responsibility_role_1029 brr ON br.role_id = brr.role_id
+					inner JOIN SDI.SDI_base_responsibility_1029 bresp ON brr.responsibility_id = bresp.responsibility_id
+					inner JOIN SDI.SDI_base_user_responsibility_1029 bur ON bresp.responsibility_id = bur.responsibility_id
+					inner JOIN SDI.SDI_base_users_1029 bu ON bur.user_id = bu.user_id
+					INNER JOIN SDI.SDI_base_organization_grant_1029 g on g.user_id = bu.user_id
+					-- INNER JOIN SDI.SDI_dt_distributor_info_1029 ddi on ddi.org_id = g.org_id and ddi.DEL_flag =0 and (ddi.end_date is null or ddi.end_date> current_timestamp)
+					-- inner Join SDI.SDI_sap_distributor_sale_area_1029 sdsa on sdsa.distributor_code = ddi.distributor_code
+				where
+					bm.system_code = 'OSS'
+					and bm.menu_parent_id = 0
+					and bu.delete_flag = 0
+					and bu.user_type = 'IN'
+					AND SUBSTR(bur.creation_date, 1, 7) <= '${PERIOD_ID_M}'
+					and br.role_id <> '272037'
+			)
+	)
+INSERT
+	OVERWRITE TABLE dwrdim.dwr_oms_capacity_d partition (PERIOD_ID_M)
+select
+	user_name,
+	user_full_name,
+	loginMode,
+	creation_date,
+	prole,
+	current_timestamp as dw_last_update_date,
+	user_id,
+	son_user_name,
+	period_id_m
+from
+	tmp	
+	
+

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WF_FORMTABLE_MAIN_1077_DT1_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/PI/WF",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

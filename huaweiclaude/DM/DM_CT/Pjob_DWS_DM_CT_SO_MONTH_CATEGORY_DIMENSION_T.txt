@@ -1,0 +1,100 @@
+/*CREATE TABLE dm.dm_ct_so_month_category_dimension_t
+(
+    stat_month              varchar(50),
+    channel_text            varchar(50),
+    prod                    varchar(300),
+    already_outbound_amount numeric(38, 10),
+    already_outbound_area   numeric(38, 10),
+    undelivered_amount      numeric(38, 10),
+    undelivered_area        numeric(38, 10),
+    not_pick_up_amount      numeric(38, 10),
+    not_pick_up_area        numeric(38, 10),
+    dw_last_update_date     timestamp(6)
+)
+    WITH (
+        orientation = column,
+        compression = middle,
+        colversion = 2.0,
+        enable_delta = false
+        )DISTRIBUTE BY HASH(stat_month);
+comment on table dm.dm_ct_so_month_category_dimension_t is '瓷砖订单按月统计品类规格出库金额面积表';
+comment on column dm.dm_ct_so_month_category_dimension_t.stat_month is '月份';
+comment on column dm.dm_ct_so_month_category_dimension_t.channel_text is '整合渠道';
+comment on column dm.dm_ct_so_month_category_dimension_t.prod is '品类规格';
+comment on column dm.dm_ct_so_month_category_dimension_t.already_outbound_amount is '已出库金额';
+comment on column dm.dm_ct_so_month_category_dimension_t.already_outbound_area is '已出库面积';
+comment on column dm.dm_ct_so_month_category_dimension_t.undelivered_amount is '未交付金额';
+comment on column dm.dm_ct_so_month_category_dimension_t.undelivered_area is '未交付面积';
+comment on column dm.dm_ct_so_month_category_dimension_t.not_pick_up_amount is '未提货金额';
+comment on column dm.dm_ct_so_month_category_dimension_t.not_pick_up_area is '未提货面积';
+comment on column dm.dm_ct_so_month_category_dimension_t.dw_last_update_date is '最后更新时间';*/
+-- update：2024/03/29 修改逻辑：出库面积使用业绩表，补充订单表过滤条件
+delete
+from dm.dm_ct_so_month_category_dimension_t
+where stat_month = '${PERIOD_ID_M}';
+insert into dm.dm_ct_so_month_category_dimension_t
+select stat_month,
+       channel_text,
+       prod,
+       sum(already_outbound_amount) already_outbound_amount,
+       sum(already_outbound_area)   already_outbound_area,
+       sum(undelivered_amount)      undelivered_amount,
+       sum(undelivered_area)        undelivered_area,
+       sum(not_pick_up_amount)      not_pick_up_amount,
+       sum(not_pick_up_area)        not_pick_up_area,
+       current_timestamp
+from (
+         select to_char(to_date(A.audat), 'yyyy-MM')         stat_month,
+                case
+                    when zh_channel_code1 = 'GD03' then '工程'
+                    when zh_channel_code1 = 'GD01' then '零售'
+                    when zh_channel_code1 = 'GD02'
+                        then '整装' end                        channel_text,
+                c.category_name || c.dimension               prod,
+                0                                            already_outbound_amount,
+                0                                            already_outbound_area,
+                0                                            undelivered_amount,
+                sum(wqrsl * a.width * a.length_1)            undelivered_area,
+                0                                            not_pick_up_amount,
+                sum((vmeng - mengef) * a.width * a.length_1) not_pick_up_area
+         from DM.DM_OTD_SALES_ORDER_DET_T A
+                  LEFT JOIN dm.dm_rpt_sale_grp_t B
+                            ON A.vkgrp = B.sale_grp
+                  left join dwimd.dwi_md_data_material_general_t c on a.matnr = c.material_num
+         where case
+                   when A.audat in ('', '00000000') then ''
+                   when A.audat is null then ''
+                   else to_char(to_date(A.audat), 'yyyy-MM')
+                   end = '${PERIOD_ID_M}'
+           and B.lev2_name = '瓷砖事业部'
+           and coalesce(abgru, '11') in ('11', '56')
+         and c.matl_group_code = '1000010'
+           and c.external_matl_group_code = '10010'
+           and substr(werks, 1, 2) in ('12', '13', '15', '16', '17', '18', '19', '7D', '72', '75', '77', '79', '8A')
+           and substr(lgort, 1, 2) != '00'
+           and lgort not in ('BC', 'GFZ', '7F21')
+         group by stat_month, channel_text, prod
+         union all
+         select calmonth                       stat_month,
+                case
+                    when integrate_channel = 'GD03' then '工程'
+                    when integrate_channel = 'GD01' then '零售'
+                    when integrate_channel = 'GD02'
+                        then '整装' end          channel_text,
+                c.category_name || c.dimension prod,
+                0                              already_outbound_amount,
+                sum(zxsmj)                     already_outbound_area,
+                0                              undelivered_amount,
+                0                              undelivered_area,
+                0                              not_pick_up_amount,
+                0                              not_pick_up_area
+         from dm.dm_ambv2_zzt_xssr_t A
+                  LEFT JOIN dm.dm_rpt_sale_grp_t B
+                            ON A.sales_grp = B.sale_grp
+                  left join dwimd.dwi_md_data_material_general_t c on a.material = c.material_num
+                  left join upload.upload_business_analysis_channel_t d on a.integrate_channel = d.channel_code
+         where calmonth = '${PERIOD_ID_M}'
+           and B.lev2_name = '瓷砖事业部'
+         group by stat_month, channel_text, prod
+     ) aa
+group by stat_month, channel_text, prod

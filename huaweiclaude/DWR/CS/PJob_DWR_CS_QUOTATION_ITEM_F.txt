@@ -1,0 +1,58 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/02/14 11:26:03 GMT+08:00
+-- desc：报价单行
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_QUOTATION_ITEM_F
+SELECT
+	T.id
+	,T.quotation_id
+	,T.quotation_item_code
+	,T.yn_cancel
+	,T.product_code
+	,T.product_name
+	,T.agent_price
+	,T.unit_price
+	,T.unit_area
+	,T.policy_discount
+	,T.creation_date
+	,T.quantity
+	,T.batch
+	,T.product_unit
+	,T.total_amount
+	,T.sales_area
+	,T.denial_reason
+	,T.batch_code
+	,T.available_qty
+	,T.approved_discount
+	,T.approved_qty
+	,T.approved_amount
+	,T.sap_deposit_number
+	,T.policy_name
+	,T.policy_code
+	,T.transferred_quantity
+	,T.remaining_transferred_quantity
+	,T.factory_code
+	,T.warehouse_code
+	,T.warehouse_age
+	,T.status
+	,T.last_update_date
+	,T.delete_flag
+	,T.created_by
+	,T.version_num
+	,T.last_update_login
+	,T.last_updated_by
+	,T.standard_price
+	,T.discount
+	,T.discount_price
+	,T.clearance_reasons
+	,T.quantity_available
+	,T.cost
+	,T.promotion_reason_code
+	,T.approved_unit_price
+	,T.clearance_reserve_price
+	,T.package_info
+	,'N' AS del_flag
+	,current_timestamp() as DW_LAST_UPDATE_DATE
+FROM SDI.SDI_S_QUOTATION_ITEM_1034 T ;

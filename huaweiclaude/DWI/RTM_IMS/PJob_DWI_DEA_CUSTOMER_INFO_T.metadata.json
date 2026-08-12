@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_DEA_CUSTOMER_INFO_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/RTM_IMS",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

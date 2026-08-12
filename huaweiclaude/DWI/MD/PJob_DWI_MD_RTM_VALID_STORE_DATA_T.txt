@@ -1,0 +1,52 @@
+
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- desc：RTM有效门店数据
+-- create time: 2022/10/11 10:12:23 GMT+08:00
+-- update from chenzhiyong 2023-12-08 新增门店地址
+-- update from huangwenbin 2024-07-02 修改分销商编码逻辑：优先拿分销商编码，再拿经销商编码
+-- update from huangwenbin 2024-07-18 修改分销商编码逻辑：优先拿分销商编码，再拿经销商编码，分销商编码存在空字符串
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_RTM_VALID_STORE_DATA_T
+select 
+ist.customer_code   		AS customer_code,--经销商编码
+ist.province        		AS province,--省
+ist.city            		AS city,--市
+ist.county          		AS county,--区
+ist.store_code      		AS store_code,--门店编码
+ist.store_type      		AS store_type,--门店类型：01旗舰店、02专卖店、03专卖区
+con.channel 				AS channel,--渠道
+con.sales_organization 		AS sales_organization,--销售组织
+con.salesman_code   		AS salesman_code,--业务员
+ist.completion_date			AS completion_date,--完工日期
+inf.revoke_date				AS revoke_date,--撤销日期
+ist.store_status			AS store_status,--是否生效
+case when coalesce(ist.distributor_code,'') <> '' then ist.distributor_code
+when ist.customer_code like '0%' then cast(cast(ist.customer_code as decimal(10)) as string)
+else ist.customer_code end	AS distributor_code,--分销商编码
+ist.operation_type			AS operation_type, --是否经营
+isc.marketing_department	AS marketing_department, ---门店所属大区
+'N'                 		AS DEL_FLAG,--删除标识
+current_timestamp() 		AS DW_LAST_UPDATE_DATE,  --数据同步时间
+ist.store_name              AS store_name,	--门店名称
+inf.store_channel           AS store_channel,    --店面渠道
+con.salesman                AS salesman,     --业务员名称
+ist.distributor_name        AS distributor_name, --分销商名称
+ist.address                 AS store_address_name  -- 门店地址名称
+from SDI.SDI_ICPOS_STORE_1027 ist
+left join sdi.sdi_ICPOS_STORE_CONTACTS_1027 isc on ist.store_id = isc.store_id
+left join SDI.SDI_ICPOS_STORE_CONTACTS_INFO_1027 con on con.store_contacts_id = isc.store_contacts_id
+left join SDI.SDI_icpos_store_info_1027  inf on inf.store_id = isc.store_id
+where con.delete_flag = 0 and con.contacts_type = '0' --联系人信息必备条件
+GROUP BY
+ist.customer_code,ist.province,ist.city,ist.county,ist.store_code,ist.store_type,channel,
+con.sales_organization,con.salesman_code,ist.completion_date,inf.revoke_date,ist.store_status,
+case when coalesce(ist.distributor_code,'') <> '' then ist.distributor_code
+when ist.customer_code like '0%' then cast(cast(ist.customer_code as decimal(10)) as string)
+else ist.customer_code end,
+ist.operation_type,isc.marketing_department,ist.store_name,inf.store_channel,con.salesman,ist.distributor_name,ist.address

@@ -1,0 +1,18 @@
+insert overwrite table sdi.sdi_aps_pro_order_sale_rel_1007
+select 
+id,
+create_by,
+create_date,
+inv_org_id,
+product_order_id,
+sale_line_no,
+sale_no,
+sale_order_detail_id,
+sale_order_id,
+sync_id,
+update_by,
+update_date,
+sap_code,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_pro_order_sale_rel_1007;

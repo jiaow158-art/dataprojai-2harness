@@ -1,0 +1,8 @@
+{
+    "name": "PJOB_DM_BO_ENGIN_CT_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "瓷砖商机报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

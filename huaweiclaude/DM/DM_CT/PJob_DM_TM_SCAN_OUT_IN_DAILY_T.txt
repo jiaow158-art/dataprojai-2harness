@@ -1,0 +1,144 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/04/15 10:43:26 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- update from 10002375 26年1月29号后直接读取TMS的结果
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+set	hive.exec.max.dynamic.partitions.pernode = 100000;--可以允许创建的最大动态分区个数
+set hive.exec.max.dynamic.partitions = 100000;--表示一个动态分区语句可以创建的最大动态分区个数
+
+WITH TMP AS (
+SELECT 
+ SUBSTR(B.approver_time,1,10) AS start_date
+,case when B.dept_id = '125' then '清远' 
+      when B.dept_id = '129' then '湖南' 
+      when B.dept_id = '111' then '江西' 
+      when B.dept_id = '127' then '重庆' else '' end base_name
+,D.dimension
+,SUM(A.scan_number) AS SIZE_SCAN_QTY
+,SUM(case when input_reason = '无码（返工、未赋码、旧库存）' then A.scan_number else A.actual_number end) AS SIZE_SUM_QTY
+,0 as bill_in_scan_qty
+,0 as bill_out_scan_qty
+,0 as bill_out_sum_qty
+,0 as bill_in_sum_qty
+FROM sdi.sdi_wms_bill_out_apply_lading_qy_1022 A  
+join sdi.sdi_wms_bill_out_apply_qy_1022 B 
+on A.apply_id = B.id
+join (select task_batch,product_code from sdi.sdi_pdm_production_task_1022 s1
+left join sdi.sdi_base_workline_1022 s2 on s1.line_id = s2.id
+where s1.create_time >= case when s2.dept_id = '111' then '2025-04-25' else '2024-09-01' end group by task_batch,product_code) C  
+ON A.batch_no = C.task_batch 
+AND SUBSTRING_INDEX( C.product_code, '_', 1 ) = SUBSTRING_INDEX( A.product_code, '_', 1 )  
+left join (select task_batch,product_code from sdi.sdi_pdm_production_task_1022 where line_id  = '53' group by task_batch,product_code) F  
+ON A.batch_no = F.task_batch and SUBSTRING_INDEX( F.product_code, '_', 1 ) = SUBSTRING_INDEX( A.product_code, '_', 1 ) 
+left join dwimd.dwi_md_data_material_general_t D 
+ON trim(A.PRODUCT_CODE) = D.MATERIAL_NUM
+WHERE B.flag = 1  AND B.STATUS = 3 AND F.task_batch IS NULL 
+AND SUBSTR(B.approver_time,1,10) between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and SUBSTR(B.approver_time,1,10) < '2026-01-29'
+GROUP BY 
+case when B.dept_id = '125' then '清远' 
+      when B.dept_id = '129' then '湖南' 
+      when B.dept_id = '111' then '江西' 
+      when B.dept_id = '127' then '重庆' else '' end
+,SUBSTR(B.approver_time,1,10)
+,D.dimension
+union all 
+select 
+ encode_rate_date as start_date
+,base_name
+,'无规格' as dimension
+,0 AS SIZE_SCAN_QTY
+,0 AS SIZE_SUM_QTY
+,sum(bill_in_scan_num) as bill_in_scan_qty
+,sum(bill_out_scan_num) as bill_out_scan_qty
+,sum(bill_out_sum_num) as bill_out_sum_qty
+,sum(bill_in_sum_num) as bill_in_sum_qty
+from sdi.sdi_wms_encode_rate_1022 
+where encode_rate_date between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and encode_rate_date < '2026-01-29'
+group by 
+ encode_rate_date
+,base_name
+union all 
+select 
+ encode_rate_date as start_date
+,base_name
+,'无规格' as dimension
+,0 AS SIZE_SCAN_QTY
+,0 AS SIZE_SUM_QTY
+,sum(bill_in_scan_num) as bill_in_scan_qty
+,0 as bill_out_scan_qty
+,0 as bill_out_sum_qty
+,sum(bill_in_sum_num) as bill_in_sum_qty
+from sdi.sdi_wms_encode_rate_1022 
+where encode_rate_date between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and encode_rate_date >= '2026-01-29'
+group by 
+ encode_rate_date
+,base_name
+union all 
+select 
+ encode_rate_date as start_date
+,base_name
+,'无规格' as dimension
+,0 AS SIZE_SCAN_QTY
+,0 AS SIZE_SUM_QTY
+,0 as bill_in_scan_qty
+,sum(bill_out_scan_num) as bill_out_scan_qty
+,sum(bill_out_sum_num) as bill_out_sum_qty
+,0 as bill_in_sum_qty
+from sdi.sdi_wms_spec_encode_rate_1022
+where encode_rate_date between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and encode_rate_date >= '2026-01-29'
+group by 
+ encode_rate_date
+,base_name
+union all 
+select 
+ encode_rate_date as start_date
+,base_name
+,spec as dimension
+,sum(bill_out_scan_num) AS SIZE_SCAN_QTY
+,sum(bill_out_sum_num) AS SIZE_SUM_QTY
+,0 as bill_in_scan_qty
+,0 as bill_out_scan_qty
+,0 as bill_out_sum_qty
+,0 as bill_in_sum_qty
+from sdi.sdi_wms_spec_encode_rate_1022
+where encode_rate_date between '${PERIOD_ID_D1}' and '${PERIOD_ID_D2}' 
+and encode_rate_date >= '2026-01-29'
+group by 
+ encode_rate_date
+,base_name
+,spec
+)
+insert overwrite table dm.dm_tm_scan_out_in_daily_t partition(period_id_d)
+SELECT 
+ start_date
+,base_name
+,dimension
+,sum(SIZE_SCAN_QTY) AS SIZE_SCAN_QTY
+,sum(SIZE_SUM_QTY) AS SIZE_SUM_QTY
+,sum(bill_in_scan_qty) as bill_in_scan_qty
+,sum(bill_out_scan_qty) as bill_out_scan_qty
+,sum(bill_out_sum_qty) as bill_out_sum_qty
+,sum(bill_in_sum_qty) as bill_in_sum_qty
+,current_timestamp as dw_last_update_date
+,start_date as period_id_d
+from tmp 
+group by 
+ start_date
+,base_name
+,dimension

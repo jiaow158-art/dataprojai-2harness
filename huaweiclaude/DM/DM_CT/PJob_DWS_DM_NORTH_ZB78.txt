@@ -1,0 +1,118 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/08/05 15:04:41 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+--工程商机转化率ZB78
+delete from 
+DM.DM_NORTH_SM_T 
+where  calmonth = '${PERIOD_ID_M}' 
+and zb_code = 'ZB78';
+with base_month as (
+    SELECT SUBSTR(DAY_DT, 1, 7) month_val, DAY_DT AS MONTH_END_DATE --月末最后一天
+    FROM DM.DM_DIM_DATE_D
+    WHERE SUBSTR(DAY_DT, 1, 7) between to_char(current_date - 1 - interval '11 months', 'yyyy-MM') and to_char(current_date - 1, 'yyyy-MM')
+      AND MONTH_END_DAY_FLAG = 'Y'
+)
+, SJZHL as (
+select 
+z.month_val as CALMONTH,
+       count(distinct case
+                          when bo_tran_date is not null --商机转化日期不为空
+                         -- and bo_stage in ('S5')
+                              and (coalesce(ltc_flag, 'NLTC') = 'LTC' or
+                                   (coalesce(ltc_flag, 'NLTC') != 'LTC' and delivery_area >= 1000))
+                              and a.bo_apply_date <= z.MONTH_END_DATE--申请日期小于等于每个月最后一日
+                              and a.bo_apply_date >= to_char(z.MONTH_END_DATE::date - interval '23 months', 'yyyy-MM-01')
+                              THEN bo_code end)                    convert_num,
+       count(distinct case
+                          when a.bo_apply_date <= z.MONTH_END_DATE and
+                               a.bo_apply_date >= to_char(z.MONTH_END_DATE::date - interval '23 months', 'yyyy-MM-01')
+                              then bo_code end)                    all_num,
+       case when all_num = 0 then 0 else convert_num / all_num end convert_rate
+from base_month z
+         left join
+     DWRLTC.DWR_BO_PROJECT_DETAIL_F a on 1 = 1
+         left join dm.dm_rpt_sales_group_t b on a.level_dept_name_9 = b.node_name9
+where ((node_name4 in ('H04230655', 'H04230685', 'H04230600')
+    and node_name5 != 'H03230605')
+    or (sale_group is null and sales_area_code is null and
+        sale_org_code in ('1000', '7900', '8100', '8200', '8300', '8500', '8800'))
+    or sales_area_code in ('S00001',
+                           'S00003',
+                           'S00004',
+                           'S00005',
+                           'S00006',
+                           'S00008',
+                           'S00009',
+                           'S00010',
+                           'S00011',
+                           'S00014',
+                           'B00012',
+                           'B00018',
+                           'B00014',
+                           'B00015',
+                           'B00021'))
+                            and bo_stage 
+                            in ('S1', 'S2', 'S3', 'S4', 'S5','SX','XX')                               
+group by 
+z.month_val
+order by
+z.month_val
+)
+
+,SJZHL2 as (
+select 
+'${PERIOD_ID_M}' as calmonth,
+'ZB78' as zb_code,
+convert_rate as 当月实绩,
+convert_rate as 累计实绩,
+convert_rate as 季度累计实绩
+from 
+SJZHL
+where calmonth  = '${PERIOD_ID_M}' 
+
+)
+
+,AMT as (
+select 
+calmonth,
+zb_code,
+sum(当月实绩) *100 as CM_STAT_AMT,
+sum(累计实绩) *100 as ACC_STAT_AMT,
+sum(季度累计实绩) *100 as QTR_TGT_AMT
+from 
+SJZHL2
+group by 
+calmonth,
+zb_code
+)
+insert into DM.DM_NORTH_SM_T
+select 
+T1.CALMONTH,
+T1.ZB_CODE,
+T2.indicator_name,
+T2.definition,
+T2.zb_stat_desc,
+T2.indicator_owner,
+T2.target_unit,
+T2.monthly_target_amount,
+T2.monthly_cumulative_amount,
+T1.CM_STAT_AMT,
+T1.ACC_STAT_AMT,
+T2.quarterly_target,
+T1.QTR_TGT_AMT,
+T2.annual_target,
+T1.ACC_STAT_AMT as CY_STAT_AMT,
+CURRENT_TIMESTAMP as DW_LAST_UPDATE_DATE,
+t2.pjfx
+from 
+AMT T1
+left join
+dwrfin.DWR_FIN_POLARIS_TARGET_F T2
+on 
+T1.ZB_CODE  =  T2.indicator_code 
+and T1.CALMONTH = T2.cal_month

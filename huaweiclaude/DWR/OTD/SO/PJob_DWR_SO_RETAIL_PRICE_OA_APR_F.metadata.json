@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_RETAIL_PRICE_OA_APR_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

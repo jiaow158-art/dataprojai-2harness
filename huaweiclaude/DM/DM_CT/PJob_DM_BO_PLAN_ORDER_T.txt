@@ -1,0 +1,82 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/09/06 15:33:25 GMT+08:00
+-- update from huangwenbin 2024-11-28 修改评审后需求数量的取值字段
+-- update from huangwenbin 2024-11-28 修改销售组的取值逻辑
+-- update from huangwenbin 2024-11-30 APS订单剔除无效状态的数据
+-- update from huangwenbin 2024-12-13 修改评审后需求数量的取值字段
+-- update from huangwenbin 2024-12-13 修改评审后需求数量的取值字段逻辑：区分LTC与OSS系统
+-- update from huangwenbin 2025-05-21 修改线组取值字段：MD_SALE_GRP_CODE-->WBS_SALE_GRP_CODE，MD_SALE_GRP_NAME-->WBS_SALE_GRP_NAME
+-- update from huangwenbin 2025-07-26 新增字段：上一次计划交付时间
+-- update from huangwenbin 2025-07-26 修改评审后需求数量的取值字段
+-- update from huangwenbin 2025-12-05 修改评审后需求数量的取值字段
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_BO_PLAN_ORDER_T
+SELECT A.WBS_NUM --首层WBS号
+      ,A.PLAN_NUM --计划订单流水号
+      ,A.PLAN_ITEM_NUM --计划单行号（三层WBS号）
+	  ,A.WBS_NAME --WBS元素描述
+	  ,A.MATERIAL_NUM --物料编码
+	  ,A.MATERIAL_NAME --物料名称
+	  ,A.SPLD_AREA_NAME --供货产区
+	  ,A.FACTORY_CODE --工厂
+	  ,COALESCE(T4.RSDU_PLAN_QTY,0) AS RSDU_PLAN_QTY --项目剩余需求数量
+	  ,COALESCE(T4.RSDU_PLAN_AREA) AS RSDU_PLAN_AREA --剩余需求数量面积
+	  ,A.ORDER_QTY AS ORDER_QTY --评审后需求数量
+	  ,A.CNFRM_PROD_DATE --确认排产交付日期
+	  ,A.EXPCT_DELV_DATE --到达项目地日期
+	  ,COALESCE(B.RMN_STOCK_QTY,0) AS RMN_STOCK_QTY --留货数量汇总
+	  ,CASE WHEN A.ORDER_QTY > COALESCE(B.RMN_STOCK_QTY,0) + COALESCE(B.OUT_STOCK_ZT_QTY,0) THEN '待留货'
+	        WHEN A.ORDER_QTY - COALESCE(B.RMN_STOCK_QTY,0) - COALESCE(B.OUT_STOCK_ZT_QTY,0) <= 0
+			THEN '已留货'
+	         END AS RMN_ST_NAME --留货状态 当 评审后需求数量-留货数量汇总-出库数<=0  已留货
+                                --评审后需求数量-留货数量汇总-出库数>0  待留货
+	  ,COALESCE(B.OUT_STOCK_ZT_QTY,0) AS TOT_OUT_QTY --累计出库数量
+      ,A.PLAN_ORDER_TYPE_NAME --计划订单类型
+      ,A.APPR_STATUS_NAME --头业务审批状态
+      ,A.PLAN_STATUS_NAME --头计划单状态
+	  ,A.MTH_BUSI_CODE --母商机编号
+	  ,A.SUB_BUSI_CODE --子商机编码
+	  ,A.SALE_EMP_NAME --WBS销售人员
+	  ,A.CREATE_EMP_NAME --计划订单创建者名称
+	  ,A.PLAN_ITEM_STATUS_NAME --计划单行状态
+	  ,A.ITEM_SUBMIT_DATE --计划订单提交日期
+	  ,A.APPR_TIME --评审通过日期
+	  ,T5.PLAN_DELV_TIME AS DMAND_DELV_DATE --预计交付时间
+	  ,A.CUST_NUM --客户编号
+	  ,A.PAY_CUST_NUM --付款方编号
+	  ,A.SALE_CHCL_CODE --分销渠道
+	  ,A.SALE_ORG_CODE --销售组织
+	  ,A.OP_DEPT_NAME --运营部
+	  ,A.OP_GRP_NAME --运营线组
+	  ,A.IS_SPEC_PROJ_NAME --是否特殊工程
+	  ,A.IS_CHAIN_NAME --是否连锁网点
+	  ,A.WBS_SALE_GRP_NAME AS SALE_GRP_CODE --销售组
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+	  ,A.WBS_SALE_GRP_CODE AS MD_SALE_GRP_CODE --销售组编码（客户主档）
+	  ,A.SALE_EMP_NUM --销售人员工号
+	  ,A.CREATE_EMP_NUM --创建人工号
+	  ,A.RFUS_RSN --评审拒绝原因
+	  ,T5.BEF_PLAN_DELV_TIME --上一次计划交付时间
+  FROM DWRLTC.DWR_BO_PLAN_ORDER_F A
+  LEFT JOIN(SELECT WBS_LEVEL3
+                  ,SUM(RMN_STOCK_QTY) AS RMN_STOCK_QTY
+				  ,SUM(OUT_STOCK_ZT_QTY) AS OUT_STOCK_ZT_QTY
+				  ,SUM(IN_STOCK_QTY) AS IN_STOCK_QTY
+              FROM DWROTD.DWR_WM_PROJ_ITEM_STOCK_T
+             GROUP BY WBS_LEVEL3
+           ) B
+	ON A.PLAN_ITEM_NUM = B.WBS_LEVEL3
+  LEFT JOIN DWROTD.DWR_OTD_RSDU_PLAN_F T4
+    ON A.PLAN_ITEM_NUM = T4.PLAN_ITEM_NUM
+  LEFT JOIN (SELECT WBS_LINE_NO
+                   ,MAX(PLAN_DELV_TIME) AS PLAN_DELV_TIME
+				   ,MAX(BEF_PLAN_DELV_TIME) AS BEF_PLAN_DELV_TIME
+               FROM DWROTD.DWR_PS_SALE_ORDER_DTL_F
+              WHERE DTL_ST_NAME = '正常'
+              GROUP BY WBS_LINE_NO
+            ) T5
+    ON A.PLAN_ITEM_NUM = T5.WBS_LINE_NO
+   AND T5.WBS_LINE_NO IS NOT NULL
+ WHERE A.DIV_NAME = '瓷砖事业部'

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWI_MD_INVENT_TURNO_DAY_CHAN_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

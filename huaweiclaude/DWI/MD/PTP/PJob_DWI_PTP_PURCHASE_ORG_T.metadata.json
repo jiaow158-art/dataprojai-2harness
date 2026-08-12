@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PTP_PURCHASE_ORG_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PTP",
+    "description": "SAP采购组织数据表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwipur"
+}

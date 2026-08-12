@@ -1,0 +1,65 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/19 11:02:19 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_NNM1_T
+SELECT
+'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+custcode AS customer_code, -- 客户编码
+ObjectCode, -- 单据
+Series, -- 序列
+SeriesName, -- 序列名称
+InitialNum, -- 初始编号
+NextNumber, -- 要使用的下一个编号
+LastNum, -- 要使用的上一个编号
+BeginStr, -- 前缀字符串
+EndStr, -- 后缀字符串
+Remark, -- 备注
+GroupCode, -- 组
+Indicator, -- 期间标识符
+Template, -- 模板
+NumSize, -- 数值大小
+FolioPref, -- 页码前缀字符串
+NextFolio, -- 下一个页码编号
+DocSubType, -- 凭证子类型
+DefESeries, -- 缺省电子序列
+IsDigSerie, -- 是数字序列
+SeriesType, -- 序列类型
+IsManual, -- 为手动序列
+BPLId, -- 已分配分属
+IsForCncl, -- 取消序列
+AtDocType, -- AT 单据类型
+IsElAuth, -- 电子权限代码
+current_timestamp() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_NNM1_1010
+UNION ALL
+SELECT
+'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+custcode AS customer_code, -- 客户编码
+ObjectCode, -- 单据
+Series, -- 序列
+SeriesName, -- 序列名称
+InitialNum, -- 初始编号
+NextNumber, -- 要使用的下一个编号
+LastNum, -- 要使用的上一个编号
+BeginStr, -- 前缀字符串
+EndStr, -- 后缀字符串
+Remark, -- 备注
+GroupCode, -- 组
+Indicator, -- 期间标识符
+Template, -- 模板
+NumSize, -- 数值大小
+FolioPref, -- 页码前缀字符串
+NextFolio, -- 下一个页码编号
+DocSubType, -- 凭证子类型
+DefESeries, -- 缺省电子序列
+IsDigSerie, -- 是数字序列
+SeriesType, -- 序列类型
+IsManual, -- 为手动序列
+BPLId, -- 已分配分属
+IsForCncl, -- 取消序列
+AtDocType, -- AT 单据类型
+IsElAuth, -- 电子权限代码
+current_timestamp() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_SW_NNM1_1010;

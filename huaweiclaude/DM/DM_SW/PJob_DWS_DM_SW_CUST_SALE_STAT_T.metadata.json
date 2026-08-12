@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_SW_CUST_SALE_STAT_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_SW",
+    "description": "数据中心SA291：卫浴零售渠道销售汇总表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

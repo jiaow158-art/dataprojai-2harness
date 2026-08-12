@@ -1,0 +1,915 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/04/28 14:45:23 GMT+08:00
+-- update from huangwenbin 2025-04-29 修改月度预算的日期格式问题
+-- update from huangwenbin 2025-05-05 修改客户统计：last_period_quarter_achievement取值字段错误问题
+-- update from huangwenbin 2025-05-06 增加无业绩有目标的客户数据
+-- update from huangwenbin 2025-05-12 修复客户维度年累计目标统计问题，增加线组数据
+-- update from huangwenbin 2025-05-13 经销商业绩目标填报存在非运中、子公司数据，需剔除
+-- update from huangwenbin 2025-06-03 增加子母客编逻辑以及一级B逻辑
+-- update from huangwenbin 2025-06-04 修改业绩目标逻辑从left join 改成union all
+-- update from huangwenbin 2025-06-06 线组目标剔除广州零售、佛山零售的目标
+-- update from huangwenbin 2025-09-04 剔除今年业绩为0的客户
+-- update from huangwenbin 2025-09-04 增加全渠道数据
+-- update from huangwenbin 2026-04-08 修改客户分类逻辑：直接读客户主档
+-- update from huangwenbin 2026-04-09 修复BUG
+-- ******************************************************************** --
+delete from dm.dm_api_sale_stat_t
+where stat_month = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+;
+
+insert into dm.dm_api_sale_stat_t(
+       node_name5 --运营中心编码
+      ,node_desc5 --运营中心
+      ,channel_name --整合渠道
+	  ,node_desc6 --部门
+	  ,node_desc7 --销区
+	  ,node_desc8 --线组
+	  ,cust_num --客户编码
+	  ,cust_name --客户名称
+	  ,cust_cat_name --客户类型
+	  ,cust_type_name --重点客户类型
+	  ,month_target --月目标
+	  ,month_achievement --月业绩
+	  ,last_year_month_achievement --去年同期月业绩
+	  ,quarter_target --季度目标
+	  ,quarter_achievement --季度业绩
+	  ,last_period_quarter_achievement --去年同期季度业绩
+	  ,year_target --年累计目标
+	  ,year_achievement --年累计业绩
+	  ,last_year_achievement --去年同期年累计业绩
+	  ,stat_month --年月
+	  ,dw_last_update_date --DW数据同步时间
+)
+with SPEC_CUSTOMER_INFO AS( --一级B客编
+SELECT DISTINCT "ACCOUNT_NUMBER" AS SPEC_CUST_NUM --一级B客编
+  FROM DM.DM_RPT_ZMASTER_CUS_T
+ WHERE "ACCOUNT_GROUP_CODE" IN ('B1')
+   AND "PARVW" = 'AG'
+),parent_customer_info as(
+	 select distinct customer,parent_customer,level4_code,level4
+	 ,ROW_NUMBER() over(partition by customer,level4 order by case when parent_customer <> customer then 1 else 2 end) rn
+       from dm.ct_sales_performance_daily_t a
+      where calday = to_char(to_date('${P_PERIOD_D}'), 'yyyyMMdd')
+        and double_count = 0
+        and a.customer is not null
+	 ),t0 as(
+select case when 渠道 = '零售渠道' then 'GD01'
+            when 渠道 = '工程渠道' then 'GD03'
+            when 渠道 = '整装头部' then 'GD02'
+             end as channel_code
+	  ,销售地区
+	  ,lpad(客户编码,10,'0') cust_num
+      ,unnest(string_to_array((
+                                                                                                                                  COALESCE(一月, '0') || ',' ||
+                                                                                                                                  COALESCE(二月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(三月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(四月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(五月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(六月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(七月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(八月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(九月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(十月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(十一月, '0') ||
+                                                                                                                                  ',' ||
+                                                                                                                                  COALESCE(十二月, '0')),
+                                          ','))                                                      目标,
+    年份 || unnest(string_to_array('01,02,03,04,05,06,07,08,09,10,11,12', ','))  stat_month
+from upload.upload_achievementcustomer
+where 年份 = to_char('${P_PERIOD_D}'::date, 'yyyy')
+),tt as(
+select channel_code
+	  ,销售地区
+	  ,case when a.SPEC_CUST_NUM is not null then t0.cust_num else COALESCE(b.parent_customer,t0.cust_num) end as cust_num
+	  ,sum(case when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+                then cast(目标 as numeric(38,10))
+                else 0
+				 end) as month_target
+	  ,sum(case when to_char((stat_month || '01')::date, 'yyyyQ') = to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                then cast(目标 as numeric(38,10))
+                else 0
+				 end) as quarter_target
+	  ,sum(case when stat_month <= to_char(to_date('${P_PERIOD_D}'), 'yyyyMM') then COALESCE(cast(目标 as numeric(38,10)),0) else 0 end) as year_target
+	  ,sum(COALESCE(cast(目标 as numeric(38,10)),0)) as all_year_target
+  from t0
+  left join SPEC_CUSTOMER_INFO a
+    on t0.cust_num = a.SPEC_CUST_NUM
+  left join parent_customer_info b
+    on 销售地区 = b.level4
+   and t0.cust_num = b.customer
+   and b.rn = 1
+ group by
+       channel_code
+	  ,销售地区
+	  ,case when a.SPEC_CUST_NUM is not null then t0.cust_num else COALESCE(b.parent_customer,t0.cust_num) end
+	  )
+,tt1 as(
+select 销售地区
+	  ,cust_num
+	  ,sum(case when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+                then cast(目标 as numeric(38,10))
+                else 0
+				 end) as month_target
+	  ,sum(case when to_char((stat_month || '01')::date, 'yyyyQ') = to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                then cast(目标 as numeric(38,10))
+                else 0
+				 end) as quarter_target
+	  ,sum(case when stat_month <= to_char(to_date('${P_PERIOD_D}'), 'yyyyMM') then COALESCE(cast(目标 as numeric(38,10)),0) else 0 end) as year_target
+	  ,sum(COALESCE(cast(目标 as numeric(38,10)),0)) as all_year_target
+  from t0
+ where channel_code = 'GD01'
+ group by
+       销售地区
+	  ,cust_num
+	  )
+,t11 as (
+SELECT 
+ case when b.spec_cust_num is not null then a.customer else parent_customer end customer
+,a.org_code
+,a.integrate_channel_code
+-- ,calday
+,sum(a.month_achievement) as month_achievement
+,sum(a.last_year_month_achievement) as last_year_month_achievement
+,sum(a.quarter_achievement) as quarter_achievement
+,sum(a.last_year_quarter_achievement) as last_period_quarter_achievement
+,sum(a.year_achievement) as year_achievement
+,sum(a.last_year_achievement) as last_year_achievement
+FROM dm.ct_sales_performance_t a
+left join SPEC_CUSTOMER_INFO b
+on a.customer = b.spec_cust_num
+where calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+group by 
+ case when b.spec_cust_num is not null then a.customer else parent_customer end
+,a.org_code
+,a.integrate_channel_code
+having sum(a.year_achievement) <> 0
+),t12 as (
+SELECT 
+ org_code
+,integrate_channel_code
+-- ,calday
+,sum(month_achievement) as month_achievement
+,sum(last_year_month_achievement) as last_year_month_achievement
+,sum(quarter_achievement) as quarter_achievement
+,sum(last_year_quarter_achievement) as last_period_quarter_achievement
+,sum(year_achievement) as year_achievement
+,sum(last_year_achievement) as last_year_achievement
+FROM dm.ct_sales_performance_t
+where calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+group by 
+ org_code
+,integrate_channel_code
+),t13 as(
+select sales_group as org_code
+      ,integrate_channel as integrate_channel_code
+	  ,sum(case when stat_month = to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+                then target
+                else 0 end) as month_target
+	  ,sum(case when to_char((stat_month || '-01')::date, 'yyyyQ') = to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+     	        then target
+                else 0 end) quarter_target
+	  ,sum(case when stat_month <= to_char(to_date('${P_PERIOD_D}'), 'yyyy-MM')
+	             and substr(stat_month,1,4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+                then target
+                else 0 end) as year_target
+  from upload.upload_ct_sales_performance_target_t
+ where substr(stat_month,1,4) = to_char(to_date('${P_PERIOD_D}'), 'yyyy')
+   and COALESCE(sales_group,'$$$') not in('ZB04','ZK01')
+ group by sales_group
+      ,integrate_channel
+),t14 as(
+select b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,b.node_desc8 as cust_name --客户名称
+	  ,'线组' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,0 as month_target --月目标
+	  ,sum(a.month_achievement) / 10000 as month_achievement --月业绩
+	  ,sum(a.last_year_month_achievement) / 10000 as last_year_month_achievement --去年同期月业绩
+	  ,0 as quarter_target --季度目标
+	  ,sum(a.quarter_achievement) / 10000 as quarter_achievement --季度业绩
+	  ,sum(a.last_period_quarter_achievement) / 10000 as last_period_quarter_achievement --去年同期季度业绩
+	  ,0 as year_target --年累计目标
+	  ,sum(a.year_achievement) / 10000 as year_achievement --年累计业绩
+	  ,sum(a.last_year_achievement) / 10000 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t12 a
+  left join dm.dm_rpt_sales_group_t b
+    on a.org_code = b.node_name9
+  left join upload.upload_business_analysis_channel_t c
+    on a.integrate_channel_code = c.channel_code
+ where b.node_name4 in('H04230655','H04230600')
+ group by b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组
+	  
+ union all
+ 
+select b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,b.node_desc8 as cust_name --客户名称
+	  ,'线组' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,sum(a.month_target) as month_target --月目标
+	  ,0 as month_achievement --月业绩
+	  ,0 as last_year_month_achievement --去年同期月业绩
+	  ,sum(a.quarter_target) as quarter_target --季度目标
+	  ,0 as quarter_achievement --季度业绩
+	  ,0 as last_period_quarter_achievement --去年同期季度业绩
+	  ,sum(a.year_target) as year_target --年累计目标
+	  ,0 as year_achievement --年累计业绩
+	  ,0 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t13 a
+  left join dm.dm_rpt_sales_group_t b
+    on a.org_code = b.node_name9
+  left join upload.upload_business_analysis_channel_t c
+    on a.integrate_channel_code = c.channel_code
+ where b.node_name4 in('H04230655','H04230600')
+ group by b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组 
+)
+
+,t1 as(
+--运营中心	整合渠道	部门	销区	线组	客户编码	客户名称	系列	规格	客户类型	重点客户类型
+select  b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组
+	  ,a.customer as cust_num --客户编码
+	  ,d.cust_name --客户名称
+	  ,e.cust_ache_class as cust_cat_name --客户类型
+	  ,case when d1.customer is not null then '强商&' end ||
+	   case when d2.customer is not null then '共享仓&' end || '' as cust_type_name --重点客户类型
+	  ,0 as month_target --月目标
+	  ,sum(a.month_achievement) / 10000 as month_achievement --月业绩
+	  ,sum(a.last_year_month_achievement) / 10000 as last_year_month_achievement --去年同期月业绩
+	  ,0 as quarter_target --季度目标
+	  ,sum(a.quarter_achievement) / 10000 as quarter_achievement --季度业绩
+	  ,sum(a.last_period_quarter_achievement) / 10000 as last_period_quarter_achievement --去年同期季度业绩
+	  ,0 as year_target --年累计目标
+	  ,sum(a.year_achievement) / 10000 as year_achievement --年累计业绩
+	  ,sum(a.last_year_achievement) / 10000 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t11 a
+  left join dm.dm_rpt_sales_group_t b
+    on a.org_code = b.node_name9
+  left join upload.upload_business_analysis_channel_t c
+    on a.integrate_channel_code = c.channel_code
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+                            ,"DESCRIPTION" as cust_name
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'   
+			) d
+    on a.customer = d.customer
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'
+                and "accnt_group8" = '强商' --客户组8			  
+			) d1
+    on a.customer = d1.customer
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'
+                and shared_warehouse = '06A' --共享仓			  
+			) d2
+    on a.customer = d2.customer
+  left join DWRDIM.DWR_DIM_CUST_GENERAL_D e
+    on a.customer = e.cust_num
+   and e.GROUP_NUM = 800
+   AND e.end_date = '4712-12-31'
+ where 1=1 --and a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+   and b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+ group by b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,b.node_desc6 --部门
+	  ,b.node_desc7 --销区
+	  ,b.node_desc8 --线组
+	  ,a.customer --客户编码
+	  ,d.cust_name --客户名称
+	  ,e.cust_ache_class --客户类型
+	  ,case when d1.customer is not null then '强商&' end ||
+	   case when d2.customer is not null then '共享仓&' end || '' --重点客户类型
+	   
+ union all
+ 
+select b.node_name5 --运营中心编码
+      ,tt.销售地区 as node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,p.node_desc6 --部门
+	  ,p.node_desc7 --销区
+	  ,p.node_desc8 --线组
+	  ,tt.cust_num as cust_num --客户编码
+	  ,d.cust_name --客户名称
+	  ,e.cust_ache_class as cust_cat_name --客户类型
+	  ,case when d1.customer is not null then '强商&' end ||
+	   case when d2.customer is not null then '共享仓&' end || '' as cust_type_name --重点客户类型
+	  ,sum(tt.month_target) as month_target --月目标
+	  ,0 as month_achievement --月业绩
+	  ,0 / 10000 as last_year_month_achievement --去年同期月业绩
+	  ,sum(tt.quarter_target) as quarter_target --季度目标
+	  ,0 as quarter_achievement --季度业绩
+	  ,0 as last_period_quarter_achievement --去年同期季度业绩
+	  ,sum(tt.year_target) as year_target --年累计目标
+	  ,0 as year_achievement --年累计业绩
+	  ,0 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from tt
+ inner join dm.dm_rpt_sales_group_t b
+    on tt.销售地区 = b.node_desc9
+   and b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+  left join upload.upload_business_analysis_channel_t c
+    on tt.channel_code = c.channel_code
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+                            ,"DESCRIPTION" as cust_name
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'   
+			) d
+    on tt.cust_num = d.customer
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'
+                and "accnt_group8" = '强商' --客户组8			  
+			) d1
+    on tt.cust_num = d1.customer
+  left join (select distinct "ACCOUNT_NUMBER" as customer
+               from dm.dm_rpt_zmaster_cus_t
+			  where "PARVW" = 'AG'
+                and shared_warehouse = '06A' --共享仓			  
+			) d2
+    on tt.cust_num = d2.customer
+  left join DWRDIM.DWR_DIM_CUST_GENERAL_D e
+    on tt.cust_num = e.cust_num
+   and e.GROUP_NUM = 800
+   AND e.end_date = '4712-12-31'	
+  left join(select distinct a.customer
+                           ,b.node_desc5
+						   ,b.node_desc6
+						   ,b.node_desc7
+						   ,b.node_desc8
+						   ,a.integrate_channel_code
+						   ,row_number() over(partition by a.customer,a.integrate_channel_code,b.node_desc5) as rn
+              from t11 a
+              left join dm.dm_rpt_sales_group_t b
+                on a.org_code = b.node_name9 
+		   ) p
+	on tt.cust_num = p.customer
+   and tt.销售地区 = p.node_desc5
+   and tt.channel_code = p.integrate_channel_code
+   and p.rn = 1
+ where 1=1 --and a.calday = to_char('${P_PERIOD_D}'::date, 'yyyyMMdd')
+ group by b.node_name5 --运营中心编码
+      ,tt.销售地区 --运营中心
+      ,c.channel_name --整合渠道
+	  ,p.node_desc6 --部门
+	  ,p.node_desc7 --销区
+	  ,p.node_desc8 --线组
+	  ,tt.cust_num --客户编码
+	  ,d.cust_name --客户名称
+	  ,e.cust_ache_class --客户类型
+	  ,case when d1.customer is not null then '强商&' end ||
+	   case when d2.customer is not null then '共享仓&' end || '' --重点客户类型	   
+),t2 as(
+select  b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,'' as node_desc6 --部门
+	  ,'' as node_desc7 --销区
+	  ,'' as node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,t.product_series_name as cust_name --客户名称 产品规格1
+	  ,'规格' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,sum(case when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as month_achievement --月业绩
+	  ,sum(case when calmonth = to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_year_month_achievement --去年同期月业绩
+	  ,sum(case when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as quarter_achievement --季度业绩
+	  ,sum(case when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date - interval '12 months', 'yyyyQ')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '12 months', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_period_quarter_achievement --去年同期季度业绩
+	  ,sum(case when calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01')
+	             and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as year_achievement --年累计业绩
+	  ,sum(case when calmonth between to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyy-01')
+	             and to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from dm.dm_so_org_Perf_stat_t a
+  left join dm.dm_rpt_zmaster_cus_t z
+    on a.customer = z."ACCOUNT_NUMBER"
+   and a.distr_chan = z."SALES_CHANNEL_CODE"
+   and a.salesorg = z."SALES_ORGANIZATION_CODE"
+   and z."PARVW" = 'AG'
+  left join (select distinct WBS_LEVEL3 AS WBS_NUM,sales_grp from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F) zz
+    on a.wbs = zz.WBS_NUM
+  left join dm.dm_rpt_sales_group_t b 
+    on case when a.data_source in ('S','T')
+            then COALESCE(COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),a.sales_grp)
+            else a.sales_grp
+             end = b.node_name9
+  left join dwimd.dwi_md_data_material_general_t t
+    on a.material = t.material_num
+  left join upload.upload_business_analysis_channel_t c
+        on a.integrate_channel = c.channel_code
+ where a.calmonth between to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+   and b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+ group by   b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,t.product_series_name --重点客户类型
+),t3 as(
+select b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,'' as node_desc6 --部门
+	  ,'' as node_desc7 --销区
+	  ,'' as node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,case when t.product_brand_name in('尊石','净奢石','微韵石','微理石','四合一','大地','地貌岩','素色','原木','尚木')
+   	        then t.product_brand_name
+			else '其他'
+			 end as cust_name --客户名称 系列
+	  ,'系列' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,sum(case when calmonth = to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as month_achievement --月业绩
+	  ,sum(case when calmonth = to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_year_month_achievement --去年同期月业绩
+	  ,sum(case when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date, 'yyyyQ')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as quarter_achievement --季度业绩
+	  ,sum(case when to_char((calmonth || '-01')::date, 'yyyyQ') = to_char('${P_PERIOD_D}'::date - interval '12 months', 'yyyyQ')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '12 months', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_period_quarter_achievement --去年同期季度业绩
+	  ,sum(case when calmonth between to_char('${P_PERIOD_D}'::date, 'yyyy-01')
+	             and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date, 'yyyyMMdd') then ambperformance
+                else 0 end) / 10000 as year_achievement --年累计业绩
+	  ,sum(case when calmonth between to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyy-01')
+	             and to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyy-MM')
+                 and calday <= to_char('${P_PERIOD_D}'::date - interval '1 years', 'yyyyMMdd')
+                then ambperformance
+                else 0 end) / 10000 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from dm.dm_so_org_Perf_stat_t a
+  left join dm.dm_rpt_zmaster_cus_t z
+    on a.customer = z."ACCOUNT_NUMBER"
+   and a.distr_chan = z."SALES_CHANNEL_CODE"
+   and a.salesorg = z."SALES_ORGANIZATION_CODE"
+   and z."PARVW" = 'AG'
+  left join (select distinct WBS_LEVEL3 AS WBS_NUM,sales_grp from DWRDIM.DWR_DIM_WBS_BASIS_INFO_F) zz
+    on a.wbs = zz.WBS_NUM
+  left join dm.dm_rpt_sales_group_t b 
+    on case when a.data_source in ('S','T')
+            then COALESCE(COALESCE(zz.sales_grp, z."SALES_GROUP_CODE"),a.sales_grp)
+            else a.sales_grp
+             end = b.node_name9
+  left join dwimd.dwi_md_data_material_general_t t
+    on a.material = t.material_num
+  left join upload.upload_business_analysis_channel_t c
+    on a.integrate_channel = c.channel_code
+ where a.calmonth between to_char('${P_PERIOD_D}'::date - interval '1 year', 'yyyy-01') and to_char('${P_PERIOD_D}'::date, 'yyyy-MM')
+   and b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+   and a.integrate_channel = 'GD01'
+ group by   b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+      ,c.channel_name --整合渠道
+	  ,case when t.product_brand_name in('尊石','净奢石','微韵石','微理石','四合一','大地','地貌岩','素色','原木','尚木')
+   	        then t.product_brand_name
+			else '其他'
+			 end --重点客户类型
+),t4 as(
+select b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+	  ,d.channel_name --整合渠道
+	  ,'' as node_desc6 --部门
+	  ,'' as node_desc7 --销区
+	  ,'' as node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,case when c.config_name in('尊石','净奢石','微韵石','微理石','四合一','大地','地貌岩','素色','原木','尚木')
+   	        then c.config_name
+			else '其他'
+			 end cust_name --客户名称 系列
+	  ,'系列' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,sum(case when to_char(to_date(a.stat_month), 'yyyyMM') = to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+                then cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10))
+                else 0
+				 end) / 10000 as month_target
+	  ,sum(case when to_char(a.stat_month::date, 'yyyyQ') = to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                then cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10))
+                else 0
+				 end) / 10000 as quarter_target
+	  ,sum(case when to_char(to_date(a.stat_month), 'yyyyMM') <= to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+	            then COALESCE(cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10)),0)
+				else 0
+				 end) / 10000 as year_target		 
+  from upload.upload_achievement_budget_t a
+  left join dm.dm_rpt_sales_group_t b
+    on a.sale_grp_name = b.node_name9
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R c
+    on a.series = c.src_sys_config_code
+   and c.SOURCE_CODE = 'ZC011'
+  left join upload.upload_business_analysis_channel_t d
+    on a.prod_channel_name = d.channel_code
+ where b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+   and substr(a.stat_month,1,4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+   and a.prod_channel_name = 'GD01'
+ group by b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+	  ,d.channel_name --整合渠道
+	  ,case when c.config_name in('尊石','净奢石','微韵石','微理石','四合一','大地','地貌岩','素色','原木','尚木')
+   	        then c.config_name
+			else '其他'
+			 end
+),t5 as(
+select b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+	  ,d.channel_name --整合渠道
+	  ,'' as node_desc6 --部门
+	  ,'' as node_desc7 --销区
+	  ,'' as node_desc8 --线组
+	  ,'' as cust_num --客户编码
+	  ,case when a.dimension = '600X600' then '600'
+            when a.dimension = '800X800' then '800'
+	        when a.dimension = '1200X600' then '612'
+	        when a.dimension = '1500X750' then '715'
+	        when a.dimension = '1800X900' then '918'
+	        when a.dimension = '600X300' then '630'
+	        when a.dimension = '800X400' then '840'
+	        when a.dimension = '1200X1200' then '超大板'
+			when upper(a.dimension) like '%X%' 
+			 and cast(split_part(upper(a.dimension),'X',1) as numeric(38,10))
+			    * cast(split_part(upper(a.dimension),'X',2) as numeric(38,10))
+				/ 1000000 >= 1.62 then '超大板'
+			when a.prod_property = 'A0001' then '其他规格'
+			 end cust_name --客户名称 规格
+	  ,'规格' as cust_cat_name --客户类型
+	  ,'' as cust_type_name --重点客户类型
+	  ,sum(case when to_char(to_date(a.stat_month), 'yyyyMM') = to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+                then cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10))
+                else 0
+				 end) / 10000 as month_target
+	  ,sum(case when to_char(a.stat_month::date, 'yyyyQ') = to_char(to_date('${P_PERIOD_D}'), 'yyyyQ')
+                then cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10))
+                else 0
+				 end) / 10000 as quarter_target
+	  ,sum(case when to_char(to_date(a.stat_month), 'yyyyMM') <= to_char(to_date('${P_PERIOD_D}'), 'yyyyMM')
+	            then COALESCE(cast(COALESCE(a.prod_it_amt1,0) as numeric(38,10)),0)
+				else 0
+				 end) / 10000 as year_target		 
+  from upload.upload_achievement_budget_t a
+  left join dm.dm_rpt_sales_group_t b
+    on a.sale_grp_name = b.node_name9
+  left join DWIMD.DWI_MD_GENERAL_CONFIG_CODE_R c
+    on a.series = c.src_sys_config_code
+   and c.SOURCE_CODE = 'ZC011'
+  left join upload.upload_business_analysis_channel_t d
+    on a.prod_channel_name = d.channel_code
+ where b.node_name4 in('H04230655','H04230600') --H04230655 :国内直营中心 H04230600 :区域运营中心
+   and substr(a.stat_month,1,4) = to_char('${P_PERIOD_D}'::date, 'yyyy')
+ group by b.node_name5 --运营中心编码
+      ,b.node_desc5 --运营中心
+	  ,d.channel_name --整合渠道
+	  ,case when a.dimension = '600X600' then '600'
+            when a.dimension = '800X800' then '800'
+	        when a.dimension = '1200X600' then '612'
+	        when a.dimension = '1500X750' then '715'
+	        when a.dimension = '1800X900' then '918'
+	        when a.dimension = '600X300' then '630'
+	        when a.dimension = '800X400' then '840'
+	        when a.dimension = '1200X1200' then '超大板'
+			when upper(a.dimension) like '%X%' 
+			 and cast(split_part(upper(a.dimension),'X',1) as numeric(38,10))
+			    * cast(split_part(upper(a.dimension),'X',2) as numeric(38,10))
+				/ 1000000 >= 1.62 then '超大板'
+			when a.prod_property = 'A0001' then '其他规格'
+			 end
+),t6 as(
+select t1.node_name5 --运营中心编码
+      ,t1.node_desc5 --运营中心
+      ,t1.channel_name --整合渠道
+	  ,t1.node_desc6 --部门
+	  ,t1.node_desc7 --销区
+	  ,t1.node_desc8 --线组
+	  ,t1.cust_num --客户编码
+	  ,t1.cust_name --客户名称
+	  ,t1.cust_cat_name --客户类型
+	  ,case when cust_type_name like '%&'
+	         and (case when tot_year_target = 0 then 0 else tot_year_achievement / tot_year_target end) <= 0.5 
+			then cust_type_name || '异常客户'
+			when (case when tot_year_target = 0 then 0 else tot_year_achievement / tot_year_target end) <= 0.5
+            then '异常客户'
+            when cust_type_name like '%&'
+			then left(cust_type_name,-1)
+			else cust_type_name
+			 end as cust_type_name --重点客户类型
+	  ,t1.month_target --月目标
+	  ,t1.month_achievement --月业绩
+	  ,t1.last_year_month_achievement --去年同期月业绩
+	  ,t1.quarter_target --季度目标
+	  ,t1.quarter_achievement --季度业绩
+	  ,t1.last_period_quarter_achievement --去年同期季度业绩
+	  ,t1.year_target --年累计目标
+	  ,t1.year_achievement --年累计业绩
+	  ,t1.last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from (select node_name5 --运营中心编码
+              ,node_desc5 --运营中心
+              ,channel_name --整合渠道
+	          ,node_desc6 --部门
+	          ,node_desc7 --销区
+	          ,node_desc8 --线组
+	          ,cust_num --客户编码
+	          ,cust_name --客户名称
+	          ,cust_cat_name --客户类型
+			  ,cust_type_name
+			  ,sum(month_target) as month_target --月目标
+	          ,sum(month_achievement) as month_achievement --月业绩
+	          ,sum(last_year_month_achievement) as last_year_month_achievement --去年同期月业绩
+	          ,sum(quarter_target) as quarter_target --季度目标
+	          ,sum(quarter_achievement) as quarter_achievement --季度业绩
+	          ,sum(last_period_quarter_achievement) as last_period_quarter_achievement --去年同期季度业绩
+	          ,sum(year_target) as year_target --年累计目标
+	          ,sum(year_achievement) as year_achievement --年累计业绩
+	          ,sum(last_year_achievement) as last_year_achievement --去年同期年累计业绩
+          from t1
+		  group by node_name5 --运营中心编码
+              ,node_desc5 --运营中心
+              ,channel_name --整合渠道
+	          ,node_desc6 --部门
+	          ,node_desc7 --销区
+	          ,node_desc8 --线组
+	          ,cust_num --客户编码
+	          ,cust_name --客户名称
+	          ,cust_cat_name --客户类型 
+	          ,cust_type_name 
+		  ) t1
+   left join(select cust_num 
+                   ,sum(year_target) as tot_year_target --客户总年累计目标
+	               ,sum(year_achievement) as tot_year_achievement --客户总年累计业绩
+               from t1
+			  group by cust_num
+            ) t
+	on t1.cust_num = t.cust_num
+	
+ union all
+
+select t1.node_name5 --运营中心编码
+      ,t1.node_desc5 --运营中心
+      ,'全渠道' as channel_name --整合渠道
+	  ,null as node_desc6 --部门
+	  ,null as node_desc7 --销区
+	  ,null as node_desc8 --线组
+	  ,t1.cust_num --客户编码
+	  ,t1.cust_name --客户名称
+	  ,t1.cust_cat_name --客户类型
+	  ,case when cust_type_name like '%&'
+	         and (case when tot_year_target = 0 then 0 else tot_year_achievement / tot_year_target end) <= 0.5 
+			then cust_type_name || '异常客户'
+			when (case when tot_year_target = 0 then 0 else tot_year_achievement / tot_year_target end) <= 0.5
+            then '异常客户'
+            when cust_type_name like '%&'
+			then left(cust_type_name,-1)
+			else cust_type_name
+			 end as cust_type_name --重点客户类型
+	  ,t1.month_target --月目标
+	  ,t1.month_achievement --月业绩
+	  ,t1.last_year_month_achievement --去年同期月业绩
+	  ,t1.quarter_target --季度目标
+	  ,t1.quarter_achievement --季度业绩
+	  ,t1.last_period_quarter_achievement --去年同期季度业绩
+	  ,t1.year_target --年累计目标
+	  ,t1.year_achievement --年累计业绩
+	  ,t1.last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from (select node_name5 --运营中心编码
+              ,node_desc5 --运营中心
+	          ,cust_num --客户编码
+	          ,cust_name --客户名称
+	          ,cust_cat_name --客户类型
+			  ,cust_type_name
+			  ,sum(month_target) as month_target --月目标
+	          ,sum(month_achievement) as month_achievement --月业绩
+	          ,sum(last_year_month_achievement) as last_year_month_achievement --去年同期月业绩
+	          ,sum(quarter_target) as quarter_target --季度目标
+	          ,sum(quarter_achievement) as quarter_achievement --季度业绩
+	          ,sum(last_period_quarter_achievement) as last_period_quarter_achievement --去年同期季度业绩
+	          ,sum(year_target) as year_target --年累计目标
+	          ,sum(year_achievement) as year_achievement --年累计业绩
+	          ,sum(last_year_achievement) as last_year_achievement --去年同期年累计业绩
+          from t1
+		  group by node_name5 --运营中心编码
+              ,node_desc5 --运营中心
+	          ,cust_num --客户编码
+	          ,cust_name --客户名称
+	          ,cust_cat_name --客户类型 
+	          ,cust_type_name 
+		  ) t1
+   left join(select cust_num 
+                   ,sum(year_target) as tot_year_target --客户总年累计目标
+	               ,sum(year_achievement) as tot_year_achievement --客户总年累计业绩
+               from t1
+			  group by cust_num
+            ) t
+	on t1.cust_num = t.cust_num 
+ 
+ union all
+
+select t2.node_name5 --运营中心编码
+      ,t2.node_desc5 --运营中心
+      ,t2.channel_name --整合渠道
+	  ,t2.node_desc6 --部门
+	  ,t2.node_desc7 --销区
+	  ,t2.node_desc8 --线组
+	  ,t2.cust_num --客户编码
+	  ,t2.cust_name --客户名称
+	  ,t2.cust_cat_name --客户类型
+	  ,t2.cust_type_name --重点客户类型
+	  ,0 as month_target --月目标
+	  ,t2.month_achievement --月业绩
+	  ,t2.last_year_month_achievement --去年同期月业绩
+	  ,0 as quarter_target --季度目标
+	  ,t2.quarter_achievement --季度业绩
+	  ,t2.last_period_quarter_achievement --去年同期季度业绩
+	  ,0 as year_target --年累计目标
+	  ,t2.year_achievement --年累计业绩
+	  ,t2.last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t2
+  
+ union all
+
+select t5.node_name5 --运营中心编码
+      ,t5.node_desc5 --运营中心
+      ,t5.channel_name --整合渠道
+	  ,t5.node_desc6 --部门
+	  ,t5.node_desc7 --销区
+	  ,t5.node_desc8 --线组
+	  ,t5.cust_num --客户编码
+	  ,t5.cust_name --客户名称
+	  ,t5.cust_cat_name --客户类型
+	  ,t5.cust_type_name --重点客户类型
+	  ,t5.month_target --月目标
+	  ,0 as month_achievement --月业绩
+	  ,0 as last_year_month_achievement --去年同期月业绩
+	  ,t5.quarter_target --季度目标
+	  ,0 as quarter_achievement --季度业绩
+	  ,0 as last_period_quarter_achievement --去年同期季度业绩
+	  ,t5.year_target --年累计目标
+	  ,0 as year_achievement --年累计业绩
+	  ,0 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t5
+  
+ union all
+
+select t3.node_name5 --运营中心编码
+      ,t3.node_desc5 --运营中心
+      ,t3.channel_name --整合渠道
+	  ,t3.node_desc6 --部门
+	  ,t3.node_desc7 --销区
+	  ,t3.node_desc8 --线组
+	  ,t3.cust_num --客户编码
+	  ,t3.cust_name --客户名称
+	  ,t3.cust_cat_name --客户类型
+	  ,t3.cust_type_name --重点客户类型
+	  ,0 as month_target --月目标
+	  ,t3.month_achievement --月业绩
+	  ,t3.last_year_month_achievement --去年同期月业绩
+	  ,0 as quarter_target --季度目标
+	  ,t3.quarter_achievement --季度业绩
+	  ,t3.last_period_quarter_achievement --去年同期季度业绩
+	  ,0 as year_target --年累计目标
+	  ,t3.year_achievement --年累计业绩
+	  ,t3.last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t3
+  
+ union all
+
+select t4.node_name5 --运营中心编码
+      ,t4.node_desc5 --运营中心
+      ,t4.channel_name --整合渠道
+	  ,t4.node_desc6 --部门
+	  ,t4.node_desc7 --销区
+	  ,t4.node_desc8 --线组
+	  ,t4.cust_num --客户编码
+	  ,t4.cust_name --客户名称
+	  ,t4.cust_cat_name --客户类型
+	  ,t4.cust_type_name --重点客户类型
+	  ,t4.month_target --月目标
+	  ,0 as month_achievement --月业绩
+	  ,0 as last_year_month_achievement --去年同期月业绩
+	  ,t4.quarter_target --季度目标
+	  ,0 as quarter_achievement --季度业绩
+	  ,0 as last_period_quarter_achievement --去年同期季度业绩
+	  ,t4.year_target --年累计目标
+	  ,0 as year_achievement --年累计业绩
+	  ,0 as last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t4
+  
+ union all
+ 
+select node_name5 --运营中心编码
+      ,node_desc5 --运营中心
+      ,channel_name --整合渠道
+	  ,node_desc6 --部门
+	  ,node_desc7 --销区
+	  ,node_desc8 --线组
+	  ,cust_num --客户编码
+	  ,cust_name --客户名称
+	  ,cust_cat_name --客户类型
+	  ,cust_type_name --重点客户类型
+	  ,month_target --月目标
+	  ,month_achievement --月业绩
+	  ,last_year_month_achievement --去年同期月业绩
+	  ,quarter_target --季度目标
+	  ,quarter_achievement --季度业绩
+	  ,last_period_quarter_achievement --去年同期季度业绩
+	  ,year_target --年累计目标
+	  ,year_achievement --年累计业绩
+	  ,last_year_achievement --去年同期年累计业绩
+	  ,to_char('${P_PERIOD_D}'::date, 'yyyy-MM') as stat_month --年月
+  from t14
+)
+select node_name5 --运营中心编码
+      ,node_desc5 --运营中心
+      ,channel_name --整合渠道
+	  ,node_desc6 --部门
+	  ,node_desc7 --销区
+	  ,node_desc8 --线组
+	  ,cust_num --客户编码
+	  ,cust_name --客户名称
+	  ,cust_cat_name --客户类型
+	  ,cust_type_name --重点客户类型
+	  ,sum(month_target) as month_target --月目标
+	  ,sum(month_achievement) as month_achievement --月业绩
+	  ,sum(last_year_month_achievement) as last_year_month_achievement --去年同期月业绩
+	  ,sum(quarter_target) as quarter_target --季度目标
+	  ,sum(quarter_achievement) as quarter_achievement --季度业绩
+	  ,sum(last_period_quarter_achievement) as last_period_quarter_achievement --去年同期季度业绩
+	  ,sum(year_target) as year_target --年累计目标
+	  ,sum(year_achievement) as year_achievement --年累计业绩
+	  ,sum(last_year_achievement) as last_year_achievement --去年同期年累计业绩
+	  ,stat_month --年月
+	  ,current_timestamp as dw_last_update_date --DW数据同步时间
+  from t6
+ group by node_name5 --运营中心编码
+      ,node_desc5 --运营中心
+      ,channel_name --整合渠道
+	  ,node_desc6 --部门
+	  ,node_desc7 --销区
+	  ,node_desc8 --线组
+	  ,cust_num --客户编码
+	  ,cust_name --客户名称
+	  ,cust_cat_name --客户类型
+	  ,cust_type_name --重点客户类型
+      ,stat_month --年月	  
+;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SYSTEM_ROLE_ALL_D",
+    "type": "HiveSQL",
+    "directory": "/DM/SYSTEM",
+    "description": "各系统角色汇总",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

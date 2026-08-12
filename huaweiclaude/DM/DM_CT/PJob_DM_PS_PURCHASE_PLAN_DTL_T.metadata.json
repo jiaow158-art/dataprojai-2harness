@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PS_PURCHASE_PLAN_DTL_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

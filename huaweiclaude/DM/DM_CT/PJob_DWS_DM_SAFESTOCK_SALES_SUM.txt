@@ -1,0 +1,35 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/24 11:07:27 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from dm.dm_safestock_sales_sum where calmonth = '${PERIOD_ID_M}' ;  
+insert into  dm.dm_safestock_sales_sum    
+with batch_prod_area as(
+select batch_start,max(product_area_code) product_area_code, 
+       case  max(product_area_code) when 'GD' then '华南'
+                                     when 'SD' then '华北'
+                                      when 'SX' then '西北'
+                                       when 'HN' then '华中'
+                                        when 'JX' then '华东'
+                                         when 'XN' then '西南' end  as prod_area
+from dwrdim.dwr_dim_product_area_d 
+group by  batch_start 
+)
+select   case when substr(t.calmonth,6,2) in('02') then concat(substr(t.calmonth,1,5),'01') else t.calmonth end as calmonth ,
+         t.material  as material_num ,
+         coalesce(t2.prod_area,t3.prod_area,t4.prod_area) as prod_area  ,
+         sum(t.zxssl) as sales_qty 
+from   dm.dm_ambv2_zzt_xssr_t t    
+left join batch_prod_area t2  on substr(t.batch,1,3) =  t2.batch_start 
+left join batch_prod_area t3  on substr(t.batch,1,2) =  t3.batch_start 
+left join upload.upload_safestock_factory_prod_area t4 on substr(t.plant,1,2) = t4.factory_code 
+where t.data_source <>'U'
+and t.sales_division_1n = '瓷砖事业部'
+and t.calmonth ='${PERIOD_ID_M}'
+group by    case when substr(t.calmonth,6,2) in('02') then concat(substr(t.calmonth,1,5),'01') else t.calmonth end   ,coalesce(t2.prod_area,t3.prod_area,t4.prod_area),t.material  ;
+
+

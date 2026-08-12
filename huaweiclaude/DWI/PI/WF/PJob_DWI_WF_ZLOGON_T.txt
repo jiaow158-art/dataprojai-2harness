@@ -1,0 +1,18 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2022/07/25 15:30:45 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIPI.DWI_WF_ZLOGON_T
+  SELECT MANDT,
+         BNAME,
+         TERMID,
+         SERVER,
+         TERMINAL,
+         SPRACHE,
+         LOGON_DATE,
+         LOGON_TIME,
+         DEL_FLAG,
+         CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+    FROM SDI.SDI_ZLOGON_1001
+   WHERE DEL_FLAG = 'N'

@@ -1,0 +1,8 @@
+{
+    "name": "DWR_TAX_INVOICE_F_DWS",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN",
+    "description": "税票表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

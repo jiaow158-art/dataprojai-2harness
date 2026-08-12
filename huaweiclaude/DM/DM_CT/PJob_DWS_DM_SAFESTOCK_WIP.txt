@@ -1,0 +1,40 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/24 13:54:10 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+
+delete from  dm.dm_safestock_wip ;
+insert into dm.dm_safestock_wip 
+select tt.material_num ,
+       tt.prod_area,
+       sum(tt.not_complete_qty)  as  not_complete_qty,
+       sum(case when tt.SELF_FOREIGN_FLAG=0  then not_complete_qty else 0 end ) as self_not_complete_qty,
+       sum(case when tt.SELF_FOREIGN_FLAG=1  then not_complete_qty else 0 end ) as foreign_not_complete_qty
+ from (
+select material_num,SELF_FOREIGN_FLAG,  
+       case when t.product_area_name = '江西基地'  then '华东'
+               when t.product_area_name = '广东基地'  then '华南'
+               when t.product_area_name = '西南基地'  then '西南'
+               when t.product_area_name = '山西基地'  then '西北'
+               when t.product_area_name = '湖南基地'  then '华中'
+               when t.product_area_name = '山东基地'  then '华北'
+               when t.product_area_name = '福建基地'  then '华南' 
+               when t.product_area_name = '广西基地'  then '华南' end as prod_area , 
+    coalesce(sum(CLOSE_QTY),0) as CLOSE_QTY ,
+    coalesce(sum(CANCEL_QTY),0) as CANCEL_QTY,
+    coalesce(sum(COMPLETE_QTY),0) as COMPLETE_QTY, 
+    coalesce(sum(QTY),0) as plan_qty,
+    sum(greatest(coalesce(QTY,0) -  coalesce(CLOSE_QTY,0)-coalesce(CANCEL_QTY,0)- coalesce(COMPLETE_QTY,0),0))  as not_complete_qty
+from    DWROTD.DWR_PS_APS_PRO_ORDER_F t    
+where t.ORDER_STATE IN(0,10,24,26,28)
+and t.is_phantom  = 0 
+and t.inv_org_id  = 1
+--and  t.PLAN_STATUS
+group by t.material_num ,SELF_FOREIGN_FLAG,product_area_name 
+)  tt   
+group by  tt.material_num ,
+          tt.prod_area;

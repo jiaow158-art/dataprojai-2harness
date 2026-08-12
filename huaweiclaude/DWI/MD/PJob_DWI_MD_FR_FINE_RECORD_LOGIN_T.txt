@@ -1,0 +1,23 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：数据中心登录表
+-- create time: 2023/02/07 11:50:05 GMT+08:00
+-- update from huangwenbin 2024-12-27 表结构改动
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_FR_FINE_RECORD_LOGIN_T
+SELECT SYNCID
+      ,STORAGETIME
+      ,DECIMAL_TIME
+      ,ACTIONMETHOD
+      ,ACTIONRESULT
+      ,ACTIONTYPE
+      ,AUTHMETHOD
+      ,IP
+      ,USERNAME
+      ,USERROLE
+      ,`TIME`
+      ,SAVE_TIME
+      ,'N' AS DEL_FLAG
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM SDI.SDI_FR_FINE_RECORD_LOGIN_1035

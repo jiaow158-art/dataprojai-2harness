@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_CRM_AMBV2_PERFORMANCE_SPLIT_RATE_MONTH",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

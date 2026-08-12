@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_HEAD_SAP_TMP01",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "SAP销售订单头临时表(01)   ",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

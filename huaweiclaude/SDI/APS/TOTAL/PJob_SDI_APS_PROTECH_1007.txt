@@ -1,0 +1,25 @@
+insert overwrite table sdi.sdi_aps_protech_1007
+select 
+id,
+algorithm_marking,
+code,
+create_by,
+create_date,
+inv_org_id,
+is_bottleneck,
+is_phantom,
+is_scheduling,
+mark_color,
+name,
+offset_time,
+process_segment_id,
+process_tech_type_id,
+sam,
+sync_id,
+transfer_time,
+update_by,
+update_date,
+working_hours,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_protech_1007;

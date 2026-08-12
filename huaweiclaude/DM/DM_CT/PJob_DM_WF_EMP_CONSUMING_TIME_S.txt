@@ -1,0 +1,126 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/03/23 17:21:29 GMT+08:00
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DM.DM_WF_EMP_CONSUMING_TIME_S PARTITION(STAT_MONTH)
+SELECT A.LASTNAME AS EMP_NAME --人员名称
+      ,A.DEPT_NAME  --所属部门
+      ,A.SAPID AS EMP_ID --人员工号
+	  ,A.CURRENT_NODE_TYPE AS NODE_TYPE
+      ,SUM(A.HS_MINUTE) AS GZ_MINUTE --总耗时(工作时间:分钟)
+	  ,SUM(A.GZ_HOUR) AS GZ_HOUR --总耗时(工作时间:小时)
+	  ,COUNT(DISTINCT REQUEST_CODE) AS WF_COUNT --流程数
+	  ,SUM(A.NODE_COUNT) AS NODE_COUNT --接收节点次数
+	  ,SUM(A.GZ_HOUR)/SUM(A.NODE_COUNT) AVG_GZ_HOUR --平均耗时(工作时间:小时)
+      ,SUM(CASE WHEN A.OPERATE_TYPE = '2:已操作' THEN NODE_COUNT ELSE 0 END) AS OPERATE_COUNT --已操作
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '已查看' THEN NODE_COUNT ELSE 0 END) AS YCK_COUNT --已查看
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '0:未操作' THEN NODE_COUNT ELSE 0 END) AS NO_OPERATE_COUNT --未操作
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '9:抄送(需提交)' THEN NODE_COUNT ELSE 0 END) AS CS_COUNT --抄送(需提交)
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '1:转发' THEN NODE_COUNT ELSE 0 END) AS ZF_COUNT --转发
+      ,A.EMP_POST_NAME --岗位层级
+	  ,A.LEV1_DEPT_NAME --部门层级1
+	  ,A.LEV2_DEPT_NAME --部门层级2
+	  ,A.LEV3_DEPT_NAME --部门层级3
+	  ,A.LEV4_DEPT_NAME --部门层级4
+	  ,A.LEV5_DEPT_NAME --部门层级5
+	  ,A.LEV6_DEPT_NAME --部门层级6
+	  ,A.LEV7_DEPT_NAME --部门层级7
+	  ,A.LEV8_DEPT_NAME --部门层级8
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,A.STAT_MONTH --统计月份
+  FROM DM.DM_WF_REQUESTS_CONSUMING_TIME_T A
+ WHERE A.STAT_MONTH = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+   AND REPLACE(SUBSTR(RECEIVE_DATE,1,7),'-','') = A.STAT_MONTH
+   AND A.wf_name not in(
+                         'BIT013-系统提醒工作流'
+                        ,'BIT011-内部留言（旧）'
+                        ,'BIT008-内部留言'
+                        ,'BIT007-通用流程(内部)'
+						,'BIT009-通用流程(外部)'
+                        ,'开发进度流程(停止申请)'
+                        ,'PIT-A2-001-系统/业务流程开发与优化申请流程(停止申请)'
+                       )
+   AND A.CURRENT_NODE_TYPE IN('审批','操作')
+   AND A.WF_TYPE_NAME NOT IN('历史流程','测试流程')
+ GROUP BY
+       A.LASTNAME
+      ,A.DEPT_NAME
+      ,A.SAPID
+	  ,A.CURRENT_NODE_TYPE
+      ,A.EMP_POST_NAME
+	  ,A.LEV1_DEPT_NAME
+	  ,A.LEV2_DEPT_NAME
+	  ,A.LEV3_DEPT_NAME
+	  ,A.LEV4_DEPT_NAME
+	  ,A.LEV5_DEPT_NAME
+	  ,A.LEV6_DEPT_NAME
+	  ,A.LEV7_DEPT_NAME
+	  ,A.LEV8_DEPT_NAME
+	  ,A.STAT_MONTH
+	  
+ UNION ALL
+
+SELECT A.LASTNAME AS EMP_NAME --人员名称
+      ,A.DEPT_NAME  --所属部门
+      ,A.SAPID AS EMP_ID --人员工号
+	  ,'合计' AS NODE_TYPE
+      ,SUM(A.HS_MINUTE) AS GZ_MINUTE --总耗时(工作时间:分钟)
+	  ,SUM(A.GZ_HOUR) AS GZ_HOUR --总耗时(工作时间:小时)
+	  ,COUNT(DISTINCT REQUEST_CODE) AS WF_COUNT --流程数
+	  ,SUM(A.NODE_COUNT) AS NODE_COUNT --接收节点次数
+	  ,SUM(A.GZ_HOUR)/SUM(A.NODE_COUNT) AVG_GZ_HOUR --平均耗时(工作时间:小时)
+      ,SUM(CASE WHEN A.OPERATE_TYPE = '2:已操作' THEN NODE_COUNT ELSE 0 END) AS OPERATE_COUNT --已操作
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '已查看' THEN NODE_COUNT ELSE 0 END) AS YCK_COUNT --已查看
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '0:未操作' THEN NODE_COUNT ELSE 0 END) AS NO_OPERATE_COUNT --未操作
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '9:抄送(需提交)' THEN NODE_COUNT ELSE 0 END) AS CS_COUNT --抄送(需提交)
+	  ,SUM(CASE WHEN A.OPERATE_TYPE = '1:转发' THEN NODE_COUNT ELSE 0 END) AS ZF_COUNT --转发
+      ,A.EMP_POST_NAME --岗位层级
+	  ,A.LEV1_DEPT_NAME --部门层级1
+	  ,A.LEV2_DEPT_NAME --部门层级2
+	  ,A.LEV3_DEPT_NAME --部门层级3
+	  ,A.LEV4_DEPT_NAME --部门层级4
+	  ,A.LEV5_DEPT_NAME --部门层级5
+	  ,A.LEV6_DEPT_NAME --部门层级6
+	  ,A.LEV7_DEPT_NAME --部门层级7
+	  ,A.LEV8_DEPT_NAME --部门层级8
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,A.STAT_MONTH --统计月份
+  FROM DM.DM_WF_REQUESTS_CONSUMING_TIME_T A
+ WHERE A.STAT_MONTH = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+   AND REPLACE(SUBSTR(RECEIVE_DATE,1,7),'-','') = A.STAT_MONTH
+   AND A.WF_NAME NOT IN(
+                         'BIT013-系统提醒工作流'
+                        ,'BIT011-内部留言（旧）'
+                        ,'BIT008-内部留言'
+                        ,'BIT007-通用流程(内部)'
+						,'BIT009-通用流程(外部)'
+                        ,'开发进度流程(停止申请)'
+                        ,'PIT-A2-001-系统/业务流程开发与优化申请流程(停止申请)'
+                       )
+   AND A.CURRENT_NODE_TYPE IN('审批','操作')
+   AND A.WF_TYPE_NAME NOT IN('历史流程','测试流程')
+ GROUP BY
+       A.LASTNAME
+      ,A.DEPT_NAME
+      ,A.SAPID
+      ,A.EMP_POST_NAME
+	  ,A.LEV1_DEPT_NAME
+	  ,A.LEV2_DEPT_NAME
+	  ,A.LEV3_DEPT_NAME
+	  ,A.LEV4_DEPT_NAME
+	  ,A.LEV5_DEPT_NAME
+	  ,A.LEV6_DEPT_NAME
+	  ,A.LEV7_DEPT_NAME
+	  ,A.LEV8_DEPT_NAME
+	  ,A.STAT_MONTH 
+;

@@ -1,0 +1,24 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/27 14:47:01 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM_SW.DM_PAM_WM_MARKUP_BARCODE_T
+select substring(cast(a.create_time as string),1,7) as start_month, -- '时间' , 
+	   b.warehouse_id ,-- '仓库ID' ,
+	   b.warehouse_name ,-- '仓库名称' ,
+	   c.dept_name ,-- '部门名称',
+	   a.product_code , -- '产品编号',
+	   a.product_name , -- '产品名称' ,
+	   count(DISTINCT a.barcode3) as Complement_qty, -- '补码数量'
+	   current_timestamp() as dw_last_update_date -- '数据同步时间'
+from SDI.SDI_pdm_relationcode_1022 a
+inner join SDI.SDI_wms_bill_in_apply_1022 b on a.storage_in_id = b.id and b.type = 5
+left join SDI.SDI_sys_dept_1022 c on b.warehouse_dept_id = c.dept_id
+where  a.flag = '1'
+group by  substring(cast(a.create_time as string),1,7) ,
+		  b.warehouse_id,
+		  b.warehouse_name ,
+		  c.dept_name,
+		  a.product_code,
+		  a.product_name;

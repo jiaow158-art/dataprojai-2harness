@@ -1,0 +1,109 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/04/15 17:34:09 GMT+08:00
+-- update from huangwenbin 2025-08-11 新增字段：实际操作人ID、实际操作人工号、实际操作人姓名
+-- ******************************************************************** --
+delete from dm.dm_wf_requests_consuming_time_pre_t
+where stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+;
+
+insert into dm.dm_wf_requests_consuming_time_pre_t(
+    request_code,
+	request_explain,
+	dept_name,
+	lastname,
+	sapid,
+	node_name,
+	l1lc,
+	wf_name,
+	receive_date,
+	receive_time,
+	operate_date,
+	operate_time,
+	operatedatesj,
+	operatetimesj,
+	operate_type,
+	last_operate_type,
+	hs_hour,
+	hs_minute,
+	dept_jg_name,
+	node_count,
+	gz_hour,
+	lev1_dept_name,
+	lev2_dept_name,
+	lev3_dept_name,
+	lev4_dept_name,
+	lev5_dept_name,
+	lev6_dept_name,
+	lev7_dept_name,
+	lev8_dept_name,
+	dw_last_update_date,
+	stat_month,
+	current_node_type,
+	emp_post_name,
+	wf_type_name,
+	wf_code,
+	is_zx,
+	request_emp_id,
+	request_emp_name,
+	actl_emp_id,
+    actl_emp_num,
+    actl_emp_name
+)
+select 
+request_code,
+	request_explain,
+	dept_name,
+	lastname,
+	sapid,
+	node_name,
+	l1lc,
+	wf_name,
+	receive_date,
+	receive_time,
+	operate_date,
+	operate_time,
+	operatedatesj,
+	operatetimesj,
+	operate_type,
+	last_operate_type,
+	hs_hour,
+	hs_minute,
+	dept_jg_name,
+	node_count,
+	gz_hour,
+	lev1_dept_name,
+	lev2_dept_name,
+	lev3_dept_name,
+	lev4_dept_name,
+	lev5_dept_name,
+	lev6_dept_name,
+	lev7_dept_name,
+	lev8_dept_name,
+	dw_last_update_date,
+	stat_month,
+	current_node_type,
+	emp_post_name,
+	wf_type_name,
+	wf_code,
+	is_zx,
+	request_emp_id,
+	request_emp_name,
+	actl_emp_id,
+    actl_emp_num,
+    actl_emp_name
+  from dm.dm_wf_requests_consuming_time_t
+ where stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+   and wf_name not in(
+                         'BIT013-系统提醒工作流'
+                        ,'BIT011-内部留言（旧）'
+                        ,'BIT008-内部留言'
+                        ,'BIT007-通用流程(内部)'
+						,'BIT009-通用流程(外部)'
+                        ,'开发进度流程(停止申请)'
+                        ,'PIT-A2-001-系统/业务流程开发与优化申请流程(停止申请)'
+                       )
+   and substr(receive_date,1,4) >= '2022'
+   AND CURRENT_NODE_TYPE IN('审批','操作')
+   AND wf_type_name not in('历史流程','测试流程')

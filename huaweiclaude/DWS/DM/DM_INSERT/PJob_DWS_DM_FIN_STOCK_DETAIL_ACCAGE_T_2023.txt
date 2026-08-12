@@ -1,0 +1,788 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/04/04 17:42:04 GMT+08:00
+-- desc：2023库存明细账龄表 dm.dm_fin_stock_detail_accage_t_2023
+-- update：2023/04/21 guzhengfeng 库存数量按库龄进行拆分
+-- update：2023/05/09 guzhengfeng 1、货架寿命到期日取dwimd.dwi_md_matl_batch_info_t.shelf_end_date；2、增加‘72*’工厂的有保质期产品判断
+-- update：2023/05/16 guzhengfeng 判断保质期到期的货架寿命到期日字段更换成 shelf_end_date
+-- update：2023/05/17 guzhengfeng 判断保质期到期的货架寿命到期日取值修改为 replace(substring(t.shelf_end_date,1,7),'-','')
+-- update: 2023/05/23 zhz 新增自有库存一系列字段
+-- update：2023/05/30 guzhengfeng 有保质期减值增加'7220'工厂判断（7220工厂（库存地点TY、FC、QA、TA）按临保质期三个月内的库存金额*0.7）
+-- update: 2023/06/14 zhz 修改新增字段数据来源
+-- update：2023/08/08 guzhengfeng 新增字段28个
+-- update：2023/08/18 guzhengfeng 修改取阿米巴内部结算价的逻辑
+-- update：2023/08/25 guzhengfeng 新增字段：doc_number 销售凭证、s_ord_item 销售凭证项目
+-- ******************************************************************** 
+delete from dm.dm_fin_stock_detail_accage_t_2023 where calmonth between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}';
+insert into dm.dm_fin_stock_detail_accage_t_2023 
+with stock1 as(
+select 
+	t.batch  					-- 批次
+	,t.calmonth  				-- 日历年/月
+	,t.calmonth2  				-- 日历月
+	,t.calyear  				-- 日历年
+	,t.comp_code  				-- 公司代码
+	,t.comp_code___t  			-- 公司代码_描述
+	,t.doc_currcy  				-- 凭证货币
+	,t.doc_currcy___t  			-- 凭证货币_描述
+	,t.extmatlgrp  				-- 外部物料组
+	,t.extmatlgrp___t  			-- 外部物料组_描述
+	,t.industry  				-- 行业
+	,t.industry___t  			-- 行业_描述
+	,t.material  				-- 物料编码
+	,t.material___t  			-- 物料编码_描述
+	,t.matl_group  				-- 物料组
+	,t.matl_group___t  			-- 物料组_描述
+	,t.matl_type  				-- 物料类型
+	,t.matl_type___t  			-- 物料类型_描述
+	,t.plant  					-- 工厂
+	,t.plant___t  				-- 工厂_描述
+	,t.reqtsn  					-- 请求事务序号
+	,t.stockcat  				-- 库存类别
+	,t.stockcat___t  			-- 库存类别_描述
+	,t.stocktype  				-- 库存类型
+	,t.stocktype___t  			-- 库存类型_描述
+	,t.stor_loc  				-- 库存地点
+	,t.stor_loc___t  			-- 库存地点_描述
+	,t.unit  					-- 计量单位
+	,t.unit___t  				-- 计量单位_描述
+	,t.val_class  				-- 评估类
+	,t.val_class___t  			-- 评估类_描述
+	,t.wbs_elemt  				-- WBS 元素
+	,t.wbs_elemt___t  			-- WBS 元素_描述
+	,t.wbs_elm_ex  				-- 0WBS_ELM_EX
+	,t.zmmm_o017_zbatch_date  	-- 入库日期
+	,t.zbatchmd  				-- 物料批次主数据
+	,t.zdpsyb  					-- 事业部
+	,t.zdpsyb___t  				-- 事业部_描述
+	,t.zdpzgsdq  				-- 子公司大区
+	,t.zdpzgsdq___t  			-- 子公司大区_描述
+	,t.zisqc  					-- 是否清仓
+	,t.ziswx  					-- 是否外协
+	,t.zmatltype  				-- 物料类别
+	,t.zmatltype___t  			-- 物料类别_描述
+	,t.zprodh3  				-- 产品层次3
+	,t.zprodh3___t  			-- 产品层次3_描述
+	,t.zww010  					-- 产区
+	,t.zww010___t  				-- 产区_描述
+	,t.zyl01  					-- 产品渠道
+	,t.zyl01___t  				-- 产品渠道_描述
+	,t.zyl06  					-- 产品等级
+	,t.zyl06___t  				-- 产品等级_描述
+	,t.quantity  				-- 数量
+	,t.zsjkcje  				-- 实际库存金额
+	,t.dw_last_update_date  	-- 数据同步时间
+	,t.z_vfdat  				-- 货架寿命到期日
+	,t.zprodh1  				-- 产品层次1
+	,t.zprodh1___t  			-- 产品层次1_描述
+	,t.zprodh2  				-- 产品层次2
+	,t.zprodh2___t  			-- 产品层次2_描述
+	,t.zprodh4  				-- 产品层次4
+	,t.zprodh4___t  			-- 产品层次4_描述
+	,t.zprodh5  				-- 产品层次5
+	,t.zprodh5___t  			-- 产品层次5_描述
+	,t.matl_grp_1  				-- 物料组1
+	,t.matl_grp_1___t  			-- 物料组1_描述
+	,t.matl_grp_2  				-- 物料组2
+	,t.matl_grp_2___t  			-- 物料组2_描述
+	,t.matl_grp_3  				-- 物料组3
+	,t.matl_grp_3___t  			-- 物料组3_描述
+	,t.matl_grp_4  				-- 物料组4
+	,t.matl_grp_4___t  			-- 物料组4_描述
+	,t.matl_grp_5  				-- 物料组5
+	,t.matl_grp_5___t  			-- 物料组5_描述
+	,t.vendor  					-- 供应商
+	,t.vendor___t  				-- 供应商_描述
+	,t.zmmm_o017_zzqj  			-- 周期价
+	,t.zgg01  					-- 产品规格
+	,t.zgg01___t  				-- 产品规格_描述
+	,t.zpcrk_fc  				-- 批次入库日期（辅材专用）
+	,t.zmmm_o017_zkcmj  		-- 库存面积
+	,t.val_type  				-- 评估类型
+	,case when g.shelf_end_date <> '00000000'  and substring(t.plant,1,2) in ('7C','73','72') then 'Y'  -- 有保质期产品
+	    else 'N' -- 无保质期产品
+	end bz_flag					-- 保质期产品标识
+	,case when t.calmonth = replace(substring(cast(sysdate as varchar),1,7),'-','') then replace(substring(cast((sysdate - 1) as varchar),1,10),'-','')
+		else  replace(substring(cast(last_day(to_date(t.calmonth,'yyyymmdd')) as varchar),1,10),'-','')
+	end zdate					-- 截至日期（输入年月月末最后一天（如果输入的是当月就取昨天））
+	,g.shelf_end_date     		-- 货架寿命到期日
+	,case when left(t.plant,2) = '32' then '江西基地'
+		  when left(t.plant,2) = '33' then '堆龙德庆裕威'
+		  when left(t.plant,2) = '35' then '江门基地'
+		  when left(t.plant,2) = '36' then '佛山基地'
+		  when left(t.plant,2) = '37' then '高明基地'
+		  when left(t.plant,2) = '38' then '佛山东鹏整装'
+		  when left(t.plant,2) = '39' then '鹏嘉'  
+		else '' 
+	end as "基地"				-- 基地
+ 	,case when t.stor_loc is not null then i.location_category  
+		else j.location_category 
+	end as "库位分类" 			-- 库位分类
+ 	,k.classify_name as "分类"	-- 分类
+	,k.category_name as "品类"	-- 品类
+	,case when left(t.plant,2) = '37' then '高明基地'
+		  when left(t.plant,2) = '32' then '江西基地'
+		  when left(t.plant,2) = '39' then '外协'
+		  when ( t.material = '#' or t.material is null ) and left(t.comp_code,2) = '32' then '江西基地'
+		  when ( t.material = '#' or t.material is null ) and left(t.comp_code,2) = '33' then '外协'
+		  when ( t.material = '#' or t.material is null ) and left(t.comp_code,2) = '35' then '江门陶瓷基地'
+		  when ( t.material = '#' or t.material is null ) and left(t.comp_code,2) = '36' then '佛山基地'
+		  when ( t.material = '#' or t.material is null ) and left(t.comp_code,2) = '37' then '高明基地'
+		  when t.zww010 = '0J' then '江西基地'
+		  when t.zww010 = '0E' then '外协'
+		  when t.zww010 in ('0W','00')  and left (T.zprodh2,1) = '3'  then '佛山基地' 
+		  when t.zww010 = 'J1' then '淋浴房厂'
+		  when t.zww010 = 'J2' then '江门水龙头厂'
+		  when t.zww010 = 'J5' then '高明基地'
+		  when left(t.zprodh2,1) in ('3','4') and left(t.plant,1) <> '3' and t.zww010 = '92' then '江门陶瓷基地'
+		  when t.zprodh2 in('4012','4103')  and left(t.plant,2) = '35' then '江门水龙头厂'
+		  when t.zprodh2 in('4014','4105','4108')  and left(t.plant,2) = '35' then '淋浴房厂'
+		  when t.zww010 in ( '92','11' ) and left(t.plant,2) = '36' then '佛山基地'
+		  when t.zprodh2 not in ('4002','4101') and t.zww010 = '00' and left (t.plant,2) = '36' then '佛山基地'
+		  when  t.zprodh2 <> '4014' and left(t.plant,2) = '35' then '江门陶瓷基地'
+		else '外协' 
+	end as "生产基地"			-- 生产基地
+	,case when t.calmonth = l.calmonth  and t.material = l.material_num and (t.stor_loc = l.store_loc or l.store_loc = 'all') then 'Y' 
+		else '' 
+	end as "清库存标识"			-- 清库存标识
+	,replace(last_day(add_months(to_date(t.calmonth,'yyyy-mm-dd'),1)),'-','') 
+		as "下月日期"			-- 下月日期
+	,case when left(t.zmmm_o017_zbatch_date,1) = '0' or t.zmmm_o017_zbatch_date is null then '999' 
+		else (date(last_day(add_months(to_date(t.calmonth,'yyyy-mm-dd'),1))) - date(to_date(t.zmmm_o017_zbatch_date,'yyyy-mm-dd'))) 
+	end as "时间差"				-- 时间差
+	,t1.prod_property			-- 产品所有权
+	,t1.prod_property_name		-- 产品所有权描述
+	,case when t1.prod_property = 'C0001' then '07'  
+		  when t1.prod_property = 'C0002' then '05' 
+		  when t1.prod_property = 'A0001' then '01' 
+		  when t1.prod_property = 'B0001' then '08' 
+		  when t1.prod_property = 'C0003' then '04' 
+		  when t1.prod_property = 'C0004' then '06' 
+		  when t1.prod_property = 'C0005' then '03' 
+		  when t1.prod_property = 'C0006' then '02' 
+		  when t1.prod_property = 'D0001' then '10' 
+		else 'null'
+	end zsyb_code				-- 事业部编码
+	,t.doc_number               -- 销售凭证
+	,t.s_ord_item               -- 销售凭证项目
+from 
+	dm.dm_rpt_zzt_kcmx_t t
+	left join dwimd.dwi_md_data_material_general_t t1
+		   on t.material = t1.material_num 
+	left join dwimd.dwi_md_matl_batch_info_t g
+		   on t.material = g.material_num 
+		  and t.batch = g.batch_num
+    left join dm.dm_rpt_stock_place_t i 
+           on t.stor_loc = i.stock_place_name 
+		  and i.stock_place_flag = '库存地点不为空' 
+		  and i.stock_place_name is not null
+	left join dm.dm_rpt_stock_place_t j 
+	       on t.plant = j.factory_code 
+		  and j.stock_place_flag = '库存地点为空'
+		  and j.stock_place_name is null 
+	left join upload.upload_sw_inv_prod_category_t k 
+		   on t.zprodh3 = k.prod_level3_code 
+	left join dm.dm_rpt_bathroom_risk_inventory_list l 
+		   on t.calmonth = l.calmonth  
+		  and t.material = l.material_num 
+		  and (t.stor_loc = l.store_loc or l.store_loc = 'all')
+where t.calmonth between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}' 
+) 
+,
+stock2 as (
+select 
+	t2.batch  					-- 批次
+	,t2.calmonth  				-- 日历年/月
+	,t2.calmonth2  				-- 日历月
+	,t2.calyear  				-- 日历年
+	,t2.comp_code  				-- 公司代码
+	,t2.comp_code___t  			-- 公司代码_描述
+	,t2.doc_currcy  			-- 凭证货币
+	,t2.doc_currcy___t  		-- 凭证货币_描述
+	,t2.extmatlgrp  			-- 外部物料组
+	,t2.extmatlgrp___t  		-- 外部物料组_描述
+	,t2.industry  				-- 行业
+	,t2.industry___t  			-- 行业_描述
+	,t2.material  				-- 物料编码
+	,t2.material___t  			-- 物料编码_描述
+	,t2.matl_group  			-- 物料组
+	,t2.matl_group___t  		-- 物料组_描述
+	,t2.matl_type  				-- 物料类型
+	,t2.matl_type___t  			-- 物料类型_描述
+	,t2.plant  					-- 工厂
+	,t2.plant___t  				-- 工厂_描述
+	,t2.reqtsn  				-- 请求事务序号
+	,t2.stockcat  				-- 库存类别
+	,t2.stockcat___t  			-- 库存类别_描述
+	,t2.stocktype  				-- 库存类型
+	,t2.stocktype___t  			-- 库存类型_描述
+	,t2.stor_loc  				-- 库存地点
+	,t2.stor_loc___t  			-- 库存地点_描述
+	,t2.unit  					-- 计量单位
+	,t2.unit___t  				-- 计量单位_描述
+	,t2.val_class  				-- 评估类
+	,t2.val_class___t  			-- 评估类_描述
+	,t2.wbs_elemt  				-- WBS 元素
+	,t2.wbs_elemt___t  			-- WBS 元素_描述
+	,t2.wbs_elm_ex  			-- 0WBS_ELM_EX
+	,t2.zmmm_o017_zbatch_date  	-- 入库日期
+	,t2.zbatchmd  				-- 物料批次主数据
+	,t2.zdpsyb  				-- 事业部
+	,t2.zdpsyb___t  			-- 事业部_描述
+	,t2.zdpzgsdq  				-- 子公司大区
+	,t2.zdpzgsdq___t  			-- 子公司大区_描述
+	,t2.zisqc  					-- 是否清仓
+	,t2.ziswx  					-- 是否外协
+	,t2.zmatltype  				-- 物料类别
+	,t2.zmatltype___t  			-- 物料类别_描述
+	,t2.zprodh3  				-- 产品层次3
+	,t2.zprodh3___t  			-- 产品层次3_描述
+	,t2.zww010  				-- 产区
+	,t2.zww010___t  			-- 产区_描述
+	,t2.zyl01  					-- 产品渠道
+	,t2.zyl01___t  				-- 产品渠道_描述
+	,t2.zyl06  					-- 产品等级
+	,t2.zyl06___t  				-- 产品等级_描述
+	,t2.quantity  				-- 数量
+	,t2.zsjkcje  				-- 实际库存金额
+	,t2.dw_last_update_date  	-- 数据同步时间
+	,t2.z_vfdat  				-- 货架寿命到期日
+	,t2.zprodh1  				-- 产品层次1
+	,t2.zprodh1___t  			-- 产品层次1_描述
+	,t2.zprodh2  				-- 产品层次2
+	,t2.zprodh2___t  			-- 产品层次2_描述
+	,t2.zprodh4  				-- 产品层次4
+	,t2.zprodh4___t  			-- 产品层次4_描述
+	,t2.zprodh5  				-- 产品层次5
+	,t2.zprodh5___t  			-- 产品层次5_描述
+	,t2.matl_grp_1  			-- 物料组1
+	,t2.matl_grp_1___t  		-- 物料组1_描述
+	,t2.matl_grp_2  			-- 物料组2
+	,t2.matl_grp_2___t  		-- 物料组2_描述
+	,t2.matl_grp_3  			-- 物料组3
+	,t2.matl_grp_3___t  		-- 物料组3_描述
+	,t2.matl_grp_4  			-- 物料组4
+	,t2.matl_grp_4___t  		-- 物料组4_描述
+	,t2.matl_grp_5  			-- 物料组5
+	,t2.matl_grp_5___t  		-- 物料组5_描述
+	,t2.vendor  				-- 供应商
+	,t2.vendor___t  			-- 供应商_描述
+	,t2.zmmm_o017_zzqj  		-- 周期价
+	,t2.zgg01  					-- 产品规格
+	,t2.zgg01___t  				-- 产品规格_描述
+	,t2.zpcrk_fc  				-- 批次入库日期（辅材专用）
+	,t2.zmmm_o017_zkcmj  		-- 库存面积
+	,t2.val_type  				-- 评估类型
+	,t2.bz_flag					-- 保质期产品标识
+	,t2.zdate					-- 截至日期（输入年月月末最后一天（如果输入的是当月就取昨天））
+	,t2.shelf_end_date     		-- 货架寿命到期日
+	,t2."基地"					-- 基地
+ 	,t2."库位分类" 				-- 库位分类
+ 	,t2."分类"					-- 分类
+	,t2."品类"					-- 品类
+	,t2."生产基地"				-- 生产基地
+	,t2."清库存标识"			-- 清库存标识
+	,t2."下月日期"				-- 下月日期
+	,t2."时间差"				-- 时间差
+	,t2.prod_property			-- 产品所有权
+	,t2.prod_property_name		-- 产品所有权描述	
+	,nvl(d2.price1,0) * nvl(t2.quantity,0) 			
+		as stock_amt			-- 库存金额（阿米巴结算价）
+	,t2.doc_number              -- 销售凭证
+	,t2.s_ord_item              -- 销售凭证项目
+from
+	stock1 t2
+	left join 
+	(select 
+		d1.matnr								-- 物料编码
+		,d1.datef								-- 开始日期
+		,d1.dated								-- 结束日期
+		,d1.zsyb_code							-- 事业部编码
+		,d1.zsyb								-- 事业部描述
+		,d1.price1								-- 内部结算价
+	from (
+		select 
+			d.matnr 							-- 物料编码
+			,d.datef 		                    -- 开始日期
+			,d.dated		                    -- 结束日期
+			,d.zsyb_code 						-- 事业部编码
+			,d.zsyb 							-- 事业部描述
+			,d.price1 							-- 内部结算价
+			,d.werks
+			,row_number ()over(partition by d.matnr ,d.datef,d.zsyb_code ,d.zsyb order by d.werks asc,d.dated desc) as rn
+		from 
+			dwifin.dwi_prc_ztamb_cost_t d
+		where d.dated > d.datef
+		) d1
+	where d1.rn = 1
+	) d2
+	on t2.material = d2.matnr 
+	and t2.zsyb_code = d2.zsyb_code
+	and REPLACE(SUBSTR(last_day(to_date(t2.calmonth||'01') - INTERVAL '0 MONTH'),1,10),'-','') >= d2.datef
+	and REPLACE(SUBSTR(last_day(to_date(t2.calmonth||'01') - INTERVAL '0 MONTH'),1,10),'-','') <= d2.dated 
+)
+,
+stock3 as (
+select 
+	t3.batch  					-- 批次
+	,t3.calmonth  				-- 日历年/月
+	,t3.calmonth2  				-- 日历月
+	,t3.calyear  				-- 日历年
+	,t3.comp_code  				-- 公司代码
+	,t3.comp_code___t  			-- 公司代码_描述
+	,t3.doc_currcy  			-- 凭证货币
+	,t3.doc_currcy___t  		-- 凭证货币_描述
+	,t3.extmatlgrp  			-- 外部物料组
+	,t3.extmatlgrp___t  		-- 外部物料组_描述
+	,t3.industry  				-- 行业
+	,t3.industry___t  			-- 行业_描述
+	,t3.material  				-- 物料编码
+	,t3.material___t  			-- 物料编码_描述
+	,t3.matl_group  			-- 物料组
+	,t3.matl_group___t  		-- 物料组_描述
+	,t3.matl_type  				-- 物料类型
+	,t3.matl_type___t  			-- 物料类型_描述
+	,t3.plant  					-- 工厂
+	,t3.plant___t  				-- 工厂_描述
+	,t3.reqtsn  				-- 请求事务序号
+	,t3.stockcat  				-- 库存类别
+	,t3.stockcat___t  			-- 库存类别_描述
+	,t3.stocktype  				-- 库存类型
+	,t3.stocktype___t  			-- 库存类型_描述
+	,t3.stor_loc  				-- 库存地点
+	,t3.stor_loc___t  			-- 库存地点_描述
+	,t3.unit  					-- 计量单位
+	,t3.unit___t  				-- 计量单位_描述
+	,t3.val_class  				-- 评估类
+	,t3.val_class___t  			-- 评估类_描述
+	,t3.wbs_elemt  				-- WBS 元素
+	,t3.wbs_elemt___t  			-- WBS 元素_描述
+	,t3.wbs_elm_ex  			-- 0WBS_ELM_EX
+	,t3.zmmm_o017_zbatch_date  	-- 入库日期
+	,t3.zbatchmd  				-- 物料批次主数据
+	,t3.zdpsyb  				-- 事业部
+	,t3.zdpsyb___t  			-- 事业部_描述
+	,t3.zdpzgsdq  				-- 子公司大区
+	,t3.zdpzgsdq___t  			-- 子公司大区_描述
+	,t3.zisqc  					-- 是否清仓
+	,t3.ziswx  					-- 是否外协
+	,t3.zmatltype  				-- 物料类别
+	,t3.zmatltype___t  			-- 物料类别_描述
+	,t3.zprodh3  				-- 产品层次3
+	,t3.zprodh3___t  			-- 产品层次3_描述
+	,t3.zww010  				-- 产区
+	,t3.zww010___t  			-- 产区_描述
+	,t3.zyl01  					-- 产品渠道
+	,t3.zyl01___t  				-- 产品渠道_描述
+	,t3.zyl06  					-- 产品等级
+	,t3.zyl06___t  				-- 产品等级_描述
+	,t3.quantity  				-- 数量
+	,t3.zsjkcje  				-- 实际库存金额
+	,t3.dw_last_update_date  	-- 数据同步时间
+	,t3.z_vfdat  				-- 货架寿命到期日
+	,t3.zprodh1  				-- 产品层次1
+	,t3.zprodh1___t  			-- 产品层次1_描述
+	,t3.zprodh2  				-- 产品层次2
+	,t3.zprodh2___t  			-- 产品层次2_描述
+	,t3.zprodh4  				-- 产品层次4
+	,t3.zprodh4___t  			-- 产品层次4_描述
+	,t3.zprodh5  				-- 产品层次5
+	,t3.zprodh5___t  			-- 产品层次5_描述
+	,t3.matl_grp_1  			-- 物料组1
+	,t3.matl_grp_1___t  		-- 物料组1_描述
+	,t3.matl_grp_2  			-- 物料组2
+	,t3.matl_grp_2___t  		-- 物料组2_描述
+	,t3.matl_grp_3  			-- 物料组3
+	,t3.matl_grp_3___t  		-- 物料组3_描述
+	,t3.matl_grp_4  			-- 物料组4
+	,t3.matl_grp_4___t  		-- 物料组4_描述
+	,t3.matl_grp_5  			-- 物料组5
+	,t3.matl_grp_5___t  		-- 物料组5_描述
+	,t3.vendor  				-- 供应商
+	,t3.vendor___t  			-- 供应商_描述
+	,t3.zmmm_o017_zzqj  		-- 周期价
+	,t3.zgg01  					-- 产品规格
+	,t3.zgg01___t  				-- 产品规格_描述
+	,t3.zpcrk_fc  				-- 批次入库日期（辅材专用）
+	,t3.zmmm_o017_zkcmj  		-- 库存面积
+	,t3.val_type  				-- 评估类型
+	,t3.bz_flag					-- 保质期产品标识
+	,t3.zdate					-- 截至日期（输入年月月末最后一天（如果输入的是当月就取昨天））
+	,t3.shelf_end_date     		-- 货架寿命到期日
+	,t3."基地"					-- 基地
+ 	,t3."库位分类" 				-- 库位分类
+ 	,t3."分类"					-- 分类
+	,t3."品类"					-- 品类
+	,t3."生产基地"				-- 生产基地
+	,t3."清库存标识"			-- 清库存标识
+	,t3."下月日期"				-- 下月日期
+	,t3."时间差"				-- 时间差
+	,t3.prod_property			-- 产品所有权
+	,t3.prod_property_name		-- 产品所有权描述	
+	,t3.stock_amt				-- 库存金额（阿米巴结算价）
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') <= t3.calmonth  then nvl(t3.zsjkcje,0)
+	    else 0 
+	end ybzq_bzdq_amt 			-- 有保质期产品，保质期到期
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') >= replace(substring(cast(add_months(concat(t3.calmonth,'01'),1) as varchar),1,7),'-','') and replace(substring(t3.shelf_end_date,1,7),'-','') <= replace(substring(cast(add_months(concat(t3.calmonth,'01'),3) as varchar),1,7),'-','') then nvl(t3.zsjkcje,0) 
+	    else 0  
+	end ybzq_bzdq_3_amt 		-- 有保质期产品,距离保质期到期3个月以内
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)
+	    else 0 
+	end wbzq_6_amt 				-- 无保质期产品，6个月以内
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)
+	    else 0 
+	end wbzq_6_12_amt 			-- 无保质期产品，6-12月
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)
+	    else 0 
+	end wbzq_12_24_amt 			-- 无保质期产品，1-2年
+    ,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc <= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and  t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-24) as varchar),1,10),'-','') then nvl(t3.zsjkcje,0)
+	    else 0 
+	end wbzq_24_amt 			-- 无保质期产品，2年以上
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') <= t3.calmonth  then nvl(t3.quantity,0)
+	    else 0 
+	end ybzq_bzdq_qty 			-- 有保质期产品数量，保质期到期
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') >= replace(substring(cast(add_months(concat(t3.calmonth,'01'),1) as varchar),1,7),'-','') and replace(substring(t3.shelf_end_date,1,7),'-','') <= replace(substring(cast(add_months(concat(t3.calmonth,'01'),3) as varchar),1,7),'-','') then nvl(t3.quantity,0) 
+	    else 0  
+	end ybzq_bzdq_3_qty 		-- 有保质期产品数量,距离保质期到期3个月以内
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.quantity,0)
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.quantity,0)
+		else 0 
+	end wbzq_6_qty 				-- 无保质期产品数量，6个月以内
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.quantity,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.quantity,0)
+	    else 0 
+	end wbzq_6_12_qty 			-- 无保质期产品数量，6-12月
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.quantity,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.quantity,0)
+	    else 0 
+	end wbzq_12_24_qty 			-- 无保质期产品数量，1-2年
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc <= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') then nvl(t3.quantity,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and  t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-24) as varchar),1,10),'-','') then nvl(t3.quantity,0)
+	    else 0 
+	end wbzq_24_qty 			-- 无保质期产品数量，2年以上
+		   
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') >= replace(substring(cast(add_months(concat(t3.calmonth,'01'),1) as varchar),1,7),'-','') and replace(substring(t3.shelf_end_date,1,7),'-','') <= replace(substring(cast(add_months(concat(t3.calmonth,'01'),3) as varchar),1,7),'-','') then nvl(t3.stock_amt,0) 
+	    else 0  
+	end ybzq_bzdq_3_aging 		-- 有保质期产品,距离保质期到期3个月以内账龄（阿米巴结算价）
+	,case when t3.bz_flag = 'Y' and replace(substring(t3.shelf_end_date,1,7),'-','') <= t3.calmonth  then nvl(t3.stock_amt,0)
+	    else 0 
+	end ybzq_bzdq_aging 		-- 有保质期产品，保质期到期账龄（阿米巴结算价）
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-6)+1) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)
+	    else 0 
+	end wbzq_6_aging 			-- 无保质期产品，6个月以内账龄（阿米巴结算价）
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-12)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-6) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)
+	    else 0 
+	end wbzq_6_12_aging 		-- 无保质期产品，6-12月账龄（阿米巴结算价）
+	,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zpcrk_fc <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and t3.zmmm_o017_zbatch_date >= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') and t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-12) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)
+	    else 0 
+	end wbzq_12_24_aging 		-- 无保质期产品，1-2年账龄（阿米巴结算价）
+    ,case when t3.bz_flag = 'N' and substring(t3.plant,1,2) = '7C'  and t3.zpcrk_fc <= replace(substring(cast((add_months(t3.zdate,-24)+1) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)			 
+		  when t3.bz_flag = 'N' and substring(t3.plant,1,2) <> '7C' and  t3.zmmm_o017_zbatch_date <= replace(substring(cast(add_months(t3.zdate,-24) as varchar),1,10),'-','') then nvl(t3.stock_amt,0)
+	    else 0 
+	end wbzq_24_aging 			-- 无保质期产品，2年以上账龄（阿米巴结算价）
+    ,t3.doc_number              -- 销售凭证
+	,t3.s_ord_item              -- 销售凭证项目
+from
+	stock2 t3
+)
+,
+stock4 as (
+select 
+	t4.batch  					-- 批次
+	,t4.calmonth  				-- 日历年/月
+	,t4.calmonth2  				-- 日历月
+	,t4.calyear  				-- 日历年
+	,t4.comp_code  				-- 公司代码
+	,t4.comp_code___t  			-- 公司代码_描述
+	,t4.doc_currcy  			-- 凭证货币
+	,t4.doc_currcy___t  		-- 凭证货币_描述
+	,t4.extmatlgrp  			-- 外部物料组
+	,t4.extmatlgrp___t  		-- 外部物料组_描述
+	,t4.industry  				-- 行业
+	,t4.industry___t  			-- 行业_描述
+	,t4.material  				-- 物料编码
+	,t4.material___t  			-- 物料编码_描述
+	,t4.matl_group  			-- 物料组
+	,t4.matl_group___t  		-- 物料组_描述
+	,t4.matl_type  				-- 物料类型
+	,t4.matl_type___t  			-- 物料类型_描述
+	,t4.plant  					-- 工厂
+	,t4.plant___t  				-- 工厂_描述
+	,t4.reqtsn  				-- 请求事务序号
+	,t4.stockcat  				-- 库存类别
+	,t4.stockcat___t  			-- 库存类别_描述
+	,t4.stocktype  				-- 库存类型
+	,t4.stocktype___t  			-- 库存类型_描述
+	,t4.stor_loc  				-- 库存地点
+	,t4.stor_loc___t  			-- 库存地点_描述
+	,t4.unit  					-- 计量单位
+	,t4.unit___t  				-- 计量单位_描述
+	,t4.val_class  				-- 评估类
+	,t4.val_class___t  			-- 评估类_描述
+	,t4.wbs_elemt  				-- WBS 元素
+	,t4.wbs_elemt___t  			-- WBS 元素_描述
+	,t4.wbs_elm_ex  			-- 0WBS_ELM_EX
+	,t4.zmmm_o017_zbatch_date  	-- 入库日期
+	,t4.zbatchmd  				-- 物料批次主数据
+	,t4.zdpsyb  				-- 事业部
+	,t4.zdpsyb___t  			-- 事业部_描述
+	,t4.zdpzgsdq  				-- 子公司大区
+	,t4.zdpzgsdq___t  			-- 子公司大区_描述
+	,t4.zisqc  					-- 是否清仓
+	,t4.ziswx  					-- 是否外协
+	,t4.zmatltype  				-- 物料类别
+	,t4.zmatltype___t  			-- 物料类别_描述
+	,t4.zprodh3  				-- 产品层次3
+	,t4.zprodh3___t  			-- 产品层次3_描述
+	,t4.zww010  				-- 产区
+	,t4.zww010___t  			-- 产区_描述
+	,t4.zyl01  					-- 产品渠道
+	,t4.zyl01___t  				-- 产品渠道_描述
+	,t4.zyl06  					-- 产品等级
+	,t4.zyl06___t  				-- 产品等级_描述
+	,t4.quantity  				-- 数量
+	,t4.zsjkcje  				-- 实际库存金额
+	,t4.bz_flag					-- 保质期产品标识
+	,t4.ybzq_bzdq_amt 			-- 有保质期产品，保质期到期
+	,t4.ybzq_bzdq_3_amt 		-- 有保质期产品,距离保质期到期3个月以内
+	,t4.wbzq_6_amt 				-- 无保质期产品，6个月以内
+	,t4.wbzq_6_12_amt 			-- 无保质期产品，6-12月
+	,t4.wbzq_12_24_amt 			-- 无保质期产品，1-2年
+    ,t4.wbzq_24_amt 			-- 无保质期产品，2年以上
+	,case when substring(t4.plant,1,2) in ('7C') then (case when t4.calmonth <  202203 then (t4.ybzq_bzdq_3_amt * 0.6) + (t4.ybzq_bzdq_amt * 1)
+															when t4.calmonth >= 202203 then (t4.ybzq_bzdq_3_amt * 0.7) + (t4.ybzq_bzdq_amt * 1)
+														end )
+		  when substring(t4.plant,1,2) in ('73') then (t4.ybzq_bzdq_3_amt * 0.7) + (t4.ybzq_bzdq_amt * 1)	
+		  when t4.plant in ('7220') and t4.stor_loc in ('TY','FC','QA','TA') then (t4.ybzq_bzdq_3_amt * 0.7) + (t4.ybzq_bzdq_amt * 1)
+		else 0
+	end ybzq_jc_amt 			-- 有保质期减值
+    ,(t4.wbzq_6_amt * 0 ) + (t4.wbzq_6_12_amt * 0.1) + (t4.wbzq_12_24_amt * 0.4) + (t4.wbzq_24_amt * 0.7) 
+	as wbzq_jc_amt 				-- 无保质期减值
+    ,current_timestamp() 
+	as dw_last_update_date 		-- 数据同步时间	
+	,t4.zprodh1  				-- 产品层次1
+	,t4.zprodh1___t  			-- 产品层次1_描述
+	,t4.zprodh2  				-- 产品层次2
+	,t4.zprodh2___t  			-- 产品层次2_描述
+	,t4.zprodh4  				-- 产品层次4
+	,t4.zprodh4___t  			-- 产品层次4_描述
+	,t4.zprodh5  				-- 产品层次5
+	,t4.zprodh5___t  			-- 产品层次5_描述
+	,t4.matl_grp_1  			-- 物料组1
+	,t4.matl_grp_1___t  		-- 物料组1_描述
+	,t4.matl_grp_2  			-- 物料组2
+	,t4.matl_grp_2___t  		-- 物料组2_描述
+	,t4.matl_grp_3  			-- 物料组3
+	,t4.matl_grp_3___t  		-- 物料组3_描述
+	,t4.matl_grp_4  			-- 物料组4
+	,t4.matl_grp_4___t  		-- 物料组4_描述
+	,t4.matl_grp_5  			-- 物料组5
+	,t4.matl_grp_5___t  		-- 物料组5_描述
+	,t4.vendor  				-- 供应商
+	,t4.vendor___t  			-- 供应商_描述
+	,t4.shelf_end_date     		-- 货架寿命到期日
+	,t4.val_type  				-- 评估类型	
+	,t4.zmmm_o017_zzqj  		-- 周期价
+	,t4.ybzq_bzdq_qty 			-- 有保质期产品数量，保质期到期
+	,t4.ybzq_bzdq_3_qty 		-- 有保质期产品数量,距离保质期到期3个月以内
+	,t4.wbzq_6_qty 				-- 无保质期产品数量，6个月以内
+	,t4.wbzq_6_12_qty 			-- 无保质期产品数量，6-12月
+	,t4.wbzq_12_24_qty 			-- 无保质期产品数量，1-2年
+	,t4.wbzq_24_qty 			-- 无保质期产品数量，2年以上
+	,t4.zmmm_o017_zbatch_date 
+	as batch_rk_date	        -- 批次入库日期（阿米巴调整)	
+	,t4."基地"					-- 基地
+ 	,t4."库位分类" 				-- 库位分类
+ 	,t4."分类"					-- 分类
+	,t4."品类"					-- 品类
+	,t4."清库存标识"			-- 清库存标识
+	,case when t4."生产基地" = '外协' then '外协' else '自产' end "外协自产"
+	,t4."生产基地"				-- 生产基地
+	,t4."下月日期"				-- 下月日期
+	,t4."时间差"				-- 时间差
+	,case when t4."时间差" > 180 and t4."时间差" <= 360 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.1 
+		else 0 
+	end "下月跌价金额-7-12个月"
+	,case when t4."时间差" > 360 and t4."时间差" <= 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.4 
+		else 0 
+	end "下月跌价金额-1-2年"
+	,case when t4."时间差" > 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.7 
+		else 0 
+	end "下月跌价金额-2年以上"
+	,(case when t4."时间差" > 180 and t4."时间差" <= 360 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.1 else 0 end ) + 
+	 (case when t4."时间差" > 360 and t4."时间差" <= 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.4 else 0 end) + 
+	 (case when t4."时间差" > 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.7 else 0 end)
+	as "下月跌价金额合计"
+	,(case when t4."时间差" > 180 and t4."时间差" <= 360 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.1 else 0 end) - wbzq_6_12_amt * 0.1 as "下月增加跌价金额-7-12个月"
+	,(case when t4."时间差" > 360 and t4."时间差" <= 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.4 else 0 end) - wbzq_12_24_amt * 0.4 as "下月增加跌价金额-1-2年"
+	,(case when t4."时间差" > 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.7 else 0 end) - wbzq_24_amt * 0.7 
+	as "下月增加跌价金额-2年以上"
+	,(case when t4."时间差" > 180 and t4."时间差" <= 360 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.1 else 0 end ) + 
+	 (case when t4."时间差" > 360 and t4."时间差" <= 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.4 else 0 end) + 
+	 (case when t4."时间差" > 720 then (t4.wbzq_6_12_amt + t4.wbzq_12_24_amt + t4.wbzq_24_amt) * 0.7 else 0 end) - (t4.wbzq_6_12_amt * 0.1 + t4.wbzq_12_24_amt * 0.4 + t4.wbzq_24_amt * 0.7) 
+	as "下月增加跌价金额合计"
+	,t4.prod_property			-- 产品所有权
+	,t4.prod_property_name		-- 产品所有权描述	
+	,t4.stock_amt				-- 库存金额（阿米巴结算价）   
+	,t4.ybzq_bzdq_3_aging 		-- 有保质期产品,距离保质期到期3个月以内账龄（阿米巴结算价）
+	,t4.ybzq_bzdq_aging 		-- 有保质期产品，保质期到期账龄（阿米巴结算价）
+	,t4.wbzq_6_aging 			-- 无保质期产品，6个月以内账龄（阿米巴结算价）
+	,t4.wbzq_6_12_aging 		-- 无保质期产品，6-12月账龄（阿米巴结算价）
+	,t4.wbzq_12_24_aging 		-- 无保质期产品，1-2年账龄（阿米巴结算价）
+    ,t4.wbzq_24_aging 			-- 无保质期产品，2年以上账龄（阿米巴结算价）
+    ,t4.doc_number              -- 销售凭证
+	,t4.s_ord_item              -- 销售凭证项目
+from
+	stock3 t4
+)
+select 
+	t5.batch  										as batch						-- 批次
+	,t5.calmonth  									as calmonth						-- 日历年/月
+	,t5.calmonth2  									as calmonth2					-- 日历月
+	,t5.calyear  									as calyear						-- 日历年
+	,t5.comp_code  									as comp_code					-- 公司代码
+	,t5.comp_code___t  								as comp_code___t				-- 公司代码_描述
+	,t5.doc_currcy  								as doc_currcy					-- 凭证货币
+	,t5.doc_currcy___t  							as doc_currcy___t				-- 凭证货币_描述
+	,t5.extmatlgrp  								as extmatlgrp					-- 外部物料组
+	,t5.extmatlgrp___t  							as extmatlgrp___t				-- 外部物料组_描述
+	,t5.industry  									as industry						-- 行业
+	,t5.industry___t  								as industry___t					-- 行业_描述
+	,t5.material  									as material						-- 物料编码
+	,t5.material___t  								as material___t					-- 物料编码_描述
+	,t5.matl_group  								as matl_group					-- 物料组
+	,t5.matl_group___t  							as matl_group___t				-- 物料组_描述
+	,t5.matl_type  									as matl_type					-- 物料类型
+	,t5.matl_type___t  								as matl_type___t				-- 物料类型_描述
+	,t5.plant  										as plant						-- 工厂
+	,t5.plant___t  									as plant___t					-- 工厂_描述
+	,t5.reqtsn  									as reqtsn						-- 请求事务序号
+	,t5.stockcat  									as stockcat						-- 库存类别
+	,t5.stockcat___t  								as stockcat___t					-- 库存类别_描述
+	,t5.stocktype  									as stocktype					-- 库存类型
+	,t5.stocktype___t  								as stocktype___t				-- 库存类型_描述
+	,t5.stor_loc  									as stor_loc						-- 库存地点
+	,t5.stor_loc___t  								as stor_loc___t					-- 库存地点_描述
+	,t5.unit  										as unit							-- 计量单位
+	,t5.unit___t  									as unit___t						-- 计量单位_描述
+	,t5.val_class  									as val_class					-- 评估类
+	,t5.val_class___t  								as val_class___t				-- 评估类_描述
+	,t5.wbs_elemt  									as wbs_elemt					-- WBS 元素
+	,t5.wbs_elemt___t  								as wbs_elemt___t				-- WBS 元素_描述
+	,t5.wbs_elm_ex  								as wbs_elm_ex					-- 0WBS_ELM_EX
+	,t5.zmmm_o017_zbatch_date  						as zmmm_o017_zbatch_date		-- 入库日期
+	,t5.zbatchmd  									as zbatchmd						-- 物料批次主数据
+	,t5.zdpsyb  									as zdpsyb						-- 事业部
+	,t5.zdpsyb___t  								as zdpsyb___t					-- 事业部_描述
+	,t5.zdpzgsdq  									as zdpzgsdq						-- 子公司大区
+	,t5.zdpzgsdq___t  								as zdpzgsdq___t					-- 子公司大区_描述
+	,t5.zisqc  										as zisqc						-- 是否清仓
+	,t5.ziswx  										as ziswx						-- 是否外协
+	,t5.zmatltype  									as zmatltype					-- 物料类别
+	,t5.zmatltype___t  								as zmatltype___t				-- 物料类别_描述
+	,t5.zprodh3  									as zprodh3						-- 产品层次3
+	,t5.zprodh3___t  								as zprodh3___t					-- 产品层次3_描述
+	,t5.zww010  									as zww010						-- 产区
+	,t5.zww010___t  								as zww010___t					-- 产区_描述
+	,t5.zyl01  										as zyl01						-- 产品渠道
+	,t5.zyl01___t  									as zyl01___t					-- 产品渠道_描述
+	,t5.zyl06  										as zyl06						-- 产品等级
+	,t5.zyl06___t  									as zyl06___t					-- 产品等级_描述
+	,t5.quantity  									as quantity						-- 数量
+	,t5.zsjkcje  									as zsjkcje						-- 实际库存金额
+	,t5.bz_flag										as bz_flag						-- 保质期产品标识
+	,t5.ybzq_bzdq_amt 								as ybzq_bzdq_amt				-- 有保质期产品，保质期到期
+	,t5.ybzq_bzdq_3_amt 							as ybzq_bzdq_3_amt				-- 有保质期产品,距离保质期到期3个月以内
+	,t5.wbzq_6_amt 									as wbzq_6_amt					-- 无保质期产品，6个月以内
+	,t5.wbzq_6_12_amt 								as wbzq_6_12_amt				-- 无保质期产品，6-12月
+	,t5.wbzq_12_24_amt 								as wbzq_12_24_amt				-- 无保质期产品，1-2年
+    ,t5.wbzq_24_amt 								as wbzq_24_amt					-- 无保质期产品，2年以上
+	,t5.ybzq_jc_amt 								as ybzq_jc_amt					-- 有保质期减值
+    ,t5.wbzq_jc_amt 								as wbzq_jc_amt					-- 无保质期减值
+    ,t5.dw_last_update_date 						as dw_last_update_date			-- 数据同步时间	
+	,t5.zprodh1  									as zprodh1						-- 产品层次1
+	,t5.zprodh1___t  								as zprodh1___t					-- 产品层次1_描述
+	,t5.zprodh2  									as zprodh2						-- 产品层次2
+	,t5.zprodh2___t  								as zprodh2___t					-- 产品层次2_描述
+	,t5.zprodh4  									as zprodh4						-- 产品层次4
+	,t5.zprodh4___t  								as zprodh4___t					-- 产品层次4_描述
+	,t5.zprodh5  									as zprodh5						-- 产品层次5
+	,t5.zprodh5___t  								as zprodh5___t					-- 产品层次5_描述
+	,t5.matl_grp_1  								as matl_grp_1					-- 物料组1
+	,t5.matl_grp_1___t  							as matl_grp_1___t				-- 物料组1_描述
+	,t5.matl_grp_2  								as matl_grp_2					-- 物料组2
+	,t5.matl_grp_2___t  							as matl_grp_2___t				-- 物料组2_描述
+	,t5.matl_grp_3  								as matl_grp_3					-- 物料组3
+	,t5.matl_grp_3___t  							as matl_grp_3___t				-- 物料组3_描述
+	,t5.matl_grp_4  								as matl_grp_4					-- 物料组4
+	,t5.matl_grp_4___t  							as matl_grp_4___t				-- 物料组4_描述
+	,t5.matl_grp_5  								as matl_grp_5					-- 物料组5
+	,t5.matl_grp_5___t  							as matl_grp_5___t				-- 物料组5_描述
+	,t5.vendor  									as vendor						-- 供应商
+	,t5.vendor___t  								as vendor___t					-- 供应商_描述
+	,t5.shelf_end_date     							as z_vfdat						-- 货架寿命到期日
+	,t5.val_type  									as val_type						-- 评估类型	
+	,t5.zmmm_o017_zzqj  							as zmmm_o017_zzqj				-- 周期价
+	,t5.ybzq_bzdq_qty 								as ybzq_bzdq_qty				-- 有保质期产品数量，保质期到期
+	,t5.ybzq_bzdq_3_qty 							as ybzq_bzdq_3_qty				-- 有保质期产品数量,距离保质期到期3个月以内
+	,t5.wbzq_6_qty 									as wbzq_6_qty					-- 无保质期产品数量，6个月以内
+	,t5.wbzq_6_12_qty 								as wbzq_6_12_qty				-- 无保质期产品数量，6-12月
+	,t5.wbzq_12_24_qty 								as wbzq_12_24_qty				-- 无保质期产品数量，1-2年
+	,t5.wbzq_24_qty 								as wbzq_24_qty					-- 无保质期产品数量，2年以上
+	,t5.batch_rk_date			        			as batch_rk_date				-- 批次入库日期（阿米巴调整)	
+	,t5."基地"										as "基地"						-- 基地
+ 	,t5."库位分类" 									as "库位分类"					-- 库位分类
+ 	,t5."分类"										as "分类"						-- 分类
+	,t5."品类"										as "品类"						-- 品类
+	,t5."清库存标识"								as "清库存标识"					-- 清库存标识
+	,t5."外协自产"									as "外协自产"					-- 外协自产
+	,t5."生产基地"									as "生产基地"					-- 生产基地
+	,t5."下月日期"									as "下月日期"					-- 下月日期
+	,t5."时间差"									as "时间差"						-- 时间差
+	,t5."下月跌价金额-7-12个月"						as "下月跌价金额-7-12个月"		-- 下月跌价金额-7-12个月
+	,t5."下月跌价金额-1-2年"            			as "下月跌价金额-1-2年"			-- 下月跌价金额-1-2年
+	,t5."下月跌价金额-2年以上"          			as "下月跌价金额-2年以上"		-- 下月跌价金额-2年以上
+	,t5."下月跌价金额合计"              			as "下月跌价金额合计"			-- 下月跌价金额合计
+	,t5."下月增加跌价金额-7-12个月"     			as "下月增加跌价金额-7-12个月"	-- 下月增加跌价金额-7-12个月
+	,t5."下月增加跌价金额-1-2年"        			as "下月增加跌价金额-1-2年"		-- 下月增加跌价金额-1-2年
+	,t5."下月增加跌价金额-2年以上"      			as "下月增加跌价金额-2年以上"	-- 下月增加跌价金额-2年以上
+	,t5."下月增加跌价金额合计"          			as "下月增加跌价金额合计"		-- 下月增加跌价金额合计
+	,nvl(t5.ybzq_bzdq_3_amt,0) * 0.7 				as ybzq_bzdq_3_fall_amt			-- 有保质期产品,距离保质期到期3个月以内跌价 70% 
+	,nvl(t5.ybzq_bzdq_amt,0) * 1 					as ybzq_bzdq_fall_amt			-- 有保质期产品，保质期到期跌价 100%
+	,nvl(t5.wbzq_6_amt,0) * 0						as wbzq_6_fall_amt				-- 无保质期产品，6个月以内跌价 0%
+	,nvl(t5.wbzq_6_12_amt,0) * 0.1					as wbzq_6_12_fall_amt			-- 无保质期产品，6-12月跌价 10%
+	,nvl(t5.wbzq_12_24_amt,0) * 0.4					as wbzq_12_24_fall_amt			-- 无保质期产品，1-2年跌价 40%
+	,nvl(t5.wbzq_24_amt,0) * 0.7					as wbzq_24_fall_amt				-- 无保质期产品，2年以上跌价 70%
+	,nvl(t5.ybzq_jc_amt,0) + nvl(t5.wbzq_jc_amt,0)	as jchj_amt						-- 减值合计（管理）				
+	,t5.stock_amt									as stock_amt					-- 库存金额（阿米巴结算价）   
+	,t5.ybzq_bzdq_3_aging 							as ybzq_bzdq_3_aging			-- 有保质期产品,距离保质期到期3个月以内账龄（阿米巴结算价）
+	,nvl(t5.ybzq_bzdq_3_aging,0) * 0.7 				as ybzq_bzdq_3_fall_aging		-- 有保质期产品,距离保质期到期3个月以内跌价（阿米巴结算价）70%	
+	,t5.ybzq_bzdq_aging 							as ybzq_bzdq_aging				-- 有保质期产品，保质期到期账龄（阿米巴结算价）
+	,nvl(t5.ybzq_bzdq_aging,0) * 1 					as ybzq_bzdq_fall_aging			-- 有保质期产品，保质期到期跌价（阿米巴结算价）100%	
+	,t5.wbzq_6_aging 								as wbzq_6_aging					-- 无保质期产品，6个月以内账龄（阿米巴结算价）
+	,nvl(t5.wbzq_6_aging,0) * 0						as wbzq_6_fall_aging			-- 无保质期产品，6个月以内跌价（阿米巴结算价）0%
+	,t5.wbzq_6_12_aging 							as wbzq_6_12_aging				-- 无保质期产品，6-12月账龄（阿米巴结算价）
+	,nvl(t5.wbzq_6_12_aging,0) * 0.1				as wbzq_6_12_fall_aging			-- 无保质期产品，6-12月跌价（阿米巴结算价）10%
+	,t5.wbzq_12_24_aging 							as wbzq_12_24_aging				-- 无保质期产品，1-2年账龄（阿米巴结算价）
+	,nvl(t5.wbzq_12_24_aging,0) * 0.4				as wbzq_12_24_fall_aging		-- 无保质期产品，1-2年跌价（阿米巴结算价） 40%
+    ,t5.wbzq_24_aging 								as wbzq_24_aging				-- 无保质期产品，2年以上账龄（阿米巴结算价）
+	,nvl(t5.wbzq_24_aging,0) * 0.7					as wbzq_24_fall_aging			-- 无保质期产品，2年以上跌价（阿米巴结算价）70%
+	,nvl(t5.ybzq_bzdq_3_aging,0) * 0.7 + nvl(t5.ybzq_bzdq_aging,0) * 1
+													as ybzq_jc_aging				-- 有保质期减值（阿米巴结算价）小计
+	,nvl(t5.wbzq_6_aging,0) * 0	+ nvl(t5.wbzq_6_12_aging,0) * 0.1 + nvl(t5.wbzq_12_24_aging,0) * 0.4 + nvl(t5.wbzq_24_aging,0) * 0.7												as wbzq_jc_aging				-- 无保质期减值（阿米巴结算价）小计	
+	,nvl(t5.ybzq_bzdq_3_aging,0) * 0.7 + nvl(t5.ybzq_bzdq_aging,0) * 1 + nvl(t5.wbzq_6_aging,0) * 0	+ nvl(t5.wbzq_6_12_aging,0) * 0.1 + nvl(t5.wbzq_12_24_aging,0) * 0.4 + nvl(t5.wbzq_24_aging,0) * 0.7
+													as jchj_aging					-- 减值合计（阿米巴结算价）
+	,t5.prod_property								as prod_property				-- 产品所有权
+	,t5.prod_property_name							as prod_property_name			-- 产品所有权描述
+	,t5.doc_number                                  as doc_number                   -- 销售凭证
+	,t5.s_ord_item                                  as s_ord_item                   -- 销售凭证项目
+from
+	stock4 t5

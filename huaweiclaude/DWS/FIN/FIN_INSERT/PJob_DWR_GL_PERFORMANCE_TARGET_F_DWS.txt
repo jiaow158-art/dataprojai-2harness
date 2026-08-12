@@ -1,0 +1,50 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/03/14 10:26:53 GMT+08:00
+-- table desc:业绩目标表(DWS)
+-- update from chenzhiyong 20220314 add
+-- ******************************************************************** --
+delete from DWRFIN.DWR_GL_PERFORMANCE_TARGET_F;
+insert into DWRFIN.DWR_GL_PERFORMANCE_TARGET_F
+SELECT
+  SALES_GRP ,    -- 销售组   SALES_GRP
+  DISTR_CHANNEL ,   -- 分销渠道 DISTR_CHAN
+  CALDAY ,      -- 日历日 CALDAY
+  CHANN_INTEGRATION_CODE , -- 渠道整合编码`/bic/zqdzh`
+  RECORD_MODE ,   -- RECORDMODE
+  CHANN_INTEGRATION_DESC ,   -- 渠道整合描述 zqdzhdesc
+  LYTQ_SALE_PERFORMANCE_TARGET ,    -- 去年同期销售业绩目标  zxsyjmb_qntq
+  LYTQ_NTAX_SALE_NETAMO_TARGET ,                 -- 去年同期不含税销售净额目标   zbhsxsjemb_qntq
+  LYTQ_GROSS_PROFIT_TARGET ,       -- 去年同期毛利额目标     zmlemb_qntq
+  DISTR_CHANNEL_DESC ,   -- 分销渠道描述  DIstr_chandesc
+  CD_SALE_PERFORMANCE ,      -- 当日销售业绩 zxsyj_dr
+  CD_GROSS_PROFIT_AMOUNT ,     --当日毛利额  zmle_dr
+  CD_NTAX_SALE_NETAMO ,   -- 当日不含税销售净额 zbhsxsje_dr
+  CM_SALE_PERFORMANCE ,   -- 当月销售业绩 zxsyj_dy
+  CM_GROSS_PROFIT_AMOUNT ,              -- 当月毛利额  zmle_dy
+  CM_NTAX_SALE_NETAMO ,          -- 当月不含税销售净额   zbhsxsje_dy
+  CM_SALE_PERFORMANCE_TARGET ,                   -- 当月销售业绩目标   zxsyjmb_dy
+  CM_GROSS_PROFIT_AMOUNT_TARGET ,       -- 当月毛利额目标  zmlemb_dy
+  CM_NTAX_SALE_NETAMO_TARGET ,       -- 当月不含税销售净额目标  zbhsxsjemb_dy
+  LYTQ_SALE_PERFORMANCE ,  -- 去年同期销售业绩  zxsyj_qntq
+  LYTQ_GROSS_PROFIT_AMOUNT ,              -- 去年同期毛利额  zmle_qntq
+  LYTQ_NTAX_SALE_NETAMO ,          -- 去年同期不含税销售净额   zbhsxsje_qntq
+  LYTQ_WM_SALE_PERFORMANCE ,             -- 去年同期整月销售业绩   zxsyj_qntq_zy
+  LYTQ_WM_GROSS_PROFIT_AMOUNT ,            -- 去年同期整月毛利额  zmle_qntq_zy
+  LYTQ_WM_NTAX_SALE_NETAMO ,                -- 去年同期整月不含税销售净额   zbhsxsje_qntq_zy
+  CMLJ_SALE_PERFORMANCE ,                      -- 当月累计销售业绩   zxsyj_dnlj
+  CMLJ_GROSS_PROFIT_AMOUNT , 				-- 当月累计毛利额   zmle_dnlj
+  CMLJ_NTAX_SALE_NETAMO , 				-- 当月累计不含税销售净额   zbhsxsje_dnlj
+  LYLJ_SALE_PERFORMANCE ,    --去年累计销售业绩  zxsyj_qnlj
+  LYLJ_GROSS_PROFIT_AMOUNT , 				  --去年累计毛利额  zmle_qnlj
+  LYLJ_NTAX_SALE_NETAMO , 	-- 去年累计不含税销售净额   zbhsxsje_qnlj
+  CYLJ_SALE_PERFORMANCE_TARGET ,     -- 当年累计销售业绩目标   zxsyjmb_dnlj
+  CYLJ_GROSS_PROFIT_TARGET ,          -- 当年累计毛利额目标   zmlemb_dnlj
+  CYLJ_NTAX_SALE_NETAMO_TARGET ,   -- 当年累计不含税销售净额目标   zbhsxsjemb_dnlj
+  CY_SALE_PERFORMANCE_TARGET ,      -- 当年销售业绩目标 zxsyjmb_dn
+  CY_GROSS_PROFIT_TARGET ,    -- 当年毛利额目标   zmlemb_dn
+  CY_NTAX_SALE_NETAMO_TARGET ,   -- 当年不含税销售净额目标  zbhsxsjemb_dn
+  DEL_FLAG ,      -- 删除标识
+  DW_LAST_UPDATE_DATE   -- 同步数据时间
+FROM DWRFIN.DWR_GL_PERFORMANCE_TARGET_F_TMP;

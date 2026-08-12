@@ -1,0 +1,29 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/08/31 09:21:10 GMT+08:00
+-- ******************************************************************** --
+
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_DMT_MATERIAL_CATE_T
+SELECT 
+       C.ITEM_NO
+      ,A.PARENT_ID AS LEV1_CATEGORY_ID
+      ,B.CATEGORY AS LEV1_CATEGORY_NAME
+      ,A.ID AS LEV2_CATEGORY_ID
+      ,A.CATEGORY AS LEV2_CATEGORY_NAME	       
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+	  ,A.SEQ
+  FROM SDI.SDI_ITEM_CATEGORY_1030 A
+  LEFT JOIN SDI.SDI_ITEM_CATEGORY_1030 B
+    ON A.PARENT_ID = B.ID
+   AND B.STATUS = 1
+   AND B.APP_ID = 1831
+   AND B.DEL_FLAG = 'N'
+  LEFT JOIN SDI.SDI_ITEM_CATEGORY_RELATION_1030 C
+    ON A.ID = C.CATEGORY_ID 
+   AND C.IS_DELETED = 0
+ WHERE A.STATUS = 1
+   AND A.DEL_FLAG = 'N'
+   AND A.APP_ID = 1831
+   AND A.PARENT_ID <> 0
+;

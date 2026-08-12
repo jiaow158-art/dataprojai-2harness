@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_SO_RETURN_ORDER_ITEM_DSS_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/SO",
+    "description": "DSS退货单行",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

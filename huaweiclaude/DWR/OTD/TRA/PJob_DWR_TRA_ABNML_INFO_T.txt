@@ -1,0 +1,41 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2024/12/02 16:16:23 GMT+08:00
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置成非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+WITH T AS(
+SELECT T2.ID
+      ,T3.EMPLOYEE_NO
+	  ,T3.NAME
+  FROM SDI.SDI_PLAT_LOGIN_USER_1005 T2
+  LEFT JOIN SDI.SDI_PLAT_EMPLOYEE_1005 T3
+    ON T2.EMPLOYEE_ID = T3.ID
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_TRA_ABNML_INFO_T
+SELECT A.ID AS ABNML_ID --ID
+      ,A.ABNORMAL_NO AS ABNML_NUM --破损单号
+      ,A.SHIP_METHOD_NAME AS SHIP_METH_NAME --运输方式
+      ,A.EXPRESS_NO AS OA_RQST_ID --OA流水号
+      ,A.ORDER_NO AS TRA_PLAN_NUM --TMS计划号
+      ,COALESCE(A.DEDUCTIBLE_AREA,0) AS TOT_AREA --总面积
+      ,COALESCE(A.DAMAGED_AREA,0) AS ABNML_AREA --破损面积
+      ,COALESCE(A.DAMAGED_QTY,0) AS ABNML_QTY --破损数量
+      ,COALESCE(A.DAMAGED_RATIO,0) / 1000 AS ABNML_RATE --破损率(‰) 
+      ,A.ABNORMAL_DATE AS ABNML_TIME --破损日期
+	  ,A.ENTRYDT AS CREATE_TIME --创建时间
+	  ,A.ENTRYID AS CREATE_EMP_ID --创建人ID
+	  ,T1.EMPLOYEE_NO AS CREATE_EMP_NUM --创建人工号
+	  ,T1.NAME AS CREATE_EMP_NAME --创建人名称
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_TMS_ABNORMAL_BUSINESS_1005 A
+  LEFT JOIN T AS T1
+    ON A.ENTRYID = T1.ID
+ WHERE A.TENANT_ID = 1

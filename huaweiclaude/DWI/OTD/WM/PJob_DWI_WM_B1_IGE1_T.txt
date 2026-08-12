@@ -1,0 +1,695 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/20 14:59:23 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_IGE1_T
+SELECT
+'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+CUSTCODE AS customer_code, -- 客户编码
+DocEntry, -- 单据内部标识
+LineNum, -- 行编号
+TargetType, -- 目标单据类型
+TrgetEntry, -- 目标单据内部标识
+BaseRef, -- 基本单据参考
+BaseType, -- 基本单据类型
+BaseEntry, -- 基本单据内部标识
+BaseLine, -- 基本行
+LineStatus, -- 行状态
+ItemCode, -- 物料编号
+Dscription, -- 物料/服务描述
+Quantity, -- 数量
+ShipDate, -- 行交货日期
+OpenQty, -- 剩余未清数量
+Price, -- 价格
+Currency, -- 价格货币
+Rate, -- 货币比率
+DiscPrcnt, -- 每行折扣 %
+LineTotal, -- 行总计
+TotalFrgn, -- 行总计（外币）
+OpenSum, -- 未清金额
+OpenSumFC, -- 未清金额（外币）
+VendorNum, -- 供应商目录编号
+SerialNum, -- 序列号
+WhsCode, -- 仓库编号
+SlpCode, -- 销售员代码
+Commission, -- 佣金百分比
+TreeType, -- 物料清单类型
+AcctCode, -- 科目代码
+TaxStatus, -- 税定义
+GrossBuyPr, -- 毛利基础价格
+PriceBefDi, -- 单价
+DocDate, -- 过账日期
+OpenCreQty, -- 贷项凭单金额
+UseBaseUn, -- 库存计量单位
+SubCatNum, -- 客户/供应商目录编号
+BaseCard, -- 基本业务伙伴代码
+TotalSumSy, -- 行总计（外币）
+OpenSumSys, -- 未清金额（系统货币）
+InvntSttus, -- 仓库状态
+OcrCode, -- 分配规则
+Project, -- 项目代码
+CodeBars, -- 条形码
+VatPrcnt, -- 每行税率
+VatGroup, -- 税定义
+PriceAfVAT, -- 毛价
+Height1, -- 高度 1
+Hght1Unit, -- 高度单位 1
+Height2, -- 高度 2
+Hght2Unit, -- 高度单位 2
+Width1, -- 宽度 1
+Wdth1Unit, -- 宽度单位 1
+Width2, -- 宽度 2
+Wdth2Unit, -- 宽度单位 2
+Length1, -- 长度 1
+Len1Unit, -- 长度单位 1
+length2, -- 长度 2
+Len2Unit, -- 长度单位 2
+Volume, -- 数量
+VolUnit, -- 体积计量单位
+Weight1, -- 重量 1
+Wght1Unit, -- 重量单位 1
+Weight2, -- 重量 2
+Wght2Unit, -- 重量单位 2
+Factor1, -- 因子 1
+Factor2, -- 因子 2
+Factor3, -- 因子 3
+Factor4, -- 因子 4
+PackQty, -- 包装数量
+UpdInvntry, -- 仓库更新
+BaseDocNum, -- 基本单据编号
+BaseAtCard, -- 客户/供应商基本单据
+SWW, -- 附加标识
+VatSum, -- 总税额
+VatSumFrgn, -- 税额（外币）
+VatSumSy, -- 税额（系统货币）
+FinncPriod, -- 过账期间
+ObjType, -- 对象类型
+BlockNum, -- 冻结编号
+ImportLog, -- 导入日志
+DedVatSum, -- 可扣除的税额
+DedVatSumF, -- 可扣除的税金额（外币）
+DedVatSumS, -- 可扣除的税额（系统货币）
+IsAqcuistn, -- 购置税
+DistribSum, -- 分配的金额
+DstrbSumFC, -- 分配的金额（外币）
+DstrbSumSC, -- 分配的金额（系统货币）
+GrssProfit, -- 行毛利
+GrssProfSC, -- 行毛利（系统货币）
+GrssProfFC, -- 行毛利（外币）
+VisOrder, -- 可视订单
+INMPrice, -- 物料的最后销售价格（OINM）
+PoTrgNum, -- 采购订单目标编号
+PoTrgEntry, -- 采购订单目标内部标识
+DropShip, -- 供应商直接发货
+PoLineNum, -- 采购订单目标行编号
+Address, -- 地址
+TaxCode, -- 税码
+TaxType, -- 税种
+OrigItem, -- 原始物料
+BackOrdr, -- 允许拖欠订单
+FreeTxt, -- 自由文本
+PickStatus, -- 拣配状态
+PickOty, -- 拣配数量
+PickIdNo, -- 拣配清单标识号
+TrnsCode, -- 发运方法
+VatAppld, -- 应用税
+VatAppldFC, -- 应用税（外币）
+VatAppldSC, -- 应用税（系统货币）
+BaseQty, -- 基本数量
+BaseOpnQty, -- 基本未清数量
+VatDscntPr, -- 税折扣 %
+WtLiable, -- 应付代扣税
+DeferrTax, -- 递延税
+EquVatPer, -- 平衡税 %
+EquVatSum, -- 总计平衡税
+EquVatSumF, -- 总计平衡税（外币）
+EquVatSumS, -- 总计平衡税（系统货币）
+LineVat, -- 净税金额
+LineVatlF, -- 净税金额
+LineVatS, -- 净税金额
+unitMsr, -- 单位
+NumPerMsr, -- 计量单位值
+CEECFlag, -- 更正发票已是/应是
+ToStock, -- 库存的更正发票金额
+ToDiff, -- 差异的更正发票金额
+ExciseAmt, -- 消费税金额
+TaxPerUnit, -- 每单位税额
+TotInclTax, -- 含税总计
+CountryOrg, -- 原产国
+StckDstSum, -- 库存分配总计
+ReleasQtty, -- 出货数量
+LineType, -- 行类型
+TranType, -- 交易类型
+Text, -- 文本
+OwnerCode, -- 单据所有人
+StockPrice, -- 库存价格
+ConsumeFCT, -- 客户销售预测
+LstByDsSum, -- 最后购买分配总计
+StckINMPr, -- 库存进料价格
+LstBINMPr, -- 最后购买库存日记账价格
+StckDstFc, -- 库存分配总计（外币）
+StckDstSc, -- 库存分配总计（系统货币）
+LstByDsFc, -- 上次购买分配总计（外币）
+LstByDsSc, -- 上次购买分配总计（系统货币）
+StockSum, -- Stock Sum
+StockSumFc, -- Stock Sum FC
+StockSumSc, -- Stock Sum SC
+StckSumApp, -- Stock Sum Applied
+StckAppFc, -- Stock Sum Applied FC
+StckAppSc, -- Stock Sum Applied SC
+ShipToCode, -- 收货方代码
+ShipToDesc, -- 收货方描述
+StckAppD, -- 库存分配 - 已应用总和
+StckAppDFC, -- 库存分配 - 已应用总和（外币）
+StckAppDSC, -- 库存分配 - 已应用总和（系统货币）
+BasePrice, -- 总计算价格
+GTotal, -- 含税总计
+GTotalFC, -- 含税总计（外币）
+GTotalSC, -- 含税总计（系统货币）
+DistribExp, -- 分配运费
+DescOW, -- 描述已覆盖
+DetailsOW, -- 明细已覆盖
+GrossBase, -- 毛利的基础方法
+VatWoDpm, -- 应用预付款之前的税
+VatWoDpmFc, -- 已应用的预付款之前的税（外币）
+VatWoDpmSc, -- 已应用预付款之前的税（系统货币）
+CFOPCode, -- 单据的 CFOP 码
+CSTCode, -- ICMS 的 CST 代码
+Usage, -- 单据的使用代码
+TaxOnly, -- 仅限于税
+WtCalced, -- 已计算的代扣税
+QtyToShip, -- 发货数量
+DelivrdQty, -- 已交货的数量
+OrderedQty, -- 已订购数量
+CogsOcrCod, -- 销货成本分配规则代码
+CiOppLineN, -- 相对行的行编号
+CogsAcct, -- 销货成本科目代码
+ChgAsmBoMW, -- 更改组装物料单子项的仓库
+ActDelDate, -- 实际交货日期
+OcrCode2, -- 成本核算代码 2
+OcrCode3, -- 成本核算代码 3
+OcrCode4, -- 成本核算代码 4
+OcrCode5, -- 成本核算代码 5
+TaxDistSum, -- 税分配金额
+TaxDistSFC, -- 税分配金额（外币）
+TaxDistSSC, -- 税分配金额（系统货币）
+PostTax, -- 将含税价格过账至库存
+Excisable, -- 应纳税[是/否]
+AssblValue, -- 应评税值
+RG23APart1, -- RG23A 部分 1 编号
+RG23APart2, -- RG23A 部分 2 编号
+RG23CPart1, -- RG23C 部分 1 编号
+RG23CPart2, -- RG23C 部分 2 编号
+CogsOcrCo2, -- 销货成本分配规则代码 2
+CogsOcrCo3, -- 销货成本分配规则代码 3
+CogsOcrCo4, -- 销货成本分配规则代码 4
+CogsOcrCo5, -- 销货成本分配规则代码 5
+LnExcised, -- 已征税的行
+LocCode, -- 位置代码
+StockValue, -- 销货成本总计
+GPTtlBasPr, -- 利润总基础价格
+unitMsr2, -- Pur/Sal UoM if BaseUnit
+NumPerMsr2, -- Pur/Sal UoM Value if Base Unit
+SpecPrice, -- 价格来源类型
+CSTfIPI, -- IPI 的 CST 代码
+CSTfPIS, -- PIS 的 CST 代码
+CSTfCOFINS, -- COFINS 的 CST 代码
+ExLineNo, -- 征税行号
+isSrvCall, -- 已通过服务呼叫创建
+PQTReqQty, -- 采购报价单：要求数量
+PQTReqDate, -- 采购报价单：要求日期
+PcDocType, -- 采购确认单据类型
+PcQuantity, -- 采购确认数量
+LinManClsd, -- 已手动关闭行
+VatGrpSrc, -- 增值税组来源
+NoInvtryMv, -- 不含库存移动
+ActBaseEnt, -- 实际基本单据分录
+ActBaseLn, -- 实际基本行编号
+ActBaseNum, -- 实际基本单据编号
+OpenRtnQty, -- 未清退货数量
+AgrNo, -- 协议编号
+AgrLnNum, -- 协议行编号
+CredOrigin, -- 贷方源
+Surpluses, -- 盈余
+DefBreak, -- 缺陷与损坏
+Shortages, -- 短缺
+UomEntry, -- 计量单位条目
+UomEntry2, -- 基本单位的计量单位条目
+UomCode, -- 计量单位代码
+UomCode2, -- 基本单位的计量单位代码
+FromWhsCod, -- 从仓库代码
+NeedQty, -- 考虑物料数量
+PartRetire, -- 部分报废
+RetireQty, -- 报废数量
+RetireAPC, -- 报废购置和生产成本
+RetirAPCFC, -- 报废购置和生产成本（外币）
+RetirAPCSC, -- 报废购置和生产成本（系统货币）
+InvQty, -- 数量 - 库存计量单位
+OpenInvQty, -- 未清数量（库存计量单位）
+EnSetCost, -- 启用退货物料成本的设置
+RetCost, -- 应收退货的退货成本
+Incoterms, -- 国际贸易术语解释通则
+TransMod, -- 运输模式
+LineVendor, -- 供应商代码行
+DistribIS, -- 分配欧贸统运费
+ISDistrb, -- 欧贸统分配金额
+ISDistrbFC, -- 欧贸统分配金额（外币）
+ISDistrbSC, -- 欧贸统分配金额（系统货币）
+IsByPrdct, -- 副产品物料
+ItemType, -- 物料类型
+PriceEdit, -- 由用户编辑价格
+PrntLnNum, -- 父行编号
+LinePoPrss, -- 采购订单流程行
+FreeChrgBP, -- 免费（业务伙伴）
+TaxRelev, -- 税相关的行
+LegalText, -- 合法文本
+ThirdParty, -- 第三方
+LicTradNum, -- 国税编号
+InvQtyOnly, -- 仅更改数量（库存计量单位）
+UnencReasn, -- Reason for Unencumbered ICMS
+ShipFromCo, -- 发货方代码
+ShipFromDe, -- 发货方描述
+FisrtBin, -- 第一个库位
+AllocBinC, -- 已分配仓位数
+ExpType, -- 费用类型
+ExpUUID, -- 费用全局唯一标识符
+ExpOpType, -- 费用操作类型
+DIOTNat, -- DIOT 国籍
+MYFtype, -- MYF 类型
+ItmTaxType, -- 物料 GST 税类别
+SacEntry, -- SAC 条目
+NCMCode, -- NCM 代码
+HsnEntry, -- HSN Entry
+OriBAbsEnt, -- 原始基本单据内部标识
+OriBLinNum, -- 原始基本单据行编号
+OriBDocTyp, -- 原始基本单据类型
+U_OrdrEntry, -- 销售订单实列号
+U_Property, -- 属性
+U_DelivDocNum, -- 配送号
+U_DelivLine, -- 配送单行号
+U_PrePurOrder, -- 请购单号
+U_FrgnName, -- 外文描述
+U_CbaseLine, -- 复制源行号
+U_CbaseEntry, -- 复制源实例
+U_CbaseObjType, -- 复制源对象
+U_OrdrDocNum, -- 销售订单单号
+U_DistNumber, -- 批次
+U_WSEntry, -- 加工单实例
+U_WSLineId, -- 加工单行号
+U_BaseType, -- 源类型
+U_BaseEntry, -- 源实例
+U_BaseLine, -- 源行号
+U_PaiCheQty, -- 已派车数量
+U_SpecDoc, -- 特价单号
+U_shipcode, -- 装运方式
+U_factory, -- 工厂代码
+U_warehouse, -- 库存代码
+U_SpecPrice, -- 特价价格
+U_FreeTxt, -- 使用位置
+U_BPCVDocEntry, -- 项目单号
+U_BPCVLineID, -- 项目明细行号
+U_IFZ, -- 是否赠品
+U_FatherItem, -- BOM父编号
+U_BomQty, -- BOM基本数量
+U_SECP, -- 二级成本
+U_BinCode, -- 库位
+U_OutBinCode, -- 出库库位
+U_A1_BaseType, -- A1源单类型
+U_A1_BaseNum, -- A1源单号
+U_A1_BaseLine, -- A1源行号
+U_A1_UseJF, -- 使用的积分
+U_A1_DSYF, -- 代收的运费
+U_BaseTypeX, -- 源类型X
+U_PSTYPE, -- 类型
+U_A1_JENum, -- A1凭证流号
+U_PrePurLine, -- 请购行号
+U_SpecName, -- 特价类型
+U_IFJG, -- 是否加工
+U_ExamenID, -- 审批号
+U_DelivCYQty, -- 配送差异
+U_ChlPrice, -- 渠道价格
+U_ChlAmo, -- 渠道总额
+U_WSFacCode, -- 加工厂代码
+U_WSFacName, -- 加工厂名称
+U_WSInPrice, -- 加工结算价
+U_WSMarkPrice, -- 加工标价
+U_WSQty, -- 转加工数
+U_WSSendQty, -- 加工领料数
+U_WSCmpQty, -- 完工数量
+U_WSFactCQty, -- 预计成品数
+U_JGBaseItem, -- 加工原料
+U_JGBaseQty, -- 加工原料数
+U_DDelivQty, -- 订单已配送数
+U_BasePkUn, -- 基本包装数
+U_PriceBefDi, -- 折扣前
+U_DiscPrcnt, -- 折扣率
+U_B1REPUEntry, -- 汇总请购单号
+U_B1REPULine, -- 汇总请购单行号
+CURRENT_TIMESTAMP() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_IGE1_1010
+UNION ALL
+SELECT
+'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+CUSTCODE AS customer_code, -- 客户编码
+DocEntry, -- 单据内部标识
+LineNum, -- 行编号
+TargetType, -- 目标单据类型
+TrgetEntry, -- 目标单据内部标识
+BaseRef, -- 基本单据参考
+BaseType, -- 基本单据类型
+BaseEntry, -- 基本单据内部标识
+BaseLine, -- 基本行
+LineStatus, -- 行状态
+ItemCode, -- 物料编号
+Dscription, -- 物料/服务描述
+Quantity, -- 数量
+ShipDate, -- 行交货日期
+OpenQty, -- 剩余未清数量
+Price, -- 价格
+Currency, -- 价格货币
+Rate, -- 货币比率
+DiscPrcnt, -- 每行折扣 %
+LineTotal, -- 行总计
+TotalFrgn, -- 行总计（外币）
+OpenSum, -- 未清金额
+OpenSumFC, -- 未清金额（外币）
+VendorNum, -- 供应商目录编号
+SerialNum, -- 序列号
+WhsCode, -- 仓库编号
+SlpCode, -- 销售员代码
+Commission, -- 佣金百分比
+TreeType, -- 物料清单类型
+AcctCode, -- 科目代码
+TaxStatus, -- 税定义
+GrossBuyPr, -- 毛利基础价格
+PriceBefDi, -- 单价
+DocDate, -- 过账日期
+OpenCreQty, -- 贷项凭单金额
+UseBaseUn, -- 库存计量单位
+SubCatNum, -- 客户/供应商目录编号
+BaseCard, -- 基本业务伙伴代码
+TotalSumSy, -- 行总计（外币）
+OpenSumSys, -- 未清金额（系统货币）
+InvntSttus, -- 仓库状态
+OcrCode, -- 分配规则
+Project, -- 项目代码
+CodeBars, -- 条形码
+VatPrcnt, -- 每行税率
+VatGroup, -- 税定义
+PriceAfVAT, -- 毛价
+Height1, -- 高度 1
+Hght1Unit, -- 高度单位 1
+Height2, -- 高度 2
+Hght2Unit, -- 高度单位 2
+Width1, -- 宽度 1
+Wdth1Unit, -- 宽度单位 1
+Width2, -- 宽度 2
+Wdth2Unit, -- 宽度单位 2
+Length1, -- 长度 1
+Len1Unit, -- 长度单位 1
+length2, -- 长度 2
+Len2Unit, -- 长度单位 2
+Volume, -- 数量
+VolUnit, -- 体积计量单位
+Weight1, -- 重量 1
+Wght1Unit, -- 重量单位 1
+Weight2, -- 重量 2
+Wght2Unit, -- 重量单位 2
+Factor1, -- 因子 1
+Factor2, -- 因子 2
+Factor3, -- 因子 3
+Factor4, -- 因子 4
+PackQty, -- 包装数量
+UpdInvntry, -- 仓库更新
+BaseDocNum, -- 基本单据编号
+BaseAtCard, -- 客户/供应商基本单据
+SWW, -- 附加标识
+VatSum, -- 总税额
+VatSumFrgn, -- 税额（外币）
+VatSumSy, -- 税额（系统货币）
+FinncPriod, -- 过账期间
+ObjType, -- 对象类型
+BlockNum, -- 冻结编号
+ImportLog, -- 导入日志
+DedVatSum, -- 可扣除的税额
+DedVatSumF, -- 可扣除的税金额（外币）
+DedVatSumS, -- 可扣除的税额（系统货币）
+IsAqcuistn, -- 购置税
+DistribSum, -- 分配的金额
+DstrbSumFC, -- 分配的金额（外币）
+DstrbSumSC, -- 分配的金额（系统货币）
+GrssProfit, -- 行毛利
+GrssProfSC, -- 行毛利（系统货币）
+GrssProfFC, -- 行毛利（外币）
+VisOrder, -- 可视订单
+INMPrice, -- 物料的最后销售价格（OINM）
+PoTrgNum, -- 采购订单目标编号
+PoTrgEntry, -- 采购订单目标内部标识
+DropShip, -- 供应商直接发货
+PoLineNum, -- 采购订单目标行编号
+Address, -- 地址
+TaxCode, -- 税码
+TaxType, -- 税种
+OrigItem, -- 原始物料
+BackOrdr, -- 允许拖欠订单
+FreeTxt, -- 自由文本
+PickStatus, -- 拣配状态
+PickOty, -- 拣配数量
+PickIdNo, -- 拣配清单标识号
+TrnsCode, -- 发运方法
+VatAppld, -- 应用税
+VatAppldFC, -- 应用税（外币）
+VatAppldSC, -- 应用税（系统货币）
+BaseQty, -- 基本数量
+BaseOpnQty, -- 基本未清数量
+VatDscntPr, -- 税折扣 %
+WtLiable, -- 应付代扣税
+DeferrTax, -- 递延税
+EquVatPer, -- 平衡税 %
+EquVatSum, -- 总计平衡税
+EquVatSumF, -- 总计平衡税（外币）
+EquVatSumS, -- 总计平衡税（系统货币）
+LineVat, -- 净税金额
+LineVatlF, -- 净税金额
+LineVatS, -- 净税金额
+unitMsr, -- 单位
+NumPerMsr, -- 计量单位值
+CEECFlag, -- 更正发票已是/应是
+ToStock, -- 库存的更正发票金额
+ToDiff, -- 差异的更正发票金额
+ExciseAmt, -- 消费税金额
+TaxPerUnit, -- 每单位税额
+TotInclTax, -- 含税总计
+CountryOrg, -- 原产国
+StckDstSum, -- 库存分配总计
+ReleasQtty, -- 出货数量
+LineType, -- 行类型
+TranType, -- 交易类型
+Text, -- 文本
+OwnerCode, -- 单据所有人
+StockPrice, -- 库存价格
+ConsumeFCT, -- 客户销售预测
+LstByDsSum, -- 最后购买分配总计
+StckINMPr, -- 库存进料价格
+LstBINMPr, -- 最后购买库存日记账价格
+StckDstFc, -- 库存分配总计（外币）
+StckDstSc, -- 库存分配总计（系统货币）
+LstByDsFc, -- 上次购买分配总计（外币）
+LstByDsSc, -- 上次购买分配总计（系统货币）
+StockSum, -- Stock Sum
+StockSumFc, -- Stock Sum FC
+StockSumSc, -- Stock Sum SC
+StckSumApp, -- Stock Sum Applied
+StckAppFc, -- Stock Sum Applied FC
+StckAppSc, -- Stock Sum Applied SC
+ShipToCode, -- 收货方代码
+ShipToDesc, -- 收货方描述
+StckAppD, -- 库存分配 - 已应用总和
+StckAppDFC, -- 库存分配 - 已应用总和（外币）
+StckAppDSC, -- 库存分配 - 已应用总和（系统货币）
+BasePrice, -- 总计算价格
+GTotal, -- 含税总计
+GTotalFC, -- 含税总计（外币）
+GTotalSC, -- 含税总计（系统货币）
+DistribExp, -- 分配运费
+DescOW, -- 描述已覆盖
+DetailsOW, -- 明细已覆盖
+GrossBase, -- 毛利的基础方法
+VatWoDpm, -- 应用预付款之前的税
+VatWoDpmFc, -- 已应用的预付款之前的税（外币）
+VatWoDpmSc, -- 已应用预付款之前的税（系统货币）
+CFOPCode, -- 单据的 CFOP 码
+CSTCode, -- ICMS 的 CST 代码
+Usage, -- 单据的使用代码
+TaxOnly, -- 仅限于税
+WtCalced, -- 已计算的代扣税
+QtyToShip, -- 发货数量
+DelivrdQty, -- 已交货的数量
+OrderedQty, -- 已订购数量
+CogsOcrCod, -- 销货成本分配规则代码
+CiOppLineN, -- 相对行的行编号
+CogsAcct, -- 销货成本科目代码
+ChgAsmBoMW, -- 更改组装物料单子项的仓库
+ActDelDate, -- 实际交货日期
+OcrCode2, -- 成本核算代码 2
+OcrCode3, -- 成本核算代码 3
+OcrCode4, -- 成本核算代码 4
+OcrCode5, -- 成本核算代码 5
+TaxDistSum, -- 税分配金额
+TaxDistSFC, -- 税分配金额（外币）
+TaxDistSSC, -- 税分配金额（系统货币）
+PostTax, -- 将含税价格过账至库存
+Excisable, -- 应纳税[是/否]
+AssblValue, -- 应评税值
+RG23APart1, -- RG23A 部分 1 编号
+RG23APart2, -- RG23A 部分 2 编号
+RG23CPart1, -- RG23C 部分 1 编号
+RG23CPart2, -- RG23C 部分 2 编号
+CogsOcrCo2, -- 销货成本分配规则代码 2
+CogsOcrCo3, -- 销货成本分配规则代码 3
+CogsOcrCo4, -- 销货成本分配规则代码 4
+CogsOcrCo5, -- 销货成本分配规则代码 5
+LnExcised, -- 已征税的行
+LocCode, -- 位置代码
+StockValue, -- 销货成本总计
+GPTtlBasPr, -- 利润总基础价格
+unitMsr2, -- Pur/Sal UoM if BaseUnit
+NumPerMsr2, -- Pur/Sal UoM Value if Base Unit
+SpecPrice, -- 价格来源类型
+CSTfIPI, -- IPI 的 CST 代码
+CSTfPIS, -- PIS 的 CST 代码
+CSTfCOFINS, -- COFINS 的 CST 代码
+ExLineNo, -- 征税行号
+isSrvCall, -- 已通过服务呼叫创建
+PQTReqQty, -- 采购报价单：要求数量
+PQTReqDate, -- 采购报价单：要求日期
+PcDocType, -- 采购确认单据类型
+PcQuantity, -- 采购确认数量
+LinManClsd, -- 已手动关闭行
+VatGrpSrc, -- 增值税组来源
+NoInvtryMv, -- 不含库存移动
+ActBaseEnt, -- 实际基本单据分录
+ActBaseLn, -- 实际基本行编号
+ActBaseNum, -- 实际基本单据编号
+OpenRtnQty, -- 未清退货数量
+AgrNo, -- 协议编号
+AgrLnNum, -- 协议行编号
+CredOrigin, -- 贷方源
+Surpluses, -- 盈余
+DefBreak, -- 缺陷与损坏
+Shortages, -- 短缺
+UomEntry, -- 计量单位条目
+UomEntry2, -- 基本单位的计量单位条目
+UomCode, -- 计量单位代码
+UomCode2, -- 基本单位的计量单位代码
+FromWhsCod, -- 从仓库代码
+NeedQty, -- 考虑物料数量
+PartRetire, -- 部分报废
+RetireQty, -- 报废数量
+RetireAPC, -- 报废购置和生产成本
+RetirAPCFC, -- 报废购置和生产成本（外币）
+RetirAPCSC, -- 报废购置和生产成本（系统货币）
+InvQty, -- 数量 - 库存计量单位
+OpenInvQty, -- 未清数量（库存计量单位）
+EnSetCost, -- 启用退货物料成本的设置
+RetCost, -- 应收退货的退货成本
+Incoterms, -- 国际贸易术语解释通则
+TransMod, -- 运输模式
+LineVendor, -- 供应商代码行
+DistribIS, -- 分配欧贸统运费
+ISDistrb, -- 欧贸统分配金额
+ISDistrbFC, -- 欧贸统分配金额（外币）
+ISDistrbSC, -- 欧贸统分配金额（系统货币）
+IsByPrdct, -- 副产品物料
+ItemType, -- 物料类型
+PriceEdit, -- 由用户编辑价格
+PrntLnNum, -- 父行编号
+LinePoPrss, -- 采购订单流程行
+FreeChrgBP, -- 免费（业务伙伴）
+TaxRelev, -- 税相关的行
+LegalText, -- 合法文本
+ThirdParty, -- 第三方
+LicTradNum, -- 国税编号
+InvQtyOnly, -- 仅更改数量（库存计量单位）
+UnencReasn, -- Reason for Unencumbered ICMS
+ShipFromCo, -- 发货方代码
+ShipFromDe, -- 发货方描述
+FisrtBin, -- 第一个库位
+AllocBinC, -- 已分配仓位数
+ExpType, -- 费用类型
+ExpUUID, -- 费用全局唯一标识符
+ExpOpType, -- 费用操作类型
+DIOTNat, -- DIOT 国籍
+MYFtype, -- MYF 类型
+ItmTaxType, -- 物料 GST 税类别
+SacEntry, -- SAC 条目
+NCMCode, -- NCM 代码
+HsnEntry, -- HSN Entry
+OriBAbsEnt, -- 原始基本单据内部标识
+OriBLinNum, -- 原始基本单据行编号
+OriBDocTyp, -- 原始基本单据类型
+U_OrdrEntry, -- 销售订单实列号
+U_Property, -- 属性
+U_DelivDocNum, -- 配送号
+U_DelivLine, -- 配送单行号
+U_PrePurOrder, -- 请购单号
+U_FrgnName, -- 外文描述
+U_CbaseLine, -- 复制源行号
+U_CbaseEntry, -- 复制源实例
+U_CbaseObjType, -- 复制源对象
+U_OrdrDocNum, -- 销售订单单号
+U_DistNumber, -- 批次
+U_WSEntry, -- 加工单实例
+U_WSLineId, -- 加工单行号
+U_BaseType, -- 源类型
+U_BaseEntry, -- 源实例
+U_BaseLine, -- 源行号
+U_PaiCheQty, -- 已派车数量
+U_SpecDoc, -- 特价单号
+U_shipcode, -- 装运方式
+U_factory, -- 工厂代码
+U_warehouse, -- 库存代码
+U_SpecPrice, -- 特价价格
+U_FreeTxt, -- 使用位置
+U_BPCVDocEntry, -- 项目单号
+U_BPCVLineID, -- 项目明细行号
+U_IFZ, -- 是否赠品
+U_FatherItem, -- BOM父编号
+U_BomQty, -- BOM基本数量
+U_SECP, -- 二级成本
+U_BinCode, -- 库位
+U_OutBinCode, -- 出库库位
+U_A1_BaseType, -- A1源单类型
+U_A1_BaseNum, -- A1源单号
+U_A1_BaseLine, -- A1源行号
+U_A1_UseJF, -- 使用的积分
+U_A1_DSYF, -- 代收的运费
+U_BaseTypeX, -- 源类型X
+U_PSTYPE, -- 类型
+U_A1_JENum, -- A1凭证流号
+U_PrePurLine, -- 请购行号
+U_SpecName, -- 特价类型
+U_IFJG, -- 是否加工
+U_ExamenID, -- 审批号
+U_DelivCYQty, -- 配送差异
+U_ChlPrice, -- 渠道价格
+U_ChlAmo, -- 渠道总额
+U_WSFacCode, -- 加工厂代码
+U_WSFacName, -- 加工厂名称
+U_WSInPrice, -- 加工结算价
+U_WSMarkPrice, -- 加工标价
+U_WSQty, -- 转加工数
+U_WSSendQty, -- 加工领料数
+U_WSCmpQty, -- 完工数量
+U_WSFactCQty, -- 预计成品数
+U_JGBaseItem, -- 加工原料
+U_JGBaseQty, -- 加工原料数
+U_DDelivQty, -- 订单已配送数
+U_BasePkUn, -- 基本包装数
+U_PriceBefDi, -- 折扣前
+U_DiscPrcnt, -- 折扣率
+U_B1REPUEntry, -- 汇总请购单号
+U_B1REPULine, -- 汇总请购单行号
+CURRENT_TIMESTAMP() AS dw_last_update_date -- 同步数据时间
+FROM SDI.SDI_SW_IGE1_1010;

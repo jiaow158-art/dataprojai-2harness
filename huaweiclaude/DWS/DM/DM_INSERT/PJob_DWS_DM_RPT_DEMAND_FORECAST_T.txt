@@ -1,0 +1,340 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- 2022年逻辑
+-- ******************************************************************** --
+--DELETE FROM DM.DM_RPT_DEMAND_FORECAST_T
+--WHERE stat_month >= 
+--CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+--     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+--         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+--          END
+--          ;
+--
+--with t1 as(
+--select case when prod_name3 in('原石','玻化砖') then '抛光砖'
+--            when prod_name3 in('抛釉砖','空气净化砖','通体大理石','抛釉砖(不含空气净化砖)') --取消'新材','ART+','DPI'
+--			  or (prod_name3 = '世界印象' and dimension = '900X900')
+--			then '抛釉砖'
+--            when prod_name3 in('715岩板','918岩板','超大板','大板') 
+--              or (prod_name3 = '世界印象' and dimension in('1200X1200','1500X750','1800X900','2400X1800','2400X800','2600X800','2800X1200','4800X2400')) then '大板'
+--            when prod_name3 = '瓷片' then '瓷片'
+--            when prod_name3 = '精瓷中板' then '中板'
+--            when prod_name3 = '仿古砖'
+--			  or (prod_name3 = '世界印象' and dimension not in('1200X1200','1500X750','1800X900','2400X1800','2400X800','2600X800','2800X1200','4800X2400','900X900')) then '仿古砖'
+--            when prod_name3 = '景观砖' then '景观砖'
+--            when prod_name3 in('其他瓷砖') or prod_name4 = '其他杂类' then '其他品类' --取消'其他品类'
+--             end as prod_name
+--       ,case when sale_grp_name0 = '国际营销' then '国贸'
+--	         when sale_grp_name0 = '梦之家事业部' then '梦之家'
+--	         when sub_grp_name1 = 'Z031' then '幕墙'
+--       		 when sale_grp_name1 = '工程市场中心' then '战略工程'
+--	         when sale_grp_name1 in('直营经营管理板块','区域运营中心') then sub_grp_name1
+--			 end as sub_grp_name --运营中心
+--	   ,* 
+--from DM.DM_RPT_SALE_FORECAST_T
+--where (sale_grp_name1 in('直营经营管理板块','区域运营中心') or sale_grp_name0 in ('梦之家事业部','国际营销') or (sale_grp_name1 = '工程市场中心' and (sub_grp_name1 is null or sub_grp_name1 not in ('Z033'))))  --(sale_grp_name2 <> '幕墙工程中心' or sale_grp_name2 is null ) and 
+--and (prod_name3 in('原石','玻化砖','抛釉砖','空气净化砖','通体大理石','715岩板','918岩板','超大板'
+--                 ,'世界印象','瓷片','精瓷中板','仿古砖','景观砖','其他瓷砖','抛釉砖(不含空气净化砖)','大板'
+--				 ) or (prod_name3 = '其他品类' and prod_name4 = '其他杂类'))--del '新材','ART+','DPI','其他品类'
+--and stat_month >= '202204'	
+--	 
+--)
+--
+--,t2 as(
+--select case when t1.prod_name = '抛光砖' and t1.dimension in('600X600','800X800') then t1.dimension
+--            when t1.prod_name = '抛光砖' then '其他规格'
+--			when t1.prod_name = '抛釉砖' and t1.dimension in('600X600','800X800','1200X600') then t1.dimension
+--			when t1.prod_name = '抛釉砖' then '其他规格'
+--			when t1.prod_name = '大板' and t1.dimension in('1500X750','2600X800','1800X900') then t1.dimension
+--			when t1.prod_name = '大板' then '其他规格'
+--			when t1.prod_name = '瓷片' and t1.dimension in('300X300','600X300','800X400') then t1.dimension
+--			when t1.prod_name = '瓷片' then '其他规格'
+--			when t1.prod_name = '中板' and t1.dimension in('600X300','800X400') then t1.dimension
+--			when t1.prod_name = '中板' then '其他规格'
+--			when t1.prod_name = '仿古砖' and t1.dimension in('600X298','600X600','800X800','1200X600') then t1.dimension
+--			when t1.prod_name = '仿古砖' then '其他规格'
+--			when t1.prod_name = '景观砖' and t1.dimension in('600X600','1200X600') then t1.dimension
+--			when t1.prod_name = '景观砖' then '其他规格'
+--			when t1.prod_name = '其他品类' then '其他规格'
+--			 end as dimension
+--       ,t1.prod_name
+--       ,case when t1.sub_grp_name = '佛山子公司' or t1.sub_grp_name = '广州子公司' then '广佛子公司' else t1.sub_grp_name end sub_grp_name
+--	   ,t1.stat_month
+--	   ,CASE WHEN t1.sale_channel = '06' THEN '工程'
+--            WHEN B.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+--            WHEN t1.sale_channel = '08' THEN '大包'
+--            WHEN B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+--            ELSE '零售'
+--            END AS CHANNEL_NAME --四大渠道	   
+--	   ,sum(zxsyj_dy)/10000 as zxsyj_dy --X实际达成业绩单位：万元
+--	   ,sum(zxsmj_dy)/10000 as zxsmj_dy --X月实际提货面积单位：万方
+--  from t1
+--  LEFT JOIN DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T B
+--  ON t1.material_num = B.MATERIAL_NUM
+-- group by case when t1.prod_name = '抛光砖' and t1.dimension in('600X600','800X800') then t1.dimension
+--            when t1.prod_name = '抛光砖' then '其他规格'
+--			when t1.prod_name = '抛釉砖' and t1.dimension in('600X600','800X800','1200X600') then t1.dimension
+--			when t1.prod_name = '抛釉砖' then '其他规格'
+--			when t1.prod_name = '大板' and t1.dimension in('1500X750','2600X800','1800X900') then t1.dimension
+--			when t1.prod_name = '大板' then '其他规格'
+--			when t1.prod_name = '瓷片' and t1.dimension in('300X300','600X300','800X400') then t1.dimension
+--			when t1.prod_name = '瓷片' then '其他规格'
+--			when t1.prod_name = '中板' and t1.dimension in('600X300','800X400') then t1.dimension
+--			when t1.prod_name = '中板' then '其他规格'
+--			when t1.prod_name = '仿古砖' and t1.dimension in('600X298','600X600','800X800','1200X600') then t1.dimension
+--			when t1.prod_name = '仿古砖' then '其他规格'
+--			when t1.prod_name = '景观砖' and t1.dimension in('600X600','1200X600') then t1.dimension
+--			when t1.prod_name = '景观砖' then '其他规格'
+--			when t1.prod_name = '其他品类' then '其他规格'
+--			 end
+--       ,t1.prod_name
+--      ,case when t1.sub_grp_name = '佛山子公司' or t1.sub_grp_name = '广州子公司' then '广佛子公司' else t1.sub_grp_name end
+--	   ,t1.stat_month
+--	   ,CASE WHEN t1.sale_channel = '06' THEN '工程'
+--            WHEN B.RESERVED_FIELD_1 = 'G105' THEN '设计师'
+--            WHEN t1.sale_channel = '08' THEN '大包'
+--            WHEN B.RESERVED_FIELD_3 = 'A9' THEN '大包'
+--            ELSE '零售'  END
+--)
+--
+--
+--,t3 as(
+--select stat_month
+--      ,sales_department
+--      ,category_name as prod_name
+--	  ,specifications_code as dimension
+--	  ,case when sales__channel = '大包渠道' then '大包'
+--	  	    when sales__channel = '零售渠道' then '零售'
+--	  	    when sales__channel = '工程渠道' then '工程'
+--	  	    when sales__channel = '设计师渠道' then '设计师'
+--	  	    end as channel_name	  
+--	  ,sum(cast(estimated_pickup_area as numeric(38,10))) as yc_area --X月预测面积单位：万方
+--	  ,sum(cast(forecast_amount as numeric(38,10))) as yc_amount --X月预测业绩单位：万元
+--  from upload.upload_sd_forecast_aroam_t
+-- where 1=1
+-- group by
+--       stat_month
+--       ,sales_department
+--      ,category_name
+--	  ,specifications_code
+--	  ,case when sales__channel = '大包渠道' then '大包'
+--	  	    when sales__channel = '零售渠道' then '零售'
+--	  	    when sales__channel = '工程渠道' then '工程'
+--	  	    when sales__channel = '设计师渠道' then '设计师'
+--	  	    end 
+--),t4 as(
+--select stat_month
+--      ,sub_grp_name
+--      ,prod_name
+--	  ,dimension
+--	  ,channel_name
+--	  ,zxsyj_dy --X实际达成业绩单位：万元
+--	  ,zxsmj_dy --X月实际提货面积单位：万方
+--	  ,cast(0 as numeric(38,10)) as yc_area --X月预测面积单位：万方
+--	  ,cast(0 as numeric(38,10)) as yc_amount --X月预测业绩单位：万元
+--  from t2
+--  
+-- union all
+--
+--select cast(stat_month as INTEGER) as stat_month
+--      ,sales_department
+--      ,prod_name
+--	  ,dimension
+--	  ,channel_name
+--	  ,cast(0 as numeric(38,10)) as zxsyj_dy --X实际达成业绩单位：万元
+--	  ,cast(0 as numeric(38,10)) as zxsmj_dy --X月实际提货面积单位：万方
+--	  ,yc_area --X月预测面积单位：万方
+--	  ,yc_amount --X月预测业绩单位：万元
+--  from t3
+--)
+--,T5 AS (select stat_month
+--      ,case when sub_grp_name like '%运营中%' then '运营中心'
+--            when sub_grp_name like '%子公司'   then '子公司'
+--            when sub_grp_name like '%运营部'   then '运营部'
+--            when sub_grp_name = '战略工程'   then '工程市场中心'
+--            when sub_grp_name = '国贸' then '国贸'
+--            when sub_grp_name = '梦之家' then '梦之家'
+--            when sub_grp_name = '幕墙' then '工程市场中心'
+--            end  sub_name
+--      ,sub_grp_name
+--      ,prod_name
+--	  ,dimension
+--	  ,channel_name
+--	  ,sum(zxsyj_dy) as zxsyj_dy --X实际达成业绩单位：万元
+--	  ,sum(zxsmj_dy) as zxsmj_dy --X月实际提货面积单位：万方
+--	  ,sum(yc_area) as yc_area --X月预测面积单位：万方
+--	  ,sum(yc_amount) as yc_amount --X月预测业绩单位：万元
+--	  ,abs(sum(zxsmj_dy) - sum(yc_area)) as ycpc_area--预测偏差面积
+--	  ,abs(sum(zxsyj_dy) - sum(yc_amount)) as ycpc_amount --预测偏差金额
+--	  ,'X' as FLAG
+--   from t4
+--   WHERE 1=1
+-- group by 
+--       stat_month
+--      ,sub_grp_name
+--      ,prod_name
+--	  ,dimension
+--	  ,channel_name
+--)
+--   INSERT INTO DM.DM_RPT_DEMAND_FORECAST_T
+--	  SELECT stat_month
+--      ,prod_name
+--	  ,dimension 
+--	  ,zxsyj_dy  --X实际达成业绩单位：万元
+--	  ,zxsmj_dy  --X月实际提货面积单位：万方
+--	  ,yc_area  --X月预测面积单位：万方
+--	  ,yc_amount  --X月预测业绩单位：万元
+--	  ,ycpc_area --预测偏差面积
+--	  ,ycpc_amount 
+--	  ,current_timestamp as dw_last_update_date -- 数据同步时间
+--	  ,sub_name
+--      ,sub_grp_name
+--      ,FLAG
+--      ,channel_name
+--	   FROM t5 
+--       WHERE FLAG = 'X' and 
+--       stat_month >= 
+--      CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+--      THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+--      ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+--      END;
+
+
+
+-- ******************************************************************** --
+-- 2023年逻辑
+-- ******************************************************************** --
+DELETE FROM DM.DM_RPT_DEMAND_FORECAST_T
+WHERE stat_month >= 202301 
+and stat_month >= 
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+    THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+        ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+         END
+         ;
+with A as (
+select 
+	COALESCE(a2.bigdimension,'其他规格') as dimension--规格划分
+	,COALESCE(a2.prod_name1,'其他瓷砖') as prod_name --品类划分
+	,case 
+		when a1.level1 in ('战略工程中心','战略地产') then '战略工程'
+		when a1.level1 in ('国际营销系统','瓷砖国际营销中心') then '国际营销' 
+		when a1.level1 in ('梦之家事业部','梦之家') then '梦之家'
+-- 		when a1.level1 = '幕墙工程中心' then '幕墙'
+		when a1.level1 in  ('幕墙工程中心','商机资源开发部','战略客户部') then '资源开发运营部' 
+		when a1.level1 = 'ART+' then 'ART+'
+		else a1.level2
+	end as sub_grp_name --运营中心
+	,a1.calmonth stat_month
+   	,case 
+   		when a1.channel_desc in ('整装头部') then '整装头部'
+   		when a1.channel_desc in ('工程渠道','工程') then '工程'
+   		when a1.channel_desc in ('大零售渠道','大零售','零售渠道') then '零售'
+   		else a1.channel_desc
+   	end	CHANNEL_NAME --销售渠道	   
+   ,a1.amount as zxsyj_dy--X实际达成业绩单位：万元
+   ,a1.area as zxsmj_dy--X月实际提货面积单位：万方
+from DM.DM_RPT_SALE_FORECAST_2023_T a1 --DM_RPT_SALE_FORECAST_2023_T
+left join DM.DM_RPT_SALE_FORECAST_T_MID a2 on a1.material = a2.material_num
+)
+,B as(
+select cast(stat_month as INTEGER) as stat_month
+      ,case 
+        when sales_department in ('国际营销','国贸') then '国际营销' 
+        when sales_department in ('战略地产','战略工程') then '战略工程'
+        when sales_department in ('战略客户部','资源开发运营部') then '资源开发运营部'
+        else sales_department 
+       end as sales_department --外挂表统一名称
+      ,category_name as prod_name 
+	  ,specifications_code as dimension
+	  ,sales__channel as channel_name	  
+	  ,cast(estimated_pickup_area as numeric(38,10)) as yc_area --X月预测面积单位：万方
+	  ,cast(forecast_amount as numeric(38,10)) as yc_amount --X月预测业绩单位：万元
+  from upload.upload_sd_forecast_aroam_t
+)
+,C as(
+select stat_month
+      ,sub_grp_name
+      ,prod_name
+	  ,dimension
+	  ,channel_name
+	  ,sum(zxsyj_dy)/10000 as zxsyj_dy --X实际达成业绩单位：万元
+	  ,sum(zxsmj_dy)/10000 as zxsmj_dy--X月实际提货面积单位：万方
+	  ,sum(cast(0 as numeric(38,10)))  as yc_area --X月预测面积单位：万方
+	  ,sum(cast(0 as numeric(38,10))) as yc_amount --X月预测业绩单位：万元
+from A
+group by stat_month,sub_grp_name,prod_name,dimension,channel_name
+
+union all
+
+select stat_month
+      ,sales_department
+      ,prod_name
+	  ,dimension
+	  ,channel_name
+	  ,sum(cast(0 as numeric(38,10))) as zxsyj_dy --X实际达成业绩单位：万元
+	  ,sum(cast(0 as numeric(38,10))) as zxsmj_dy --X月实际提货面积单位：万方
+	  ,sum(yc_area) as yc_area--X月预测面积单位：万方
+	  ,sum(yc_amount) as yc_amount --X月预测业绩单位：万元
+from B
+group by stat_month,sales_department,prod_name,dimension,channel_name
+)
+,D AS (
+select stat_month
+	  --可以忽略这个字段，前端统一一下
+      ,case when sub_grp_name like '%运营中%' then '运营中心'
+            when sub_grp_name like '%子公司'   then '子公司'
+            when sub_grp_name like '资源开发运营部'   then '工程市场中心'
+            when sub_grp_name = '战略工程'   then '工程市场中心'
+            when sub_grp_name = '国际营销' then '国际营销'
+            when sub_grp_name = '梦之家' then '梦之家'
+            when sub_grp_name = '幕墙' then '工程市场中心'
+             when sub_grp_name = 'ART+' then 'ART+'
+            end  sub_name
+      ,sub_grp_name
+      ,prod_name
+	  ,dimension
+	  ,channel_name
+	  ,sum(zxsyj_dy) as zxsyj_dy --X实际达成业绩单位：万元
+	  ,sum(zxsmj_dy) as zxsmj_dy --X月实际提货面积单位：万方
+	  ,sum(yc_area) as yc_area --X月预测面积单位：万方
+	  ,sum(yc_amount) as yc_amount --X月预测业绩单位：万元
+	  ,abs(sum(zxsmj_dy) - sum(yc_area)) as ycpc_area--预测偏差面积
+	  ,abs(sum(zxsyj_dy) - sum(yc_amount)) as ycpc_amount --预测偏差金额
+	  ,'X' as FLAG
+from C
+WHERE 1=1
+ group by 
+       stat_month
+      ,sub_grp_name
+      ,prod_name
+	  ,dimension
+	  ,channel_name
+)
+INSERT INTO DM.DM_RPT_DEMAND_FORECAST_T
+SELECT 
+	cast(stat_month as INTEGER) as stat_month
+	,prod_name
+	,dimension 
+	,zxsyj_dy  --X实际达成业绩单位：万元
+	,zxsmj_dy  --X月实际提货面积单位：万方
+	,yc_area  --X月预测面积单位：万方
+	,yc_amount  --X月预测业绩单位：万元
+	,ycpc_area --预测偏差面积
+	,ycpc_amount 
+	,current_timestamp as dw_last_update_date -- 数据同步时间
+	,sub_name
+	,sub_grp_name
+	,FLAG
+	,channel_name  
+FROM D
+WHERE FLAG = 'X' 
+-- and sub_grp_name <> '国际营销'
+and 
+stat_month >=202301
+and stat_month >= 
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+    THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+        ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+         END
+         ;

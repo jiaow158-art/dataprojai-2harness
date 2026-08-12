@@ -1,0 +1,35 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2024/01/18 09:56:07 GMT+08:00
+-- description:汇联易附件信息
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_huilianyi_application_file_form_history;
+insert into dm.dm_huilianyi_application_file_form_history
+with tem as 
+(
+SELECT 
+    attachmentoid
+    ,fileName
+    ,path
+    ,downloadUrl
+    ,replace(replace(createdDate,'T',' '),'Z','') as fj_createdDate
+    ,fileURL
+    ,link
+    ,ROW_NUMBER() over(partition by attachmentoid order by createdDate)as RN
+from  upload.upload_huilianyi_application_file_form_history
+)
+
+SELECT 
+    attachmentoid
+    ,fileName
+    ,path
+    ,downloadUrl
+    ,fj_createdDate
+    ,fileURL
+    ,link
+    ,current_timestamp()  as dw_last_update_date
+from  tem
+where RN = 1

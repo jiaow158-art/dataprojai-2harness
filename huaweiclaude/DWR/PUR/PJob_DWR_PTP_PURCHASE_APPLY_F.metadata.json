@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_APPLY_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/PUR",
+    "description": "SAP采购申请表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

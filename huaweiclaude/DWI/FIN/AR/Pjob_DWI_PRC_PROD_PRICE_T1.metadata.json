@@ -1,0 +1,8 @@
+{
+    "name": "Pjob_DWI_PRC_PROD_PRICE_T1",
+    "type": "HiveSQL",
+    "directory": "/DWI/FIN/AR",
+    "description": "来源表A004",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwifin"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_WM_STOCK_RES_PRE_T",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "dp_mrs_hive_prod: 修复零售留货新增渠道的可能",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "sdi"
+}

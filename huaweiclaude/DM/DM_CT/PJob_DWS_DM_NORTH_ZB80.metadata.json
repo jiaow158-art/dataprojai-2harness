@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB80",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "主菜单SKU平均销值同比增长率（大零售渠道）ZB80",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

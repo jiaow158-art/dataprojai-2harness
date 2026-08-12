@@ -1,0 +1,1164 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/09/29 14:54:23 GMT+08:00
+-- 增加ITSM-需求工单总量、ITSM-故障工单量指标 修改人：黄文彬 修改日期：2022-11-12
+-- 将UPLOAD_ITIL_SYSTEM_OP_DATE_T替换成dm_itil_system_op_date_vi 修改人：黄文彬 修改日期：2023-12-05
+-- 修改ITSM-响应工单量、ITSM-及时响应工单量的统计逻辑，保持与ITSM报表-内外部工单情况汇总表逻辑一致 黄文彬 2023-12-11
+-- 修改ITSM-响应工单量、ITSM-及时响应工单量、ITSM-今年关闭工单量、ITSM-去年同期关闭工单量的统计逻辑，创建日期在月末的工单归属到下个月 黄文彬 2024-02-29
+-- 修改关于故障工单目录二剔除为：需求、维保的数据，OP_DATE为统计月份12月前的数据都应参与计算 -15000571
+-- ******************************************************************** --
+DELETE FROM DM.DM_MD_SYSTEM_STAT_D
+WHERE SUBSTR(STAT_DATE,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(STAT_DATE,1,10) <= '${PERIOD_ID_D2}'
+;
+
+WITH T AS(
+--  一.数据财经产品部
+--    1.经营看板-当天报表热度
+select to_char(operationdate,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'数据财经产品部' AS DEPT_NAME --部门
+	  ,'经营看板-当天报表热度' AS STAT_TYPE --统计类型
+      ,resname AS SUB_STAT_TYPE --统计子类型
+	  ,COUNT(logid) AS STAT_CNT
+from DWIMD.DWI_MD_MOBILE_LOG_BW_T
+where 1=1
+and resname <> '集团日报'
+and to_char(operationdate,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(operationdate,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(operationdate,'yyyy-MM-dd'),resname
+
+UNION ALL
+
+--    2.经营看板-当天活跃人数
+select to_char(operationdate,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'数据财经产品部' AS DEPT_NAME --部门
+	  ,'经营看板-当天活跃人数' AS STAT_TYPE --统计类型
+      ,username AS SUB_STAT_TYPE --统计子类型
+	  ,count(username) STAT_CNT
+from DWIMD.DWI_MD_MOBILE_LOG_BW_T
+where 1=1
+and to_char(operationdate,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(operationdate,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(operationdate,'yyyy-MM-dd'),username
+
+union all
+--    3.经营看板-访问次数
+select to_char(operationdate,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'数据财经产品部' AS DEPT_NAME --部门
+	  ,'经营看板-访问次数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(logid) AS STAT_CNT
+from DWIMD.DWI_MD_MOBILE_LOG_BW_T
+where 1=1
+and to_char(operationdate,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(operationdate,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(operationdate,'yyyy-MM-dd')
+
+UNION ALL
+
+--数据中台-接口出错次数
+SELECT 
+to_char(to_timestamp(cast(start_time as float)) ,'yyyy-MM-dd') AS STAT_DATE --日期
+,'数据财经产品部' AS DEPT_NAME --部门
+,'数据中台-接口出错次数' AS STAT_TYPE --统计类型
+,NULL AS SUB_STAT_TYPE --统计子类型
+,count(1)  AS STAT_CNT
+from api_log.api_to_dws atd 
+where  api_name not like '%test' and response_body not like '%function%' 
+and api_name not like '%TEST' and api_name <> 'apic_DATA_OTD_SO_DTL_RFC'
+and response_body not like '%missing FROM-clause%'
+and to_char(to_timestamp(cast(start_time as float)) ,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_timestamp(cast(start_time as float)) ,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+and http_status <> '200' 
+group by to_char(to_timestamp(cast(start_time as float)) ,'yyyy-MM-dd')
+
+ UNION ALL
+
+--  二.渠道商用产品部
+
+--    1.RTM-活跃人数
+select to_char(to_date(T1.LOGIN_TIME),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'渠道商用产品部' AS DEPT_NAME --部门
+	  ,'RTM-活跃人数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(distinct  T1.USER_ID) AS STAT_CNT --登录人数 
+from DWIPI.DWI_WF_LNK_LOGINLOG_T T1,
+     DWIPI.DWI_WF_LNK_EMP_INFO_T T2,
+     DWIPI.DWI_WF_LNK_ORG_EXT_T T3,
+     DWIPI.DWI_WF_LNK_POSTN_EXT_T t4
+where T1.LOGIN_NAME = T2.username(+) 
+and T2.postn_id = t4.ROW_ID(+)
+AND T4.DEPT_ID = T3.ROW_ID(+)
+and to_char(to_date(T1.LOGIN_TIME),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(T1.LOGIN_TIME),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(T1.LOGIN_TIME),'yyyy-MM-dd')
+
+UNION ALL
+
+--    2.RTM-订单行数
+select a.STAT_DATE AS STAT_DATE --日期
+      ,'渠道商用产品部' AS DEPT_NAME --部门
+	  ,'RTM-订单行数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,a.STAT_CNT +b.STAT_CNT AS STAT_CNT
+from(
+select 
+to_char(to_date(t1.confirm_date),'yyyy-MM-dd') STAT_DATE
+,COUNT(t1.OSS_SO_ITEM_ID) STAT_CNT 
+from   DWROTD.DWR_SO_HEAD_OSS_F OD
+,   DWROTD.DWR_SO_ITEM_OSS_F t1--订单行
+where t1.OSS_SO_ID = OD.OSS_SO_ID
+group by to_char(to_date(t1.confirm_date),'yyyy-MM-dd')
+) a
+left join (
+select 
+to_char(to_date(expect_date),'yyyy-MM-dd') STAT_DATE
+,count(dss_so_item_id) STAT_CNT
+from  DWROTD.DWR_SO_ITEM_DSS_F
+where 1=1
+group by to_char(to_date(expect_date),'yyyy-MM-dd')
+) b
+on a.STAT_DATE = b.STAT_DATE
+where to_char(to_date(a.STAT_DATE),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(a.STAT_DATE),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+
+UNION ALL
+
+--    4.DMT-设计家-C端用户量及浏览量
+select to_char(to_date(stat_date),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'渠道商用产品部' AS DEPT_NAME --部门
+	  ,'DMT-设计家-C端浏览量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,sum(visit_times) AS STAT_CNT --,sum(visitor) 用户数
+from  DWIMD.DWI_MD_USER_ACTIVE_DMT_T
+where 1=1
+and app_id = 'wx20e01abd59b3009b'
+and to_char(to_date(stat_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(stat_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(stat_date),'yyyy-MM-dd')
+
+UNION ALL
+
+select to_char(to_date(stat_date),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'渠道商用产品部' AS DEPT_NAME --部门
+	  ,'DMT-设计家-C端用户数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,sum(visitor) AS STAT_CNT
+from  DWIMD.DWI_MD_USER_ACTIVE_DMT_T
+where 1=1
+and app_id = 'wx20e01abd59b3009b'
+and to_char(to_date(stat_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(stat_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(stat_date),'yyyy-MM-dd')
+
+union all
+
+--    5.CC-cc（瓷砖)-工单量
+select to_char(to_date(t.CREATE_TIME),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'渠道商用产品部' AS DEPT_NAME --部门
+	  ,'CC-cc（瓷砖)-工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(distinct order_no) AS STAT_CNT
+from DWIITR.DWI_ITR_BASE_ORDER_T t
+where EP_CODE = '1000'  
+and (proc_key = 'dp_work_complain' or proc_key = 'dpcz_work_order')
+and to_char(to_date(t.CREATE_TIME),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(t.CREATE_TIME),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(t.CREATE_TIME),'yyyy-MM-dd')
+
+union all
+--  三、大供应链产品部
+--    1.大供应链-MOM-APS-登录人数
+select to_char(logtime,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-MOM-APS-登录人数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(distinct users) STAT_CNT 
+from DWIMD.DWI_MD_LOGIN_ACTIVE_APS_T
+where 1=1
+and to_char(logtime,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(logtime,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(logtime,'yyyy-MM-dd')
+
+union all
+--   2. DAS-DAS-报表查看次数
+select to_char(to_date(shift_date),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'DAS-DAS-报表查看次数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(usage_times) 次数
+from DWIOTD.DWI_PAM_OPERATION_STATISTICS_DAS_T
+where 1=1
+and to_char(to_date(shift_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(shift_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(shift_date),'yyyy-MM-dd')
+
+union all
+--   3. 大供应链-TMS-TMS-物流订单数
+
+select to_char(to_date(order_date),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-TMS-TMS-物流订单数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,SUM(order_count) STAT_CNT
+from DWIOTD.DWI_WM_SJZT_DAILY_ORDER_T
+where 1=1
+and to_char(to_date(order_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(order_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+----物流订单数  
+group by to_char(to_date(order_date),'yyyy-MM-dd')
+
+UNION ALL
+
+--   4. 大供应链-SAP-SAP-登录人数
+select  to_char(to_date(logon_date,'yyyy-MM-dd'),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-SAP-SAP-登录人数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(distinct termid) STAT_CNT
+from DWIPI.DWI_WF_ZLOGON_T
+where 1=1
+and to_char(to_date(logon_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(logon_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+and substr(logon_date,1,1) <> '0'
+group by logon_date
+
+UNION ALL
+
+--   5. 大供应链-SAP-SAP-活跃人数
+select  to_char(to_date(A.logon_date,'yyyy-MM-dd'),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-SAP-SAP-活跃人数' AS STAT_TYPE --统计类型
+	  ,A.BNAME AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DWIPI.DWI_WF_ZLOGON_T A
+LEFT JOIN DWIMD.DWI_MD_SAP_USER_INFO_T B
+ON A.BNAME = B.BNAME
+where 1=1
+and to_char(to_date(A.logon_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(A.logon_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+and substr(A.logon_date,1,1) <> '0'
+and B.USTYP = 'A'
+group by A.logon_date
+        ,A.BNAME
+
+UNION ALL
+
+--   6. 大供应链-APS-APS-非计划类手工单总面积
+select to_char(A.ORDER_DATE,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-APS-APS-非计划类手工单总面积' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,SUM(COALESCE(A.ORDER_AREA,0)) STAT_CNT
+  FROM DWROTD.DWR_PS_MANUAL_PROD_ORDER_F A
+ WHERE A.INV_ORG_ID = 1
+   AND A.IS_PHANTOM = 0
+   AND A.UPLOAD_STATE = 1
+   and to_char(A.ORDER_DATE,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.ORDER_DATE,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+ GROUP BY to_char(A.ORDER_DATE,'yyyy-MM-dd')  
+
+UNION ALL
+
+--   7. 大供应链-APS-APS-非计划类手工单面积
+select to_char(A.ORDER_DATE,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-APS-APS-非计划类手工单面积' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,SUM(COALESCE(A.ORDER_AREA,0)) STAT_CNT
+  FROM DWROTD.DWR_PS_MANUAL_PROD_ORDER_F A
+ WHERE A.INV_ORG_ID = 1
+   AND A.IS_PHANTOM = 0
+   AND A.UPLOAD_STATE = 1
+   AND A.CREATE_EMP_NAME IN('李钰钿','卢静韵','李美厦','霍满锐','邓雯菁')
+   and to_char(A.ORDER_DATE,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.ORDER_DATE,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+ GROUP BY to_char(A.ORDER_DATE,'yyyy-MM-dd') 
+
+UNION ALL
+
+--   8. 大供应链-SAP-SAP-未锁定用户数
+select A.STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-SAP-SAP-未锁定用户数' AS STAT_TYPE --统计类型
+	  ,B.BNAME AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from(select day_dt as STAT_DATE
+       from dm.dm_dim_date_d
+	  where SUBSTR(day_dt,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+	    and day_dt <= '${PERIOD_ID_D2}'
+    ) A
+left join DWIMD.DWI_MD_SAP_USER_INFO_T B
+  ON 1 = 1
+where 1 = 1
+and B.USTYP = 'A'
+AND B.UFLAG = '0'
+group by A.STAT_DATE
+        ,B.BNAME
+
+UNION ALL
+
+--   9. 大供应链-APS-APS-提前7天下达工单数
+select to_char(B.RELEASE_START_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-APS-APS-提前7天下达工单数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) STAT_CNT
+  FROM DWROTD.DWR_PS_APS_PLAN_TASK_F A
+  LEFT JOIN DWROTD.DWR_PS_APS_PLAN_TASK_DTL_F B
+    ON A.ID = B.PLAN_TASK_ID
+ WHERE A.INV_ORG_ID = 1
+   AND A.STATUS IN(20,30)
+   and to_char(B.RELEASE_START_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(B.RELEASE_START_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and DATE_PART('day',A.START_TIME - B.RELEASE_START_TIME) > 7
+ GROUP BY to_char(B.RELEASE_START_TIME,'yyyy-MM-dd')
+
+UNION ALL
+
+--   10. 大供应链-APS-APS-提前7天下达工单总数
+select to_char(B.RELEASE_START_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-APS-APS-提前7天下达工单总数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) STAT_CNT
+  FROM DWROTD.DWR_PS_APS_PLAN_TASK_F A
+  LEFT JOIN DWROTD.DWR_PS_APS_PLAN_TASK_DTL_F B
+    ON A.ID = B.PLAN_TASK_ID
+ WHERE A.INV_ORG_ID = 1
+   AND A.STATUS IN(20,30)
+   and to_char(B.RELEASE_START_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(B.RELEASE_START_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+ GROUP BY to_char(B.RELEASE_START_TIME,'yyyy-MM-dd')
+
+UNION ALL
+
+--   11. 大供应链-清远条码-清远条码-扫码稽查总数
+select to_char(A.CHECK_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-扫码稽查总数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) STAT_CNT
+  FROM DWROTD.DWR_CK_FLEEING_INSPECTION_F A
+ WHERE to_char(A.CHECK_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.CHECK_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+ GROUP BY to_char(A.CHECK_TIME,'yyyy-MM-dd')
+ 
+UNION ALL
+
+--   12. 大供应链-清远条码-清远条码-稽查无结果数
+select to_char(A.CHECK_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-稽查无结果数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) STAT_CNT
+  FROM DWROTD.DWR_CK_FLEEING_INSPECTION_F A
+ WHERE to_char(A.CHECK_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.CHECK_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and out_bill_id is null
+ GROUP BY to_char(A.CHECK_TIME,'yyyy-MM-dd') 
+ 
+UNION ALL
+
+--   13. 大供应链-清远条码-清远条码-打码总数
+select to_char(A.STATISTIC_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-打码总数' AS STAT_TYPE --统计类型
+	  ,LINE_NAME AS SUB_STAT_TYPE --统计子类型
+      ,SUM(PRODUCT_QTY) STAT_CNT
+  FROM DWROTD.DWR_CK_CODE_STATISTIC_REPORT_F A
+ WHERE to_char(A.STATISTIC_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.STATISTIC_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and type = 2
+ GROUP BY to_char(A.STATISTIC_TIME,'yyyy-MM-dd')
+         ,LINE_NAME
+
+UNION ALL
+
+--   14. 大供应链-清远条码-清远条码-打码成功总数
+select to_char(A.STATISTIC_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-打码成功总数' AS STAT_TYPE --统计类型
+	  ,LINE_NAME AS SUB_STAT_TYPE --统计子类型
+      ,SUM(IDENTIFY_QTY) STAT_CNT
+  FROM DWROTD.DWR_CK_CODE_STATISTIC_REPORT_F A
+ WHERE to_char(A.STATISTIC_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.STATISTIC_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and type = 2
+ GROUP BY to_char(A.STATISTIC_TIME,'yyyy-MM-dd')
+         ,LINE_NAME
+
+UNION ALL
+
+--   15. 大供应链-清远条码-清远条码-打码异常总数
+select to_char(A.STATISTIC_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-打码异常总数' AS STAT_TYPE --统计类型
+	  ,LINE_NAME AS SUB_STAT_TYPE --统计子类型
+      ,SUM(COALESCE(PRODUCT_QTY,0) - COALESCE(IDENTIFY_QTY,0)) STAT_CNT
+  FROM DWROTD.DWR_CK_CODE_STATISTIC_REPORT_F A
+ WHERE to_char(A.STATISTIC_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.STATISTIC_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and type = 2
+ GROUP BY to_char(A.STATISTIC_TIME,'yyyy-MM-dd')
+         ,LINE_NAME 		  
+
+UNION ALL
+
+--   16. 大供应链-清远条码-清远条码-隐形码打码总数
+select to_char(A.STATISTIC_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-隐形码打码总数' AS STAT_TYPE --统计类型
+	  ,LINE_NAME AS SUB_STAT_TYPE --统计子类型
+      ,SUM(PRODUCT_QTY) STAT_CNT
+  FROM DWROTD.DWR_CK_CODE_STATISTIC_REPORT_F A
+ WHERE to_char(A.STATISTIC_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.STATISTIC_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and type = 1
+ GROUP BY to_char(A.STATISTIC_TIME,'yyyy-MM-dd')
+         ,LINE_NAME
+
+UNION ALL
+
+--   17. 大供应链-清远条码-清远条码-隐形码打码成功总数
+select to_char(A.STATISTIC_TIME,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'大供应链产品部' AS DEPT_NAME --部门
+	  ,'大供应链-清远条码-清远条码-隐形码打码成功总数' AS STAT_TYPE --统计类型
+	  ,LINE_NAME AS SUB_STAT_TYPE --统计子类型
+      ,SUM(IDENTIFY_QTY) STAT_CNT
+  FROM DWROTD.DWR_CK_CODE_STATISTIC_REPORT_F A
+ WHERE to_char(A.STATISTIC_TIME,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+   and to_char(A.STATISTIC_TIME,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   and type = 1
+ GROUP BY to_char(A.STATISTIC_TIME,'yyyy-MM-dd')
+         ,LINE_NAME
+
+UNION ALL
+
+--  四、PPMO产品部
+
+--   1. PPMO-OA-OA-登录人数
+
+select  to_char(to_date(t.operatedate),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-登录人数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(distinct t.operateuserid) STAT_CNT
+from DWIPI.DWI_WF_LOGINNUM_OA_T t
+where 1=1
+and t.operatetype = 6
+and t.clienttype = 1
+and to_char(to_date(operatedate),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7)
+and to_char(to_date(operatedate),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+group by to_char(to_date(t.operatedate),'yyyy-MM-dd')
+
+UNION ALL
+
+--   2. PPMO-OA-OA-流程发生数
+select  to_char(to_date(t.create_date),'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-流程发生数' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,count(request_code) STAT_CNT
+from dwrpi.DWR_WF_REQUEST_BASIC_INTO_F t
+where 1=1
+and to_char(to_date(create_date),'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(to_date(create_date),'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(to_date(t.create_date),'yyyy-MM-dd')
+   
+UNION ALL
+
+--   3. PPMO-OA-OA-MBS002-用车申请流程（总部）发生数
+select SQRQ AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS002-用车申请流程（总部）发生数' AS STAT_TYPE --统计类型
+	  ,'发生数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_CAR_USE_APPLY_FLOW_T t
+where 1=1
+AND ASSID IS NOT NULL
+and SUBSTR(SQRQ,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and SQRQ <= '${PERIOD_ID_D2}' 
+   group by SQRQ
+   
+UNION ALL
+
+--   4. PPMO-OA-OA-MBS010-后勤维修申请流程发生数
+select SQSJ AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS010-后勤维修申请流程发生数' AS STAT_TYPE --统计类型
+	  ,'发生数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_LOGISTICS_REPAIR_APPLY_FLOW_T t
+where 1=1
+AND ASSID IS NOT NULL
+and SUBSTR(SQSJ,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and SQSJ <= '${PERIOD_ID_D2}'
+   group by SQSJ  
+   
+UNION ALL
+
+--   5. PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)发生数
+select SQRQ AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)发生数' AS STAT_TYPE --统计类型
+	  ,'发生数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_RESTAURANT_ORDER_FLOW_T t
+where 1=1
+AND ASSID IS NOT NULL
+and SUBSTR(SQRQ,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and SQRQ <= '${PERIOD_ID_D2}' 
+   group by SQRQ 
+ 
+UNION ALL
+
+--   6. PPMO-OA-OA-MBS004-公寓住宿申请流程发生数
+select SQRQ AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS004-公寓住宿申请流程发生数' AS STAT_TYPE --统计类型
+	  ,'发生数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_APARTMENT_STAY_APPLY_FLOW_T t
+where 1=1
+AND ASSID IS NOT NULL
+and SUBSTR(SQRQ,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and SQRQ <= '${PERIOD_ID_D2}' 
+   group by SQRQ 
+
+UNION ALL
+
+--   7. PPMO-OA-OA-PTP018-办公用品申购流程（总部）发生数
+select SQRQ AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-PTP018-办公用品申购流程（总部）发生数' AS STAT_TYPE --统计类型
+	  ,'发生数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_OFFICE_SUPPLIES_PURCHASE_FLOW_T t
+where 1=1
+AND ASSID IS NOT NULL
+and SUBSTR(SQRQ,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+and SQRQ <= '${PERIOD_ID_D2}'  
+   group by SQRQ 
+
+UNION ALL
+
+--   8. PPMO-OA-OA-MBS002-用车申请流程（总部）服务满意度
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS002-用车申请流程（总部）服务满意度' AS STAT_TYPE --统计类型
+	  ,'服务满意度' AS SUB_STAT_TYPE --统计子类型
+      ,sum(coalesce(star_rating,0)) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+AND to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+AND to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+and business_type ='car_use_info'
+group by to_char(creation_date,'yyyy-MM-dd')
+   
+   
+UNION ALL
+
+--   9. PPMO-OA-OA-MBS010-后勤维修申请流程服务满意度
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS010-后勤维修申请流程服务满意度' AS STAT_TYPE --统计类型
+	  ,'服务满意度' AS SUB_STAT_TYPE --统计子类型
+      ,sum(coalesce(star_rating,0)) STAT_CNT
+from DM.DM_OA_LOGISTICS_MAINTENANCE_T t
+where 1=1
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(creation_date,'yyyy-MM-dd')  
+   
+UNION ALL
+
+--   10. PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)服务满意度
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)服务满意度' AS STAT_TYPE --统计类型
+	  ,'服务满意度' AS SUB_STAT_TYPE --统计子类型
+      ,sum(coalesce(star_rating,0)) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+and business_type ='restaurant'
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}' 
+   group by to_char(creation_date,'yyyy-MM-dd') 
+ 
+UNION ALL
+
+--   11. PPMO-OA-OA-MBS004-公寓住宿申请流程服务满意度
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS004-公寓住宿申请流程服务满意度' AS STAT_TYPE --统计类型
+	  ,'服务满意度' AS SUB_STAT_TYPE --统计子类型
+      ,sum(coalesce(star_rating,0)) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+and business_type ='apartment_order'
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(creation_date,'yyyy-MM-dd') 
+
+UNION ALL
+
+--   12. PPMO-OA-OA-MBS002-用车申请流程（总部）服务条数
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS002-用车申请流程（总部）服务条数' AS STAT_TYPE --统计类型
+	  ,'服务条数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+AND to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+AND to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}' 
+and business_type ='car_use_info'
+group by to_char(creation_date,'yyyy-MM-dd')
+   
+   
+UNION ALL
+
+--   13. PPMO-OA-OA-MBS010-后勤维修申请流程服务条数
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS010-后勤维修申请流程服务条数' AS STAT_TYPE --统计类型
+	  ,'服务条数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_OA_LOGISTICS_MAINTENANCE_T t
+where 1=1
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(creation_date,'yyyy-MM-dd')  
+   
+UNION ALL
+
+--   14. PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)服务条数
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS012-小餐厅订餐流程(总部)服务条数' AS STAT_TYPE --统计类型
+	  ,'服务条数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+and business_type ='restaurant'
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(creation_date,'yyyy-MM-dd') 
+ 
+UNION ALL
+
+--   15. PPMO-OA-OA-MBS004-公寓住宿申请流程服务条数
+select to_char(creation_date,'yyyy-MM-dd') AS STAT_DATE --日期
+      ,'PPMO产品部' AS DEPT_NAME --部门
+	  ,'PPMO-OA-OA-MBS004-公寓住宿申请流程服务条数' AS STAT_TYPE --统计类型
+	  ,'服务条数' AS SUB_STAT_TYPE --统计子类型
+      ,count(1) STAT_CNT
+from DM.DM_OA_CAR_USE_EVALUATE_T t
+where 1=1
+and business_type ='apartment_order'
+and to_char(creation_date,'yyyy-MM') = SUBSTR('${PERIOD_ID_D2}',1,7) 
+and to_char(creation_date,'yyyy-MM-dd') <= '${PERIOD_ID_D2}'
+   group by to_char(creation_date,'yyyy-MM-dd')
+ 
+UNION ALL
+
+--  五、ITIL产品部
+
+--   1. ITSM-需求工单总量
+select 
+       SUBSTR(CREATE_TIME,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-需求工单总量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) AS STAT_CNT
+from DWRBIT.DWR_RM_ORDER_FLOW_F 
+where FORM_KEY = 'systemandbusiness'
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS not in('orderstate01','orderstate00','workOrderStatus00','workOrderStatus09','orderstate06')
+group by SUBSTR(CREATE_TIME,1,10)
+
+union all
+
+--   2. ITSM-故障工单量
+select 
+       SUBSTR(CREATE_TIME,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-故障工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(1) AS STAT_CNT
+from DWRBIT.DWR_RM_ORDER_FLOW_F 
+where FORM_KEY = 'eventManagement'
+and FLOW_STATUS > 0
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS not in('orderstate01','orderstate00','workOrderStatus00','workOrderStatus09','orderstate06')
+group by SUBSTR(CREATE_TIME,1,10)
+
+UNION ALL
+
+--   3. ITSM-一线工程师处理率
+SELECT
+       A.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-一线工程师处理率' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,round((a.ZL-b.EX)/a.ZL,4) AS STAT_CNT
+from 
+-- 工单总量
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,count(*) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS in('orderstate04','workOrderStatus05')
+group by SUBSTR(COMPLATE_TIME,1,10)
+) a
+INNER JOIN
+-- 二线工程师处理量
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,count(*) as EX 
+ from DWRBIT.DWR_RM_ORDER_FLOW_F a 
+ INNER JOIN (SELECT USER_ID
+               FROM DWRDIM.DWR_DIM_ITSM_USER_ROLE_D
+              WHERE USER_ID NOT IN (select USER_ID  from DWRDIM.DWR_DIM_ITSM_USER_ROLE_D where role_id='dfa6c6344e114b1280ab0363580e228a')
+			    AND role_name = '二线工程师'
+			  GROUP BY USER_ID) R1
+ ON R1.USER_ID = a.BUSI_HANDLE_USERID
+ LEFT JOIN DM.dm_itil_system_op_date_vi B
+ ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and a.FLOW_STATUS > 0
+AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180
+and BUSI_STATUS in ('orderstate04','workOrderStatus05')
+group by SUBSTR(COMPLATE_TIME,1,10)
+) b
+on a.STAT_DATE = b.STAT_DATE
+
+UNION ALL
+
+--   4. ITSM-关闭工单量
+SELECT
+       A.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-关闭工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,a.ZL AS STAT_CNT
+from 
+-- 工单总量
+(SELECT  SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,count(distinct a.flow_num) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+  ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS in('orderstate04','workOrderStatus05')
+group by SUBSTR(COMPLATE_TIME,1,10)
+) a
+
+UNION ALL
+
+--   5. ITSM-二线工程师处理量
+SELECT
+       b.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-二线工程师处理量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,b.EX AS STAT_CNT
+from 
+-- 二线工程师处理量
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,count(distinct a.flow_num) as EX 
+ from DWRBIT.DWR_RM_ORDER_FLOW_F a 
+ INNER JOIN (SELECT USER_ID
+               FROM DWRDIM.DWR_DIM_ITSM_USER_ROLE_D
+              WHERE USER_ID NOT IN (select USER_ID  from DWRDIM.DWR_DIM_ITSM_USER_ROLE_D where role_id='dfa6c6344e114b1280ab0363580e228a')
+			    AND role_name = '二线工程师'
+			  GROUP BY USER_ID) R1
+ ON R1.USER_ID = a.BUSI_HANDLE_USERID
+where a.FORM_KEY = 'eventManagement' 
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and a.FLOW_STATUS > 0 
+and BUSI_STATUS in ('orderstate04','workOrderStatus05')
+group by SUBSTR(COMPLATE_TIME,1,10)
+) b
+
+UNION ALL
+
+--   6. ITSM-一线处理量
+SELECT
+       SUBSTR(A.COMPLATE_TIME,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-一线处理量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,count(distinct a.flow_num) - count(distinct case when R1.USER_ID is not null then a.flow_num else null end) AS STAT_CNT
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+  ON B.SYSTEM_NAME = A.SYSTEM_NAME
+left join (SELECT USER_ID
+               FROM DWRDIM.DWR_DIM_ITSM_USER_ROLE_D
+              WHERE USER_ID NOT IN (select USER_ID  from DWRDIM.DWR_DIM_ITSM_USER_ROLE_D where role_id='dfa6c6344e114b1280ab0363580e228a')
+			    AND role_name = '二线工程师'
+			  GROUP BY USER_ID) R1
+ ON R1.USER_ID = a.BUSI_HANDLE_USERID  
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS in('orderstate04','workOrderStatus05')
+GROUP BY SUBSTR(A.COMPLATE_TIME,1,10)
+
+UNION ALL
+
+--   7. ITSM-工单量
+SELECT
+       SUBSTR(CREATE_TIME,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,COUNT(1) AS STAT_CNT
+  FROM DM.DM_WORK_ORDER_DOCU_T A
+ WHERE SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+   AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+ GROUP BY SUBSTR(CREATE_TIME,1,10)
+
+UNION ALL
+
+--   8. ITSM-及时响应工单量
+SELECT
+       SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-及时响应工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,COUNT(DISTINCT FLOW_NUM) AS STAT_CNT
+  FROM DWRBIT.DWR_RM_ORDER_FLOW_F A
+  LEFT JOIN DM.DM_DIM_DATE_D B
+	ON SUBSTR(A.CREATE_TIME,1,10) = B.DAY_DT
+   AND B.MONTH_END_DAY_FLAG = 'Y'
+ WHERE SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+   AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) <= '${PERIOD_ID_D2}'
+   AND BUSI_STATUS_NAME IN ('处理中', '挂起', '待评价', '关闭')
+   --剔除服务目录二属于‘需求’的工单
+AND A.CTI_NAME NOT LIKE '%需求%'
+AND A.CTI_NAME NOT LIKE '%维保%'
+   AND A.FLOW_STATUS > 0
+   AND A.FORM_KEY = 'eventManagement'
+   AND A.RESP_TIME <= 15
+ GROUP BY SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10)
+ 
+union all
+
+--   9. ITSM-响应工单量
+select 
+       SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-响应工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,COUNT(DISTINCT FLOW_NUM) AS STAT_CNT
+from DWRBIT.DWR_RM_ORDER_FLOW_F A
+LEFT JOIN DM.DM_DIM_DATE_D B
+  ON SUBSTR(A.CREATE_TIME,1,10) = B.DAY_DT
+ AND B.MONTH_END_DAY_FLAG = 'Y'
+where SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) <= '${PERIOD_ID_D2}'
+AND BUSI_STATUS_NAME IN ('处理中', '挂起', '待评价', '关闭')
+AND SYSTEM_NAME IS NOT NULL	
+--剔除服务目录二属于‘需求’的工单
+AND A.CTI_NAME NOT LIKE '%需求%'
+AND A.CTI_NAME NOT LIKE '%维保%'
+--and BUSI_STATUS not in('orderstate01','orderstate00','workOrderStatus00','workOrderStatus09','orderstate06')
+group by SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) 
+
+union all
+
+--   10. ITSM-故障工单占比
+select 
+       SUBSTR(A.COMPLATE_TIME,1,10) AS STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-故障工单占比' AS STAT_TYPE --统计类型
+	  ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END AS SUB_STAT_TYPE --统计子类型
+      ,COUNT(distinct a.flow_num) AS STAT_CNT
+from DWRBIT.DWR_RM_ORDER_FLOW_F A
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+ ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where A.FORM_KEY = 'eventManagement'
+and A.FLOW_STATUS > 0
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) > 0
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and A.BUSI_STATUS in('orderstate04','workOrderStatus05')
+group by 
+       SUBSTR(A.COMPLATE_TIME,1,10)
+      ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END
+			 
+ UNION ALL
+			 
+--   11. ITSM-故障工单占比-关闭工单量
+SELECT
+       A.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-故障工单占比-关闭工单量' AS STAT_TYPE --统计类型
+	  ,A.SUB_STAT_TYPE --统计子类型
+	  ,a.ZL AS STAT_CNT
+from 
+-- 工单总量
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+             WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			  AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			 WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			  END AS SUB_STAT_TYPE --统计子类型
+       ,count(distinct a.flow_num) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+  ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) > 0
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS in('orderstate04','workOrderStatus05')
+group by
+       SUBSTR(COMPLATE_TIME,1,10)
+      ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END --统计子类型
+) a	
+
+ UNION ALL
+
+--   12. ITSM-故障工单占比-一线处理量
+SELECT
+       a.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-故障工单占比-一线处理量' AS STAT_TYPE --统计类型
+	  ,a.SUB_STAT_TYPE --统计子类型
+	  ,(a.ZL - COALESCE(b.EX,0)) AS STAT_CNT
+from 
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END AS SUB_STAT_TYPE --统计子类型
+       ,count(distinct a.flow_num) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.dm_itil_system_op_date_vi B
+  ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) > 0
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS in('orderstate04','workOrderStatus05')
+group by 
+       SUBSTR(COMPLATE_TIME,1,10)
+      ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END --统计子类型
+) a
+LEFT JOIN
+-- 二线工程师处理量
+(SELECT SUBSTR(COMPLATE_TIME,1,10) AS STAT_DATE --日期
+       ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END AS SUB_STAT_TYPE --统计子类型
+       ,count(distinct a.flow_num) as EX 
+ from DWRBIT.DWR_RM_ORDER_FLOW_F a 
+ INNER JOIN (SELECT USER_ID
+               FROM DWRDIM.DWR_DIM_ITSM_USER_ROLE_D
+              WHERE USER_ID NOT IN (select USER_ID  from DWRDIM.DWR_DIM_ITSM_USER_ROLE_D where role_id='dfa6c6344e114b1280ab0363580e228a')
+			    AND role_name = '二线工程师'
+			  GROUP BY USER_ID) R1
+ ON R1.USER_ID = a.BUSI_HANDLE_USERID
+ LEFT JOIN DM.dm_itil_system_op_date_vi B
+  ON B.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+AND SUBSTR(CREATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CREATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+AND SUBSTR(COMPLATE_TIME,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(COMPLATE_TIME,1,10) <= '${PERIOD_ID_D2}'
+and a.FLOW_STATUS > 0 
+and BUSI_STATUS in ('orderstate04','workOrderStatus05')
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) > 0
+group by 
+       SUBSTR(COMPLATE_TIME,1,10)
+      ,CASE WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 90 THEN '<3个月'
+            WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 90
+			 AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) < 180 THEN '3-6个月'
+			WHEN DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - B.OP_DATE) >= 180 THEN '>6个月'
+			 END --统计子类型
+) b
+on a.STAT_DATE = b.STAT_DATE
+and COALESCE(a.SUB_STAT_TYPE,'SNULL') = COALESCE(b.SUB_STAT_TYPE,'SNULL') 
+
+ UNION ALL
+ 
+--   13. ITSM-去年同期关闭工单量
+SELECT
+       A.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-去年同期关闭工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,a.ZL AS STAT_CNT
+from 
+-- 工单总量
+(SELECT SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END + interval '1 YEAR',1,10) AS STAT_DATE --日期
+       ,count(distinct a.flow_num) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.DM_DIM_DATE_D B
+ON SUBSTR(A.CREATE_TIME,1,10) = B.DAY_DT
+AND B.MONTH_END_DAY_FLAG = 'Y'
+LEFT JOIN DM.dm_itil_system_op_date_vi C
+  ON C.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+--剔除服务目录二属于‘需求’的工单
+AND A.CTI_NAME NOT LIKE '%需求%'
+AND A.CTI_NAME NOT LIKE '%维保%'
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - C.OP_DATE) >= 0
+AND C.OP_DATE  <   to_char(to_date('${PERIOD_ID_D2}')  - interval ' 1 years','yyyy-MM-dd')
+AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END + interval '1 YEAR',1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END + interval '1 YEAR',1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS not in('orderstate01','orderstate00','workOrderStatus00','workOrderStatus09','orderstate06')
+group by SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END + interval '1 YEAR',1,10)
+) a
+
+ UNION ALL
+ 
+--   14. ITSM-今年关闭工单量
+SELECT
+       A.STAT_DATE --日期
+      ,'ITIL产品部' AS DEPT_NAME --部门
+	  ,'ITSM-今年关闭工单量' AS STAT_TYPE --统计类型
+	  ,NULL AS SUB_STAT_TYPE --统计子类型
+	  ,a.ZL AS STAT_CNT
+from 
+-- 工单总量
+(SELECT SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) AS STAT_DATE --日期
+       ,count(distinct a.flow_num) as ZL 
+from DWRBIT.DWR_RM_ORDER_FLOW_F a
+LEFT JOIN DM.DM_DIM_DATE_D B
+ON SUBSTR(A.CREATE_TIME,1,10) = B.DAY_DT
+AND B.MONTH_END_DAY_FLAG = 'Y'
+LEFT JOIN DM.dm_itil_system_op_date_vi C
+  ON C.SYSTEM_NAME = A.SYSTEM_NAME
+where a.FORM_KEY = 'eventManagement' 
+and a.FLOW_STATUS > 0
+--剔除服务目录二属于‘需求’的工单
+AND A.CTI_NAME NOT LIKE '%需求%'
+AND A.CTI_NAME NOT LIKE '%维保%'
+--AND DATE_PART('DAY',CAST(SUBSTR(A.CREATE_TIME,1,10) AS DATE) - C.OP_DATE) >= 0
+AND C.OP_DATE  <   to_char(to_date('${PERIOD_ID_D2}')  - interval ' 1 years','yyyy-MM-dd')
+AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,7) = SUBSTR('${PERIOD_ID_D2}',1,7)
+AND SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10) <= '${PERIOD_ID_D2}'
+and BUSI_STATUS not in('orderstate01','orderstate00','workOrderStatus00','workOrderStatus09','orderstate06')
+group by SUBSTR(CASE WHEN B.DAY_DT IS NOT NULL
+				  THEN CAST(B.DAY_DT AS DATE) + INTERVAL '1 DAY'
+				  ELSE A.CREATE_TIME
+				   END,1,10)
+) a
+)
+ 
+INSERT INTO DM.DM_MD_SYSTEM_STAT_D(
+        STAT_DATE
+       ,DEPT_NAME
+       ,STAT_TYPE
+       ,SUB_STAT_TYPE
+       ,STAT_CNT
+       ,DW_LAST_UPDATE_DATE
+)
+SELECT STAT_DATE --日期
+      ,DEPT_NAME --部门
+	  ,STAT_TYPE --统计类型
+	  ,SUB_STAT_TYPE --统计子类型
+      ,STAT_CNT --统计数
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+  FROM T
+;

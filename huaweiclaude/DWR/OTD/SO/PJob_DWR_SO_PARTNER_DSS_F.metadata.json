@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_SO_PARTNER_DSS_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/SO",
+    "description": "DSS合作伙伴",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

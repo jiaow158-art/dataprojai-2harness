@@ -1,0 +1,128 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/10/30 14:29:03 GMT+08:00
+-- description:用户计算订单交付日报中的金额
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+DELETE FROM dm.dm_order_deliver_day_report ;
+INSERT INTO dm.dm_order_deliver_day_report
+with tem as
+(
+select
+	'1' as time_type
+	,a.sales_grp
+	,a.PROD_PROPERTY_NAME
+	,a.calmonth
+	,a.distr_chan
+	,b.product_level2_code as  zprodh2
+	,a.size_dim
+	,a.material
+	,a.ambperformance
+	,a.zxsmj
+	,a.zxssl
+	,a.customer
+from dm.dm_ambv2_zzt_xssr_t a
+left join dwimd.dwi_md_data_material_general_t b on a.material = b.material_num
+where 1=1
+and calmonth = to_char(current_date - INTERVAL '1 month', 'YYYY-MM')
+
+union all 
+
+select
+	'3' as time_type
+	,a.sales_grp
+	,a.PROD_PROPERTY_NAME
+	,a.calmonth
+	,a.distr_chan
+	,b.product_level2_code as zprodh2
+	,a.size_dim
+	,a.material
+	,a.ambperformance
+	,a.zxsmj
+	,a.zxssl
+	,a.customer
+from dm.dm_ambv2_zzt_xssr_t a
+left join dwimd.dwi_md_data_material_general_t b on a.material = b.material_num
+where 1=1
+and calmonth <= to_char(current_date - INTERVAL '1 month', 'YYYY-MM')
+and calmonth >= to_char(current_date - INTERVAL '3 month', 'YYYY-MM')
+
+union all 
+
+select
+	'6' as time_type
+	,a.sales_grp
+	,a.PROD_PROPERTY_NAME
+	,a.calmonth
+	,a.distr_chan
+	,b.product_level2_code as zprodh2
+	,a.size_dim
+	,a.material
+	,a.ambperformance
+	,a.zxsmj
+	,a.zxssl
+	,a.customer
+from dm.dm_ambv2_zzt_xssr_t a
+left join dwimd.dwi_md_data_material_general_t b on a.material = b.material_num
+where 1=1
+and calmonth <= to_char(current_date - INTERVAL '1 month', 'YYYY-MM')
+and calmonth >= to_char(current_date - INTERVAL '6 month', 'YYYY-MM')
+
+union all
+
+--PJob_DM_DP_API_CUST_GENERAL引用这个类型
+select
+	'CM6' as time_type
+	,sales_grp
+	,PROD_PROPERTY_NAME
+	,calmonth
+	,distr_chan
+	,zprodh2
+	,size_dim
+	,material
+	,ambperformance
+	,zxsmj
+	,zxssl
+	,customer
+from dm.dm_ambv2_zzt_xssr_t a
+where 1=1
+and calmonth > to_char(current_date - INTERVAL '6 month', 'YYYY-MM')
+)
+
+select 
+    case
+	    when b.node_name4 in ('H04230600')  then b.node_desc5
+	    when b.node_name4 in ('H04230655')  then b.node_desc5
+	    when b.node_name5 in ('Z033', 'Z031','H05230609')  then b.node_desc5
+	    when b.node_name3 in ('H03230617') then b.node_desc3 --国际营销系统
+	    when b.node_name3 in ('H03230628') then b.node_desc3 -- 梦之家事业部
+    end sub_grp,
+	distr_chan,
+	zprodh2,
+	size_dim,
+	material,
+	sum(ambperformance) as sales_amt,  --金额
+	sum(zxsmj) as sales_area, --面积
+	sum(zxssl) as sales_qty,
+	current_timestamp() as dw_last_update_date,
+	time_type,
+	customer
+from tem a
+left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+where 1=1
+and (NODE_NAME2 = 'H11000001' or (coalesce(b.node_name2, '#') = '#' AND A.PROD_PROPERTY_NAME IN ('整装产品', '瓷砖产品')))
+--and ((node_name4 in ('H04230600', 'H04230655') and
+--        (strpos(node_desc5, '子公司') > 0 or strpos(node_desc5, '运营中心') > 0))
+--    	or (node_name3 in ('H03230617', 'H03230628'))
+--    	or node_name5 in ('Z031', 'H05230609', 'Z033')
+--    )
+group by 
+	time_type,
+	sub_grp,
+	distr_chan,
+	zprodh2,
+	size_dim,
+	material,
+	customer

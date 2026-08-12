@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_PLAN_DEMANDPLAN_RTM_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/PLAN",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

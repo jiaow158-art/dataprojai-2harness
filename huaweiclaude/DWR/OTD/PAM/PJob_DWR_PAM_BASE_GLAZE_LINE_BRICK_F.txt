@@ -1,0 +1,180 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2024/06/27 09:52:19 GMT+08:00
+-- description:釉线入砖数记录表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+
+--   drop table DWROTD.DWR_PAM_BASE_GLAZE_LINE_BRICK_F;
+-- create table DWROTD.DWR_PAM_BASE_GLAZE_LINE_BRICK_F (
+--  site_code string comment '基地'
+-- ,work_shop_code string comment '车间'
+-- ,PRODUCT_LINE_CODE string comment '产线代码'
+-- ,work_no_code string comment '工序代码'
+-- ,PRODUCT_DATE string comment '生产日期'
+-- ,SHIFT_CODE string comment '班次代码'
+-- ,SHIFT_START_TIME timestamp comment '班次开始时间'
+-- ,SHIFT_END_TIME timestamp comment '班次结束时间'
+-- ,PRODUCT_CODE string comment '产品编号'
+-- ,PRODUCT_DIM string comment '规格'
+-- ,UNIT_AREA numeric(38,10) comment '单位面积'
+-- ,SUCCESSION_INKJET_COUNTER_NUM numeric(38,10) comment '喷墨机计数器-接班'
+-- ,SHIFT_INKJET_COUNTER_NUM numeric(38,10) comment '喷墨机计数器-交班'
+-- ,INKJET_COUNTER_BRICK_NUM numeric(38,10) comment '喷墨机计数器-实际入砖数'
+-- ,SUCCESSION_STOCK_NUM  numeric(38,10) comment '储坯器储坯数-接班'
+-- ,SHIFT_STOCK_NUM numeric(38,10) comment	'储坯器储坯数-交班'
+-- ,SUCCESSION_PICK_NUM numeric(38,10) comment	'捡砖机计数器-接班'
+-- ,SHIFT_PICK_NUM	numeric(38,10) comment '捡砖机计数器-交班'
+-- ,BRICK_PICK_NUM	numeric(38,10) comment '捡砖机计数器-实际入砖数'
+-- -- ,SUCCESSION_GREEN_TRACK_NUM	numeric(38,10) comment '储坯轨道储坯数-接班'
+-- -- ,SHIFT_GREEN_TRACK_NUM	numeric(38,10) comment '储坯轨道储坯数-交班'
+-- ,creater string	comment '创建人姓名'
+-- ,create_time timestamp comment '创建时间'
+-- ,updater string	comment '修改人姓名'
+-- ,update_time timestamp comment '修改时间'
+-- ,DEL_FLAG  string comment  '删除标识'
+-- ,DW_LAST_UPDATE_DATE timestamp comment '最后更新时间'
+-- )
+-- PARTITIONED by (
+-- `period_id_m` string )
+
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with tmp as (
+select 
+ T.site as site_code -- '基地'
+,T.work_shop as work_shop_code --'车间'
+,T.PRODUCT_LINE as PRODUCT_LINE_CODE -- '产线代码'
+,T.work_no_code -- '工序代码'
+,SUBSTR(T.PRODUCT_DATE,1,10) AS PRODUCT_DATE -- '生产日期'
+,T.SHIFT as SHIFT_CODE -- '班次代码'
+,T.SHIFT_START_TIME -- '班次开始时间'
+,T.SHIFT_END_TIME -- '班次结束时间'
+,T.GROUP_CODE AS PRODUCT_CODE -- '产品编号'
+,T.GROUP_SPECIFICATION AS PRODUCT_DIM -- '规格'
+,T.SUCCESSION_INKJET_COUNTER AS SUCCESSION_INKJET_COUNTER_NUM -- '喷墨机计数器-接班'
+,T.SHIFT_INKJET_COUNTER AS SHIFT_INKJET_COUNTER_NUM -- '喷墨机计数器-交班'
+,T.INKJET_COUNTER_BRICK_NUM --'喷墨机计数器-实际入砖数'
+,case when T.shift = 'YC_BC01' then nvl(T.SUCCESSION_STOCK_NUM,0) + nvl(T.SUCCESSION_GREEN_TRACK_NUM,0) else 0 end as SUCCESSION_STOCK_NUM  -- 储坯器储坯数接班'
+,case when T.shift = 'YC_BC02' then nvl(T.SHIFT_STOCK_NUM,0) + nvl(T.SHIFT_GREEN_TRACK_NUM,0) else 0 end as SHIFT_STOCK_NUM  --	储坯器储坯数交班'
+,T.SUCCESSION_PICK AS SUCCESSION_PICK_NUM--'捡砖机计数器-接班'
+,T.SHIFT_PICK AS SHIFT_PICK_NUM	    --'捡砖机计数器-交班'
+,T.BRICK_PICK_NUM	    --'捡砖机计数器-实际入砖数'
+,T.CREATE_BY AS creater -- '创建人姓名'
+,T.CREATE_DATE AS create_time --'创建时间'
+,T.LAST_UPDATE_BY AS updater -- '修改人姓名'
+,T.LAST_UPDATE_DATE AS update_time -- '修改时间'
+,case when T.shift = 'YC_BC02' then nvl(T.SHIFT_STOCK_NUM,0)  else 0 end shift_change_stock_num_jiaob --储坯器储坯数-交班
+,case when T.shift = 'YC_BC01' then nvl(T.SUCCESSION_STOCK_NUM,0) else 0 end shift_join_stock_num_jieb --储坯器储坯数-接班
+,case when T.shift = 'YC_BC02' then nvl(T.SHIFT_GREEN_TRACK_NUM,0) else 0 end shift_change_green_track_num_jiaob --储坯轨道储坯数-交班
+,case when T.shift = 'YC_BC01' then nvl(T.SUCCESSION_GREEN_TRACK_NUM,0) else 0 end shift_join_green_track_num_jieb --储坯轨道储坯数-接班
+FROM sdi.sdi_d_work_hop_glaze_line_1006 T  --车间釉线入砖表
+where T.site = '1800' and T.delete_flag = 1 
+and T.PRODUCT_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all 
+select 
+ T.site as site_code -- '基地'
+,T.work_shop as work_shop_code --'车间'
+,T.PRODUCT_LINE as PRODUCT_LINE_CODE -- '产线代码'
+,T.work_no_code -- '工序代码'
+,SUBSTR(T.shift_date,1,10) AS PRODUCT_DATE -- '生产日期'
+,T.shift_code as SHIFT_CODE -- '班次代码'
+,T.SHIFT_START_TIME -- '班次开始时间'
+,T.SHIFT_END_TIME -- '班次结束时间'
+,T.product_code AS PRODUCT_CODE -- '产品编号'
+,T.product_specification AS PRODUCT_DIM -- '规格'
+,0 AS SUCCESSION_INKJET_COUNTER_NUM -- '喷墨机计数器-接班'
+,0 AS SHIFT_INKJET_COUNTER_NUM -- '喷墨机计数器-交班'
+,0 AS INKJET_COUNTER_BRICK_NUM --'喷墨机计数器-实际入砖数'
+,T.SUCCESSION_STOCK_NUM  -- '储坯器储坯数-接班'
+,T.SHIFT_STOCK_NUM --	'储坯器储坯数-交班'
+,0 AS SUCCESSION_PICK_NUM    --'捡砖机计数器-接班'
+,0 AS SHIFT_PICK_NUM	   --'捡砖机计数器-交班'
+,0 AS BRICK_PICK_NUM	   --'捡砖机计数器-实际入砖数'
+,T.creater -- '创建人姓名'
+,T.create_time --'创建时间'
+,T.updater -- '修改人姓名'
+,T.update_time -- '修改时间'
+,0 as shift_change_stock_num_jiaob --储坯器储坯数-交班
+,0 as shift_join_stock_num_jieb --储坯器储坯数-接班
+,0 as  shift_change_green_track_num_jiaob --储坯轨道储坯数-交班
+,0 as shift_join_green_track_num_jieb --储坯轨道储坯数-接班
+from sdi.sdi_dj_glaze_line_brick_record_1006 T  --釉线入砖数记录表
+where T.site in ('1900') and T.delete_flag = '1'
+and T.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+union all 
+select 
+ T.site as site_code -- '基地'
+,T.work_shop as work_shop_code --'车间'
+,T.PRODUCT_LINE as PRODUCT_LINE_CODE -- '产线代码'
+,T.work_no_code -- '工序代码'
+,SUBSTR(T.shift_date,1,10) AS PRODUCT_DATE -- '生产日期'
+,T.shift_code as SHIFT_CODE -- '班次代码'
+,T.SHIFT_START_TIME -- '班次开始时间'
+,T.SHIFT_END_TIME -- '班次结束时间'
+,T.product_code AS PRODUCT_CODE -- '产品编号'
+,T.product_specification AS PRODUCT_DIM -- '规格'
+,0 AS SUCCESSION_INKJET_COUNTER_NUM -- '喷墨机计数器-接班'
+,0 AS SHIFT_INKJET_COUNTER_NUM -- '喷墨机计数器-交班'
+,0 AS INKJET_COUNTER_BRICK_NUM --'喷墨机计数器-实际入砖数'
+,T.SUCCESSION_STOCK_NUM  -- '储坯器储坯数-接班'
+,T.SHIFT_STOCK_NUM --	'储坯器储坯数-交班'
+,0 AS SUCCESSION_PICK_NUM    --'捡砖机计数器-接班'
+,0 AS SHIFT_PICK_NUM	   --'捡砖机计数器-交班'
+,0 AS BRICK_PICK_NUM	   --'捡砖机计数器-实际入砖数'
+,T.creater -- '创建人姓名'
+,T.create_time --'创建时间'
+,T.updater -- '修改人姓名'
+,T.update_time -- '修改时间'
+,0 as shift_change_stock_num_jiaob --储坯器储坯数-交班
+,0 as shift_join_stock_num_jieb --储坯器储坯数-接班
+,0 as  shift_change_green_track_num_jiaob --储坯轨道储坯数-交班
+,0 as shift_join_green_track_num_jieb --储坯轨道储坯数-接班
+from sdi.sdi_dj_molding_section_production_data_1006 T  --釉线入砖数记录表
+where T.site in ('1500') and T.delete_flag = '1'
+and T.shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+)
+insert overwrite table DWROTD.DWR_PAM_BASE_GLAZE_LINE_BRICK_F partition(period_id_m)
+select 
+ T.site_code -- '基地'
+,T.work_shop_code --'车间'
+,T.PRODUCT_LINE_CODE -- '产线代码'
+,T.work_no_code -- '工序代码'
+,T.PRODUCT_DATE -- '生产日期'
+,T.SHIFT_CODE -- '班次代码'
+,T.SHIFT_START_TIME -- '班次开始时间'
+,T.SHIFT_END_TIME -- '班次结束时间'
+,T.PRODUCT_CODE -- '产品编号'
+,T.PRODUCT_DIM -- '规格'
+,NVL(T1.UNIT_AREA,0) AS UNIT_AREA--单位面积
+,NVL(T.SUCCESSION_INKJET_COUNTER_NUM,0) AS SUCCESSION_INKJET_COUNTER_NUM -- '喷墨机计数器-接班'
+,NVL(T.SHIFT_INKJET_COUNTER_NUM,0) AS SHIFT_INKJET_COUNTER_NUM -- '喷墨机计数器-交班'
+,NVL(T.INKJET_COUNTER_BRICK_NUM,0) AS INKJET_COUNTER_BRICK_NUM --'喷墨机计数器-实际入砖数'
+,NVL(T.SUCCESSION_STOCK_NUM,0) AS SUCCESSION_STOCK_NUM -- '储坯器储坯数-接班'
+,NVL(T.SHIFT_STOCK_NUM,0) AS SHIFT_STOCK_NUM--	'储坯器储坯数-交班'
+,NVL(T.SUCCESSION_PICK_NUM,0) AS SUCCESSION_PICK_NUM    --'捡砖机计数器-接班'
+,NVL(T.SHIFT_PICK_NUM,0) AS SHIFT_PICK_NUM	   --'捡砖机计数器-交班'
+,NVL(T.BRICK_PICK_NUM,0) AS BRICK_PICK_NUM	   --'捡砖机计数器-实际入砖数'
+,T.creater -- '创建人姓名'
+,T.create_time --'创建时间'
+,T.updater -- '修改人姓名'
+,T.update_time -- '修改时间'
+,'N' AS DEL_FLAG  --  '删除标识'
+,current_timestamp () AS DW_LAST_UPDATE_DATE -- '最后更新时间'
+,shift_change_stock_num_jiaob --储坯器储坯数-交班
+,shift_join_stock_num_jieb --储坯器储坯数-接班
+,shift_change_green_track_num_jiaob --储坯轨道储坯数-交班
+,shift_join_green_track_num_jieb --储坯轨道储坯数-接班
+,SUBSTR(T.PRODUCT_DATE,1,7) AS period_id_m
+FROM TMP T
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T1
+on T.PRODUCT_CODE = T1.material_num 

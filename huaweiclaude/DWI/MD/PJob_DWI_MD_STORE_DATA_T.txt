@@ -1,0 +1,53 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/05/10 14:36:48 GMT+08:00
+-- desc：门店数据表 DWIMD.DWI_MD_STORE_DATA_T
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE  DWIMD.DWI_MD_STORE_DATA_T
+SELECT 
+    store_id
+    ,operation_center_code
+    ,operation_center_name
+    ,customer_code
+    ,customer_name
+    ,distributor_code
+    ,distributor_name
+    ,old_store_code
+    ,store_code
+    ,store_name
+    ,design_area
+    ,store_area
+    ,shop_type
+    ,store_type
+    ,store_nature
+    ,store_status
+    ,province
+    ,city
+    ,county
+    ,address
+    ,is_get_location
+    ,longitude
+    ,latitude
+    ,store_filing_date
+    ,completion_date
+    ,operation_type
+    ,is_product_to_dp
+    ,product_brand
+    ,is_need_reset
+    ,revoke_date
+    ,revoke_reason
+    ,address_conflict_reason
+    ,del_flag
+    ,start_date
+    ,end_date
+    ,update_date
+    ,dw_last_update_date
+FROM 
+    DWIMD.DWI_MD_STORE_DATA_T_HIS  
+WHERE END_DATE = '4712-12-31' AND DEL_FLAG = 'N'

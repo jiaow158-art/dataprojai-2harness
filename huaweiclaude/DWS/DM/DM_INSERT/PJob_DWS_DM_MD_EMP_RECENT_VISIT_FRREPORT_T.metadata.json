@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_MD_EMP_RECENT_VISIT_FRREPORT_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

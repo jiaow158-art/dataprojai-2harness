@@ -1,0 +1,60 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/07 11:39:20 GMT+08:00
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+INSERT OVERWRITE TABLE DM.DM_LTC_ORDER_PLAN_INSTOCK_T
+SELECT t3.SALE_ORDER_HEAD_NO, -- 销售订单号
+       t3.SALE_ORDER_LINE_NO, -- 销售订单行号
+	   t3.WBS_NUM , -- 'WBS编码',
+	   t3.WBS_NAME_CN, -- 'WBS名称',
+       t.production_order  as PLAN_NO,-- 报工号
+       t.site as FACTORY_NUM, -- 工厂代码
+       t.site_describe as FACTORY_NAME_CN , -- 工厂描述
+       t.work_shop as WORKSHOP_CODE, -- 车间代码
+       t.work_shop_desc as WORKSHOP_NAME_CN, -- 车间描述
+       t.product_line as PRODUCT_LINE_CODE, -- 产线代码
+       t.product_line_desc as PRODUCT_LINE_NAME_CN, -- 产线描述
+       t.shift_date, -- 班次日期
+	   t3.CUSTOMER_NUM, -- 客户编码
+	   t3.CUSTOMER_NAME_CN, -- 客户名称
+       t.item as MATERIAL_NUM , -- 物料编码
+       t.item_name as MATERIAL_NAME_CN , -- 物料名称
+       t.item_voucher as MATERIAL_VOUCHER, -- 物料凭证
+       t.production_version, -- 生产版本
+       t.production_version_desc , -- 生产版本描述
+       t.post_date , -- 过账日期
+       max(t.post_date) over(PARTITION by t.production_order) as max_post_date, -- 过账日期(最大值)
+       t.voucher_date,
+       max(t.voucher_date) over(PARTITION by t.production_order) as max_post_date, -- 凭证日期(最大值)
+       t.report_no , -- 报工点
+       t.report_type, -- 报工点类型
+       t.warehousing_number as INVENTORY_QUANTITY, -- 入库数量
+       (t.warehousing_number * t2.area) as INVENTORY_QUANTITY_AREA, --入库数量面积
+       t.batch_no, -- 批次号
+       t.inventory_location, -- 库存地点
+       t.production_order, -- 生产订单
+       t.voucher_year, -- 凭证年份
+       t.sap_api_status , -- SAP接口调用状态 0调用成功  1 调用失败
+       t.aps_api_status , -- APS接口调用状态 0 调用成功 1 调用失败
+       t.api_type , -- 接口类型 （0 入库 1 一级入库）
+       t.audit_account , -- 审核人账号
+       t.audit_name, -- 审核人名字
+       t.audit_time , -- 审核时间
+       max(t.audit_time) over(PARTITION by t.production_order) as max_post_date, -- 审核时间(最大值)
+       t.audit_status, -- 是否审核 0待审核 1已审核
+       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE, -- 同步数据时间
+	   T3.plan_item_num --计划单行号
+FROM SDI.SDI_dp_new_production_report_work_record_1006 t -- 入库表
+left join sdi.sdi_item_1007 t2
+on t.item = t2.code 
+and t2.is_phantom = 0 
+left join DM.DM_LTC_ORDER_PLAN_PS_T T3 -- 排产表
+on t.production_order = t3.plan_no
+where t.delete_flag = 1
+and t.production_order is not null;

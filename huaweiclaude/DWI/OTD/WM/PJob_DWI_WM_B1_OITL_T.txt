@@ -1,0 +1,98 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/08/12 14:15:11 GMT+08:00
+-- update from chenzhiyong 20230215 新增卫浴经销商:321991
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIOTD.DWI_WM_B1_OITL_T
+SELECT
+	'CT' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+	CUSTCODE AS customer_code, -- 客户编码
+	LogEntry, -- 日志内部标识
+	TransId, -- 交易标识
+	ItemCode, -- 物料代码
+	ItemName, -- 物料描述
+	ManagedBy, -- 管理方法
+	DocEntry, -- 单据内部标识
+	DocLine, -- 单据行编号
+	DocType, -- 交易类型
+	DocNum, -- 单据编号
+	BaseEntry, -- 基本单据内部标识
+	BaseLine, -- 基本单据行编号
+	BaseType, -- 基本单据类型
+	ApplyEntry, -- 应用的单据内部标识
+	ApplyLine, -- 应用的单据行编号
+	ApplyType, -- 应用的单据类型
+	DocDate, -- 单据过账日期
+	CardCode, -- 业务伙伴代码
+	CardName, -- 业务伙伴名称
+	DocQty, -- 单据数量
+	StockQty, -- 影响数量的库存
+	DefinedQty, -- SnB 定义的数量
+	StockEff, -- 库存影响
+	CreateDate, -- 创建日期
+	LocType, -- 位置类型
+	LocCode, -- 位置代码
+	AppDocNum, -- 应用的单据编号
+	VersionNum, -- Version Number
+	Transfered, -- Year Tranfer
+	Instance, -- INSTANCE
+	SubLineNum, -- 子行编号
+	BSubLineNo, -- 基本子行编号
+	AppSubLine, -- 应用的子行编号
+	ActBaseTp, -- 实际基准类型
+	ActBaseEnt, -- 实际基准条目
+	ActBaseLn, -- 实际基准线
+	ActBasSubL, -- 实际子基线
+	AllocateTp, -- 分配单据类型
+	AllocatEnt, -- 分配单据录入
+	AllocateLn, -- 分配单据行
+	CreateTime, -- 创建时间
+	CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_CT_OITL_1010
+UNION ALL
+SELECT
+	'SW' AS CUSTOMER_TYPE, -- 客户类型：CZ:瓷砖 SW：洁具
+	CUSTCODE AS customer_code, -- 客户编码
+	LogEntry, -- 日志内部标识
+	TransId, -- 交易标识
+	ItemCode, -- 物料代码
+	ItemName, -- 物料描述
+	ManagedBy, -- 管理方法
+	DocEntry, -- 单据内部标识
+	DocLine, -- 单据行编号
+	DocType, -- 交易类型
+	DocNum, -- 单据编号
+	BaseEntry, -- 基本单据内部标识
+	BaseLine, -- 基本单据行编号
+	BaseType, -- 基本单据类型
+	ApplyEntry, -- 应用的单据内部标识
+	ApplyLine, -- 应用的单据行编号
+	ApplyType, -- 应用的单据类型
+	DocDate, -- 单据过账日期
+	CardCode, -- 业务伙伴代码
+	CardName, -- 业务伙伴名称
+	DocQty, -- 单据数量
+	StockQty, -- 影响数量的库存
+	DefinedQty, -- SnB 定义的数量
+	StockEff, -- 库存影响
+	CreateDate, -- 创建日期
+	LocType, -- 位置类型
+	LocCode, -- 位置代码
+	AppDocNum, -- 应用的单据编号
+	VersionNum, -- Version Number
+	Transfered, -- Year Tranfer
+	Instance, -- INSTANCE
+	SubLineNum, -- 子行编号
+	BSubLineNo, -- 基本子行编号
+	AppSubLine, -- 应用的子行编号
+	ActBaseTp, -- 实际基准类型
+	ActBaseEnt, -- 实际基准条目
+	ActBaseLn, -- 实际基准线
+	ActBasSubL, -- 实际子基线
+	AllocateTp, -- 分配单据类型
+	AllocatEnt, -- 分配单据录入
+	AllocateLn, -- 分配单据行
+	CreateTime, -- 创建时间
+	CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+FROM SDI.SDI_SW_OITL_1010;

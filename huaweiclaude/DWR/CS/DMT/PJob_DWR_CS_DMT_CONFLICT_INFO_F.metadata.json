@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CS_DMT_CONFLICT_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS/DMT",
+    "description": "同城报备冲突日志表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

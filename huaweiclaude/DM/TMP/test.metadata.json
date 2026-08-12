@@ -1,0 +1,8 @@
+{
+    "name": "test",
+    "type": "HiveSQL",
+    "directory": "/DM/TMP",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

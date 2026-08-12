@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_TRA_TMS_SHIP_ORDER_T",
+    "type": "HiveSQL",
+    "directory": "/DWR/OTD/TRA",
+    "description": "TMS运单头表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

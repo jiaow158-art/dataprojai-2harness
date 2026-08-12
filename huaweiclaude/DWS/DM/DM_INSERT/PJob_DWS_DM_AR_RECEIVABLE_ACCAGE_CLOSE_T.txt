@@ -1,0 +1,58 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc：应收账龄减值表（定版）
+-- create time: 2022/11/08 08:44:03 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM dm.dm_ar_receivable_accage_close_t
+ WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''))
+ ;
+insert into dm.dm_ar_receivable_accage_close_t
+  SELECT
+	 edition_date
+	,comp_code
+	,comp_code___t
+	,debitor
+	,debitor___t
+	,wbs_elemt
+	,wbs_elemt___t
+	,sales_grp
+	,sales_grp___t
+	,zysye
+	,zyq
+	,zdqyj
+	,bf_2020_zl_ysyq_0_90_amt
+	,af_2020_zl_ysyq_0_90_amt
+	,bf_2020_zl_ysyq_91_275_amt
+	,af_2020_zl_ysyq_91_275_amt
+	,bf_2020_zl_ysyq_276_720_amt
+	,af_2020_zl_ysyq_276_720_amt
+	,bf_2020_zl_ysyq_721_1440_amt
+	,af_2020_zl_ysyq_721_1440_amt
+	,bf_2020_zl_ysyq_a_1441_amt
+	,af_2020_zl_ysyq_a_1441_amt
+	,bf_2020_zl_yswyq_0_365_amt
+	,af_2020_zl_yswyq_0_365_amt
+	,bf_2020_zl_yswyq_366_730_amt
+	,af_2020_zl_yswyq_366_730_amt
+	,bf_2020_zl_yswyq_731_1095_amt
+	,af_2020_zl_yswyq_731_1095_amt
+	,bf_2020_zl_yswyq_1096_1460_amt
+	,af_2020_zl_yswyq_1096_1460_amt
+	,bf_2020_zl_yswyq_a_1461_amt
+	,af_2020_zl_yswyq_a_1461_amt
+	,ysyq_jc_amt
+	,yswyq_jc_amt
+	,current_timestamp as dw_last_update_date
+	,af_2020_zl_yswyq_1_90_amt
+	,bf_2020_zl_yswyq_1_90_amt
+	,af_2020_zl_yswyq_91_275_amt
+	,bf_2020_zl_yswyq_91_275_amt
+	,af_2020_zl_yswyq_276_720_amt
+	,bf_2020_zl_yswyq_276_720_amt
+	,af_2020_zl_yswyq_721_1440_amt
+	,bf_2020_zl_yswyq_721_1440_amt
+	,af_2020_zl_yswyq_a_1440_amt
+	,bf_2020_zl_yswyq_a_1440_amt
+FROM dm.dm_ar_receivable_accage_t
+WHERE EDITION_DATE IN (REPLACE(SUBSTR(last_day(to_date('${PERIOD_ID_D}') - INTERVAL '1 MONTH'),1,10),'-',''),REPLACE(SUBSTR(last_day('${PERIOD_ID_D}'),1,10),'-',''));

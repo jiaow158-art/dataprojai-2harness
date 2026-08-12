@@ -1,0 +1,21 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/12/24 11:09:23 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+delete from   dm.dm_safestock_no_deliver ;  
+insert into dm.dm_safestock_no_deliver
+select material_num,product_area  as prod_area,sum(nodeliver_qty_aps) as nodeliver_qty_aps
+from  dm.dm_rpt_sales_deliver_t 
+where nodeliver_qty_aps >0
+and stat_month ='${PERIOD_ID_M}'
+group by material_num,product_area;
+/*select * from   DWROTD.DWR_PS_SALE_ORDER_DTL_F t1  
+where  t1.INV_ORG_ID =1 
+AND t1.IS_PHANTOM =0
+AND t1.CALCULATION_FLAG=0
+AND t1.DETAIL_STATE = 0
+AND t1.ORDER_PROG_ST_CODE IN(6,7,8,9,10,11)*/

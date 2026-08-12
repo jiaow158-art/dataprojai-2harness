@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_AMBV2_PROFIT_T-停用",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "阿米巴收入成本（利润）底表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_B1_KL_WYJX_INVENTORY_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "B1库龄表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

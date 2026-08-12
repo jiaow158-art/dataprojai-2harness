@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZBMDSL",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "门店数量指标",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

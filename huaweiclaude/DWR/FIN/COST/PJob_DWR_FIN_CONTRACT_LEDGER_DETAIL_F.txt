@@ -1,0 +1,325 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2024/09/13 13:50:51 GMT+08:00
+-- description:合同台账模型
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+
+
+-- DWRFIN.DWR_FIN_CONTRACT_LEDGER_DETAIL_F
+
+INSERT OVERWRITE TABLE  DWRFIN.DWR_FIN_CONTRACT_LEDGER_DETAIL_F 
+SELECT
+a.id AS id, --Id标识,
+a.order_no AS order_no,-- 合同台账编号,
+a.contract_no AS contract_no,--合同编号,
+a.contract_name AS contract_name,--合同名称,
+case when a.contract_status="EFFECTIVE" then "已生效"
+when a.contract_status="DRAFT" then "草稿"
+when a.contract_status="SUSPEND" then "已中止"
+when a.contract_status="CHANGED" then "已变更"
+when a.contract_status="CHANGING" then "变更中"
+when a.contract_status="REVIEWING" then "审核中"
+else a.contract_status end AS contract_status,--合同状态,
+g.name as contract_CLAS,--合同分类,
+a.framework AS framework,--是框架合同,
+h.name as contract_type,--合同类型,
+a.corporation_code AS CO_CODE,--公司代码,
+a.corporation_name AS CO_NAME,--公司名称,
+a.organization_code AS organization_code,--签订部门代码,
+a.organization_name AS organization_nam,--签订部门名称,
+a.organization_name_path AS organization_name_path,--签订部门名称路径,
+case when a.partner_type="SUPPLIER" then "供应商"
+when a.partner_type="CUSTOMER" then "客户"
+else a.partner_type end AS partner_type,--合作伙伴类型,
+a.partner_code AS partner_code,--合作伙伴代码,
+a.partner_name AS partner_name,--合作伙伴名称,
+a.bank_code AS bank_code,--开户银行代码,
+a.bank_name AS bank_name,--开户银行名称,
+a.bank_account_number AS bank_account_number,--银行账号,
+a.bank_account_name AS bank_account_name,--银行户名,
+a.start_date AS start_date,--有效起始日期,
+a.end_date AS end_date,--有效终止日期,
+a.signing_date AS signing_date,--签订日期,
+a.contract_amount AS contract_amount,--总金额,
+a.currency_code AS currency_code,--币种代码,
+a.currency_name AS currency_name,--币种名称,
+a.invoice_nature_code AS invoice_nature_code,--发票性质代码,
+a.invoice_nature_name AS invoice_nature_name,--发票性质名称,
+a.operator_account AS operator_account,--经办人账号,
+a.operator_name AS operator_name,--经办人名称,
+case when a.request_type="APPLY" then "正常申请"
+when a.request_type="CHANGE" then "合同变更"
+else a.request_type end AS request_type,--申请类型,
+case when a.flow_status="COMPLETED" then "审批完成"
+when a.flow_status="INIT" then "草稿状态"
+when a.flow_status="INPROCESS" then "审批中"
+else a.flow_status end AS flow_status,--流程状态,
+a.archive_no AS archive_no,--电子档案单编号,
+a.deleted AS deleted,--删除标识,
+a.frozen AS frozen,--冻结,
+a.source_contract_no AS source_contract_no,--来源合同号,
+a.source_contract_order_no AS source_contract_order_no,--来源合同台账编号,
+a.change_contract_no AS change_contract_no,--变更合同号,
+a.change_contract_order_no AS change_contract_order_no,--变更合同台账编号,
+a.creator_account AS creator_account,--创建人账号,
+a.creator_name AS creator_name,--创建人名称,
+a.created_date AS created_date,--创建时间,
+a.last_editor_account AS last_editor_account,--最后修改人账号,
+a.last_editor_name AS last_editor_name,--最后修改人名称,
+a.last_edited_date AS last_edited_date,--最后修改时间,
+a.bank_category_code AS bank_category_code,--银行类别代码,
+a.bank_category_name AS bank_category_name,--银行类别名称,
+a.applied_amount AS applied_amount,--合同已申请总金额,
+a.can_apply_amount AS can_apply_amount,--合同可申请总金额,
+a.paid_amount AS paid_amount,--合同已支付总金额,
+a.source_type AS source_type,--业务来源,
+a.source_order_no AS source_order_no,--业务来源编号,
+a.direct_effect AS direct_effect,--直接生效标识,
+a.expense_contract AS expense_contract,--是费用合同,
+a.contract_signing_place AS contract_signing_place,--合同签订地点,
+a.need_amortize AS need_amortize,--是否需要摊销,
+a.contract_remark AS contract_remark,--合同说明,
+a.oa_serial_number AS oa_serial_number,--OA流水号,
+a.tax_rate AS tax_rate, --税率  
+a.amortize_amount AS amortize_amount, --合同总摊销金额  
+a.amortize_period_number AS amortize_period_number, --摊销期数  
+a.amortize_start_date AS amortize_start_date, --起始日期  
+a.amortize_end_date AS amortize_end_date, --截止日期  
+f.name AS Amortization_type, --摊销类型  
+a.cost_amount AS cost_amount, --合同总成本金额  
+a.tax_amount AS tax_amount, --合同总税金金额  
+b.item_no AS item_no, --合同明细条款行项目号  
+i.`name` AS Nature_contract_details, --合同明细条款款项性质  
+b.amount AS amount, --合同明细条款付款金额  
+b.account_period AS account_period, --合同明细条款账期  
+b.planned_payment_date AS planned_payment_date, --合同明细条款计划付款日期  
+b.payment_terms AS payment_terms, --合同明细条款付款条件  
+b.undertaking_corporation_code AS undertaking_corporation_code, --合同明细条款承担公司代码  
+b.undertaking_corporation_name AS undertaking_corporation_name, --合同明细条款承担公司名称  
+b.payment_corporation_code AS payment_corporation_code, --合同明细条款支付公司代码  
+b.payment_corporation_name AS payment_corporation_name, --合同明细条款支付公司名称  
+b.pre_use_amount AS pre_use_amount, --合同明细条款申请中金额  
+b.used_amount AS used_amount, --合同明细条款已申请金额  
+b.tax_rate AS contract_tax_rate, --合同明细条款税率  
+b.tax_code AS contract_tax_code, --合同明细条款税码  
+b.tax_rate_describe AS tax_rate_describe, --合同明细条款税率描述  
+b.deleted AS contract_del_flag, --合同明细条款删除标识  
+b.creator_account AS contract_creator_account, --合同明细条款创建人账号  
+b.creator_name AS contract_creator_name, --合同明细条款创建人名称  
+b.created_date AS contract_created_date, --合同明细条款创建时间  
+b.last_editor_account AS contract_last_editor_account, --合同明细条款最后修改人账号  
+b.last_editor_name AS contract_last_editor_name,--合同明细条款最后修改人名称,
+b.last_edited_date AS contract_last_edited_date,--合同明细条款最后修改时间,
+case when b.write_off_status="INIT" then ""
+when b.write_off_status="PROCESSED" then ""
+when b.write_off_status="PART_PROCESSED" then ""
+else b.write_off_status end AS write_off_status,--合同明细条款核销状态,
+b.expected_write_off_date AS expected_write_off_date,--合同明细条款预计核销日期,
+b.remark AS Contract_details_remark,--合同明细条款说明,
+b.source AS Contract_details_source,--合同明细条款来源信息,
+b.organization_code AS Cont_organization_code,--合同明细条款承担部门代码,
+b.organization_name AS Cont_organization_name,--合同明细条款承担部门名称,
+b.organization_name_path AS Cont_organization_name_path,--合同明细条款承担部门名称路径,
+b.cost_center_code AS cost_center_code, --合同明细条款成本中心代码  
+b.cost_center_name AS cost_center_name, --合同明细条款成本中心名称  
+b.project_code AS project_code, --合同明细条款项目代码  
+b.project_name AS project_name, --合同明细条款项目名称  
+b.contract_payment_method AS contract_payment_method, --合同明细条款付款方式  
+b.expected_invoice_return_date AS expected_invoice_return_date, --合同明细条款预计回发票时间  
+b.payment_proportion AS payment_proportion, --合同明细条款付款比例项  
+c.business_execution_request_source AS business_execution_request_source, --条款执行申请来源  
+c.business_execution_request_no AS business_execution_request_no, --条款执行申请单号  
+c.total_payment_amount AS total_payment_amount, --执行申请单号总金额  
+c.payment_amount AS payment_amount, --已支付金额  
+c.invalid_amount AS invalid_amount, --已注销金额  
+c.invalid_repayment_amount AS invalid_repayment_amount, --已注销金额（可重新申请）  
+c.operator_account AS pay_operator_account, --付款经办人账号  
+c.operator_name AS pay_operator_name, --付款经办人姓名  
+c.erp_account_no AS erp_account_no, --条款执行ERP会计凭证号  
+c.payment_time AS payment_time, --银行实际支付时间  
+c.pre_write_off_amount AS pre_write_off_amount, --核销中金额  
+c.write_off_amount AS write_off_amount, --已核销金额  
+case when c.execution_type="PAYMENT" then "直接支付"
+ when c.execution_type="REIMBURSEMENT" then "报销"
+else c.execution_type end AS execution_type,--执行类型,
+c.apply_order_no AS apply_order_no, --源费用申请单号  
+c.deleted AS Enforcement_clause_deleted, --执行条款删除标识  
+c.tickets_received AS tickets_received, --预付款是否已到票  
+d.business_request_source AS online_business_request_source, --线上核销申请来源  
+d.business_request_no AS online_business_request_no, --线上核销申请单号  
+d.write_off_amount AS online_write_off_amount, --线上核销金额  
+d.erp_account_no AS online_erp_account_no, --线上核销ERP会计凭证号  
+case when d.write_off_status="PROCESSED" then "已核销"
+when d.write_off_status="PRETREATMENT" then "预核销"
+else d.write_off_status end AS Online_verification_status,--线上核销状态,
+d.deleted AS online_delete_flag,--线上核销删除标识,
+d.creator_account AS online_creator_account,--线上核销创建人账号,
+d.creator_name AS online_creator_name,--线上核销创建人名称,
+case when d.execution_type="REIMBURSEMENT" then "报销"
+when d.execution_type="WRITE_OFF" then "直接核销"
+else d.execution_type end  AS online_execution_type,-- 线上核销操作类型,
+d.apply_order_no AS online_apply_order_no,--线上核销源申请单号,
+e.source_type AS Offline_source_type,--线下核销来源,
+e.vourcher_no AS offline_vourcher_no,--线下核销凭证号,
+e.write_off_amount AS offline_write_off_amount,--线下核销金额,
+e.remark AS offline_remark,--线下核销说明,
+e.deleted AS offline_delete_flag,--线下核销删除标识,
+e.creator_account AS offline_creator_account,--线下核销创建人账号,
+e.creator_name AS offline_creator_name,--线下核销创建人姓名
+current_timestamp() as dw_last_update_date -- 最后更新时间
+FROM SDI.SDI_CSM_CONTRACT_HEAD_1039 a
+LEFT JOIN SDI.SDI_CSM_CONTRACT_PAYMENT_ITEM_1039 b ON a.id = b.contract_head_id
+LEFT JOIN SDI.SDI_CSM_CONTRACT_PAYMENT_EXECUTION_ITEM_1039 c ON c.contract_payment_item_id = b.id
+LEFT JOIN SDI.SDI_CSM_CONTRACT_WRITE_OFF_ITEM_1039 d ON d.contract_payment_execution_item_id = c.id
+LEFT JOIN SDI.SDI_CSM_CONTRACT_OFFLINE_WRITE_OFF_SOURCE_1039 e ON e.contract_payment_execution_item_id = c.id
+LEFT JOIN SDI.SDI_AAM_AMORTIZE_TYPE_1039 f ON f.id = a.amortize_type_id
+LEFT JOIN SDI.SDI_BAF_CONTRACT_CLASSIFY_1039 g ON g.id = a.contract_classify_id
+LEFT JOIN SDI.SDI_BAF_CONTRACT_TYPE_1039 h ON h.id = a.contract_type_id
+LEFT JOIN SDI.SDI_BAF_PAYMENT_NATURE_1039 i ON i.id = b.payment_nature_id
+
+
+
+
+
+
+-- CREATE TABLE DWRFIN.DWR_FIN_CONTRACT_LEDGER_DETAIL_F (
+--     id NUMERIC(38,10) COMMENT 'Id标识',
+--     order_no STRING COMMENT '合同台账编号',
+--     contract_no STRING COMMENT '合同编号',
+--     contract_name STRING COMMENT '合同名称',
+--     contract_status STRING COMMENT '合同状态',
+--     contract_CLAS STRING COMMENT '合同分类',
+--     framework STRING COMMENT '是框架合同',
+--     contract_type STRING COMMENT '合同类型',
+--     CO_CODE STRING COMMENT '公司代码',
+--     CO_NAME STRING COMMENT '公司名称',
+--     organization_code STRING COMMENT '签订部门代码',
+--     organization_nam STRING COMMENT '签订部门名称',
+--     organization_name_path STRING COMMENT '签订部门名称路径',
+--     partner_type STRING COMMENT '合作伙伴类型',
+--     partner_code STRING COMMENT '合作伙伴代码',
+--     partner_name STRING COMMENT '合作伙伴名称',
+--     bank_code STRING COMMENT '开户银行代码',
+--     bank_name STRING COMMENT '开户银行名称',
+--     bank_account_number STRING COMMENT '银行账号',
+--     bank_account_name STRING COMMENT '银行户名',
+--     start_date STRING COMMENT '有效起始日期',
+--     end_date STRING COMMENT '有效终止日期',
+--     signing_date STRING COMMENT '签订日期',
+--     contract_amount NUMERIC(38,10) COMMENT '总金额',
+--     currency_code STRING COMMENT '币种代码',
+--     currency_name STRING COMMENT '币种名称',
+--     invoice_nature_code STRING COMMENT '发票性质代码',
+--     invoice_nature_name STRING COMMENT '发票性质名称',
+--     operator_account STRING COMMENT '经办人账号',
+--     operator_name STRING COMMENT '经办人名称',
+--     request_type STRING COMMENT '申请类型',
+--     flow_status STRING COMMENT '流程状态',
+--     archive_no STRING COMMENT '电子档案单编号',
+--     del_flag STRING COMMENT '删除标识',
+--     frozen STRING COMMENT '冻结',
+--     source_contract_no STRING COMMENT '来源合同号',
+--     source_contract_order_no STRING COMMENT '来源合同台账编号',
+--     change_contract_no STRING COMMENT '变更合同号',
+--     change_contract_order_no STRING COMMENT '变更合同台账编号',
+--     creator_account STRING COMMENT '创建人账号',
+--     creator_name STRING COMMENT '创建人名称',
+--     created_date STRING COMMENT '创建时间',
+--     last_editor_account STRING COMMENT '最后修改人账号',
+--     last_editor_name STRING COMMENT '最后修改人名称',
+--     last_edited_date STRING COMMENT '最后修改时间',
+--     bank_category_code STRING COMMENT '银行类别代码',
+--     bank_category_name STRING COMMENT '银行类别名称',
+--     applied_amount NUMERIC(38,10) COMMENT '合同已申请总金额',
+--     can_apply_amount NUMERIC(38,10) COMMENT '合同可申请总金额',
+--     paid_amount NUMERIC(38,10) COMMENT '合同已支付总金额',
+--     source_type STRING COMMENT '业务来源',
+--     source_order_no STRING COMMENT '业务来源编号',
+--     direct_effect STRING COMMENT '直接生效标识',
+--     expense_contract STRING COMMENT '是费用合同',
+--     contract_signing_place STRING COMMENT '合同签订地点',
+--     need_amortize STRING COMMENT '是否需要摊销',
+--     contract_remark STRING COMMENT '合同说明',
+--     oa_serial_number STRING COMMENT 'OA流水号',
+--     tax_rate NUMERIC(38,10) COMMENT '税率',
+--     amortize_amount NUMERIC(38,10) COMMENT '合同总摊销金额',
+--     amortize_period_number STRING COMMENT '摊销期数',
+--     amortize_start_date STRING COMMENT '起始日期',
+--     amortize_end_date STRING COMMENT '截止日期',
+--     Amortization_type STRING COMMENT '摊销类型',
+--     cost_amount NUMERIC(38,10) COMMENT '合同总成本金额',
+--     tax_amount NUMERIC(38,10) COMMENT '合同总税金金额',
+--     item_no STRING COMMENT '合同明细条款行项目号',
+--     Nature_contract_details  STRING COMMENT '合同明细条款款项性质',
+--     amount NUMERIC(38,10) COMMENT '合同明细条款付款金额',
+--     account_period STRING COMMENT '合同明细条款账期',
+--     planned_payment_date STRING COMMENT '合同明细条款计划付款日期',
+--     payment_terms STRING COMMENT '合同明细条款付款条件',
+--     undertaking_corporation_code STRING COMMENT '合同明细条款承担公司代码',
+--     undertaking_corporation_name STRING COMMENT '合同明细条款承担公司名称',
+--     payment_corporation_code STRING COMMENT '合同明细条款支付公司代码',
+--     payment_corporation_name STRING COMMENT '合同明细条款支付公司名称',
+--     pre_use_amount NUMERIC(38,10) COMMENT '合同明细条款申请中金额',
+--     used_amount NUMERIC(38,10) COMMENT '合同明细条款已申请金额',
+--     contract_tax_rate STRING COMMENT '合同明细条款税率',
+--     contract_tax_code STRING COMMENT '合同明细条款税码',
+--     tax_rate_describe STRING COMMENT '合同明细条款税率描述',
+--     contract_del_flag STRING COMMENT '合同明细条款删除标识',
+--     contract_creator_account STRING COMMENT '合同明细条款创建人账号',
+--     contract_creator_name STRING COMMENT '合同明细条款创建人名称',
+--     contract_created_date STRING COMMENT '合同明细条款创建时间',
+--     contract_last_editor_account STRING COMMENT '合同明细条款最后修改人账号',
+--     contract_last_editor_name STRING COMMENT '合同明细条款最后修改人名称',
+--     contract_last_edited_date STRING COMMENT '合同明细条款最后修改时间',
+--     write_off_status STRING COMMENT '合同明细条款核销状态',
+--     expected_write_off_date STRING COMMENT '合同明细条款预计核销日期',
+--     Contract_details_remark STRING COMMENT '合同明细条款说明',
+--     Contract_details_source STRING COMMENT '合同明细条款来源信息',
+--     Cont_organization_code STRING COMMENT '合同明细条款承担部门代码',
+--     Cont_organization_name STRING COMMENT '合同明细条款承担部门名称',
+--     Cont_organization_name_path STRING COMMENT '合同明细条款承担部门名称路径',
+--     cost_center_code STRING COMMENT '合同明细条款成本中心代码',
+--     cost_center_name STRING COMMENT '合同明细条款成本中心名称',
+--     project_code STRING COMMENT '合同明细条款项目代码',
+--     project_name STRING COMMENT '合同明细条款项目名称',
+--     contract_payment_method STRING COMMENT '合同明细条款付款方式',
+--     expected_invoice_return_date STRING COMMENT '合同明细条款预计回发票时间',
+--     payment_proportion STRING COMMENT '合同明细条款付款比例项',
+--     business_execution_request_source STRING COMMENT '条款执行申请来源',
+--     business_execution_request_no STRING COMMENT '条款执行申请单号',
+--     total_payment_amount NUMERIC(38,10) COMMENT '执行申请单号总金额',
+--     payment_amount NUMERIC(38,10) COMMENT '已支付金额',
+--     invalid_amount NUMERIC(38,10) COMMENT '已注销金额',
+--     invalid_repayment_amount NUMERIC(38,10) COMMENT '已注销金额（可重新申请）',
+--     pay_operator_account STRING COMMENT '付款经办人账号',
+--     pay_operator_name STRING COMMENT '付款经办人姓名',
+--     erp_account_no STRING COMMENT '条款执行ERP会计凭证号',
+--     payment_time STRING COMMENT '银行实际支付时间',
+--     pre_write_off_amount NUMERIC(38,10) COMMENT '核销中金额',
+--     write_off_amount NUMERIC(38,10) COMMENT '已核销金额',
+--     execution_type STRING COMMENT '执行类型',
+--     apply_order_no STRING COMMENT '源费用申请单号',
+--     Enforcement_clause_deleted STRING COMMENT '执行条款删除标识',
+--     tickets_received STRING COMMENT '预付款是否已到票',
+--     online_business_request_source STRING COMMENT '线上核销申请来源',
+--     online_business_request_no STRING COMMENT '线上核销申请单号',
+--     online_write_off_amount NUMERIC(38,10) COMMENT '线上核销金额',
+--     online_erp_account_no STRING COMMENT '线上核销ERP会计凭证号',
+--     Online_verification_status STRING COMMENT '线上核销状态',
+--     online_delete_flag STRING COMMENT '线上核销删除标识',
+--     online_creator_account STRING COMMENT '线上核销创建人账号',
+--     online_creator_name STRING COMMENT '线上核销创建人名称',
+--     online_execution_type STRING COMMENT '线上核销操作类型',
+--     online_apply_order_no STRING COMMENT '线上核销源申请单号',
+--     Offline_source_type STRING COMMENT '线下核销来源',
+--     offline_vourcher_no STRING COMMENT '线下核销凭证号',
+--     offline_write_off_amount NUMERIC(38,10) COMMENT '线下核销金额',
+--     offline_remark STRING COMMENT '线下核销说明',
+--     offline_delete_flag STRING COMMENT '线下核销删除标识',
+--     offline_creator_account STRING COMMENT '线下核销创建人账号',
+--     offline_creator_name STRING COMMENT '线下核销创建人姓名',
+--     dw_last_update_date TIMESTAMP COMMENT '最后更新时间'
+-- )

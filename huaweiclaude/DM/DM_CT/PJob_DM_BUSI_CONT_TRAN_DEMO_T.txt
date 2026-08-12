@@ -1,0 +1,360 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/08/06 10:11:12 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+insert overwrite into dm.dm_busi_cont_tran_demo_t
+with TMP as (
+select 
+ doc_number
+,s_ord_item
+,z_gcbbh
+,material
+,salesorg
+,DISTR_CHAN
+,sum(zxsmj) as zxsmj
+,sum(zxssl) as zxssl
+,sum(case when COMMISSION_GROUP = '02' then 0 else zsyjf end ) as zsyjf
+,sum(case when data_source = 'T' and coalesce(bus_area,'L000') <> 'L000' then 0
+          when material is null then 0
+		  when material = '' then 0
+		  else --数据来源T而且(业务范围不等于L000，或者业务范围是空），或者物料编码为空时，成交总价为0
+     case when bus_area <> 'G000' OR bus_area IS NULL then ambperformance else 0 end -
+     case when (commission_group <> '02' OR commission_group IS NULL) and material is not null then zsyjf else 0 end end) deal_sum_amt -- 成交价总价
+,sum(case when data_source = 'T' and coalesce(bus_area,'L000') <> 'L000' then 0
+         when material is null then 0
+		 when material = '' then 0
+		 else zxssl end) deal_qty --数据来源T而且(业务范围不等于L000，或者业务范围是空），或者物料编码为空时，成交数量为0
+,sum(case when data_source = 'T' and coalesce(bus_area,'L000') <> 'L000' then 0
+         when material is null then 0
+		 when material = '' then 0
+		 else zxsmj end) deal_area --数据来源T而且(业务范围不等于L000，或者业务范围是空），或者物料编码为空时，成交面积为0
+,min(calday) as min_cal_date
+,max(calday) as max_cal_date
+,sum(z_yjsgtzz) as z_yjsgtzz
+,sum(standard_price_a) as standard_price_a
+,sum(ambperformance) as ambperformance
+,sum(sales_performance) as sales_performance
+,sum(performance_1n) as performance_1n
+,sum(cross_performance) as cross_performance
+,sum(internal_performance) as internal_performance
+from dm.dm_ambv2_zzt_xssr_t T
+where calday <> '00000000' and (z_gcbbh is not null or zsjbm is not null)
+and (data_source NOT IN ('U','D') or data_source is null )
+group by 
+ doc_number
+,s_ord_item
+,z_gcbbh
+,material
+,salesorg
+,DISTR_CHAN
+) 
+select 
+ T.busi_num --商机号
+,T.busi_name	--商机名称
+,T.cust_num	--经销商客编
+,T.cust_name	--经销商名称
+,T.erp_type_name	--企业类型名称
+,T.emp_num	--业务员工号
+,T.emp_name	--业务员名称
+,T.busi_owner_code	--商机负责人工号
+,T.busi_owner_name	--商机负责人名称
+,T.busi_follower	--商机跟进人
+,T.busi_belong_name	--商机归属方名称
+,T.sales_area_code	--销售区域（编码）
+,T.sales_area_name	--销售区域
+,T.sales_dept_code	--销售部门（编码）
+,T.sales_dept_name	--销售部门
+,T.sales_grp_code	--销售组编码
+,T.sales_grp_name	--销售组名称
+,T.sales_org	--销售组织
+,T.comp_code	--公司代码
+,T.wbs_code	--WBS号
+,T.dept_name	--事业部名称
+,T.devel_org_name	--建设单位全称
+,T.const_org_name	--施工单位全称
+,T.design_org_name	--设计单位全称
+,T.address	--详细地址
+,T.province_name	--省名称
+,T.city_name	--市名称
+,T.region_name	--区名称
+,T.busi_type_name	--业务类型名称
+,T.busi_stage_name	--商机阶段名称
+,T.proj_major_cate_name	--工程大类名称
+,T.proj_sub_cate_name	--工程小类名称
+,T.busi_source_name	--商机来源名称
+,T.source_org_name	--来源单位名称
+,T.is_spec_proj	--是否特殊工程
+,T.is_bro_busi	--是否兄弟商机
+,T.quto_busi	--引用商机
+,T.is_long_proj	--是否长周期项目
+,T.is_xa	--是否雄安
+,T.is_free_busi	--是否免费商机
+,T.is_repet_busi	--是否重复商机
+,T.relat_repet_busi	--关联重复商机
+,T.state_value_end_date	--阶段有效结束日期
+,T.state_value_start_date	--阶段有效开始日期
+,T.state_staus_name	--阶段状态名称（系统预设）
+,T.state_value_days	--阶段有效天数
+,T.proj_nature_name	--项目性质名称
+,T.prod_cate_name	--产品品类名称
+,T.source_clue_name	--源线索名称
+,T.busi_rep_status_name	--商机报备状态名称
+,T.busi_succ_date	--报备成功日期
+,T.busi_pay_style_name	--报备费缴纳方式名称
+,T.busi_fee_status_name	--报备费状态名称
+,T.busi_pay_end_date	--报备费缴费截止时间
+,T.pur_way_name	--采购方式名称
+,T.pur_scale_name	--采购规模名称
+,T.bid_mode_name	--竞价方式名称
+,T.is_take_bid_grt	--是否已交投标保证金
+,T.is_need_pri_review	--是否需要价审
+,T.proj_payer_code	--项目付款方
+,T.proj_payer_name	--项目付款方全称
+,T.btr_result_name	--报价或投标或入库结果反馈名称
+,T.sign_org_name	--签约单位全称
+,T.is_sign_org_same	--签约单位是否与付款单位一致
+,T.sign_way_name	--签约/入库方式名称
+,T.sign_value_start_date	--签约有效开始日期
+,T.sign_value_end_date	--签约有效结束日期
+,T.apply_way_code	--供货方式名称
+,T.apply_staus_name	--供货状态名称
+,T.is_delay_apply	--是否延迟供货
+,T.predict_apply_fin_date	--预计供货完成日期
+,T.renew_staus_name	--续签状态名称
+,T.s01_tran_time	--S0-S1转化时间
+,T.s12_tran_time	--S1-S2转化时间
+,T.s23_tran_time	--S2-S3转化时间
+,T.s34_tran_time	--S3-S4转化时间
+,T.s45_tran_time	--S4-S5转化时间
+,T.sx_tran_time	--SX转化时间
+,T.par_busi_code	 --母商机编码
+,T.par_busi_name	--母商机名称
+,T.is_share_tactic	--是否共享战略
+,T.belong_tactic_cust_name	--所属战略客户客编编码名称
+,T.is_chain	--是否连锁
+,T.chain_type_name	--连锁类型名称
+,T.tactic_style_name	--战略类型名称
+,T.cust_type_name	--客户类型名称
+,T.belong_role_name	--所属角色名称
+,T.second_role_name	--二级角色名称
+,T.cus_lev_name	--客户级别名称
+,T.cus_star_lev_name	--客户星级名称
+,T.expand_staus_name	--开拓状态名称
+,T.ope_staus_name	--运营状态名称
+,T.up_org_name	--上级单位名称
+,T.cust_risk_lev_name	--客户风险等级名称
+,T.user_group_name	--用户群体名称
+,T.busi_1_lev_desc	--商机一级节点描述
+,T.busi_2_lev_desc	--商机二级节点描述
+,T.busi_3_lev_desc	--商机三级节点描述
+,T.busi_4_lev_desc	--商机四级节点描述
+,T.busi_5_lev_desc	--商机五级节点描述
+,T.busi_6_lev_desc	--商机六级节点描述
+,T.busi_7_lev_desc	--商机七级节点描述
+,T.busi_8_lev_desc	--商机八级节点描述
+,T.busi_9_lev_desc	--商机九级节点描述
+,T.cntc_num  --合同编号
+,T.proj_num  --项目评审编号
+,T.stage_name  --合同阶段数据类型
+,T.data_src_code --合同阶段数据来源
+,T.ser_num  --流水号
+,T.ofr_type_name  --报价单类型
+,T.ofr_num  --oss/ltc報價單
+,T.ofr_item_num --oss/ltc報價單行
+,T.sap_ofr_num --sap报价单号
+,T.sap_ofr_item_num--sap报价单行
+,T.order_num  --oss/ltc订单号
+,T.order_line_num --oss/ltc订单行
+,T.sap_order_num --sap订单号       
+,T.sap_order_line_num  --sap订单行号
+,T.cntc_id  --合同ID
+,T.cntc_item_id --合同行ID
+,T.proj_id  --项目ID
+,T.proj_item_id --项目行ID
+,T.plan_item_num --计划单行号
+,T.dmand_num --要货单号
+,T.dmand_line_id  --要货单行号
+,T.cust_num   --客户编码
+,T.cust_name  --客户名称
+,T.dstr_cust_num  --经销商客编
+,T.dstr_cust_name  --经销商名称
+,T.is_sub_co_name --是否子公司描述
+,T.is_pltf_name --是否运营平台描述
+,T.is_algr_name --是否代签描述
+,T.is_coop_name --是否厂商合作描述
+,T.seal_date --盖章日期
+,T.new_flag  --最新标识
+,T.rcpts_st_name --单据状态描述
+,T.div_name  --事业部描述
+,T.cntc_st_name --合同状态描述
+,T.cntc_vers  --合同版本号
+,T.eff_date  --生效日期
+,T.inval_date --失效日期
+,T.delv_per  --预计供货周期
+,T.delv_start_date  --预计供货开始日期
+,T.delv_end_date  --预计供货结束日期
+,T.material_src_name --产品来源描述
+,T.material_num  --物料编码
+,T2.material_name  --物料名称
+,T2.category AS material_cat_name --品类描述
+,T2.dimension  --规格
+,T2.reserved_field1_name as material_chnl_name  --产品渠道描述
+,T.gcf_prc  --工程方价格
+,T.aply_prc --申请价格 
+,T.aply_qty  --申请数量
+,T.appr_nak_prc  --审批裸价
+,T.appr_prc  --审批价格
+,T.amb_cost  --阿米巴成本
+,T.amt_prft_amt  --阿米巴毛利额
+,T.amt_prft_rate  --阿米巴毛利率
+,T.std_a_cost  --标A成本
+,T.std_a_amt  --标A成本毛利额
+,T.std_a_rate  --标A成本毛利率
+,T.dstr_grs_rate  --经销商毛利率
+,T.sale_amt  --销售额
+,T.cntc_prc --合同单价
+,T.unit  --单位
+,T.wt_vol --重量体积
+,T.dealer_prc  --经销商提货价
+,T.ep_prc  --EP价
+,T.disc_rate  --折扣率
+,T.cntc_qty  -- 合同用量
+,T.is_instl_name  --是否包安装描述
+,T.instl_prc  --安装单价
+,T.ctrl_srvc_rate  --集采服务费率
+,T.order_srvc_rate  --抢单服务费率
+,T.grnd_srvc_rate  --落地服务费率
+,T.advn_srvc_rate  --垫资服务费率
+,T.srvc_rate   --综合费率
+,T.srvc_rate2  --综合费率2
+,T.busi_coms_rate  --业务提成率
+,T.material_st_name  --物料状态
+,T2.unit_area as unit_area  --单片面积
+,T.qty --订单数量
+,T.dmand_qty-- 要货单数量
+,case when T.qty > 0 AND T1.zxssl > 0 and T.rmn_qty < T1.zxssl THEN T1.zxssl ELSE T.rmn_qty END rmn_qty --留货数 (存在已发货数量比留货数大的情况)
+,T.proj_rmn_qty -- 项目留货数
+,T.plan_ord_qty --计划单数量
+,T.rlse_start_time --生产下达时间
+,T.close_time --生产关闭时间
+,T.FLAG  
+,T1.zxsmj  --销售面积
+,T1.zxssl  --销售数量
+,T1.zsyjf  --使用积分
+,T1.deal_sum_amt --成交总价
+,T1.min_cal_date --首次出库时间
+,T1.max_cal_date  --最后一次出库时间
+,T1.z_yjsgtzz  --业绩手工调整值
+,T1.standard_price_a  --标准成本A
+,T1.ambperformance  --业绩
+,T1.sales_performance  --销售业绩
+,T1.performance_1n  --1+N业绩
+,T1.cross_performance  --跨事业部业绩
+,T1.internal_performance  --事业部内部业绩
+,T2.product_level_code as prod_hier	--产品层次
+,T2.product_level_name as prod_hier___t	--产品层次的文本
+,T2.matl_group_code as matl_group	--物料组
+,T2.matl_group_name as matl_group___t	--物料组的文本
+,T3.matl_group1_code AS matl_grp_1	--物料组1
+,T3.matl_group1_name AS matl_grp_1___t	--物料组1的文本
+,T3.matl_group2_code AS matl_grp_2	--物料组2
+,T3.matl_group2_name AS matl_grp_2___t	--物料组2的文本
+,T3.matl_group3_code AS matl_grp_3	--物料组3
+,T3.matl_group3_name AS matl_grp_3___t	--物料组3的文本
+,T3.matl_group4_code AS matl_grp_4	--物料组4
+,T3.matl_group4_name AS matl_grp_4___t	--物料组4的文本
+,T3.matl_group5_code AS matl_grp_5	--物料组5
+,T3.matl_group5_name AS matl_grp_5___t	--物料组5的文本
+,T2.external_matl_group_code as extmatlgrp	--外部物料组
+,T2.external_matl_group_name as extmatlgrp___t	--外部物料组的文本
+,T2.product_group_code as division	--产品组
+,T2.product_group_name as division___t	--产品组的文本
+,T2.dimension as size_dim	--大小/量纲
+,T2.product_level1_code as zprodh1	--产品层次1
+,T2.product_level1_name as zprodh1___t	--产品层次1描述
+,T2.product_level2_code as zprodh2	--产品层次2
+,T2.product_level2_name as zprodh2___t	--产品层次2描述
+,T2.product_level3_code as zprodh3	--产品层次3
+,T2.product_level3_name as zprodh3___t	--产品层次3描述
+,T2.product_level4_code as zprodh4	--产品层次4
+,T2.product_level4_name as zprodh4___t	--产品层次4描述
+,T2.product_level5_code as zprodh5	--产品层次5
+,T2.product_level5_name as zprodh5___t	--产品层次5描述
+,T2.product_specify_code as zgg01	--产品规格
+,T2.product_specify_name as zgg01___t	--产品规格描述
+,T2.reserved_field_1 as zyl01	--产品渠道
+,T2.reserved_field1_name as zyl01___t	--产品渠道描述
+,T2.reserved_field_5 as zyl05	--新品说明
+,T2.reserved_field5_name as zyl05___t	--新品说明描述
+,T2.category as zpl	--品类
+,T2.category_name as zpl___t	--品类描述
+,T2.product_position1 as zdw01	--产品定位
+,T2.product_position_name1 as zdw01___t	--产品定位描述
+,T2.reserved_field_8 as zyl08	--产品功能
+,T2.reserved_field8_name as zyl08___t	--产品功能描述
+,T2.reserved_field_3 as zyl03	--盈利分析
+,T2.reserved_field3_name as zyl03___t	--盈利分析描述
+,T2.faces_code as zmx01	--面相
+,T2.faces_name as zmx01___t	--面相描述
+,T2.texture_1 as zwl01	--产品材质
+,T2.texture_1_name as zwl01___t	--产品材质描述
+,T2.new_product_code as zwlmc	--工艺新品
+,T2.new_product_name as zwlmc___t	--工艺新品描述
+,T2.color_code as zsx01	--色系
+,T2.color_name as zsx01___t	--色系描述
+,T2.texture_2 as zwl02	--纹路
+,T2.texture_2_name as zwl02___t	--纹路描述
+,T2.product_listed_date as zferth	--产品上市时间
+,'' as zferth___t	--产品上市时间描述
+,T2.matl_type_code as matl_type	--产品类型
+,T2.old_material_num as zbismt	--旧物料号
+,T2.prod_property as prod_property	--产品所有权
+,T2.prod_property_name as prod_property_name	--产品所有权名称
+,'' as category_name	---品类
+,'' as prod_line_name	--产品线
+,'' as category_prod_line	--品类-产品线管理
+,'' as masterseries_prod	--主推产品
+,'' as mastersale_prod	--主销产品
+,'' as sku_short_code	--简码SKU
+,'' as bom_flag	--浴室柜订单齐套标识
+,T2.product_brand_code	--物料系列编码
+,T2.product_brand_name	--物料系列名称
+,'' as factory_type	--自制外协
+,T2.secondary_crafts_code	--次工艺编码
+,T2.secondary_crafts_name	--次工艺描述
+,T2.auxiliary_processes_code	--辅工艺编码
+,T2.auxiliary_processes_name	--辅工艺描述
+,T2.reserved_field_7	--胚体工艺
+,T2.reserved_field7_name	--胚体工艺描述
+,T2.embryo_whiteness_code	--胚体白度编码
+,T2.embryo_whiteness_name	--胚体白度描述
+,current_timestamp() as dw_last_update_date
+,T1.deal_qty  --成交数量
+,T1.deal_area  --成交面积
+,T.PAR_CUST_NUM --母客编(主档)
+,T.PAR_CUST_NAME --母客编名称(主档)
+,T.busi_belong_flag --商机归属方类型
+,T4.menge AS review_plan_qty -- 评审计划单数量
+,T.t_qty --退货订单数量
+,T.t_rmn_qty --退货留货数量
+,T.version_flag --版本标识
+,T.price_type -- 价格类型
+,T.buyout_price --一口价
+,T.cntc_create_date--合同创建日期
+from dwrltc.dwr_busi_cont_tran_demo_t T 
+left join tmp T1 
+on coalesce(T.sap_order_num,'#') = coalesce(T1.doc_number,'&')
+and coalesce(T.sap_order_line_num,'#') = coalesce(T1.s_ord_item,'&')
+and flag not in ('9','11')
+left join DWIMD.DWI_MD_DATA_MATERIAL_GENERAL_T T2
+on T.MATERIAL_NUM = T2.MATERIAL_NUM 
+left join (select material_num,max(matl_group1_code) matl_group1_code,max(matl_group2_code) matl_group2_code,max(matl_group3_code) matl_group3_code,max(matl_group4_code) as matl_group4_code ,max(matl_group5_code) matl_group5_code,max(matl_group1_name) matl_group1_name,max(matl_group2_name) matl_group2_name,max(matl_group3_name) matl_group3_name,max(matl_group4_name) as matl_group4_name ,max(matl_group5_name) matl_group5_name
+from dwimd.dwi_md_data_material_sales_t group by material_num) T3
+on T.MATERIAL_NUM = T3.material_num 
+left join (select zjhdid,sum(case when czjhdhh is null then menge else prlab+zljcksl end) as menge 
+from dm.dm_otd_wbs_plan_order_det_t where zjhdid is not null group by zjhdid) T4
+on T.plan_item_num = T4.zjhdid

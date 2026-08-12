@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_WM_ALL_TYPE_STOCK_F",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "SAP所有库存类型总库存表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

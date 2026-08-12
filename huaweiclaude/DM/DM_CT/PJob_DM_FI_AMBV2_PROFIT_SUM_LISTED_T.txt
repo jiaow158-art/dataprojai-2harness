@@ -1,0 +1,340 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2025/03/28 15:37:52 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_fi_ambv2_profit_sum_listed_t where stat_month BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}';
+insert into dm.dm_fi_ambv2_profit_sum_listed_t
+with fy as (
+select
+month as stat_month,
+fy.sales_group_code as sales_grp,
+fy.comp_code ,
+sum(case when func_scope_code IN ('5501','5504') and SUBSTR(general_ledger_account,1,3) in ('004','006') and (case when voucher_type_code = 'RV' 
+then (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) else 1=1 end) then coalesce(local_currency_amt,0) else 0 end) as "销售费用",
+sum(case when func_scope_code = '5502' and SUBSTR(general_ledger_account,1,3) in ('004','006') and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(local_currency_amt,0) else 0 end) as "管理费用",
+sum(case when func_scope_code = '4110' and SUBSTR(general_ledger_account,1,3) in ('004','006') and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null)
+then coalesce(local_currency_amt,0) else 0 end) as "研发费用",
+sum(case when func_scope_code = '5503' and SUBSTR(general_ledger_account,1,3) in ('004','006') and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(local_currency_amt,0) else 0 end)  as "财务费用",
+sum(case when general_ledger_account like '005402%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(local_currency_amt,0) else 0 end) as "税金及附加",
+sum(case when general_ledger_account like '005203%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(-local_currency_amt,0) else 0 end) as "其他收益",
+sum(case when general_ledger_account like '005201%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(-local_currency_amt,0) else 0 end) as "投资收益(损失)",
+sum(case when general_ledger_account like '005202%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(-local_currency_amt,0) else 0 end) as "公允价值变动收益",
+sum(case when general_ledger_account like '0055010%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null) 
+then coalesce(-local_currency_amt,0) else 0 end) as "资产处置收益(损失)",
+sum(case when general_ledger_account like '00530%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null)
+then coalesce(-local_currency_amt,0) else 0 end) as "营业外收入",
+sum(case when general_ledger_account like '00560%' and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null)
+then coalesce(local_currency_amt,0) else 0 end) as "营业外支出"
+from DWRFIN.DWR_FIN_COST_D_COMPRE_SUBJ_T fy
+where fy.comp_code <> 'Z000' --and (fy.cust_group_code <> 'Z0' or fy.cust_group_code is null)
+and month BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+group by
+ month,
+ fy.sales_group_code,
+ fy.comp_code 
+)
+
+,fy1 as (--外挂表-线组维度
+select
+month as stat_month,
+coalesce(b.sales_grp_l,b.sales_grp) as sales_grp,
+a.comp_code ,
+sum(case when SUBSTR(general_ledger_account,1,7) IN ('0061001','0061003') then coalesce(-local_currency_amt,0) else 0 end) as "信用减值利得(损失)",
+sum(case when general_ledger_account like '0061002%' then coalesce(-local_currency_amt,0) else 0 end) as "资产减值利得(损失)",
+sum(case when general_ledger_account like '005701%' then coalesce(local_currency_amt,0) else 0 end) as "所得税费用"
+from DWRFIN.DWR_FIN_COST_D_COMPRE_SUBJ_T a
+left join UPLOAD.UPLOAD_DIVISION_COMP_T b
+on a.comp_code = b.comp_code and b.end_date = '9999-12-31'
+where a.comp_code <> 'Z000' and (a.cust_group_code <> 'Z0' or a.cust_group_code is null)
+and month BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+group by
+ month,
+ coalesce(b.sales_grp_l,b.sales_grp),
+ a.comp_code 
+)
+--业务收支
+,qt as (
+select
+calmonth  as stat_month
+,qt.sales_grp
+,qt.comp_code
+,sum(coalesce(zqtywsr_jtj_ddy,0)+coalesce(zqtywsr_jgf_dd,0)+coalesce(zzyywsr_jgf_fdd,0)+coalesce(zzyywsr_pdsr,0)+coalesce(zzyywsr_qt,0)+coalesce(zqtywsr_ddy,0)) as "其他业务收入"
+,sum(case when qt.comp_code <> 'Z000' and (cust_group <> 'Z0' or cust_group is null) then coalesce(zqtywzc_ddy,0)+coalesce(zqtywzc_jtj,0)+coalesce(zqtywzc_jgf_dd,0)+coalesce(zqtywzc_jgf_fdd,0)+
+    coalesce(zqtywzc_qt_fdd,0) else 0 end + case when bill_type in ('ZIVS','ZIV','ZIG','ZIGS') then -coalesce(zqtywsr_gsj,0) else 0 end 
+    + case when bill_type in ('ZIVS','ZIV','ZIG','ZIGS') then coalesce(zqtywzc_ddy,0) else 0 end ) as "其他业务支出"
+from dm.dm_zzt_xssr_qt_t qt
+where qt.comp_code <> 'Z000' and (cust_group <> 'Z0' or cust_group is null)
+and calmonth BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+group by
+calmonth,
+qt.sales_grp,
+qt.comp_code
+)
+,jf as ( --发票积分
+select 
+ calmonth  as stat_month
+,sales_group_code_wbs as sales_grp
+,comp_code 
+,sum(case when score_classification = '使用积分' then -coalesce(pointsvalue,0) else 0 end) as "使用积分"
+,sum(case when score_classification = '政策内' then coalesce(pointsvalue,0) else 0 end) as "本期报销"
+,sum(case when score_classification = '政策外' then coalesce(pointsvalue,0) else 0 end) as "本期积分(政策外)"
+from DWRFIN.DWR_GL_POINTSDETAIL_F jf
+LEFT JOIN DWRDIM.DWR_DIM_CUST_SALES_AREA_D2 L 
+ON jf.CUSTOMER = L.cust_num AND jf.distr_chan = L.distribution_chnl_code AND jf.salesorg = L.sales_org_code  
+AND L.end_date = '4712-12-31' and L.del_flag = 'N'
+where jf.comp_code <> 'Z000' and (L.cust_group_code <> 'Z0' or L.cust_group_code is null)
+and calmonth BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+group by 
+ calmonth  
+,sales_group_code_wbs 
+,comp_code
+)
+,sr as (
+select 
+ calmonth  as stat_month
+,sales_grp as sales_grp
+,comp_code 
+,sum(case when (comp_code <> 'Z000' or comp_code is null) and (cust_group <> 'Z0' or cust_group is null) and data_source = 'S' then coalesce(zzyywsr_gn,0) + coalesce(zyywsr_wm,0) + coalesce(zyywsr_jtj,0) + coalesce(zyywsr_zyck,0) + coalesce(zzyywsr_qt,0) + coalesce(zzxcyf,0) + coalesce(zhwjzjgtz,0) else 0 end ) as "主营业务收入"
+,sum(case when  data_source = 'S' and (bill_type not in ('ZIVS','ZIV','ZIG','ZIGS') or bill_type is null) and comp_code <> '8000' and (comp_code <> 'Z000' or comp_code is null) 
+    and (cust_group <> 'Z0' or cust_group is null) then coalesce(zyywcb,0) + coalesce(zyywcb_dsf,0) + coalesce(zzyywcb_azf,0) + coalesce(zyywcb_yf,0) + coalesce(zyywcb_zxf,0) else 0 end 
+    + case when (comp_code <> 'Z000' or comp_code is null) and (cust_group <> 'Z0' or cust_group is null) and bus_area = 'D000' then coalesce(zcbtzz,0) else 0 end     
+    + case when comp_code = '7C00' and (comp_code <> 'Z000' or comp_code is null) and (cust_group <> 'Z0' or cust_group is null) then coalesce(zzyywcb_qt,0) else 0 end 
+    + case when data_source = 'S' and bill_type in ('ZIR','ZIRS','ZIW','ZIWS') then -coalesce(zyywsr_gsj,0) else 0 end 
+    + case when data_source = 'S' and bill_type in ('ZIR','ZIRS','ZIW','ZIWS') then coalesce(zyywcb,0) else 0 end) as "主营业务成本"
+,sum(case when data_source = 'S' and (comp_code <> 'Z000' or comp_code is null) and (cust_group <> 'Z0' or cust_group is null) 
+    and (bill_type not in ('ZIVS','ZIV','ZIG','ZIGS') or bill_type is null) and comp_code <> '8000' then coalesce(zyywcb_yf,0) + coalesce(zyywcb_zxf,0) else 0 end) as "物流成本"
+,sum(case when data_source = 'S' and (comp_code <> 'Z000' or comp_code is null) and (cust_group <> 'Z0' or cust_group is null) 
+     then coalesce(ext_profit_1n_amt,0) + coalesce(ext_cross_profit_amt,0) else 0 end - case when data_source = 'D' and (comp_code <> 'Z000' or comp_code is null)  
+     and (cust_group <> 'Z0' or cust_group is null) and (coalesce(ext_profit_1n_amt,0) <> 0 or coalesce(ext_cross_profit_amt,0) <> 0)  then coalesce(profit_1n_amt,0) + coalesce(cross_profit_amt,0)
+    - coalesce(ext_profit_1n_amt,0) - coalesce(ext_cross_profit_amt,0) else 0 end) as "分成费用"
+from dm.dm_ambv2_profit_t 
+where 1=1
+and calmonth BETWEEN '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}'
+group by 
+ calmonth  
+,sales_grp 
+,comp_code 
+)
+,tmp as (
+select 
+stat_month,
+sales_grp,
+comp_code, 
+0 as "主营业务收入",
+0 as "使用积分",
+0 as "本期报销",
+0 as "本期积分(政策外)",
+0 as "其他业务收入",
+0 as "主营业务成本",
+0 as "物流成本",
+0 as "其他业务支出",
+fy."税金及附加",
+fy."销售费用",
+fy."管理费用",
+fy."研发费用",
+fy."财务费用",
+fy."其他收益",
+fy."投资收益(损失)",
+fy."公允价值变动收益",
+0 as "信用减值利得(损失)",
+0 as "资产减值利得(损失)",
+fy."资产处置收益(损失)",
+fy."营业外收入",
+fy."营业外支出",
+0 as "分成费用",
+0 as "所得税费用"
+from fy
+union all
+select 
+stat_month,
+sales_grp,
+comp_code, 
+0 as "主营业务收入",
+0 as "使用积分",
+0 as "本期报销",
+0 as "本期积分(政策外)",
+0 as "其他业务收入",
+0 as "主营业务成本",
+0 as "物流成本",
+0 as "其他业务支出",
+0 as "税金及附加",
+0 as "销售费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其他收益",
+0 as "投资收益(损失)",
+0 as "公允价值变动收益",
+fy1."信用减值利得(损失)",
+fy1."资产减值利得(损失)",
+0 as "资产处置收益(损失)",
+0 as "营业外收入",
+0 as "营业外支出",
+0 as "分成费用",
+fy1."所得税费用" 
+from fy1
+union all
+select 
+stat_month,
+sales_grp,
+comp_code, 
+0 as "主营业务收入",
+0 as "使用积分",
+0 as "本期报销",
+0 as "本期积分(政策外)",
+qt."其他业务收入",
+0 as "主营业务成本",
+0 as "物流成本",
+qt."其他业务支出",
+0 as "税金及附加",
+0 as "销售费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其他收益",
+0 as "投资收益(损失)",
+0 as "公允价值变动收益",
+0 as "信用减值利得(损失)",
+0 as "资产减值利得(损失)",
+0 as "资产处置收益(损失)",
+0 as "营业外收入",
+0 as "营业外支出",
+0 as "分成费用",
+0 as "所得税费用"
+from qt
+union all
+select 
+stat_month,
+sales_grp,
+comp_code, 
+0 as "主营业务收入",
+jf."使用积分",
+jf."本期报销",
+jf."本期积分(政策外)",
+0 as "其他业务收入",
+0 as "主营业务成本",
+0 as "物流成本",
+0 as "其他业务支出",
+0 as "税金及附加",
+0 as "销售费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其他收益",
+0 as "投资收益(损失)",
+0 as "公允价值变动收益",
+0 as "信用减值利得(损失)",
+0 as "资产减值利得(损失)",
+0 as "资产处置收益(损失)",
+0 as "营业外收入",
+0 as "营业外支出",
+0 as "分成费用",
+0 as "所得税费用"
+from jf
+union all
+select 
+stat_month,
+sales_grp,
+comp_code, 
+sr."主营业务收入",
+0 as "使用积分",
+0 as "本期报销",
+0 as "本期积分(政策外)",
+0 as "其他业务收入",
+sr."主营业务成本",
+sr."物流成本",
+0 as "其他业务支出",
+0 as "税金及附加",
+0 as "销售费用",
+0 as "管理费用",
+0 as "研发费用",
+0 as "财务费用",
+0 as "其他收益",
+0 as "投资收益(损失)",
+0 as "公允价值变动收益",
+0 as "信用减值利得(损失)",
+0 as "资产减值利得(损失)",
+0 as "资产处置收益(损失)",
+0 as "营业外收入",
+0 as "营业外支出",
+sr."分成费用",
+0 as "所得税费用"
+from sr
+)
+,tmp1 as (
+select 
+stat_month,
+sales_grp,
+comp_code, 
+sum("主营业务收入") as "主营业务收入",
+sum("使用积分") as "使用积分",
+sum("本期报销") as "本期报销",
+sum("本期积分(政策外)") as "本期积分(政策外)",
+sum("其他业务收入") as "其他业务收入",
+sum("主营业务成本") as "主营业务成本",
+sum("物流成本") as "物流成本",
+sum("其他业务支出") as "其他业务支出",
+sum("税金及附加") as "税金及附加",
+sum("销售费用") as "销售费用",
+sum("管理费用") as "管理费用",
+sum("研发费用") as "研发费用",
+sum("财务费用") as "财务费用",
+sum("其他收益") as "其他收益",
+sum("投资收益(损失)") as "投资收益(损失)",
+sum("公允价值变动收益") as "公允价值变动收益",
+sum("信用减值利得(损失)") as "信用减值利得(损失)",
+sum("资产减值利得(损失)") as "资产减值利得(损失)",
+sum("资产处置收益(损失)") as "资产处置收益(损失)",
+sum("营业外收入") as "营业外收入",
+sum("营业外支出") as "营业外支出",
+sum("分成费用") as "分成费用",
+sum("所得税费用") as "所得税费用"
+from tmp
+group by 
+stat_month,
+sales_grp,
+comp_code
+)
+select 
+T.stat_month,
+CASE WHEN T1.node_name2 = 'R91000001' THEN coalesce(T2.sales_grp_l,T2.sales_grp,T.sales_grp) ELSE T.sales_grp END AS sales_grp,
+T.comp_code, 
+"主营业务收入" as main_bus_income_amt,
+"使用积分" as incld_point_amt,
+"本期报销" as cur_reimburse_amt,
+"本期积分(政策外)" as cur_point_out_policy_amt,
+"其他业务收入" as other_bus_income_amt,
+"主营业务成本" as main_bus_cost_amt,
+"物流成本" as lgstcs_cost_amt,
+"其他业务支出" as other_bus_cost_amt,
+"税金及附加" as addl_tax_amt,
+"销售费用" as noincld_sale_fee_amt,
+"管理费用" as mng_fee_amt,
+"研发费用" as dev_fee_amt,
+"财务费用" as fin_fee_amt,
+"其他收益" as oth_income_amt,
+"投资收益(损失)" as inv_income_amt,
+"公允价值变动收益" as fr_val_chg_income_amt,
+"信用减值利得(损失)" as cre_impair_gain_loss_amt,
+"资产减值利得(损失)" as asset_impair_gain_loss_amt,
+"资产处置收益(损失)" as asset_disp_income_loss_amt,
+"营业外收入" as incld_oth_income_prft_amt,
+"营业外支出" as incld_oth_expd_prft_amt,
+"分成费用" as sharing_fee_amt,
+"所得税费用" as income_tax_exp_amt,
+current_timestamp() as dw_last_update_date 
+from tmp1 T
+left join dm.dm_rpt_sales_group_t T1
+on T.sales_grp = T1.node_name9
+left join UPLOAD.UPLOAD_DIVISION_COMP_T T2
+on T.comp_code = T2.comp_code and T2.end_date = '9999-12-31'

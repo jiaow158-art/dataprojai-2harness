@@ -1,0 +1,16 @@
+insert overwrite table sdi.sdi_aps_subres_strategy_1007
+select 
+id,
+code,
+create_by,
+create_date,
+inv_org_id,
+is_phantom,
+name,
+remark,
+sync_id,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_aps_subres_strategy_1007;

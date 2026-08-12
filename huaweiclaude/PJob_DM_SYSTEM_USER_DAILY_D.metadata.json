@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SYSTEM_USER_DAILY_D",
+    "type": "HiveSQL",
+    "directory": "/",
+    "description": "各系统日活跃统计报表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

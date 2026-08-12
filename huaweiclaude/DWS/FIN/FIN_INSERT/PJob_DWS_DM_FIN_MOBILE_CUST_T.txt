@@ -1,0 +1,2702 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/08/03 17:31:21 GMT+08:00
+-- table desc：移动端-客户 DM.DM_FIN_MOBILE_CUST_T
+-- 需求人：zhouhaochang
+-- update：2023/09/26 zhouhaochang 层级架构去重
+-- update：2024/01/17 增加阿米巴成本逻辑
+-- update：2024/03/28 事业部剔除数据来源U
+-- update：2024/06/20 修改历史月只存最后一天
+-- update：2024/08/26 增加季度数据，增加删除一年前数据记录逻辑
+-- ******************************************************************** --
+
+delete
+from DM.DM_FIN_MOBILE_CUST_T
+where calday not in (select day_id
+                     from dm.dm_dim_date_d
+                     where month_end_day_flag = 'Y'
+                       and day_id < to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd'))
+  and to_char(calday::date, 'yyyy-MM') != to_char(to_date('${PERIOD_ID_D}'), 'yyyy-MM');
+delete
+from DM.DM_FIN_MOBILE_CUST_T
+where calday <= to_char(to_date('${PERIOD_ID_D}') - interval '1 years', 'yyyyMMdd');
+DELETE
+from DM.DM_FIN_MOBILE_CUST_T
+where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd');
+INSERT INTO DM.DM_FIN_MOBILE_CUST_T
+select calday,
+       datetype,
+       node_name,
+       distr_chan,
+       distr_chan_desc,
+       costtype,
+       customer,
+       txtmd,
+       achievement,
+       last_year_achievement,
+       last_month_achievement,
+       no_tax,
+       gross_profit,
+       last_year_no_tax,
+       last_year_gross_profit,
+       last_month_no_tax,
+       last_month_gross_profit
+from (
+         -----------------A成本
+--日
+         select calday,
+                '日'                                                                     datetype,
+                'H99000000'                                                             node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name2                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name3                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name4                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name5                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name6                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name7                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name8                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '日'                                                                     datetype,
+                node_name9                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                            achievement,
+                sum(last_year_day_achievement) / 10000                                  last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                 last_month_achievement,
+                sum(day_no_tax) / 10000                                                 no_tax,
+                (sum(day_no_tax) - sum(day_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                       last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                      last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+--月
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                'H99000000'                                                                 node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name2                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name3                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name4                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name5                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name6                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name7                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name8                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '月'                                                                         datetype,
+                node_name9                                                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                       costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                              achievement,
+                sum(last_year_month_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                                   last_month_achievement,
+                sum(month_no_tax) / 10000                                                   no_tax,
+                (sum(month_no_tax) - sum(month_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_month_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                                        last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+                  --季
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                'H99000000'                                                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name2                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name3                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name4                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name5                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name6                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name7                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name8                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '季'                                                                           datetype,
+                node_name9                                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                         costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                               achievement,
+                sum(last_year_quarter_achievement) / 10000                                    last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                                   last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                                   no_tax,
+                (sum(quarter_no_tax) - sum(quarter_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                                         last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                                        last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_a_sales_cost)) /
+                10000                                                                         last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+--年
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                'H99000000'                                                             node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name2                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name3                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name4                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name5                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name6                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name7                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name8                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '年'                                                                     datetype,
+                node_name9                                                              node_name,
+                distr_chan,
+                distr_chan_desc,
+                'A成本'                                                                   costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                           achievement,
+                sum(last_year_year_achievement) / 10000                                 last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                 last_year_achievement,
+                sum(year_no_tax) / 10000                                                no_tax,
+                (sum(year_no_tax) - sum(year_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                      last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+         union all
+         -----------------标准A
+--日
+         select calday,
+                '日'                                                                              datetype,
+                'H99000000'                                                                      node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name2                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name3                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name4                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name5                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name6                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name7                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name8                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '日'                                                                              datetype,
+                node_name9                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                                                     achievement,
+                sum(last_year_day_achievement) / 10000                                           last_year_achievement,
+                SUM(last_month_day_achievement) / 10000                                          last_month_achievement,
+                sum(day_no_tax) / 10000                                                          no_tax,
+                (sum(day_no_tax) - sum(day_standard_a_sales_cost)) / 10000                       gross_profit,
+                sum(last_year_day_no_tax) / 10000                                                last_year_no_tax,
+                (sum(last_year_day_no_tax) - sum(last_year_day_standard_a_sales_cost)) / 10000   last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000                                               last_month_no_tax,
+                (sum(last_month_day_no_tax) - sum(last_month_day_standard_a_sales_cost)) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+--月
+         union all
+         select calday,
+                '月'                                                            datetype,
+                'H99000000'                                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name2                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name3                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name4                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name5                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name6                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name7                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name8                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '月'                                                            datetype,
+                node_name9                                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                                 achievement,
+                sum(last_year_month_achievement) / 10000                       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000                      last_month_achievement,
+                sum(month_no_tax) / 10000                                      no_tax,
+                (sum(month_no_tax) - sum(month_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_month_no_tax) / 10000                            last_year_no_tax,
+                (sum(last_year_month_no_tax) - sum(last_year_month_standard_a_sales_cost)) /
+                10000                                                          last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000                           last_month_no_tax,
+                (sum(last_month_month_no_tax) - sum(last_month_month_standard_a_sales_cost)) /
+                10000                                                          last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+                  --季
+         union all
+         select calday,
+                '季'                                                                datetype,
+                'H99000000'                                                        node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name2                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name3                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name4                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name5                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name6                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name7                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name8                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '季'                                                                datetype,
+                node_name9                                                         node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                              costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                                    achievement,
+                sum(last_year_quarter_achievement) / 10000                         last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000                        last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                                        no_tax,
+                (sum(quarter_no_tax) - sum(quarter_standard_a_sales_cost)) / 10000 gross_profit,
+                sum(last_year_quarter_no_tax) / 10000                              last_year_no_tax,
+                (sum(last_year_quarter_no_tax) - sum(last_year_quarter_standard_a_sales_cost)) /
+                10000                                                              last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000                             last_quarter_no_tax,
+                (sum(last_month_quarter_no_tax) - sum(last_month_quarter_standard_a_sales_cost)) /
+                10000                                                              last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+--年
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                'H99000000'                                                                      node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name2                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name2
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name3                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name3
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name4                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name4
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name5                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name5
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name6                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name6
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name7                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name7
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name8                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name8
+         union all
+         select calday,
+                '年'                                                                              datetype,
+                node_name9                                                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '标准A'                                                                            costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                                                    achievement,
+                sum(last_year_year_achievement) / 10000                                          last_year_achievement,
+                SUM(last_year_year_achievement) / 10000                                          last_year_achievement,
+                sum(year_no_tax) / 10000                                                         no_tax,
+                (sum(year_no_tax) - sum(year_standard_a_sales_cost)) / 10000                     gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000                                               last_year_no_tax,
+                (sum(last_year_year_no_tax) - sum(last_year_year_standard_a_sales_cost)) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, a.customer, d.txtmd, node_name9
+         union all
+         --阿米巴成本
+--日
+         select calday,
+                '日'                                          datetype,
+                'H99000000'                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name2                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, node_name2, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name3                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name3, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name4                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name4, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name5                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name5, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name6                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name6, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name7                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name7, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name8                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name8, node_name9, node_desc9, a.customer, d.txtmd
+         union all
+         select calday,
+                '日'                                          datetype,
+                node_name9                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(day_achievement) / 10000                 achievement,
+                sum(last_year_day_achievement) / 10000       last_year_achievement,
+                SUM(last_month_day_achievement) / 10000      last_month_achievement,
+                sum(day_no_tax) / 10000                      no_tax,
+                sum(day_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_day_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_day_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_day_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_day_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name9, a.customer, d.txtmd
+--月
+         union all
+         select calday,
+                '月'                                            datetype,
+                'H99000000'                                    node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name2                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, node_name2, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name3                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name3, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name4                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name4, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name5                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name5, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name6                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name6, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name7                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name7, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name8                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name8, node_name9, node_desc9, a.customer, d.txtmd
+         union all
+         select calday,
+                '月'                                            datetype,
+                node_name9                                     node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                        costtype,
+                a.customer,
+                d.txtmd,
+                sum(month_achievement) / 10000                 achievement,
+                sum(last_year_month_achievement) / 10000       last_year_achievement,
+                SUM(last_month_month_achievement) / 10000      last_month_achievement,
+                sum(month_no_tax) / 10000                      no_tax,
+                sum(month_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_month_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_month_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_month_no_tax) / 10000           last_month_no_tax,
+                sum(last_month_month_amb_gross_profit) / 10000 last_month_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name9, a.customer, d.txtmd
+                  --季
+         union all
+         select calday,
+                '季'                                              datetype,
+                'H99000000'                                      node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name2                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, node_name2, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name3                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name3, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name4                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name4, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name5                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name5, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name6                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name6, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name7                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name7, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name8                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name8, node_name9, node_desc9, a.customer, d.txtmd
+         union all
+         select calday,
+                '季'                                              datetype,
+                node_name9                                       node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                          costtype,
+                a.customer,
+                d.txtmd,
+                sum(quarter_achievment) / 10000                  achievement,
+                sum(last_year_quarter_achievement) / 10000       last_year_achievement,
+                SUM(last_month_quarter_achievement) / 10000      last_quarter_achievement,
+                sum(quarter_no_tax) / 10000                      no_tax,
+                sum(quarter_amb_gross_profit) / 10000            gross_profit,
+                sum(last_year_quarter_no_tax) / 10000            last_year_no_tax,
+                sum(last_year_quarter_amb_gross_profit) / 10000  last_year_gross_profit,
+                sum(last_month_quarter_no_tax) / 10000           last_quarter_no_tax,
+                sum(last_month_quarter_amb_gross_profit) / 10000 last_quarter_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name9, a.customer, d.txtmd
+--年
+         union all
+         select calday,
+                '年'                                          datetype,
+                'H99000000'                                  node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source in ('S', 'T')
+           and coalesce(cust_group, '#') != 'Z0'
+         group by calday, distr_chan, distr_chan_desc, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name2                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+           and data_source != 'U'
+         group by calday, distr_chan, distr_chan_desc, node_name2, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name3                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name3, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name4                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name4, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name5                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name5, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name6                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name6, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name7                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name7, a.customer,
+                  d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name8                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name8, node_name9, node_desc9, a.customer, d.txtmd
+         union all
+         select calday,
+                '年'                                          datetype,
+                node_name9                                   node_name,
+                distr_chan,
+                distr_chan_desc,
+                '阿米巴成本'                                      costtype,
+                a.customer,
+                d.txtmd,
+                sum(year_achievement) / 10000                achievement,
+                sum(last_year_year_achievement) / 10000      last_year_achievement,
+                SUM(last_year_year_achievement) / 10000      last_year_achievement,
+                sum(year_no_tax) / 10000                     no_tax,
+                sum(year_amb_gross_profit) / 10000           gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit,
+                sum(last_year_year_no_tax) / 10000           last_year_no_tax,
+                sum(last_year_year_amb_gross_profit) / 10000 last_year_gross_profit
+         from dm.dm_fin_mobile_t a
+                  left join dm.dm_rpt_sales_group_t b on a.sales_grp = b.node_name9
+                  left join dm.dm_rpt_bi0_tcustomer_t d on a.customer = d.customer
+
+         where calday = to_char(to_date('${PERIOD_ID_D}'), 'yyyyMMdd')
+         group by calday, distr_chan, distr_chan_desc, node_name9, a.customer, d.txtmd
+     ) a
+GROUP BY calday,
+         datetype,
+         node_name,
+         distr_chan,
+         distr_chan_desc,
+         costtype,
+         customer,
+         txtmd,
+         achievement,
+         last_year_achievement,
+         last_month_achievement,
+         no_tax,
+         gross_profit,
+         last_year_no_tax,
+         last_year_gross_profit,
+         last_month_no_tax,
+         last_month_gross_profit

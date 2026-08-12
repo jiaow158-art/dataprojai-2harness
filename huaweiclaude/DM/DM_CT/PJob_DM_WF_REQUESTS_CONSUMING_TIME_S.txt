@@ -1,0 +1,163 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/03/22 10:14:50 GMT+08:00
+-- ******************************************************************** --
+
+--导出流程节点数
+
+with t1 as(
+select trim(w.wf_name) as wf_name
+	  ,wt.typename as WF_TYPE_NAME
+	  ,case when n.node_type in('审批') then '审批'
+            else n.node_type
+			 end as node_type
+      ,count(n.node_name) as node_count
+from DWRPI.dwr_wf_basic_info_f w
+INNER JOIN DWRPI.dwr_wf_flow_node_f f
+ON w.WF_CODE  = f.wf_id  
+INNER JOIN DWRPI.dwr_wf_node_basic_into_f n
+ON n.node_id = f.node_id
+left join SDI.SDI_WORKFLOW_TYPE_1004 wt
+on w.wf_type = wt.id
+WHERE w.is_valid = 1
+and n.is_end_node <> '1' --剔除归档节点
+and n.is_custom_node is null
+AND n.node_type IN('审批','操作')
+AND wt.typename NOT IN('历史流程','测试流程')
+and n.is_zx = '主线'
+group by trim(w.wf_name)
+		,wt.typename
+		,case when n.node_type in('审批') then '审批'
+              else n.node_type
+			   end
+		
+ union all 
+
+select trim(w.wf_name) as wf_name
+	  ,wt.typename as WF_TYPE_NAME
+	  ,'合计' as node_type
+      ,count(n.node_name) as node_count
+from DWRPI.dwr_wf_basic_info_f w
+INNER JOIN DWRPI.dwr_wf_flow_node_f f
+ON w.WF_CODE  = f.wf_id  
+INNER JOIN DWRPI.dwr_wf_node_basic_into_f n
+ON n.node_id = f.node_id
+left join SDI.SDI_WORKFLOW_TYPE_1004 wt
+on w.wf_type = wt.id
+WHERE w.is_valid = 1
+and n.is_end_node <> '1' --剔除归档节点
+and n.is_custom_node is null
+AND n.node_type IN('审批','操作')
+AND wt.typename NOT IN('历史流程','测试流程')
+and n.is_zx = '主线'
+group by trim(w.wf_name)
+		,wt.typename
+),t2 as(
+select stat_month
+      ,WF_TYPE_NAME
+	  ,wf_name
+	  ,CURRENT_NODE_TYPE as node_type
+	  ,sum(node_count) as node_count
+	  ,sum(hs_minute) as hs_minute
+	  ,sum(gz_hour) as gz_hour
+	  ,count(distinct case when substr(request_day,1,7) = SUBSTR('${PERIOD_ID_D}',1,7)
+	                       then request_code
+						   else null
+						    end) as request_cnt --总发起数
+  from DM.DM_WF_REQUESTS_CONSUMING_TIME_T
+ where LEV1_DEPT_NAME is not null 
+   and stat_month = substr(replace(receive_date,'-',''),1,6)
+   and stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+   and wf_name not in(
+                         'BIT013-系统提醒工作流'
+                        ,'BIT011-内部留言（旧）'
+                        ,'BIT008-内部留言'
+                        ,'BIT007-通用流程(内部)'
+						,'BIT009-通用流程(外部)'
+                        ,'开发进度流程(停止申请)'
+                        ,'PIT-A2-001-系统/业务流程开发与优化申请流程(停止申请)'
+                       )
+   AND CURRENT_NODE_TYPE IN('审批','操作')
+   AND wf_type_name not in('历史流程','测试流程')   
+ group by
+       stat_month
+      ,WF_TYPE_NAME
+	  ,wf_name
+	  ,CURRENT_NODE_TYPE
+	  
+ union all
+
+select stat_month
+      ,WF_TYPE_NAME
+	  ,wf_name
+	  ,'合计' as node_type
+	  ,sum(node_count) as node_count
+	  ,sum(hs_minute) as hs_minute
+	  ,sum(gz_hour) as gz_hour
+	  ,count(distinct case when substr(request_day,1,7) = SUBSTR('${PERIOD_ID_D}',1,7)
+	                       then request_code
+						   else null
+						    end) as request_cnt --总发起数
+  from DM.DM_WF_REQUESTS_CONSUMING_TIME_T
+ where LEV1_DEPT_NAME is not null 
+   and stat_month = substr(replace(receive_date,'-',''),1,6)
+   and stat_month = REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+   and wf_name not in(
+                         'BIT013-系统提醒工作流'
+                        ,'BIT011-内部留言（旧）'
+                        ,'BIT008-内部留言'
+                        ,'BIT007-通用流程(内部)'
+						,'BIT009-通用流程(外部)'
+                        ,'开发进度流程(停止申请)'
+                        ,'PIT-A2-001-系统/业务流程开发与优化申请流程(停止申请)'
+                       )
+   AND CURRENT_NODE_TYPE IN('审批','操作')
+   AND wf_type_name not in('历史流程','测试流程')   
+ group by
+       stat_month
+      ,WF_TYPE_NAME
+	  ,wf_name
+)
+insert overwrite table dm.DM_WF_REQUESTS_CONSUMING_TIME_S
+select a.wf_name
+	  ,a.WF_TYPE_NAME
+      ,a.node_count as xt_node_count
+	  ,REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','') as stat_month
+	  ,0 as hs_node_count
+	  ,0 as hs_minute
+	  ,0 as gz_hour
+	  ,current_timestamp as DW_LAST_UPDATE_DATE
+	  ,a.node_type
+	  ,0 as request_cnt --总发起数
+  from t1 a
+
+ union all
+ 
+select a.wf_name
+	  ,a.WF_TYPE_NAME
+      ,0 as xt_node_count
+	  ,REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','') as stat_month
+	  ,coalesce(a.node_count,0) as hs_node_count
+	  ,coalesce(a.hs_minute,0) as hs_minute
+	  ,coalesce(a.gz_hour,0) as gz_hour
+	  ,current_timestamp as DW_LAST_UPDATE_DATE
+	  ,a.node_type
+	  ,a.request_cnt --总发起数
+  from t2 a
+   
+ union all
+
+select a.wf_name
+	  ,a.WF_TYPE_NAME
+      ,a.xt_node_count
+	  ,a.stat_month
+	  ,a.hs_node_count
+	  ,a.hs_minute
+	  ,a.gz_hour
+	  ,a.DW_LAST_UPDATE_DATE
+	  ,a.node_type
+	  ,a.request_cnt --总发起数
+  from dm.DM_WF_REQUESTS_CONSUMING_TIME_S a
+ where stat_month <> REPLACE(SUBSTR('${PERIOD_ID_D}',1,7),'-','')
+;

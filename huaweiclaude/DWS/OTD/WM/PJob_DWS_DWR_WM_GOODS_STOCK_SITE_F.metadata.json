@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_WM_GOODS_STOCK_SITE_F",
+    "type": "DWSSQL",
+    "directory": "/DWS/OTD/WM",
+    "description": "SAP货物库位表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

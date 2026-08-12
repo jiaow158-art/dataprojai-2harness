@@ -1,0 +1,265 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2023/04/22 14:03:20 GMT+08:00
+-- update from chenzhiyong 20230428 渠道编码按业务提供的关系修改，不用sap的渠道编码
+-- update from chenzhiyong 20230609 新增箱容字段
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with PREDICT_CHANNEL_PICKUP_01 as(   -- 渠道数据，用来发散，只限制了：经销/流通/家装，因为只有这3个渠道才限制型谱
+	SELECT -- 日期 t1.stat_month
+		   t1.def_channnel,  -- 渠道
+		   t1.material_num,  -- 物料
+		   t1.near12_avg_sendout_goods_qty  , -- 近12个月月均发货数
+		   t1.near6_avg_sendout_goods_qty  ,	-- 近6个月月均发货数
+	       t1.near3_avg_sendout_goods_qty  ,	-- 近3个月月均发货数
+	       t1.in_transit_qty, -- N月在途订单 （已发货未接收）
+	       t1.leaveing_goods_no_sendout_qty ,--	当月已留货未发货 	
+	   	   t1.n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+	   	   t1.n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+		   t1.n3_pickup_forecast_suggest_qty-- N+3月系统提货预测建议值
+	FROM DM_SW.DM_SW_PREDICT_CHANNEL_PICKUP_T t1
+	where t1.stat_month = substring('${PERIOD_ID_D}',1,7) -- 每月1号跑上月月末的数据
+	and t1.def_channnel in ('经销','流通','家装')
+),
+PREDICT_CHANNEL_PICKUP_02 as(   -- 渠道数据，排除：经销/流通/家装，因为只有这3个渠道才限制型谱
+	SELECT -- 日期 t1.stat_month
+		   t1.def_channnel,  -- 渠道
+		   t1.material_num,  -- 物料
+		   t1.near12_avg_sendout_goods_qty  , -- 近12个月月均发货数
+		   t1.near6_avg_sendout_goods_qty  ,	-- 近6个月月均发货数
+	       t1.near3_avg_sendout_goods_qty  ,	-- 近3个月月均发货数
+	       t1.in_transit_qty, -- N月在途订单 （已发货未接收）
+	       t1.leaveing_goods_no_sendout_qty ,--	当月已留货未发货 	
+	   	   t1.n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+	   	   t1.n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+		   t1.n3_pickup_forecast_suggest_qty-- N+3月系统提货预测建议值
+	FROM DM_SW.DM_SW_PREDICT_CHANNEL_PICKUP_T t1
+	where t1.stat_month = substring('${PERIOD_ID_D}',1,7) -- 每月1号跑上月月末的数据
+	and t1.def_channnel not in ('经销','流通','家装')
+),
+
+DIM_DETAIL_DATA as(  -- 数据发散，用型谱的数据按月/物料发散,有型谱无事实数据，指标字段给0
+	SELECT distinct 
+		   t2.def_channnel,
+		   t1.material_num 
+	FROM DWIOTD.DWI_PLAN_PRODUCT_SPECTRUM_T T1
+	JOIN (SELECT DISTINCT case when t1.distribution_channel_code='01' then  '经销'
+	                           when t1.distribution_channel_code='08' then  '家装'
+	                           when t1.distribution_channel_code='10' then  '流通' end AS def_channnel,
+	      t1.MATERIAL_NUM 
+	      FROM DWIMD.dwi_md_data_material_SALES_t t1
+	      LEFT JOIN sdi.SDI_ZTMM004_1001 t2 ON t1.material_num = t2.matnr and t1.distribution_channel_code = t2.vtweg and t2.flag='X'
+	      join  DWIMD.dwi_md_data_material_general_t t3 ON t1.material_num = t3.material_num
+	      WHERE t1.distribution_channel_code IN('01','08','10') 
+	      AND (not t1.matl_group3_code in('PJ'))
+          AND ( t1.matl_group4_code NOT IN('DZ','DJ','TZ','TS',''))
+          AND (not t3.matl_texture in('A001','A002'))
+          AND ((t3.matl_type_code ='FERT' AND coalesce(t1.matl_group2_code,'') IN('J9','J11')) or (t3.matl_type_code ='HALB' AND coalesce(t1.matl_group2_code,'') IN('J9')))
+          AND t3.product_level1_code IN('30','40','31','41')
+          AND t3.reserved_field_1 IN('G101','G111','G112','G113','G116','G108','G103','G111','G112','G113','G114','G104','G116')
+          AND (( t1.distribution_channel_code IN('01') AND t3.reserved_field_1 IN('G101','G111','G112','G113','G116','G108','G114','G116'))
+              or ( t1.distribution_channel_code IN('08') AND t3.reserved_field_1 IN('G103','G111','G112','G113','G116','G108','G114','G116'))
+              or ( t1.distribution_channel_code IN('10') AND t3.reserved_field_1 IN('G104','G111','G112','G116'))
+              )
+          AND (not t3.x_dstrb_c_mm_status_code='GG')
+          AND (not t3.X_plant_matl_status='99')
+	      AND t2.matnr is null) t2 ON T1.MATERIAL_NUM = T2.MATERIAL_NUM  
+	where t1.stat_month = substring(add_months('${PERIOD_ID_D}',2),1,7)   -- 传4月，获取6月型谱的数据
+),
+material_sales_data as(   -- 物料销售数据
+   SELECT T1.material_num,
+	   T1.material_name,
+	   t2.prod_line_name ,    -- 营销大类
+	   t2.second_level_name   -- 营销小类
+	FROM DWIMD.dwi_md_data_material_general_t t1
+	left join DWIMD.DWI_MD_PRODUCT_LEVEL_APS_T t2
+	on case when NVL(t1.product_level3_code,'NULL') <> NVL(t2.prod_level_code,'NULL') then t1.product_level2_code = t2.prod_level_code 
+	else t1.product_level3_code = t2.prod_level_code end
+),
+sales_code_data as(   -- 销售代码及产品状态数据
+	SELECT T2.code as material_num,  -- 物料编码
+	       T2.name as material_name,  -- 物料名称
+	       T1.product_line,			  -- 产品线
+	       T1.series ,				  -- 系列
+	       T1.code as sales_code,	  -- 销售代码
+	       T3.PROD_STATUS_NAME  	  -- 产品状态
+	FROM SDI.SDI_WYAPS_SALES_CODE_MAINTAIN_1007 T1
+	JOIN SDI.SDI_ITEM_1007 T2
+	ON T1.item_id = T2.ID
+	left join (
+	   select t1.code AS PROD_STATUS_CODE,
+			   t1.name AS PROD_STATUS_NAME
+		from SDI.SDI_BD_CATALOG_1007 t1
+		join SDI.SDI_BD_CATALOG_TYPE_1007 t2
+		on t1.catalog_type_id = t2.id
+		where t2.CODE = 'PRODUCT_STATE'
+		and t1.inv_org_id = '2'
+		and t1.is_phantom = '0'
+	) T3
+	ON T1.product_state = T3.PROD_STATUS_CODE
+	WHERE T1.inv_org_id = '2'   -- 库存组织
+	and T1.is_phantom = '0'     -- 幽灵属性
+),
+price_data as(   -- 产品价格数据  
+	select /*case when t1.konda = 'JK' then '零售' 
+            	when t1.konda = 'JL' then '流通'
+            	when t1.konda = 'JE' then '鹏嘉'
+            else '' end channnel_name,*/
+	       T1.mandt as group_code,  -- 集团
+		   t1.konda as price_group_code, -- 价格组
+		   t1.matnr as material_num, -- 物料编码
+		   t2.KBETR/t2.KPEIN as unit_price -- 单价
+	from sdi.sdi_a963_1001 t1
+	LEFT JOIN SDI.sdi_konp_1001 t2
+	on t1.knumh = t2.knumh  -- 条件记录号
+	and t1.kschl = t2.kschl  
+	where t1.mandt = '800' -- 集团
+	and t1.kschl = 'PR00' -- 条件类型
+	and t1.konda in ('JK','JE','JL') -- 客户价格组
+	and REPLACE(CAST('${PERIOD_ID_D}' AS STRING),'-','') BETWEEN t1.datab  and t1.datbi 
+	and t2.kopos = '01' -- 条件的序列号
+),
+PREDICT_CHANNEL_DETAIL_DATA as(
+	select substring(add_months('${PERIOD_ID_D}',1),1,7) as stat_month,
+		   t1.def_channnel,
+		   t1.material_num,
+		   t3.material_name,  -- 物料名称
+		   t4.sales_code,     -- 销售代码
+	       t4.prod_status_name,   -- 产品生命状态
+		   t3.prod_line_name as sale_big_type_name,     -- 营销大类
+	       t3.second_level_name as sale_small_type_name,  -- 营销小类
+	       nvl(t5.unit_price,0) *  (case when t5.price_group_code='JE' then 0.31 else 1 end) as produce_price,   -- 产品单价
+		   nvl(t2.near12_avg_sendout_goods_qty,0) as  near12_avg_sendout_goods_qty, -- 近12个月月均发货数
+		   nvl(t2.near6_avg_sendout_goods_qty,0) as  near6_avg_sendout_goods_qty,	-- 近6个月月均发货数
+	       nvl(t2.near3_avg_sendout_goods_qty,0) as  near3_avg_sendout_goods_qty,	-- 近3个月月均发货数
+	       nvl(t2.in_transit_qty,0) as in_transit_qty, -- N月在途订单 （已发货未接收）
+	       nvl(t2.leaveing_goods_no_sendout_qty,0) as leaveing_goods_no_sendout_qty,--	当月已留货未发货 	
+	   	   nvl(t2.n1_pickup_forecast_suggest_qty,0) as n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+	   	   nvl(t2.n2_pickup_forecast_suggest_qty,0) as n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+		   nvl(t2.n3_pickup_forecast_suggest_qty,0) as n3_pickup_forecast_suggest_qty-- N+3月系统提货预测建议值
+	from DIM_DETAIL_DATA t1
+	left join PREDICT_CHANNEL_PICKUP_01 t2
+	on  t1.def_channnel = t2.def_channnel
+	and t1.material_num = t2.material_num
+	left join material_sales_data t3
+	on t1.material_num = t3.material_num
+	LEFT JOIN sales_code_data t4
+	on T1.material_num = t4.material_num
+	LEFT JOIN price_data t5
+	--on t1.def_channnel = t5.channnel_name
+	on case when t1.def_channnel = '经销' then 'JK'
+	        when t1.def_channnel = '流通' then 'JL'
+	        when t1.def_channnel = '电商' then 'JE'
+	        when t1.def_channnel = '艺耐' then 'JK'
+	      else '' end = t5.price_group_code
+	and T1.material_num = t5.material_num
+	union all
+	select substring(add_months('${PERIOD_ID_D}',1),1,7) as stat_month,
+		   t2.def_channnel,
+		   t2.material_num,
+		   t3.material_name,  -- 物料名称
+		   t4.sales_code,     -- 销售代码
+	       t4.prod_status_name,   -- 产品生命状态
+		   t3.prod_line_name as sale_big_type_name,     -- 营销大类
+	       t3.second_level_name as sale_small_type_name,  -- 营销小类
+	       nvl(t5.unit_price,0) as produce_price,   -- 产品单价
+		   t2.near12_avg_sendout_goods_qty  , -- 近12个月月均发货数
+		   t2.near6_avg_sendout_goods_qty  ,	-- 近6个月月均发货数
+	       t2.near3_avg_sendout_goods_qty  ,	-- 近3个月月均发货数
+	       t2.in_transit_qty, -- N月在途订单 （已发货未接收）
+	       t2.leaveing_goods_no_sendout_qty ,--	当月已留货未发货 	
+	   	   t2.n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+	   	   t2.n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+		   t2.n3_pickup_forecast_suggest_qty-- N+3月系统提货预测建议值
+	from PREDICT_CHANNEL_PICKUP_02 t2
+	JOIN (
+	SELECT t1.distribution_channel_code,t1.material_num
+	FROM DWIMD.dwi_md_data_material_SALES_t t1
+	join  DWIMD.dwi_md_data_material_general_t t2 ON t1.material_num = t2.material_num
+	LEFT JOIN sdi.SDI_ZTMM004_1001 t3 ON t1.material_num = t3.matnr and t1.distribution_channel_code = t3.vtweg and t3.flag='X'
+    WHERE (not t1.matl_group3_code in('PJ'))
+    AND ( t1.matl_group4_code NOT IN('DZ','DJ','TZ','TS',''))
+    AND (not t2.matl_texture in('A001','A002'))
+    AND ((t2.matl_type_code ='FERT' AND coalesce(t1.matl_group2_code,'') IN('J9','J11','')) or (t2.matl_type_code ='HALB' AND coalesce(t1.matl_group2_code,'')  IN('J9','J11','')))
+     AND (not t1.matl_group3_code in('PJ'))
+     AND t2.product_level1_code IN('30','40','31','41')
+     AND (not t2.x_dstrb_c_mm_status_code='GG')
+     AND (not t2.X_plant_matl_status='99')
+     AND t3.matnr is null
+     AND (( t1.distribution_channel_code IN('02') AND t2.reserved_field_1 IN('G101','G111','G112','G113','G116','G108','G114','G116'))
+              or ( t1.distribution_channel_code IN('03') AND t2.reserved_field_1 IN('G101','G102','G111','G112','G113','G116','G108','G114','G116'))
+              or ( t1.distribution_channel_code IN('05') AND t2.reserved_field_1 IN('G107','G109','G108'))
+              or ( t1.distribution_channel_code IN('07') AND t2.reserved_field_1 IN('G110','G108','G114'))
+              or ( t1.distribution_channel_code IN('06') AND t2.reserved_field_1 IN('G102','G111','G112','G113','G116','G108','G114','G116'))
+              )
+    GROUP BY t1.distribution_channel_code,t1.material_num
+	) t1 ON t1.material_num = t2.material_num 
+	     and case when t2.def_channnel = '经销' then '01'
+            when t2.def_channnel = '展厅' then '02'
+		    when t2.def_channnel = '艺耐' then '03'
+		 	when t2.def_channnel = '电商' then '07'  
+		 	when t2.def_channnel = '内部交易' then '03'
+		 	when t2.def_channnel = 'OEM' then '05'
+		 	when t2.def_channnel = '国贸' then '05'
+		 	when t2.def_channnel = '自营工程'  then '06'
+		 	when t2.def_channnel = '经销工程'  then '06'
+		  	when t2.def_channnel = '家装' then '08'
+		    when t2.def_channnel = '流通' then '10' end  = t1.distribution_channel_code
+	join material_sales_data t3
+	on t2.material_num = t3.material_num and t3.prod_line_name is not null
+	LEFT JOIN sales_code_data t4
+	on T2.material_num = t4.material_num
+	LEFT JOIN price_data t5
+	on case when t2.def_channnel = '零售' then 'JK'
+	        when t2.def_channnel = '流通' then 'JL'
+	        when t2.def_channnel = '鹏嘉' then 'JE'
+	        when t2.def_channnel = '艺耐' then 'JK'
+	      else '' end = t5.price_group_code
+	and T2.material_num = t5.material_num
+	
+)
+INSERT OVERWRITE TABLE dm_sw.DM_SW_PREDICT_CHANNEL_T PARTITION(stat_month)
+select CONCAT(replace(t1.stat_month,'-',''),ROW_NUMBER() OVER()) SEQ_NO, -- 数据同步ID
+	   case when t1.def_channnel = '经销' then '01'
+            when t1.def_channnel = '展厅' then '02'
+		    when t1.def_channnel = '艺耐' then '03'
+		 	when t1.def_channnel = '电商' then '07'  
+		 	when t1.def_channnel = '内部交易' then '11'
+		 	when t1.def_channnel = 'OEM' then '05'
+		 	when t1.def_channnel = '国贸' then '09'
+		 	when t1.def_channnel = '自营工程'  then '04'
+		 	when t1.def_channnel = '经销工程'  then '06'
+		  	when t1.def_channnel = '家装' then '08'
+		    when t1.def_channnel = '流通' then '10'
+	   end  channnel_num,  -- 渠道编码
+	   t1.def_channnel as channnel_name,  -- 渠道名称
+	   t1.material_num,  -- 物料编码
+	   t1.material_name,  -- 物料名称
+	   t1.sales_code,     -- 销售代码
+       t1.prod_status_name,   -- 产品生命状态
+	   t1.sale_big_type_name,     -- 营销大类
+       t1.sale_small_type_name,  -- 营销小类
+       t1.produce_price,   -- 产品单价
+	   t1.near12_avg_sendout_goods_qty  , -- 近12个月月均发货数
+	   t1.near6_avg_sendout_goods_qty  ,	-- 近6个月月均发货数
+       t1.near3_avg_sendout_goods_qty  ,	-- 近3个月月均发货数
+       t1.in_transit_qty, -- N月在途订单 （已发货未接收）
+       t1.leaveing_goods_no_sendout_qty ,--	当月已留货未发货 	
+   	   t1.n1_pickup_forecast_suggest_qty, -- N+1月系统提货预测建议值 
+   	   t1.n2_pickup_forecast_suggest_qty,-- N+2月系统提货预测建议值 
+	   t1.n3_pickup_forecast_suggest_qty,-- N+3月系统提货预测建议值
+	   current_timestamp() as dw_last_update_date , --数据同步时间
+	   NVL(t2.pack_num,1) AS pack_num,  -- 箱容
+	   t1.stat_month
+from PREDICT_CHANNEL_DETAIL_DATA t1
+left join (select product_code AS material_num,max(pack_num) as pack_num from SDI.SDI_ZTMM001_1001 group by product_code) t2
+on t1.material_num = t2.material_num
+where t1.def_channnel not in('艺耐','电商');

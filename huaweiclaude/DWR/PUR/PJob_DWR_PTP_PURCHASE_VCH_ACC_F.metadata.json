@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_VCH_ACC_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/PUR",
+    "description": "SAP采购凭证中的帐户设置表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwimd"
+}

@@ -1,0 +1,69 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2023/06/20 14:42:06 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_WF_SNGL_REQUESTS_CONSUMING_TIME_S
+WHERE STAT_MONTH = '${PERIOD_ID_M}'
+;
+
+INSERT INTO DM.DM_WF_SNGL_REQUESTS_CONSUMING_TIME_S(
+         STAT_MONTH
+        ,WF_TYPE_NAME
+        ,WF_NAME
+        ,REQUEST_EXPLAIN
+        ,NODE_CNT
+        ,REQUEST_EMP_NAME
+        ,REQUEST_DAY
+        ,GD_DAY
+        ,WORK_HS
+        ,WORK_HS_HOUR
+        ,AVG_WORK_HS
+        ,HS_24HOUR
+        ,HS_24HOR_TIME
+        ,DW_LAST_UPDATE_DATE
+)
+WITH T1 AS(
+SELECT STAT_MONTH --统计月份
+      ,WF_TYPE_NAME --流程模板
+	  ,WF_NAME --流程名称
+	  ,REQUEST_EXPLAIN --流水号
+	  ,SUM(NODE_CNT) AS NODE_CNT --流程节点数
+	  ,REQUEST_EMP_NAME --发起人名称
+	  ,REQUEST_DAY --启动时间
+	  ,GD_DAY --结束时间
+	  ,SUM(WORK_HS) AS WORK_HS --耗时（工作时间：秒）
+	  ,ROUND(SUM(WORK_HS) / SUM(NODE_CNT) / 3600,2) AS AVG_WORK_HS --单个节点平均耗时
+	  ,SUM(HS_24HOUR) AS HS_24HOUR --耗时24小时制
+  FROM DM.DM_WF_SNGL_REQUESTS_CONSUMING_TIME_T
+ WHERE STAT_MONTH = '${PERIOD_ID_M}'
+ GROUP BY 
+       STAT_MONTH --统计月份
+      ,WF_TYPE_NAME --流程模板
+	  ,WF_NAME --流程名称
+	  ,REQUEST_EXPLAIN --流水号
+	  ,REQUEST_EMP_NAME --发起人名称
+	  ,REQUEST_DAY --启动时间
+	  ,GD_DAY --结束时间
+)
+SELECT STAT_MONTH --统计月份
+      ,WF_TYPE_NAME --流程模板
+	  ,WF_NAME --流程名称
+	  ,REQUEST_EXPLAIN --流水号
+	  ,NODE_CNT --流程节点数
+	  ,REQUEST_EMP_NAME --发起人名称
+	  ,REQUEST_DAY --启动时间
+	  ,GD_DAY --结束时间
+	  ,WORK_HS --耗时（工作时间：秒）
+	  ,ROUND(WORK_HS / 3600,2) AS WORK_HS_HOUR --耗时（工作时间：小时）
+	  ,AVG_WORK_HS --单个节点平均耗时
+	  ,HS_24HOUR --耗时24小时制（秒）
+	  ,REPLACE(CASE WHEN HS_24HOUR >= 86400 
+	                THEN TRUNC(HS_24HOUR/86400) || '天' || TRUNC(MOD(HS_24HOUR,86400)/3600) || '小时' || TRUNC(MOD(MOD(HS_24HOUR,86400),3600)/60) || '分钟'
+			        WHEN HS_24HOUR < 86400 AND HS_24HOUR >= 3600
+			        THEN '0天'||TRUNC(HS_24HOUR/3600) || '小时' || TRUNC(MOD(HS_24HOUR,3600)/60) || '分钟'
+			        WHEN HS_24HOUR < 3600
+			        THEN '0天0小时'||TRUNC(HS_24HOUR/60)||'分钟'
+			         END,'.0','') AS HS_24HOR_TIME --耗时24小时制
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间				 
+  FROM T1

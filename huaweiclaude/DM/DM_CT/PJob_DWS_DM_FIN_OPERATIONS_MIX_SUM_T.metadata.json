@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_FIN_OPERATIONS_MIX_SUM_T",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

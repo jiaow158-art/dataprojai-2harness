@@ -1,0 +1,21 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/10/24 14:58:53 GMT+08:00
+-- ******************************************************************** --
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE DM.DM_WM_STRATEGY_USER_WAREHOUSE_T PARTITION(STAT_MONTH)
+select 
+     t1.inv_location,  -- 库存地点
+     t1.material_num,  -- 物料编码
+     t1.batch_num,     -- 批次号
+     sum(t1.available_inventory_area) as available_inventory_area,  -- 可用库存面积
+     current_timestamp() as dw_last_update_date,  -- 数据同步时间
+     REPLACE(SUBSTRING(date '${PERIOD_ID_D}' + interval '-1' day,1,7),'-','') AS STAT_MONTH --月份
+from dm.DM_WM_ALL_TYPE_STOCK_T t1
+where t1.inv_location in('GCDZ','GCCA','GCPA','GCTA','GCSA','GCQA', 'GCSD','BJ','BJ01' )
+group by t1.inv_location,
+     	 t1.material_num,
+         t1.batch_num;

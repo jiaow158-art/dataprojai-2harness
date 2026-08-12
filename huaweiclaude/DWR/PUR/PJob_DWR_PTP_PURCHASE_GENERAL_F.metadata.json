@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_PTP_PURCHASE_GENERAL_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/PUR",
+    "description": "SAP采购一般数据表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrpur"
+}

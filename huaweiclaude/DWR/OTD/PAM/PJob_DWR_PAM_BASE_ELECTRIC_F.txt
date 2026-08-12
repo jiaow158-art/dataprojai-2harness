@@ -1,0 +1,396 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: chenzhiyong
+-- create time: 2024/05/30 15:19:21 GMT+08:00
+-- description:瓷砖各基地用电表
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- UPDATE FROM CHENZHIYONG 20240611 山西用电排除总表的逻辑
+-- UPDATE FROM CHENZHIYONG 20240611 优化用电没记录的情况
+-- UPDATE FROM CHENZHIYONG 20240612 新增江西用电逻辑
+-- UPDATE FROM CHENZHIYONG 20240618 修改重庆/山西取数逻辑
+-- UPDATE FROM CHENZHIYONG 20240620 湖南用电排除表号为（0~10）的数据
+-- UPDATE FROM CHENZHIYONG 20240621 清远用电替换表名及修改整体逻辑
+-- UPDATE FROM CHENZHIYONG 20240621 修改湖南用电排除表号为（0~9）的数据
+-- UPDATE FROM CHENZHIYONG 20240625 修改湖南用电is_public是否公用逻辑
+-- UPDATE FROM CHENZHIYONG 20240708 修改江西用电逻辑
+-- UPDATE FROM ZHZ 20240709 新增重庆原车间编码字段
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+-- 瓷砖各基地用电表
+---- 清远用电
+WITH QY_DP_ELECTRIC_METER_PROCESS_DATA as( -- 清远成本中心关系数据
+	SELECT site AS SITE_CODE,  
+	       work_shop AS WORK_SHOP_CODE,  
+	       product_line AS PRODUCT_LINE_CODE,  
+	       work_no_code,  
+	       cost_center AS COST_CENTER_CODE
+	FROM SDI.SDI_dp_electric_meter_process_1006  -- 电表与工序对照信息维护(1300/1500)
+	WHERE delete_flag = 1  
+	AND site = '1300'  
+	AND (cost_center LIKE '%MA%' OR cost_center LIKE '%MB%')  
+	GROUP BY site,  
+	    	 work_shop,  
+	    	 product_line,  
+	    	 work_no_code,  
+	    	 cost_center
+),
+QY_ELECTRICITY_RESULT_DATA AS( -- 清远用电结果数据
+	SELECT T1.dp_date AS START_DATE, -- 日期
+		   T1.site AS SITE_CODE, -- 基地编码
+		   T1.work_shop AS WORK_SHOP_CODE, -- 车间编码
+		   T1.product_line AS PRODUCT_LINE_CODE, -- 产线编码
+		   T1.work_no_code , -- 工序编码
+		   T2.COST_CENTER_CODE, -- 成本中心编码
+		   SUM(NVL(T1.electricity_number,0)) AS ELECTRICITY_QTY -- 用电量
+	FROM SDI.sdi_dp_split_process_electricity_1006 T1-- 表-工序平摊用电量
+	LEFT JOIN QY_DP_ELECTRIC_METER_PROCESS_DATA T2
+	ON T1.site = T2.SITE_CODE 
+	AND T1.work_shop = T2.WORK_SHOP_CODE 
+	AND T1.product_line  = T2.PRODUCT_LINE_CODE 
+	AND T1.work_no_code = T2.work_no_code 
+	WHERE T1.delete_flag = 1
+	AND T1.site = '1300'
+	AND T1.dp_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 3月前的1号开始，调度传昨天,格式是：YYYY-MM-DD
+	GROUP BY T1.dp_date, -- 日期
+		     T1.site, -- 基地编码
+		     T1.work_shop , -- 车间编码
+		     T1.product_line , -- 产线编码
+		     T1.work_no_code , -- 工序编码
+		     T2.COST_CENTER_CODE -- 成本中心编码
+),
+JX_ELECTRICITY_DIM_DATA AS(  -- 江西用电维度数据
+	SELECT T1.SITE,   
+		   T1.WORK_SHOP,   
+		   T1.PRODUCT_LINE,   
+		   T1.WORK_NO_CODE,
+		   T1.COST_CENTER
+	FROM(SELECT SITE,   
+				   WORK_SHOP,   
+				   PRODUCT_LINE,   
+				   WORK_NO_CODE,
+				   COST_CENTER,
+				   ROW_NUMBER() OVER(PARTITION BY SITE,WORK_SHOP,PRODUCT_LINE,WORK_NO_CODE ORDER BY COST_CENTER ASC) RN
+			FROM(SELECT SITE,   
+				   WORK_SHOP,   
+				   PRODUCT_LINE,   
+				   WORK_NO_CODE,
+				   COST_CENTER
+			FROM SDI.SDI_DJ_POWERCONSUMPTION_COSTCENTER_MAINTENANCE_1006 T
+			WHERE DELETE_FLAG = 1   
+			AND SITE = '1500'
+			GROUP BY  SITE,   
+					  WORK_SHOP,   
+					  PRODUCT_LINE,   
+					  WORK_NO_CODE,
+					  COST_CENTER 
+			) T
+		) T1
+		WHERE T1.RN = 1
+),
+JX_ELECTRICITY_RESULT_DATA AS( -- 江西用电结果数据
+	SELECT DSPE.DP_DATE AS START_DATE, -- 日期
+		   DSPE.SITE AS site_code, -- 基地编码
+		   DSPE.WORK_SHOP AS work_shop_code , -- 车间编码
+		   DSPE.PRODUCT_LINE AS product_line_code , -- 产线编码
+		   DSPE.WORK_NO_CODE AS work_no_code , -- 工序编码
+		   CC.COST_CENTER AS cost_center_code, -- 成本中心编码
+		   SUM(NVL(DSPE.ELECTRICITY_NUMBER,0)) AS ELECTRICITY_QTY -- 用电量 
+	FROM SDI.SDI_DP_SPLIT_PROCESS_ELECTRICITY_1006 DSPE
+	LEFT JOIN JX_ELECTRICITY_DIM_DATA CC 
+	ON	CC.SITE = DSPE.SITE
+	AND CC.WORK_SHOP = DSPE.WORK_SHOP
+	AND CC.PRODUCT_LINE = DSPE.PRODUCT_LINE
+	AND CC.WORK_NO_CODE = DSPE.WORK_NO_CODE
+	WHERE DSPE.DELETE_FLAG = 1
+	AND DSPE.SITE ='1500'
+	GROUP BY DSPE.SITE,
+			 DSPE.DP_DATE,
+			 DSPE.WORK_SHOP,
+			 DSPE.PRODUCT_LINE,
+			 DSPE.WORK_NO_CODE,
+			 CC.COST_CENTER
+),
+HN_ELECTRICITY_DATA AS(  -- 湖南用电数据
+	SELECT SUBSTRING(`DATE`,1,10) AS START_DATE, -- 日期
+		    SITE,  -- 基地编码
+		    WORK_SHOP, -- 车间编码
+		    PRODUCT_LINE, -- 产线编码
+		    WORK_NO_CODE, -- 工序编码
+		    COST_CENTER,  -- 成本中心编码
+		    SUM(NVL(TOTAL_ELECTRICITY_CONSUMPTION_QTY,0)) AS TOTAL_ELECTRICITY_CONSUMPTION_QTY -- 总用电量
+	FROM SDI.SDI_DH_ELECTRICITY_CONSUMPTION_RECORD_1006 T -- 用电记录
+	WHERE DELETE_FLAG = 1
+	AND SITE = '1600'
+	AND `DATE` <> ' '  -- 排除日期为空格的数据
+	AND form_no NOT IN (0,1,2,3,4,5,6,7,8,9) -- 表号 
+	AND is_public = '0' -- 是否公用
+	AND SUBSTRING(`DATE`,1,10) >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 3月前的1号开始，调度传昨天,格式是：YYYY-MM-DD
+	GROUP BY SUBSTRING(`DATE`,1,10), -- 日期
+		    SITE,  -- 基地编码
+		    WORK_SHOP, -- 车间编码
+		    PRODUCT_LINE, -- 产线编码
+		    WORK_NO_CODE, -- 工序编码
+		    COST_CENTER
+),
+HN_ELECTRICITY_SHARE_DATA AS( -- 湖南用电分摊数据
+	SELECT `DATE` AS START_DATE, -- 日期
+		   SITE, -- 基地编码
+		   WORK_SHOP, -- 车间编码
+		   COST_CENTER, -- 成本中心编码
+		   SUM(NVL(ELECTRICITY_NUMBER,0)) AS ELECTRICITY_NUMBER -- 用电量
+	FROM SDI.SDI_DH_PUBLIC_METER_1006 T  -- 公用电表分摊
+	WHERE DELETE_FLAG = 1
+	AND T.SITE = '1600'
+	AND `DATE` >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 3月前的1号开始，调度传昨天,格式是：YYYY-MM-DD
+	GROUP BY `DATE`, -- 日期
+			   SITE, -- 基地编码
+			   WORK_SHOP, -- 车间编码
+			   COST_CENTER
+),
+HN_ELECTRICITY_RESULT_DATA AS( -- 湖南用电结果数据
+	SELECT  T1.START_DATE, -- 日期
+		    T1.SITE AS SITE_CODE,  -- 基地编码
+		    T1.WORK_SHOP AS WORK_SHOP_CODE, -- 车间编码
+		    T1.PRODUCT_LINE AS PRODUCT_LINE_CODE, -- 产线编码
+		    T1.WORK_NO_CODE, -- 工序编码
+		    T1.COST_CENTER AS COST_CENTER_CODE,  -- 成本中心编码
+		    T1.TOTAL_ELECTRICITY_CONSUMPTION_QTY + NVL(T2.ELECTRICITY_NUMBER,0) AS ELECTRICITY_QTY -- 用电量
+	FROM HN_electricity_DATA T1
+	LEFT JOIN HN_electricity_share_DATA T2
+	ON T1.START_DATE = T2.START_DATE
+	AND T1.SITE = T2.SITE
+	AND T1.WORK_SHOP = T2.WORK_SHOP
+	AND T1.COST_CENTER = T2.COST_CENTER
+),
+CQ_ELECTRICITY_DATA AS(  -- 重庆用电数据
+	SELECT shift_date AS START_DATE, --日期
+		   site AS SITE_CODE, -- 基地编码
+		   work_shop AS work_shop_CODE, -- 车间编码
+		   cost_center AS COST_CENTER_CODE, -- 成本中心编码
+		   SUM(NVL(total,0) * NVL(shared_proportion,0)) AS CQ_electricity_QTY -- 用电量
+	FROM SDI.SDI_d_electricity_consumption_records_1006 --用电记录
+	WHERE delete_flag = 1
+	AND site = '1800'
+	AND shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 3月前的1号开始，调度传昨天,格式是：YYYY-MM-DD
+	GROUP BY shift_date,
+			 site,
+			 work_shop,
+			 cost_center
+),
+CQ_ELECTRICITY_DETAIL_DATA AS(  -- 重庆用电明细数据
+	SELECT START_DATE, -- 日期
+		   SITE_CODE, -- 基地编码
+		   work_shop_CODE, -- 车间编码
+		   COST_CENTER_CODE, -- 成本中心编码
+		   CQ_total_electricity_QTY - CQ_COST_CENTER_TOTAL_electricity_QTY AS CQ_CY_electricity_QTY, --  差异数 :总表电量 - 成本中心总用电量
+	       CQ_electricity_QTY * ( 1 + ((CQ_total_electricity_QTY - CQ_COST_CENTER_TOTAL_electricity_QTY ) / CQ_COST_CENTER_TOTAL_electricity_QTY)) AS CQ_SHARE_electricity_QTY -- 用电汇总*（1+差异数/成本中心总用电量）
+	from(
+		SELECT START_DATE,
+			   SITE_CODE,
+			   work_shop_CODE,
+			   COST_CENTER_CODE,
+			   sum(CQ_electricity_QTY) OVER(PARTITION BY START_DATE,SITE_CODE,COST_CENTER_CODE) AS CQ_electricity_QTY, -- 用电汇总
+			   SUM(CASE WHEN work_shop_CODE IN('ZB','DYB') THEN CQ_electricity_QTY ELSE 0 END) 
+			       OVER(PARTITION BY START_DATE,SITE_CODE) AS CQ_total_electricity_QTY, --  总表电量
+			   SUM(CASE WHEN work_shop_CODE NOT IN('ZB','DYB') THEN CQ_electricity_QTY ELSE 0 END) 
+			       OVER(PARTITION BY START_DATE,SITE_CODE,COST_CENTER_CODE) AS CQ_COST_CENTER_electricity_QTY, --  成本中心用电量
+			   SUM(CASE WHEN work_shop_CODE NOT IN('ZB','DYB') THEN CQ_electricity_QTY ELSE 0 END) 
+			       OVER(PARTITION BY START_DATE,SITE_CODE) AS CQ_COST_CENTER_TOTAL_electricity_QTY, --  成本中心总用电量
+			   ROW_NUMBER() OVER(PARTITION BY START_DATE,SITE_CODE,COST_CENTER_CODE ORDER BY work_shop_code ASC) RN --  车间不一致，随机取一条
+		FROM CQ_ELECTRICITY_DATA --重庆用电数据
+		) t
+		WHERE RN = 1
+),
+CQ_ELECTRICITY_RESULT_DATA AS( -- 重庆用电结果数据
+	SELECT T1.START_DATE, -- 日期
+		   T1.SITE_CODE, -- 基地编码
+		   T2.work_shop AS WORK_SHOP_CODE, -- 车间编码
+		   T2.PRODUCT_LINE AS PRODUCT_LINE_CODE, -- 产线编码
+		   T2.WORK_NO_CODE, -- 工序编码
+		   T1.COST_CENTER_CODE, -- 成本中心编码
+		   T1.CQ_SHARE_ELECTRICITY_QTY AS ELECTRICITY_QTY ,-- 用电量
+		   T1.WORK_SHOP_CODE AS S_WORK_SHOP_CODE --源表车间编码
+	FROM CQ_ELECTRICITY_DETAIL_DATA T1 -- 重庆用电明细数据
+	LEFT JOIN SDI.SDI_DJ_POWERCONSUMPTION_COSTCENTER_MAINTENANCE_1006 T2 -- 用电与成本中心维护表
+	ON T1.SITE_CODE = T2.SITE
+	AND T1.COST_CENTER_CODE = T2.COST_CENTER
+	AND T2.DELETE_FLAG = 1
+	AND T2.SITE = '1800'
+	WHERE T1.work_shop_code NOT IN ('ZB','DYB') -- 排除 ZB/DYB
+),
+SX_ELECTRICITY_DATA AS(  -- 山西用电数据
+	SELECT shift_date AS METER_READING_DATE, -- 抄表日期
+		   SITE , -- 基地编码
+		   METER_CODE, -- 电表代码
+		   SUM(NVL(ACTUAL_ELECTRICITY,0)) AS ACTUAL_ELECTRICITY, -- 当天实际用电量
+		   SUM(NVL(CURRENT_DAY_APPORTIONMENT,0)) AS CURRENT_DAY_APPORTIONMENT, -- 当日分摊量
+		   SUM(NVL(ACTUAL_ELECTRICITY,0) + NVL(CURRENT_DAY_APPORTIONMENT,0)) AS ELECTRICITY_QTY -- 用电量
+	FROM SDI.SDI_DS_ELECTRICITY_RECORD_1006 -- 用电记录
+	WHERE DELETE_FLAG = 1
+	AND SITE = '1900'
+	AND (METER_CODE <> '68' OR meter_name NOT LIKE '%总表%') -- 排除总表的数据
+	AND shift_date >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 3月前的1号开始，调度传昨天,格式是：YYYY-MM-DD
+	GROUP BY shift_date, -- 抄表日期
+		     SITE ,
+		     METER_CODE -- 电表代码
+),
+SX_ELECTRICITY_RESULT_DATA AS(  -- 山西用电结果数据
+	SELECT T1.METER_READING_DATE AS START_DATE, -- 抄表日期
+		   T1.SITE AS SITE_CODE,   -- 基地编码
+		   T2.WORK_SHOP AS WORK_SHOP_CODE,  -- 车间编码
+		   T2.PRODUCT_LINE AS PRODUCT_LINE_CODE, -- 产线编码
+		   T2.WORK_NO_CODE, -- 工序编码
+		   T2.COST_CENTER AS COST_CENTER_CODE, -- 成本中心编码
+		   SUM(T1.ELECTRICITY_QTY) AS  ELECTRICITY_QTY-- 用电量
+	FROM SX_ELECTRICITY_DATA T1  -- 山西用单数据
+	LEFT JOIN SDI.SDI_DH_METER_INFO_1006 T2 -- 电表信息维护表
+	ON T1.SITE = T2.SITE
+	AND T1.METER_CODE = T2.ELECTRIC_METER_CODE
+	AND T2.DELETE_FLAG = 1
+	AND T2.SITE = '1900'
+	GROUP BY T1.METER_READING_DATE, -- 抄表日期
+		     T1.SITE,   -- 基地编码
+		     T2.WORK_SHOP,  -- 车间编码
+		     T2.PRODUCT_LINE, -- 产线编码
+		     T2.WORK_NO_CODE, -- 工序编码
+		     T2.COST_CENTER -- 成本中心编码
+), 
+ELECTRICITY_RESULT_DATA AS( -- 用电结果数据
+	SELECT START_DATE,
+		   SITE_CODE,
+		   WORK_SHOP_CODE,
+		   PRODUCT_LINE_CODE,
+		   WORK_NO_CODE,
+		   COST_CENTER_CODE,
+		   ELECTRICITY_QTY,
+		   WORK_SHOP_CODE as S_WORK_SHOP_CODE 
+	FROM QY_ELECTRICITY_RESULT_DATA -- 清远用电结果数据
+	UNION ALL
+	SELECT START_DATE, -- 日期
+	       SITE_CODE, -- 基地编码
+	       WORK_SHOP_CODE , -- 车间编码
+	       PRODUCT_LINE_CODE , -- 产线编码
+	       WORK_NO_CODE , -- 工序编码
+	       COST_CENTER_CODE, -- 成本中心编码
+	       ELECTRICITY_QTY, -- 用电量 
+	       WORK_SHOP_CODE as S_WORK_SHOP_CODE
+	FROM JX_ELECTRICITY_RESULT_DATA  -- 江西用电结果数据
+	UNION ALL
+	SELECT START_DATE,
+		   SITE_CODE,
+		   WORK_SHOP_CODE,
+		   PRODUCT_LINE_CODE,
+		   WORK_NO_CODE,
+		   COST_CENTER_CODE,
+		   ELECTRICITY_QTY,
+		   WORK_SHOP_CODE as S_WORK_SHOP_CODE
+	FROM HN_ELECTRICITY_RESULT_DATA -- 湖南用电分摊数据
+	UNION ALL
+	SELECT START_DATE,
+		   SITE_CODE,
+		   WORK_SHOP_CODE,
+		   PRODUCT_LINE_CODE,
+		   WORK_NO_CODE,
+		   COST_CENTER_CODE,
+		   ELECTRICITY_QTY,
+		   S_WORK_SHOP_CODE
+	FROM CQ_ELECTRICITY_RESULT_DATA -- 重庆用电结果数据
+	UNION ALL
+	SELECT START_DATE,
+		   SITE_CODE,
+		   WORK_SHOP_CODE,
+		   PRODUCT_LINE_CODE,
+		   WORK_NO_CODE,
+		   COST_CENTER_CODE,
+		   ELECTRICITY_QTY,
+		   WORK_SHOP_CODE as S_WORK_SHOP_CODE
+	FROM SX_ELECTRICITY_RESULT_DATA  -- 山西用电结果数据
+),
+dim_date as (    -- 日期维度,发散维度用
+	select day_dt 
+	     from dm.dm_dim_date_d 
+	  where day_dt <=SUBSTR('${PERIOD_ID_D}',1,10) 
+	    and day_dt >=  CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01') -- 前3月，调度传昨天,格式：YYYY-MM-DD 
+),
+ACTICAL_DETAIL_DATA AS( -- 实际数据
+	SELECT SUBSTRING(START_DATE,1,7) as period_id_m,
+		   START_date,
+		   site_code,
+		   work_shop_code,
+		   product_line_code,
+		   work_no_code,
+		   cost_center_code,
+		   S_WORK_SHOP_CODE,
+		   SUM(ELECTRICITY_QTY) AS ELECTRICITY_QTY
+	FROM ELECTRICITY_RESULT_DATA T 
+	WHERE START_DATE >= CONCAT(SUBSTRING(ADD_MONTHS('${PERIOD_ID_D}',-2),1,7),'-01')
+	GROUP BY SUBSTRING(START_DATE,1,7),
+			 START_date,
+			 site_code,
+			 work_shop_code,
+			 product_line_code,
+			 work_no_code,
+			 cost_center_code,
+			 S_WORK_SHOP_CODE
+),
+ACTICAL_DETAIL_DIM_DATA AS( -- 维度数据
+	SELECT period_id_m,
+		   site_code,
+		   work_shop_code,
+		   product_line_code,
+		   work_no_code,
+		   cost_center_code,
+		   S_WORK_SHOP_CODE
+	FROM ACTICAL_DETAIL_DATA
+	GROUP BY period_id_m,
+			 site_code,
+			 work_shop_code,
+			 product_line_code,
+			 work_no_code,
+			 cost_center_code,
+			 S_WORK_SHOP_CODE
+),
+result_data as(
+	SELECT t1.day_dt AS start_date,
+		   t2.period_id_m ,
+		   t2.site_code ,
+		   t2.work_shop_code,
+		   t2.product_line_code ,
+		   t2.work_no_code ,
+		   t2.cost_center_code ,
+		   t2.S_WORK_SHOP_CODE,
+		   nvl(t3.ELECTRICITY_QTY,0) AS ELECTRICITY_QTY
+	FROM dim_date T1
+	LEFT JOIN ACTICAL_DETAIL_DIM_DATA t2
+	ON SUBSTRING(T1.day_dt,1,7) = T2.period_id_m  -- 按月发散
+	LEFT JOIN ACTICAL_DETAIL_DATA t3
+	ON t1.day_dt = t3.START_date
+	AND t2.period_id_m = t3.period_id_m
+	AND t2.site_code = t3.site_code
+	AND t2.work_shop_code = t3.work_shop_code
+	AND t2.product_line_code = t3.product_line_code
+	AND t2.work_no_code = t3.work_no_code
+	AND t2.cost_center_code = t3.cost_center_code
+)
+INSERT OVERWRITE TABLE DWROTD.DWR_PAM_BASE_ELECTRIC_F PARTITION(PERIOD_ID_M)
+SELECT NVL(PERIOD_ID_M,SUBSTRING(START_DATE,1,7)) AS START_MONTH, -- 月份
+	   START_DATE, -- 日期
+	   SITE_CODE, -- 基地编码
+	   WORK_SHOP_CODE, -- 车间编码
+	   PRODUCT_LINE_CODE, -- 产线编码
+	   WORK_NO_CODE, -- 工序编码
+	   COST_CENTER_CODE, -- 成本中心编码
+	   ELECTRICITY_QTY, -- 用电量
+	   'N' AS DEL_FLAG , -- 删除数据标识
+	   CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE,  -- 同步数据时间
+	   S_WORK_SHOP_CODE, --源车间编码 
+	   NVL(PERIOD_ID_M,SUBSTRING(START_DATE,1,7)) AS PERIOD_ID_M -- 分区月
+FROM result_data;

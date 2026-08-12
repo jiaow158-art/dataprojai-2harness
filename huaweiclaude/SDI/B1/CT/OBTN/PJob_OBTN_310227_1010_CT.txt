@@ -1,0 +1,96 @@
+--SQL性能优化设置
+			set hive.cbo.enable=true;
+			set hive.mapjoin.smalltable.filesize=100000000;
+			set hive.auto.convert.join.noconditionaltask.size=200000000;
+			set hive.mapred.local.mem=4096;
+			INSERT OVERWRITE TABLE SDI.SDI_CT_OBTN_1010 partition(custcode ='310227')
+			SELECT
+			 	ItemCode,
+				SysNumber,
+				DistNumber,
+				MnfSerial,
+				LotNumber,
+				ExpDate,
+				MnfDate,
+				InDate,
+				GrntStart,
+				GrntExp,
+				CreateDate,
+				Location,
+				Status,
+				Notes,
+				DataSource,
+				UserSign,
+				Transfered,
+				Instance,
+				AbsEntry,
+				ObjType,
+				itemName,
+				LogInstanc,
+				UserSign2,
+				UpdateDate,
+				CostTotal,
+				Quantity,
+				QuantOut,
+				PriceDiff,
+				Balance,
+				TrackingNt,
+				TrackiNtLn,
+				SumDec,
+				U_Length,
+				U_Width,
+				U_Height,
+				U_Weight
+				,'310227' AS CUST_CODE
+,'N' AS DEL_FLAG
+, current_timestamp() as DW_LAST_UPDATE_DATE 
+,'' AS u_packun
+ FROM STG.STG_OBTN_310227_1010_CT 
+  UNION ALL
+			SELECT
+				T1.ItemCode,
+				T1.SysNumber,
+				T1.DistNumber,
+				T1.MnfSerial,
+				T1.LotNumber,
+				T1.ExpDate,
+				T1.MnfDate,
+				T1.InDate,
+				T1.GrntStart,
+				T1.GrntExp,
+				T1.CreateDate,
+				T1.Location,
+				T1.Status,
+				T1.Notes,
+				T1.DataSource,
+				T1.UserSign,
+				T1.Transfered,
+				T1.Instance,
+				T1.AbsEntry,
+				T1.ObjType,
+				T1.itemName,
+				T1.LogInstanc,
+				T1.UserSign2,
+				T1.UpdateDate,
+				T1.CostTotal,
+				T1.Quantity,
+				T1.QuantOut,
+				T1.PriceDiff,
+				T1.Balance,
+				T1.TrackingNt,
+				T1.TrackiNtLn,
+				T1.SumDec,
+				T1.U_Length,
+				T1.U_Width,
+				T1.U_Height,
+				T1.U_Weight,
+				T1.CUST_CODE,
+				T1.DEL_FLAG,
+				T1.DW_LAST_UPDATE_DATE
+				,T1.u_packun
+			FROM SDI.SDI_CT_OBTN_1010 T1
+            LEFT JOIN STG.STG_OBTN_310227_1010_CT T2
+			ON T1.AbsEntry = T2.AbsEntry
+			WHERE custcode ='310227'
+AND T1.DEL_FLAG = 'N'
+AND T2.AbsEntry IS NULL;

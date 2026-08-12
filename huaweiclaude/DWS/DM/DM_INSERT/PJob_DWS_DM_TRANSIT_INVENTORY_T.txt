@@ -1,0 +1,93 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- desc: 在途库存
+-- create time: 2022/10/24 10:03:55 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_TRANSIT_INVENTORY_T
+WHERE stat_month >= 
+CASE WHEN SUBSTR(CURRENT_DATE,9,2) = '05'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END;
+insert into dm.dm_transit_inventory_t
+with mat as (
+select b.material_num,b.bathroom_channal as product_channal,b.matl_group_code,b.product_level_code,c.matl_group2_code,
+bath_category_name as category_name
+from  dwimd.dwi_md_data_material_general_t as b 
+left join (select t.material_num,max(t.matl_group2_code) as matl_group2_code from dwimd.dwi_md_data_material_sales_t as t group by t.material_num ) c on b.material_num = c.material_num
+left join upload.upload_wm_sw_sap_prod_grp_t as k on b.product_level3_code = k.prod_code3 
+where bath_category_name <> '配件'
+),
+ZT_PUR as (--在途采购单
+	select 
+	 t."month_id" as stat_month
+	,A.material_num 
+	,sum(case when A.RETURN_ITEM_FLAG = 'X' then - A.purchase_order_qty  else A.purchase_order_qty end) as purchase_order_qty
+	,sum(case when A.RETURN_ITEM_FLAG = 'X' then - A.po_currency_networth else A.po_currency_networth end) as po_currency_networth
+	from DWRPUR.DWR_PTP_PURCHASE_VCH_ITEM_F A
+	join DWRPUR.DWR_PTP_PURCHASE_VCH_HEADER_F B on A.purchase_voucher_num = B.purchase_voucher_num 
+	join (select "month_id" from dm.dm_dim_date_d  where "month_id" <= substr(sysdate,1,4) || substr(sysdate,6,2) group by "month_id") as t on 1=1 
+	where B.purchase_voucher_type in ('NB','ZNB2','ZNB1') and B.purchase_group in ('A14','A15')
+	and material_num <> 'SNULL' and A.purchase_vch_flag is null and supplier_or_creditor_num  <> '0001001511'  --稳畅属于内部
+	and factory_code in ('3320','3603','3620','3820') --and delivery_flag is null  --交货已完成 
+	and SUBSTR(replace(B.record_create_date,'-',''),1,6) <= t."month_id"  and A.po_currency_networth <> 0 --排除存在金额但数量不为0的寄售订单
+	group by  A.material_num,t."month_id" 
+),
+ZT_BEL as (--入库物料凭证
+	select 
+	 t."month_id" as stat_month
+	,A.material_num
+	,sum(case when A.MOVE_TYPE in ('101','911','162','123') then A.QUANTITY2 
+		  when A.MOVE_TYPE in ('102','912','161','122') then -A.QUANTITY2 
+		  else 0 end) as QUANTITY
+	,sum(case when A.MOVE_TYPE in ('101','911','162','123') then A.BASIC_CURRENCY_AMT 
+		  when A.MOVE_TYPE in ('102','912','161','122') then -A.BASIC_CURRENCY_AMT 
+		  else 0 end ) as BASIC_CURRENCY_AMT    
+	from DWRPUR.DWR_PTP_PURCHASE_RECEIPT_REL_V A
+	join DWRPUR.DWR_PTP_PURCHASE_VCH_HEADER_F B on A.purchase_voucher_num = B.purchase_voucher_num 
+	join (select "month_id" from dm.dm_dim_date_d  where "month_id" <= substr(sysdate,1,4) || substr(sysdate,6,2) group by "month_id") as t on 1=1 
+	where B.purchase_voucher_type in ('NB','ZNB2','ZNB1') and B.purchase_group in ('A14','A15')
+	and material_num <> 'SNULL' and A.purchase_vch_flag is null and supplier_or_creditor_num  <> '0001001511'  --稳畅属于内部
+	and factory_code in ('3320','3603','3620','3820') --and delivery_flag is null --交货已完成
+	and SUBSTR(replace(A.VOUCHER_POST_DATE,'-',''),1,6) <= t."month_id" and A.po_currency_networth <> 0
+	group by A.material_num,t."month_id"
+)
+,zt as (
+	select
+	z.stat_month 
+	,z.material_num 
+	,(coalesce(z.purchase_order_qty,0)-coalesce(t.QUANTITY,0)) as 在途数量
+	,(coalesce(z.po_currency_networth,0) - coalesce(t.BASIC_CURRENCY_AMT,0))/10000 as 在途金额	  
+	from ZT_PUR as z 
+	left join ZT_BEL t on z.material_num = t.material_num and z.stat_month = t.stat_month
+	where  z.stat_month >= '202202'  
+),
+zt1 as (
+select coalesce (a.material_num,b.material_num) as material_num
+--,m.category_name as 品类
+,coalesce (a.stat_month,b.stat_month) as stat_month
+,coalesce (a.transit_num ,b.在途数量) as transit_num
+,coalesce (a.transit_amount/10000 ,b.在途金额) as transit_amount
+from upload.upload_in_transit_stock a 
+full outer join zt b on a.stat_month = b.stat_month and a.material_num = b.material_num
+left join mat m on a.material_num = m.material_num
+
+)
+select 
+a.material_num
+,a.stat_month
+,m.category_name
+,m.product_channal
+,a.transit_num
+,a.transit_amount
+,case when m.matl_group2_code = 'J10' then 'X' else '' end as is_risk
+,current_timestamp as last_update_date
+from zt1 a
+left join mat m on a.material_num = m.material_num
+where 1=1 and a.transit_num > 0--and m.category_name is not null 
+AND stat_month >= 
+CASE WHEN SUBSTR(CURRENT_DATE,9,2) = '05'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END

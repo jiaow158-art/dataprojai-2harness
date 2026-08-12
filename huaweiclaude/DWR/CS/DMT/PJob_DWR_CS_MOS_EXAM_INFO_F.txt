@@ -1,0 +1,69 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2025/06/11 09:50:55 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRCS.DWR_CS_MOS_EXAM_INFO_F
+SELECT  A.ID --ID
+       ,A.CREATER_ID AS CREATE_EMP_ID --创建人ID
+       ,A.CREATER_NAME AS CREATE_EMP_NAME --创建人名称
+       ,A.CREATE_TIME --创建时间
+       ,A.MODIFIER_ID AS UPDATE_EMP_ID --修改人ID
+       ,A.MODIFIER_NAME AS UPDATE_EMP_NAME --修改人名称
+       ,A.MODIFY_TIME AS UPDATE_TIME --修改时间
+       ,A.VERSION AS VERS_NUM --数据版本号
+       ,A.EXAMINE_NO AS EXAM_NUM --审核编码
+       ,A.EDIT_CLIENT_ID AS EDIT_CUST_ID --编辑的客户ID
+       ,A.EDIT_CLIENT_NAME AS EDIT_CUST_NAME --编辑的姓名	   
+       ,A.EDIT_INTENTION_ORDER_ID AS EDIT_ORDER_ID --编辑的意向订单ID
+       ,A.EDIT_STORE_ID AS EDIT_STR_ID --编辑的门店ID
+       ,A.EDIT_STORE_NAME AS EDIT_STR_NAME --编辑的门店名
+       ,A.EDIT_EMPLOYEE_ID AS EDIT_EMP_ID --编辑的跟进员工ID
+       ,A.EDIT_EMPLOYEE_NAME AS EDIT_EMP_NAME --编辑的跟进员工名
+       ,A.EDIT_DEALER_ID --编辑的经销商ID
+       ,A.EDIT_DEALER_NAME --编辑的经销商
+       ,A.PASS_CLIENT_ID AS PASS_CUST_ID --通过后的客户ID
+       ,A.PASS_INTENTION_ORDER_ID AS PASS_ORDER_ID --通过后的意向订单ID
+       ,A.EDIT_PHONE AS EDIT_PHONE_NUM --编辑的手机
+       ,A.EDIT_ADDRESS AS EDIT_ADDR --编辑的地址
+       ,A.EDIT_STAGE_CODE --客户阶段编码
+       ,A.EDIT_STAGE_NAME --客户阶段描述
+       ,A.EDIT_SOURCE_ID AS CUST_SRC_ID --客户来源ID
+       ,B.NAME AS CUST_SRC_NAME --客户来源
+	   ,COALESCE(B.PARENT_ID,A.EDIT_SOURCE_ID) AS PARNT_CUST_SRC_ID --客户上级来源ID
+	   ,COALESCE(B.PARENT_NAME,B.NAME) AS PARNT_CUST_SRC_NAME --客户上级来源
+       ,A.FOLLOW_RULE_ID AS FOLOW_RULE_ID --报备设置ID
+       ,A.FOLLOW_RULE_DETAIL_ID AS FOLOW_RULE_DTL_ID --报备设置详情ID
+       ,A.FOLLOW_RULE_DETAIL_DAY_ID AS FOLOW_RULE_DTL_DAY_ID --报备天数设置ID
+       ,A.FOLLOW_RULE_DETAIL_AREA_DAY_ID AS FOLOW_RULE_DTL_AREA_DAY_ID --区域报备天数设置ID
+       ,A.`TYPE` AS EXAM_TYPE_CODE --冲突类型编码 1.报备审核 2.奖励审核,3没用，4冲突，5相似
+	   ,CASE WHEN A.`TYPE` = 1 THEN '报备审核'
+	         WHEN A.`TYPE` = 2 THEN '奖励审核'
+			 WHEN A.`TYPE` = 3 THEN '没用'
+			 WHEN A.`TYPE` = 4 THEN '冲突'
+			 WHEN A.`TYPE` = 5 THEN '相似'
+			  END AS EXAM_TYPE_NAME --冲突类型描述
+       ,A.TRIGGER_TIME AS TRIGR_TIME --触发时间
+       ,A.STATUS AS EXAM_ST_CODE --冲突状态编码 -1.已拒绝 0.待审核 1.审核通过
+	   ,CASE WHEN A.STATUS = -1 THEN '已拒绝'
+	         WHEN A.STATUS = 0 THEN '待审核'
+			 WHEN A.STATUS = 1 THEN '审核通过'
+			  END AS EXAM_ST_NAME --冲突状态描述
+       ,A.EXAMINATION_EMPLOYEE_ID AS APPR_EMP_ID --审核员工ID
+       ,A.EXAMINATION_TIME AS APPR_TIME --审核时间
+       ,A.EXAMINATION_DURATION AS APPR_DUR --审核时长，单位小时
+       ,COALESCE(A.REWARD_AMOUNT,0) AS RWARD_AMT --奖励金额
+       ,A.REJECT_REASON AS REJ_RSN --审核不通过原因
+       ,A.REMARK --备注
+       ,CAST(A.AUTO_EXAMINE_FLAG AS STRING) AS IS_AUTO_APPR_CODE --是否自动审核编码
+	   ,CASE WHEN CAST(A.AUTO_EXAMINE_FLAG AS STRING) = 'TRUE' THEN '是'
+	         WHEN CAST(A.AUTO_EXAMINE_FLAG AS STRING) = 'FALSE' THEN '否'
+			 ELSE '否'
+			  END AS IS_AUTO_APPR_NAME --是否自动审核描述
+       ,A.CONFLICT_TIP_LOG_ID AS TIP_LOG_ID --提示记录ID，用来拿参数
+       ,A.CONFLICT_TIP_LOG_CODE AS TIP_LOG_CODE --提示记录编码，方便报表联查
+       ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_SAL_CLIENT_FOLLOW_EXAMINATION_1012 A
+  LEFT JOIN SDI.SDI_SAL_CLIENT_SOURCE_INFO_1012 B
+    ON A.EDIT_SOURCE_ID = B.ID
+ WHERE CAST(A.DELETE_FLAG AS STRING) = 'FALSE'

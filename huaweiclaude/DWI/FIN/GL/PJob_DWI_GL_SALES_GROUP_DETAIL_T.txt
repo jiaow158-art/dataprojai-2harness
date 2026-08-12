@@ -1,0 +1,41 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/06 10:27:57 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWIFIN.DWI_GL_SALES_GROUP_DETAIL_T
+SELECT a.`SALES_GRP` AS sales_group_code, -- 销售组编码 
+	   b.txtsh AS sales_group_name,  -- 销售组名称
+       a.`/BIC/ZDPSYB` AS utilities_dept_code, -- 事业部编码 
+       c.`TXTSH` AS utilities_dept_name, -- 事业部名称
+       a.`/BIC/ZDPXT` AS system_code, -- 系统编码 
+       d.`TXTSH` AS system_name,  -- 系统名称
+       a.`/BIC/ZDPZGSDQ` AS subcompany_big_area_code, -- 子公司大区编码
+       e.`TXTSH` AS subcompany_big_area_name,  -- 子公司大区名称
+       a.`SALES_OFF` AS sales_dept_code, -- 销售部门编码 
+       f.`TXTSH` AS sales_dept_name, --销售部门名称
+       a.`OBJVERS` AS object_versions, -- 对象版本 
+       a.`CHANGED` AS update_flag, -- 更改标志(I 已插入/ D 已删除)
+       a.`CO_AREA` AS cost_control_field,  -- 成本控制域
+       a.`/BIC/ZAMB_INCO` AS sales_group_in_cost,  -- 阿米巴销售组收入成本中心
+       a.`/BIC/ZAMB_ACSR` AS revenue_account, -- 阿米巴收入科目
+       a.`/BIC/ZAMB_ACCB` AS cost_account,  -- 阿米巴成本科目
+       a.`/BIC/ZAMB_CELL` AS accounting_unit,  -- 阿米巴核算单元
+       a.`/BIC/ZDPJT` AS group_num,  -- 集团
+       current_timestamp() as dw_last_update_date -- 数据同步时间
+   FROM SDI.SDI_PSALES_GRP_1009 a
+   LEFT JOIN SDI.SDI_tsales_grp_1009 b 
+   ON a.`SALES_GRP` = b.sales_grp 
+   AND b.langu = '1'
+   AND b.del_flag = 'N'
+   LEFT JOIN SDI.SDI_bic_tzdpsyb_1009 c 
+   ON a.`/BIC/ZDPSYB` = c.`/BIC/ZDPSYB`
+   LEFT JOIN SDI.SDI_bic_tzdpxt_1009 d 
+   ON a.`/BIC/ZDPXT` = d.`/BIC/ZDPXT`
+   LEFT JOIN SDI.SDI_bic_tzdpzgsdq_1009 e
+   ON a.`/BIC/ZDPZGSDQ` = e.`/BIC/ZDPZGSDQ`
+   LEFT JOIN SDI.SDI_tsales_off_1009 f 
+   ON a.`SALES_OFF` = f.`SALES_OFF`
+   AND f.`LANGU` = '1'
+   AND f.del_flag = 'N'
+   where a.del_flag = 'N';

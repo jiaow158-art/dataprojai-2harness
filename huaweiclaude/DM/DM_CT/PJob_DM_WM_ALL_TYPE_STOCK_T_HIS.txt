@@ -1,0 +1,98 @@
+-- HIVE SQL 
+-- ******************************************************************** --
+-- AUTHOR: chenzhiyong
+-- CREATE TIME: 2022/11/02 17:07:15 GMT+08:00
+-- ******************************************************************** --
+
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+INSERT OVERWRITE TABLE DM.DM_WM_ALL_TYPE_STOCK_T_HIS PARTITION (STAT_MONTH)
+SELECT
+  material_id , 
+  material_num , 
+  material_name , 
+  external_matl_group_code , 
+  matl_group_code , 
+  size_unit , 
+  length_1 , 
+  width , 
+  dimension , 
+  product_channel_code , 
+  product_channel_name , 
+  product_stage2 , 
+  brand_name , 
+  factory_werks_id , 
+  factory_werks_code , 
+  factory_werks_name , 
+  inv_location , 
+  batch_num , 
+  latest_voucher_post_date , 
+  earliest_voucher_post_date , 
+  sal_vch_num , 
+  sal_vch_item_num , 
+  wbs_element , 
+  cust_id , 
+  cust_num , 
+  cust_name , 
+  supplier_or_creditor_id , 
+  supplier_or_creditor_num , 
+  supplier_or_creditor_name , 
+  product_area_id , 
+  product_area_code , 
+  product_area_name , 
+  total_inventory_quantity , 
+  project_inventory_quantity , 
+  qc_inventory_quantity , 
+  frozen_inventory_quantity , 
+  reserve_inventory_quantity , 
+  prepar_inventory_quantity , 
+  available_inventory_quantity , 
+  total_inventory_area , 
+  project_inventory_area , 
+  qc_inventory_area , 
+  frozen_inventory_area , 
+  reserve_inventory_area , 
+  prepar_inventory_area , 
+  available_inventory_area , 
+  dw_last_update_date , 
+  product_level_code , 
+  promote_reason , 
+  matl_group1_code , 
+  matl_group1_name , 
+  matl_group2_code , 
+  matl_group2_name , 
+  matl_group3_code , 
+  matl_group3_name , 
+  matl_group4_code , 
+  matl_group4_name , 
+  matl_group5_code , 
+  matl_group5_name , 
+  product_level_code1 , 
+  product_level_code2 , 
+  product_level_code3 , 
+  product_level_code4 , 
+  product_level_code5 , 
+  product_level_code6 , 
+  suit_area , 
+  production_date , 
+  promote_reason_code , 
+  clearance_reason_code , 
+  clearance_reason , 
+  first_promote_date , 
+  inv_location_name , 
+  projectqc_inventory_quantity , 
+  profrozen_inventory_quantity , 
+  proreserve_inventory_quantity , 
+  proprepar_inventory_quantity , 
+  available_proinventory_quantity ,
+  all_stock_quantity,
+  ohter_stock_qty,
+  SUBSTRING(date_sub(current_date(),1),1,7) AS STAT_MONTH
+FROM DM.DM_WM_ALL_TYPE_STOCK_T;

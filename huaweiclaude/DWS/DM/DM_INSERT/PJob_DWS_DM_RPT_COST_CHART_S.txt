@@ -1,0 +1,113 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/25 11:40:49 GMT+08:00
+-- ******************************************************************** --
+delete from DM.DM_RPT_COST_CHART_S;
+with cost_data as (
+select 
+a.prod_code,
+a.material_name_cn, 
+a.factory , 
+a.factory_desc ,
+a.sales_org ,
+b."/BIC/ZWW010",
+a.prod_level2_code,
+a.prod_level2_name,
+a.prod_level3_code,
+a.prod_level3_name,
+a.sales_achievement,--销售业绩
+a.no_sto_sales_qty,-- 事业部-销售成本 
+a.sales_cost,-- 事业部-销售成本 
+a.sto_qty,-- STO数量 
+( a.no_sto_sales_qty + a.sto_qty ) as sum_num,-- 总数量 
+case when ( a.no_sto_sales_qty + a.sto_qty ) <> 0 then ( a.sales_cost / ( a.no_sto_sales_qty + a.sto_qty ) ) end  as unit_price,--单价
+c.shipment_cost_amt ,-- 2021年出货单价 
+( a.no_sto_sales_qty + a.sto_qty ) * c.shipment_cost_amt as sum_2122_price,-- 22年销售数*21年出货单价 
+a.sales_cost - ( a.no_sto_sales_qty + a.sto_qty ) * c.shipment_cost_amt as lever_price,-- 销售成本-22年结构成本 
+d.category_name ,
+case when left (a.factory,2) = '37' then '高明基地'
+	 when left (a.factory,2) = '32' then '江西基地'
+	 when left (a.factory,2) = '39' then '外协'
+	 when ( a.prod_code = '#' or a.prod_code is null ) and left (a.sales_org,2) = '32' then '江西基地'
+	 when ( a.prod_code = '#' or a.prod_code is null ) and left (a.sales_org,2) = '33' then '外协'
+	 when ( a.prod_code = '#' or a.prod_code is null ) and left (a.sales_org,2) = '35' then '江门陶瓷基地'
+	 when ( a.prod_code = '#' or a.prod_code is null ) and left (a.sales_org,2) = '36' then '佛山基地'
+	 when ( a.prod_code = '#' or a.prod_code is null ) and left (a.sales_org,2) = '37' then '高明基地'
+	 when b."/BIC/ZWW010" = '0J' then '江西基地'
+	 when b."/BIC/ZWW010" = '0E' then '外协'
+	 when b."/BIC/ZWW010" in ('0W','00')  and left (a.prod_level2_code,1) = '3'  then '佛山基地' --and left (a.factory,2) = '36' 
+	 when b."/BIC/ZWW010" = 'J1' then '淋浴房厂'
+	 when b."/BIC/ZWW010" = 'J2' then '江门水龙头厂'
+	 when b."/BIC/ZWW010" = 'J5' then '高明基地'
+	 when left (a.prod_level2_code,1) in ('3','4') and left (a.factory,1) <> '3' and b."/BIC/ZWW010" = '92' then '江门陶瓷基地'
+	 when a.prod_level2_code in('4012','4103')  and left (a.factory,2) = '35' then '江门水龙头厂'  --and b."/BIC/ZWW010" = '11'
+	 when a.prod_level2_code in('4014','4105','4108')  and left (a.factory,2) = '35' then '淋浴房厂'
+--	 when a.prod_level2_code = '4101' and b."/BIC/ZWW010" = 'DZ' then '高明基地'
+--	 when (a.prod_level2_code in ('4002','4101')  and left (a.factory,2) = '37' ) or 
+--	 ( b."/BIC/ZWW010" = 'DZ' and a.prod_level2_code = '4002') then '高明基地'
+	 when b."/BIC/ZWW010" in ( '92','11' ) and left (a.factory,2) = '36' then '佛山基地'
+	 when a.prod_level2_code not in ('4002','4101') and b."/BIC/ZWW010" = '00' and left (a.factory,2) = '36' then '佛山基地'
+	 when  a.prod_level2_code <> '4014' and left (a.factory,2) = '35' then '江门陶瓷基地'
+	 else '外协' 
+	 end as pro_area, 
+	 a.sales_group,--销售组
+	 a.sales_group_desc ,--销售组描述
+	 a.calendar_year_month, --年月
+	 e.category2_name ,--品类2-根据产品层次2匹配 
+	 e.category3_name, -- 品类3-根据产品层次2匹配 
+	 a.seller_to_party --客编
+from  dm.DM_RPT_BATHROOM_PRODSALES_S as a 
+left join dm.DM_RPT_BIC_PZBATCHMD_T  as b on a.prod_code = b."MATERIAL" and a.batch_code = b."/BIC/ZBATCHMD" 
+left join DM.DM_RPT_SHIPMENT_UNITPRICE_T as c on a.prod_code = c.material_num and c.year_t = left(a.calendar_year_month,4) -1  
+left join DM.DM_RPT_PROD_CATEGORY_T as d on a.prod_level3_code = d.prod_level3_code 
+left join dm.dm_rpt_parts_category_t as e on a.prod_level3_code = e.prod_level3_code 
+)
+  insert into DM.DM_RPT_COST_CHART_S  
+select 
+prod_code,
+material_name_cn, 
+factory , 
+factory_desc ,
+"/BIC/ZWW010" as ZWW010, 
+prod_level2_code,
+prod_level2_name,
+prod_level3_code,
+prod_level3_name,
+no_sto_sales_qty,-- 事业部-销售成本 
+sales_cost,-- 事业部-销售成本 
+sto_qty,-- STO数量 
+sum_num,-- 总数量 
+unit_price,--单价
+shipment_cost_amt ,-- 2021年出货单价 
+sum_2122_price,-- 22年销售数*21年出货单价 
+lever_price,-- 销售成本-22年结构成本 
+(case when category_name is null then 
+(case when pro_area = '高明基地' then '卫浴其它'  
+	 when pro_area = '佛山基地' then '陶瓷其它'
+     when pro_area = '江门陶瓷基地' then '陶瓷其它'
+     when pro_area = '江西基地' then '陶瓷其它'
+     when pro_area = '淋浴房厂' then '卫浴其它'
+     when pro_area = '鹏嘉' then '陶瓷其它'
+     when pro_area = '外协' then '陶瓷其它' else category_name end ) 
+     when ( category2_name is not null and category_name = '其他类' ) then category2_name 
+     else category_name end ) as category_name, --品类-根据产品层次2匹配  
+case when pro_area = '佛山基地' then '自产'
+     when pro_area = '高明基地' then '自产'
+     when pro_area = '江门陶瓷基地' then '自产'
+     when pro_area = '江西基地' then '自产'
+     when pro_area = '淋浴房厂' then '自产'
+     when pro_area = '鹏嘉' then '外协'
+     when pro_area = '江门水龙头厂' then '自产'
+     when pro_area = '外协' then '外协' end as ower_pro,-- 外协自产 
+	 pro_area,-- 产区 
+	 current_date,
+	 sales_group ,--销售组
+	 calendar_year_month ,--年月
+	 sales_group_desc, --销售组描述
+	 category2_name ,--品类2-根据产品层次2匹配 
+	 category3_name, -- 品类3-根据产品层次2匹配 
+	 sales_achievement,--销售业绩
+	 sales_org,
+	 seller_to_party as sales_cus--客编	
+ 	 from cost_data;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_SO_ZL_ORDER_ZJ_PRE_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

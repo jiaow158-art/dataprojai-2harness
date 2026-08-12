@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_NORTH_ZB29",
+    "type": "DWSSQL",
+    "directory": "/DM/DM_CT",
+    "description": "产成品库存周转次数（瓷砖事业部）ZB29",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

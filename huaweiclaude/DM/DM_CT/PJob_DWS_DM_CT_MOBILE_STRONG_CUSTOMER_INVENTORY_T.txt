@@ -1,0 +1,27 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- create time: 2023/09/05 15:38:34 GMT+08:00
+-- description:瓷砖移动端强商库存 dm.dm_ct_mobile_strong_customer_inventory_t
+-- history list:zhouhaochang
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+delete from dm.dm_ct_mobile_strong_customer_inventory_t
+where substr(stat_day, 1, 7) = substr(to_char('${PERIOD_D}'::date, 'yyyy-MM-dd'), 1, 7);
+INSERT into dm.dm_ct_mobile_strong_customer_inventory_t
+select day_dt,
+       customer_code,
+       sales_org_name,
+       sum(qm_qty * width * length_1 / 1000 / 1000),
+       sum(qm_amt),
+       current_timestamp
+from DM.DM_WM_INVENTORY_CT_T a
+         join (
+    select distinct "ACCOUNT_NUMBER", "NAME"
+    from dm.dm_rpt_zmaster_cus_t
+    where accnt_group8code = '01'
+    order by "ACCOUNT_NUMBER") b on a.customer_code = b."ACCOUNT_NUMBER"
+where substr(day_dt, 1, 7) = substr(to_char('${PERIOD_D}'::date, 'yyyy-MM-dd'), 1, 7)
+group by day_dt,
+       customer_code,
+       sales_org_name;

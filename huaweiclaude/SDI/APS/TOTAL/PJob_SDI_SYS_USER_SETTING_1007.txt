@@ -1,0 +1,17 @@
+insert overwrite table sdi.sdi_sys_user_setting_1007
+select 
+id,
+create_by,
+create_date,
+inv_org_id,
+is_phantom,
+key,
+source,
+sync_id,
+update_by,
+update_date,
+user_id,
+vaule,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_sys_user_setting_1007;

@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_QMS_CHG_ORDER_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/QMS",
+    "description": "变更单",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dm"
+}

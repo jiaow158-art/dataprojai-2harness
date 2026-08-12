@@ -1,0 +1,47 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004400
+-- create time: 2023/07/21 11:51:36 GMT+08:00
+-- desc:卫浴dp分销数库存数据齐套编码分摊比例
+-- ******************************************************************** --
+
+-- 业务背景：分销商库存用子项存储，无法区分齐套编码。所以根据最近3个月提货比例进行分摊
+--分摊规则：根据最近3个月各齐套编码占某一主柜的比例来进行分摊，本脚本用于计算分摊比例
+with tmp_data as(
+select   
+		T3.operation_center_code, 
+		T1.complete_code as material_num,
+		T1.material_num  as small_material_num, 
+		SUM(T1.actual_billed_qty) as material_qty
+FROM DM.DM_GL_OUT_INVOICE_T T1 
+join DWIMD.dwi_md_data_material_general_t T2
+on t1.material_num = t2.material_num
+join DM_SW.DM_SW_PREDICT_CUST_ORG T3 ON t1.cust_sal = T3.cust_num
+where t1.id_bom is not null
+and t2.product_level3_code = '4002001'  -- 主柜
+and t1.bill_date >= add_monthS(CAST('${PERIOD_ID_D}' AS STRING),-2) -- 最近3个月 
+and t1.bill_date <='${PERIOD_ID_D}'  
+group by T3.operation_center_code, 
+		T1.complete_code,
+		T1.material_num 
+having  SUM(T1.actual_billed_qty)>0
+)
+,
+tmp_data01 as(
+	select t.operation_center_code,t.material_num,t.small_material_num,t.material_qty,
+		   sum(material_qty) over(PARTITION by t.operation_center_code,t.small_material_num) as tot_material_qty
+	from tmp_data t
+),
+tmp_data02 as(
+	select t.operation_center_code,t.material_num,t.small_material_num,
+	       max(material_qty) as material_qty,
+	       max(tot_material_qty) as tot_material_qty,
+	       max(material_qty) / max(tot_material_qty) as material_ratio
+	from tmp_data01 t
+	group by t.operation_center_code,t.material_num,t.small_material_num
+)
+insert overwrite table DM_SW.DM_SW_PERDICT_BOM_RATIO
+select t1.*,
+       current_timestamp() as dw_last_update_date,
+       substr('${PERIOD_ID_D}',1,7) as stat_month
+from tmp_data02 t1;

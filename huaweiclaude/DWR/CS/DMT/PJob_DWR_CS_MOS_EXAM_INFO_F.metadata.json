@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWR_CS_MOS_EXAM_INFO_F",
+    "type": "HiveSQL",
+    "directory": "/DWR/CS/DMT",
+    "description": "客户报备审核",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

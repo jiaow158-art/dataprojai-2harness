@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_PTP_PURCHASE_TRANSIT_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_SW",
+    "description": "卫浴供应链采购在途",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

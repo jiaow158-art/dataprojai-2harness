@@ -1,0 +1,16 @@
+insert overwrite table sdi.sdi_bd_catalog_type_1007
+select 
+id,
+code,
+create_by,
+create_date,
+description,
+inv_org_id,
+is_phantom,
+name,
+sync_id,
+update_by,
+update_date,
+'N' AS DEL_FLAG,
+current_timestamp() as DW_LAST_UPDATE_DATE
+from stg.stg_bd_catalog_type_1007;

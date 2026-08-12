@@ -1,0 +1,46 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/09/05 15:39:17 GMT+08:00
+-- ******************************************************************** --
+WITH TMP_DATA01 AS
+(
+	SELECT T2.KUNNR,
+	       T2.BZIRK
+	FROM SDI.SDI_KNA1_1001 T1
+	JOIN SDI.SDI_KNVV_1001 T2
+	ON T1.MANDT = T2.MANDT 
+	AND T1.KUNNR = T2.KUNNR 
+	WHERE T1.AUFSD = ''
+	AND T1.LIFSD = ''
+	AND T1.FAKSD = ''
+	AND T2.AUFSD = ''
+	AND T2.LIFSD = ''
+	AND T2.FAKSD = ''
+	AND T1.del_flag = 'N'
+	AND T2.del_flag = 'N'
+	AND substring(T2.BZIRK,1,1) = 'S'
+	GROUP BY T2.KUNNR,
+			 T2.BZIRK
+),
+TMP_DATA02 AS(
+   SELECT BZIRK,
+   		  BZTXT AS BZIRK_NAME
+   FROM SDI.sdi_t171t_1001 
+   WHERE del_flag = 'N' 
+   AND spras = '1'
+),
+TMP_DATA03 AS(
+	SELECT T1.BZIRK AS OPERATION_CODE,  -- 营运中心编码
+	       T2.BZIRK_NAME AS OPERATION_NAME, -- 营运中心名称
+	       CASE WHEN SUBSTRING(T1.KUNNR,1,4) = '0000' THEN SUBSTRING(T1.KUNNR,5)
+	       ELSE T1.KUNNR
+	       END CUSTOMER_CODE, -- 客户编码
+	       CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 数据同步编码
+	FROM TMP_DATA01 T1
+	LEFT JOIN TMP_DATA02 T2
+	ON T1.BZIRK = T2.BZIRK
+)
+INSERT OVERWRITE TABLE DWIMD.DWI_MD_DATA_OPERATION_CUST_R
+SELECT T.*
+FROM TMP_DATA03 T;

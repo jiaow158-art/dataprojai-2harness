@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_PERFORMANCE_CHART_S",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

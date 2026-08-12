@@ -1,0 +1,170 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10002375
+-- create time: 2026/01/26 08:56:49 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+set tez.grouping.max-size=134217728;  -- 128MB（单位字节）
+-- 禁用自动MapJoin优化（针对混合类型JOIN）
+SET hive.auto.convert.join=false;
+SET hive.auto.convert.join.noconditionaltask=false;
+
+with TMP AS (
+select 
+ A.TEXT_NO AS INV_CODE  --发票代码
+,A.TAX_NO AS TAX_CODE   --税票号
+,A.KUNNR AS CUS_CODE    --客户编码
+,A.BUKRS AS COMP_CODE  --公司代码
+,A.VBELN AS BILL_INV_CODE   --SAP发票号码
+,B.acc_voucher_line_item_num AS  BILL_INV_ITEM_CODE--SAP发票号行项目
+,A.ZKPSQ AS BUS_SQ_CODE    --业务流水号
+,from_unixtime(unix_timestamp(A.DATE_D,'yyyyMMdd'),'yyyy-MM-dd') AS CREATE_DATE  --打印日期
+,from_unixtime(unix_timestamp(A.TIME_T ,'HHmmss'),'HH:mm:ss')  AS CREATE_TIME  --打印时间
+,A.TAX_TYPE AS TAX_TYPE --发票类型
+,A.NAME AS CREATER     --输入人
+,A.DEMO AS REMARK     --备注
+,'' AS PUR_NAME --购方名称
+,B.sale_voucher_num AS SALE_ORD_NUM-- 销售订单
+,B.reference_voucher_num AS REFER_NUM --提货单
+,B.material_num AS  MATERIAL_NUM  --物料编码
+,B.so_item_text  AS MATERIAL_NAME--物料描述
+,CASE WHEN A.STATUS_VF = 'F' THEN -B.actual_billed_qty ELSE B.actual_billed_qty END AS BILL_QTY -- 数量
+,B.sale_unit AS SALE_UNIT --单位
+,CASE WHEN A.STATUS_VF = 'F' AND B.bill_type IN ('ZT2','ZT4','ZTS2','ZTS4') THEN -nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) 
+      WHEN A.STATUS_VF = 'F' AND B.bill_type NOT IN ('ZT2','ZT4','ZTS2','ZTS4') THEN -(nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) - nvl(B.kwert_kurrf21,0))
+      WHEN A.STATUS_VF <> 'F' AND B.bill_type IN ('ZT2','ZT4','ZTS2','ZTS4') THEN nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) 
+      WHEN A.STATUS_VF <> 'F' AND B.bill_type NOT IN ('ZT2','ZT4','ZTS2','ZTS4') THEN (nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) - nvl(B.kwert_kurrf21,0))
+      ELSE 0 END AS NON_TAX_TOTAL_AMT --不含税总价
+,CASE WHEN A.STATUS_VF = 'F' THEN -nvl(B.doc_currency_tax,0) * nvl(B.fin_acc_post_rate,0) ELSE nvl(B.doc_currency_tax,0) * nvl(B.fin_acc_post_rate,0) END AS TAX_AMT --税额
+,CASE WHEN A.STATUS_VF = 'F' AND B.bill_type IN ('ZT2','ZT4','ZTS2','ZTS4') THEN -nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) 
+      WHEN A.STATUS_VF = 'F' AND B.bill_type NOT IN ('ZT2','ZT4','ZTS2','ZTS4') THEN -(nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) - nvl(B.kwert_kurrf21,0))
+      WHEN A.STATUS_VF <> 'F' AND B.bill_type IN ('ZT2','ZT4','ZTS2','ZTS4') THEN nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) 
+      WHEN A.STATUS_VF <> 'F' AND B.bill_type NOT IN ('ZT2','ZT4','ZTS2','ZTS4') THEN (nvl(B.issue_vc_net_worth_amt,0) * nvl(B.fin_acc_post_rate,0) - nvl(B.kwert_kurrf21,0))
+      ELSE 0 END + CASE WHEN A.STATUS_VF = 'F' THEN -nvl(B.doc_currency_tax,0) * nvl(B.fin_acc_post_rate,0) ELSE nvl(B.doc_currency_tax,0) * nvl(B.fin_acc_post_rate,0) END AS TOATL_AMT  --总价
+,B.currency_type AS CURR_CODE --货币
+,B.fin_acc_post_rate AS POST_RATE  --过账汇率
+,B.sale_area AS SALE_AREA --面积
+,'M2' AS AREA_UNIT -- 面积单位
+,B.batch_num AS BATCH_NUM --批次
+,B.sale_org_code AS SALE_ORG_CODE   --销售组织
+,B.factory_code AS FAC_CODE  --工厂
+,B.bill_date AS BILL_DATE --发票过账日期
+,B.wbs_element AS WBS_NUM  --项目号
+,'SAP' AS DATA_SOURCE -- 数据来源
+,A.STATUS_VF AS INV_STATUS  --发票状态
+,B.bill_type --发票类型
+,B.bill_type_desc --发票类型描述
+,B.cust_group --客户组
+,from_unixtime(unix_timestamp(A.DATE_D,'yyyyMMdd'),'yyyy-MM') as period_id_m
+from sdi.sdi_zinvoice4_1001 A 
+left join dwrfin.dwr_gl_invoice_conditional_f  B
+on A.VBELN = B.bill_voucher_num
+where A.STATUS_VF <> 'D' --and substr(A.DATE_D,1,6) between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}' 
+UNION ALL 
+select 
+ A.INVOICECODE AS INV_CODE  --发票代码
+,A.INVOICENO AS TAX_CODE   --税票号
+,A.KUNRG AS CUS_CODE    --客户编码
+,A.BUKRS AS COMP_CODE  --公司代码
+,B.VOUCHER AS BILL_INV_CODE   --SAP发票号码
+,B.GOODSITEM AS  BILL_INV_ITEM_CODE--SAP发票号行项目
+,A.ORIGINALSERIALNO AS BUS_SQ_CODE    --业务流水号
+,from_unixtime(unix_timestamp(B.ERDAT,'yyyyMMdd'),'yyyy-MM-dd') AS CREATE_DATE  --打印日期
+,from_unixtime(unix_timestamp(B.ERZET ,'HHmmss'),'HH:mm:ss') AS CREATE_TIME  --打印时间
+,A.INVOICETYPE AS TAX_TYPE --发票类型
+,A.DRAWER AS CREATER     --输入人
+,A.REMARKS AS REMARK     --备注
+,A.BUYERNAME AS PUR_NAME --购方名称
+,C.sale_voucher_num AS SALE_ORD_NUM-- 销售订单
+,C.reference_voucher_num AS REFER_NUM --提货单
+,B.GOODSNO AS  MATERIAL_NUM  --物料编码
+,B.GOODSNAME  AS MATERIAL_NAME--物料描述
+,B.GOODSQUANTITY AS BILL_QTY -- 数量
+,B.GOODSUNIT AS SALE_UNIT --单位
+,B.GOODSTOTALPRICE - B.GOODSTOTALTAX AS NON_TAX_TOTAL_AMT --不含税总价
+,B.GOODSTOTALTAX AS TAX_AMT --税额
+,B.GOODSTOTALPRICE AS TOATL_AMT  --总价
+,C.voucher_currency_code AS CURR_CODE --货币
+,C.fin_acc_post_rate AS POST_RATE  --过账汇率
+,C.sale_area AS SALE_AREA --面积
+,'M2' AS AREA_UNIT -- 面积单位
+,C.batch_num AS BATCH_NUM --批次
+,C.sale_org_code AS SALE_ORG_CODE   --销售组织
+,C.factory_code AS FAC_CODE  --工厂
+,C.bill_date AS BILL_DATE --发票过账日期
+,C.wbs_element AS WBS_NUM  --项目号
+,'OMS/OSS' AS DATA_SOURCE -- 数据来源
+,A.STATUS AS INV_STATUS  --发票状态
+,C.bill_type --发票类型
+,C.bill_type_desc --发票类型描述
+,C.cust_group --客户组
+,from_unixtime(unix_timestamp(B.ERDAT,'yyyyMMdd'),'yyyy-MM') as period_id_m
+from SDI.SDI_ZINV_HEADER_RES_1001 A 
+join sdi.sdi_zinv_list_result_1001 B
+on A.serialno = B.serialno 
+and A.INVOICEID = B.INVOICEID
+and A.INVOICEID_NN = B.INVOICEID_NN
+left join dwrfin.dwr_gl_invoice_conditional_f  C
+on B.VOUCHER = C.bill_voucher_num AND B.GOODSITEM = C.ACC_VOUCHER_LINE_ITEM_NUM
+where A.STATUS <> 'D' --and (substr(B.ERDAT,1,6) between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}' or substr(B.aedat,1,6) between '${PERIOD_ID_M1}' and '${PERIOD_ID_M2}')
+)
+INSERT OVERWRITE TABLE DWRFIN.DWR_FIN_INV_TAX_DETAIL_T-- partition(period_id_m) 
+SELECT 
+ T.INV_CODE  --发票代码
+,T.TAX_CODE   --税票号
+,T.CUS_CODE    --客户编码
+,T1.NAME1 AS CUS_NAME  --客户名称
+,T.COMP_CODE  --公司代码
+,T.BILL_INV_CODE   --SAP发票号码
+,T.BILL_INV_ITEM_CODE--SAP发票号行项目
+,T.BUS_SQ_CODE    --业务流水号
+,T.CREATE_DATE  --打印日期
+,T.CREATE_TIME  --打印时间
+,T.TAX_TYPE --发票类型
+,CASE WHEN T.TAX_TYPE = 1 THEN '增值税普通发票'
+      WHEN T.TAX_TYPE = 2 THEN '增值税专用发票'
+      WHEN T.TAX_TYPE = 3 THEN '出口税发票'
+      WHEN T.TAX_TYPE = 4 THEN '增值税电子专用发票'
+      WHEN T.TAX_TYPE = 5 THEN '增值税电子普通发票' END AS TAX_TYPE_NAME --发票类型名称
+,T.CREATER     --输入人
+,T.REMARK     --备注
+,T.PUR_NAME --购方名称
+,T.SALE_ORD_NUM-- 销售订单
+,T.REFER_NUM --提货单
+,T.MATERIAL_NUM  --物料编码
+,T.MATERIAL_NAME--物料描述
+,T.BILL_QTY -- 数量
+,T.SALE_UNIT --单位
+,T.NON_TAX_TOTAL_AMT --不含税总价
+,T.TAX_AMT --税额
+,T.TOATL_AMT  --总价
+,T.CURR_CODE --货币
+,T.POST_RATE  --过账汇率
+,T.SALE_AREA --面积
+,T.AREA_UNIT -- 面积单位
+,T.BATCH_NUM --批次
+,T.SALE_ORG_CODE   --销售组织
+,T.FAC_CODE  --工厂
+,T.BILL_DATE --发票过账日期
+,T.WBS_NUM  --项目号
+,T2.WBS_level3_desc --项目名称
+,T.DATA_SOURCE -- 数据来源
+,T.INV_STATUS  --发票状态
+,CASE WHEN T.INV_STATUS = 'F' THEN '是' ELSE '否' END AS IS_DEL  --是否作废/冲销
+,T.bill_type --发票类型
+,T.bill_type_desc --发票类型描述
+,T.cust_group --客户组
+,current_timestamp() AS DW_LAST_UPDATE_DATE
+,period_id_m
+from TMP T
+LEFT JOIN sdi.sdi_kna1_1001 T1
+on T.CUS_CODE = T1.KUNNR
+LEFT JOIN DWRDIM.DWR_DIM_WBS_BASIS_INFO_F T2
+on case when T.WBS_NUM = '' OR T.WBS_NUM IS NULL OR T.WBS_NUM = '0000000000' then concat(rand(10),'*%*') else T.WBS_NUM end = T2.wbs_level3
+;

@@ -1,0 +1,108 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/10/27 16:59:35 GMT+08:00
+-- update from chenzhiyong 20230320 新增逻辑
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=100000000;
+set hive.auto.convert.join.noconditionaltask.size=200000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+with tmp_data as(
+	SELECT T1.VBELN,
+		   T1.POSNR,
+		   T1.ID_BOM,
+		   T2.COMPLETE_CODE
+	FROM SDI.SDI_VBAP_1001 T1
+	LEFT JOIN (
+		SELECT DISTINCT T.ID_BOM,T.COMPLETE_CODE
+		   FROM(
+			   SELECT ITEM_NO AS ID_BOM,
+			          PRODUCT_CODE AS COMPLETE_CODE
+			   FROM SDI.SDI_S_ORDER_ITEM_LT_1029
+			   WHERE ITEM_NO IS NOT NULL
+			   UNION ALL
+			  	SELECT T2.ROW_ID AS ID_BOM,
+			  	       T1.NAME AS COMPLETE_CODE
+				FROM SDI.SDI_S_PROD_INT_1002 T1
+				JOIN SDI.SDI_S_ORDER_ITEM_1002 T2
+				ON T1.ROW_ID = T2.PROD_ID
+			 ) T
+	)T2
+	ON T1.ID_BOM = T2.ID_BOM
+	WHERE T1.ID_BOM IS NOT NULL 
+	AND T1.ID_BOM <> ''
+ )
+INSERT OVERWRITE TABLE DM.DM_GL_OUT_INVOICE_T PARTITION(PERIOD_ID_M)
+SELECT 
+	a.BILL_VOUCHER_NUM --vbeln开票凭证 
+	,b.ACC_VOUCHER_LINE_ITEM_NUM --posnr  --开票行号
+	,a.BILL_DATE --fkdat  --开票日期
+	,a.BILL_TYPE --fkart  --开票类型 
+	,a.VOUCHER_CURRENCY_CODE --waerk  --凭证货币
+	,a.PAYER_ID --kunrg  --付款方
+	,a.SALE_ORG_CODE --vkorg  --销售组织
+	,a.DISTRIBUTION_CHANNEL_CODE  --vtweg  --分销渠道
+	,a.CUST_SAL  --售达方
+	,b.MATERIAL_NUM --matnr  --物料编码
+	,case when a.BILL_TYPE in ('ZRE1','ZS1','ZS6','ZC1','IG','ZT1','ZIWS','ZIR','ZS11','ZS8','ZRE2','ZRE3','ZRE4','ZS81','ZS12','ZIVS','ZG2','ZTS2','ZIG','ZLS1','ZTS3')
+	then - b.ACTUAL_BILLED_QTY else b.ACTUAL_BILLED_QTY end as ACTUAL_BILLED_QTY--fkimg  --实际已开票数量
+	,b.FACTORY_CODE --werks  --工厂
+	,b.INV_LOCATION --lgort	 --库存地点
+	,b.BATCH_NUM --charg	 --批次
+	,b.SALE_UNIT --vrkme	 --销售单位
+	,case when a.BILL_TYPE in ('ZRE1','ZS1','ZS6','ZC1','IG','ZT1','ZIWS','ZIR','ZS11','ZS8','ZRE2','ZRE3','ZRE4','ZS81','ZS12','ZIVS','ZG2','ZTS2','ZIG','ZLS1','ZTS3')
+	then - b.VC_NET_WORTH_AMT else b.VC_NET_WORTH_AMT end as VC_NET_WORTH_AMT --netwr  --净值
+	,b.SALE_OFFICE_CODE --vkbur  --销售办事处
+	,b.SALE_GROUP --vkgrp  --销售组
+	,case when a.BILL_TYPE in ('ZRE1','ZS1','ZS6','ZC1','IG','ZT1','ZIWS','ZIR','ZS11','ZS8','ZRE2','ZRE3','ZRE4','ZS81','ZS12','ZIVS','ZG2','ZTS2','ZIG','ZLS1','ZTS3')
+	then - b.DOC_CURRENCY_TAX else b.DOC_CURRENCY_TAX end as DOC_CURRENCY_TAX --mwsbp  --税额
+	,a.CREATE_DATE --erdat  --记录建立日期
+	,a.FIN_ACC_POST_RATE --kurrf  --财务会计过账汇率
+	,a.VCH_TERM_NUM --knumv  --凭证条件号d
+	,b.SO_ITEM_TEXT --arktx  --销售订单项目的短文本
+	,b.SALE_VOUCHER_NUM --aubel  --销售凭证
+	,b.PROD_LEVEL --prodh  --产品层次
+	,b.SALE_VOUCHER_ITEM_NUM --aupos  --销售凭证项目
+	,a.CUST_ACCT_ASSIGN_GROUP --ktgrd  --客户的账户分配组
+	,b.TERM_SETTING_GROUP --ktgrm  --该物料的科目设置组
+	,a.CANCEL_BILL_VOUCHER_NUM --sfakn  --已取消的开票凭证编号
+	,a.REFERENCE_VOUCHER_NUM --xblnr  --参考凭证号
+	,a.ACCOUNT_CHECK_STATUS --rfbsk  --传输到会计核算的状态
+	,b.PROJECT_GROSS_WEIGHT --brgew  --毛重
+	,b.PROJ_VOL --volum  --体积
+	,b.WEIGHT_UNIT --gewei	 --重量单位
+	,b.VOL_UNIT --voleh  --体积单位
+	,b.MATERIAL_GROUP1 --mvgr1  --物料组1
+	,b.MATERIAL_GROUP2 --mvgr2  --物料组2
+	,b.MATERIAL_GROUP3 --mvgr3  --物料组3
+	,b.MATERIAL_GROUP4 --mvgr4  --物料组4
+	,b.MATERIAL_GROUP5 --mvgr5  --物料组5
+	,b.PRICE_DATE --prsdt  --定价日期和汇率
+	,b.PS_WBS_ELEMENT --PS_PSP_PNR  --wbs号
+	,a.LAST_UPDATE_DATE --更改日期
+	,current_timestamp() as dw_last_update_date -- 数据同步时间
+	,b.subtotal_price_process1 --净价1
+	,b.subtotal_price_process2 --净价2
+	,b.subtotal_price_process3 --净价3(发票总价)
+	,b.subtotal_price_process4 --净价4(特批折扣)
+	,b.subtotal_price_process5 --净价5
+	,b.subtotal_price_process6 --净价6(PR00)
+	,T2.ID_BOM
+	,T2.COMPLETE_CODE
+	,b.COMMISSION_GROUP --佣金组
+	,a.period_id_m -- 分区(月)
+FROM DWRFIN.DWR_GL_INVOICE_HEAD_F a 
+INNER JOIN DWRFIN.DWR_GL_INVOICE_ITEM_F b 
+ON a.BILL_VOUCHER_NUM = b.BILL_VOUCHER_NUM
+LEFT JOIN tmp_data T2
+ON b.SALE_VOUCHER_NUM = T2.VBELN
+AND b.SALE_VOUCHER_ITEM_NUM = T2.POSNR
+-- where a.period_id_m in
+-- (SELECT DISTINCT period_id_m 
+--  from DWRFIN.DWR_GL_INVOICE_HEAD_F
+--  WHERE SUBSTRING(CAST(dw_last_update_date AS STRING),1,10) >= '${PERIOD_ID_D}')

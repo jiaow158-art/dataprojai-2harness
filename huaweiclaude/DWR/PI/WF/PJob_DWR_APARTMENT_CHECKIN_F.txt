@@ -1,0 +1,92 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2026/05/13 15:53:12 GMT+08:00
+-- description:公寓客房入住登记数据查询
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+
+
+INSERT OVERWRITE TABLE dwrpi.dwr_apartment_checkin_f
+SELECT
+  -- 主表通用字段
+  fm.id AS id, -- 自增序号
+  fm.requestid AS request_id, -- OA流程唯一标识
+  fm.LSH AS serial_no, -- 业务流水号
+  fm.ZSLB AS stay_type, -- 住宿类型：临时/团体/长期
+  fm.KHXZ AS customer_type, -- 客户性质：公司客户/代理商/项目工作人员/公司员工
+  fm.RZRQ AS checkin_date, -- 入住日期(yyyy-MM-dd)
+  fm.LKRQ AS checkout_date, -- 离开日期(yyyy-MM-dd)
+  fm.ZSTS AS stay_days, -- 住宿天数（实际入住晚数）
+  fm.FFFS AS pay_method, -- 付费方式：公司付款/员工工资支付/现付（现金/刷卡/微信）
+  fm.SSBM AS department, -- 所属部门（费用扣费部门）
+  fm.FYLB AS expense_type, -- 费用类别（财务分类）
+  fm.CBZXLL AS cost_center, -- 费用成本中心编码
+  CAST(fm.KYYS AS DECIMAL(18,2)) AS budget_amount, -- 费用预算金额(元)，保留2位小数
+  CAST(fm.FYHJBZ AS DECIMAL(18,2)) AS total_amount, -- 订单合计金额(元)，保留2位小数
+  fm.GSDJR AS contact_name, -- 业务联系人姓名
+  fm.GSDJRDH AS contact_phone, -- 业务联系人电话
+  -- 流程状态转换为英文枚举，便于API调用
+  CASE 
+    WHEN wr.currentnodetype = 1 THEN 'created' -- 已创建
+    WHEN wr.currentnodetype = 2 THEN 'approving' -- 审批中
+    WHEN wr.currentnodetype = 3 THEN 'archived' -- 已归档
+    ELSE 'unknown' -- 未知状态
+  END AS process_status, -- 流程状态
+  fm.GDRQ AS archive_date, -- 归档日期(yyyy-MM-dd)
+  
+  -- 明细1：单人单房基础信息（single_前缀）
+  dt1.FJH1 AS single_room_no, -- 单人单房-房号
+  dt1.FJXX1 AS single_room_info, -- 单人单房-房间信息（如34㎡）
+  dt1.RZFX1 AS single_room_type, -- 单人单房-房型（如大床房/标间）
+  dt1.XM1 AS single_guest_name, -- 单人单房-住宿人姓名
+  CAST(dt1.FYBZ1 AS DECIMAL(18,2)) AS single_price, -- 单人单房-单价(元/晚)，保留2位小数
+  dt1.XB1 AS single_gender, -- 单人单房-性别：男/女
+  dt1.SFZH1 AS single_id_card1, -- 单人单房-住宿人身份证号
+  dt1.SFZHR1 AS single_id_card2, -- 单人单房-同住人身份证号
+  dt1.DW AS single_company, -- 单人单房-住宿人所属单位
+  dt1.ZW AS single_title, -- 单人单房-住宿人职务
+  
+  -- 明细2：多房/批量房间信息（batch_前缀）
+  dt2.FJH2 AS batch_room_no, -- 多房批量-房号
+  dt2.FJXX2 AS batch_room_info, -- 多房批量-房间信息（如34㎡）
+  dt2.RZFX2 AS batch_room_type, -- 多房批量-房型（如大床房/标间）
+  CAST(dt2.FYBZ2 AS DECIMAL(18,2)) AS batch_price, -- 多房批量-单价(元/晚)，保留2位小数
+  dt2.SL2 AS batch_quantity, -- 多房批量-同类型房间数量
+  CAST(dt2.ZFF2 AS DECIMAL(18,2)) AS batch_subtotal, -- 多房批量-小计金额(单价×数量)
+  
+  -- 明细3：长租/团体补充信息（long_term_前缀）
+  dt3.RZFX3 AS long_term_room_type, -- 长租团体-房型（如大床房/标间）
+  dt3.FJXX3 AS long_term_room_info, -- 长租团体-房间信息（如34㎡）
+  CAST(dt3.FYBZ3 AS DECIMAL(18,2)) AS long_term_price, -- 长租团体-单价(元/晚)，保留2位小数
+  dt3.XM3 AS long_term_guest_name, -- 长租团体-住宿人姓名
+  dt3.BMDW3 AS long_term_company, -- 长租团体-住宿人所属单位
+  CAST(dt3.CZFLAG3 AS DECIMAL(18,2)) AS long_term_flag, -- 长租团体-长租标识/费用
+  dt3.LXDH3 AS long_term_phone, -- 长租团体-住宿人联系电话
+  CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE
+FROM sdi.SDI_FORMTABLE_MAIN_738_1004 fm
+-- 关联流程表，过滤有效流程
+INNER JOIN sdi.SDI_WORKFLOW_REQUESTBASE_1004 wr 
+  ON fm.requestid = wr.requestid
+-- 关联3张明细表（左连接保证主表数据不丢失）
+LEFT JOIN sdi.sdi_formtable_main_738_dt1_1004 dt1
+  ON fm.id = dt1.mainid
+LEFT JOIN sdi.sdi_formtable_main_738_dt2_1004 dt2
+  ON fm.id = dt2.mainid
+LEFT JOIN sdi.sdi_formtable_main_738_dt3_1004 dt3
+  ON fm.id = dt3.mainid
+WHERE 1=1
+  -- 核心过滤条件：归档日期范围
+--   AND fm.GDRQ BETWEEN '2026-05-01' AND '2026-05-11'
+  -- 必加条件：仅查询公寓入住登记流程
+  AND wr.workflowid = 9742
+  -- 默认仅查询已归档数据（T+1同步标准）
+--   AND wr.currentnodetype = 3
+-- 使用英文别名排序，符合Hive语法规范
+-- ORDER BY archive_date ASC, request_id ASC;

@@ -1,0 +1,44 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_15000571
+-- create time: 2025/10/16 14:14:12 GMT+08:00
+-- description:注明脚本业务含义
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** -- --
+-- ******************************************************************** -- --
+--SQL性能优化设置
+set hive.cbo.enable=true;
+set hive.mapjoin.smalltable.filesize=200000000;
+set hive.auto.convert.join.noconditionaltask.size=400000000;
+set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE dm.DM_OMS_USER_MONTHLY_D PARTITION(PERIOD_ID_M)
+SELECT  
+T1.system_flag,
+-- COUNT(DISTINCT user_name) AS YHZJS    --用户总基数
+count(distinct case when 
+datediff(case when SUBSTR(current_timestamp ,1,7) = '${PERIOD_ID_M}' THEN   date_sub(SUBSTR(current_timestamp,1,10),1) ELSE    last_day('${PERIOD_ID_M}'||'-01') end ,
+substring(t1.login_date,1,10)) <=365   AND IS_FROZE = 'N' 
+then t1.user_id 
+else null end ) AS total_registered_users,    --用户总基数
+-- count(distinct case when 
+-- datediff(case when SUBSTR(current_timestamp ,1,7) = '${PERIOD_ID_M}' THEN   date_sub(SUBSTR(current_timestamp,1,10),1) ELSE    last_day('${PERIOD_ID_M}'||'-01') end ,
+-- substring(t1.login_date,1,10)) <=30 
+-- then t1.user_name 
+-- else null end ) AS monthly_active_users,    --月活跃数
+count(distinct case when substring(t1.login_date,1,7) = '${PERIOD_ID_M}'  AND IS_FROZE = 'N' then t1.user_id end) as monthly_active_users ,--月活跃数
+current_timestamp   as last_update_date,
+-- count(distinct t1.user_id) as total_registered_users_al,
+T1.role_name,
+'${PERIOD_ID_M}'    as PERIOD_ID_M --分区统计月
+FROM 
+-- dwrltc.dwr_system_user_capacity_d
+dwrdim.DWR_SYSTEM_ROLE_CAPACITY_D T1
+where  period_id_m <='${PERIOD_ID_M}' 
+AND SUBSTR(p_system_flag,1,3) = 'OMS'
+group by
+T1.system_flag,
+T1.role_name

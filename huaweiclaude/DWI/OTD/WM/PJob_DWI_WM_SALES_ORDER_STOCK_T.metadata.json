@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWI_WM_SALES_ORDER_STOCK_T",
+    "type": "HiveSQL",
+    "directory": "/DWI/OTD/WM",
+    "description": "SAP销售订单库存",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwiotd"
+}

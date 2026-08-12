@@ -1,0 +1,8 @@
+{
+    "name": "DWI_MD_CONFIG_SAP",
+    "type": "HiveSQL",
+    "directory": "/DWI/MD/PZB",
+    "description": "",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrbs"
+}

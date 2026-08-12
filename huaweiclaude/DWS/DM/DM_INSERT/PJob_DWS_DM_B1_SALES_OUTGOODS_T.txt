@@ -1,0 +1,132 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: guzhengfeng
+-- table desc：B1经销商销售出库表
+-- create time: 2022/08/24 09:54:12 GMT+08:00
+-- update from chenzhiyong 20230202 DM_B1_CUSTOMER_DATA_T 去重
+-- ******************************************************************** --
+TRUNCATE TABLE DM.DM_B1_SALES_OUTGOODS_T;
+INSERT INTO DM.DM_B1_SALES_OUTGOODS_T
+with MATL_GROUP1_DATA as
+(
+   SELECT MATERIAL_NUM
+         ,MATL_GROUP1_CODE  -- 物料组1名称
+		 ,MATL_GROUP2_CODE  -- 物料组2名称
+	     ,MATL_GROUP3_CODE  -- 物料组3名称
+	     ,MATL_GROUP4_CODE  -- 物料组4名称
+	     ,MATL_GROUP5_CODE  --  物料组5名称
+         ,ROW_NUMBER() OVER(PARTITION BY MATERIAL_NUM ORDER BY CASE WHEN MATL_GROUP2_CODE IS NOT NULL THEN 1 ELSE 0 END DESC, UPDATE_DATE DESC) AS RN
+       FROM DWIMD.DWI_MD_DATA_MATERIAL_SALES_T
+      WHERE END_DATE = '4712-12-31'
+        AND DEL_FLAG = 'N'  
+),
+dm_b1_customer_data as
+(select DISTINCT CUSTOMER_TYPE,
+		customer_code,
+		customer_name_cn 
+ from dm.dm_b1_customer_data_t 
+ where customer_flag = 'N'
+ --and customer_type = 'CT'  
+)
+SELECT A.CUSTOMER_TYPE   -- 客户类型 CT:瓷砖  SW:洁具
+      ,E.BZIRK as OPERATION_CODE  -- 营运中心编码
+	  ,E.BZIRK_NAME as OPERATION_NAME  -- 运营中心名称
+      ,A.DEALER_CODE   -- 经销商编码
+	  ,B.customer_name_cn AS DEALER_NAME  -- 经销商名称
+      ,A.OUT_RETURN_GOODS      --出退货 
+      ,A.DOC_NUM  --单号
+      ,A.CUST_CODE  --客户编码
+      ,A.CUST_NAME_CN  --客户名称
+      ,A.CHANNEL_NAME_CN  --渠道
+      ,A.CUST_ADDRESS  --客户地址
+      ,A.DOC_DATE    --单据日期 
+      ,A.MATERIAL_NUM   --物料编码
+      ,A.MATERIAL_NAME  --物料描述
+      ,A.MATL_GROUP_CODE  --物料组代码
+      ,A.MATL_GROUP_NAME  --物料组名称
+      ,A.EXTERNAL_MATL_GROUP_CODE  -- 外部物料组
+      ,A.EXTERNAL_MATL_GROUP_NAME   -- 外部物料组名称
+      ,A.MATL_TYPE_CODE     -- 物料类型
+      ,A.MATL_TYPE_NAME     --物料类型名称
+      ,A.PRODUCT_GROUP_CODE  -- 产品组
+      ,A.PRODUCT_GROUP_NAME  --产品组名称 
+      ,A.PRODUCT_CLASSIFY_CODE  -- 产品分级
+      ,A.PRODUCT_CLASSIFY_NAME  -- 产品分级名称
+      ,A.PRODUCT_LEVEL_CODE  --  '产品层次' 
+      ,A.PRODUCT_LEVEL_NAME  --  '产品层次名称' 
+      ,A.PRODUCT_LEVEL1_CODE --   '产品层次1' 
+      ,A.PRODUCT_LEVEL1_NAME  --   '产品层次1名称' 
+      ,A.PRODUCT_LEVEL2_CODE --   '产品层次2' 
+      ,A.PRODUCT_LEVEL2_NAME --   '产品层次2名称' 
+      ,A.PRODUCT_LEVEL3_CODE --   '产品层次3' 
+      ,A.PRODUCT_LEVEL3_NAME --   '产品层次3名称'
+      ,A.PRODUCT_LEVEL4_CODE --   '产品层次4'
+      ,A.PRODUCT_LEVEL4_NAME --   '产品层次4名称' 
+	  ,C.MATL_GROUP1_CODE  -- 物料组1名称
+	  ,C.MATL_GROUP2_CODE  -- 物料组2名称
+	  ,C.MATL_GROUP3_CODE  -- 物料组3名称
+	  ,C.MATL_GROUP4_CODE  -- 物料组4名称
+	  ,C.MATL_GROUP5_CODE  --  物料组5名称
+      ,A.MATERIAL_QTY  --数量
+      ,A.BATCH_NUM  --批次
+      ,A.PRICE   --单价
+      ,A.LINE_TOTAL_AMT   --行合计
+      ,A.UNIT            --单位
+      ,A.BAR_CODE   --条形码
+      ,A.DISCOUNT_PRICE_AGO_AMT    --折扣前价格
+      ,A.DISCOUNT_PRICE_AMT   --折扣
+      ,A.COST_PRICE_AMT   --成本价
+      ,A.COST_TOTAL_AMT  	--成本合计
+      ,A.GROSS_PROFIT_AMT  --毛利
+      ,A.NO_CLEAR_QTY  --未清数量
+      ,A.LINE_NUM  --行号
+      ,A.WM_NAME  -- 仓库
+      ,A.BATCH_NUM_STOCK  -- 批次库存
+      ,A.GROUP_NAME   --客户组
+      ,A.B1_MATERIAL_GROUP_NAME  --物料组
+      ,A.CUST_FROM  -- 客户来源
+      ,A.BILL_ADDRESS  -- 单据地址
+      ,A.CLOUD_ORDER_FLAG  -- 云订货下单标识
+	  ,A.MATERIAL_ID  -- 物料代理键
+	  ,A.SALES_CHANNEL  -- 销售渠道
+	  ,A.LENGTH_1 		-- 长度
+	  ,A.WIDTH			-- 宽度
+	  ,A.HEIGHT			-- 高度
+	  ,D.ZPLBM AS CATEGORY_CODE -- 品类编码
+	  ,D.ZPLMS AS CATEGORY_NAME -- 品类名称
+	  ,A.DIMENSION 				-- 规格(大小量纲)
+	  ,A.TOTAL_SALES_AMT			--销售总额
+	  ,CURRENT_TIMESTAMP() AS DW_LAST_UPDATE_DATE -- 同步数据时间
+	  ,F.LEVEL2_CODE AS LEVEL2_CODE     -- 层级2
+      ,F.LEVEL2_NAME AS LEVEL2_NAME     -- 层级2描述
+      ,F.LEVEL3_CODE AS LEVEL3_CODE     -- 层级3
+      ,F.LEVEL3_NAME AS LEVEL3_NAME     -- 层级3描述
+      ,F.LEVEL4_CODE AS LEVEL4_CODE     -- 层级4
+      ,F.LEVEL4_NAME AS LEVEL4_NAME     -- 层级4描述
+  FROM DWROTD.DWR_WM_B1_SALES_ORDER_F A
+  join dm_b1_customer_data  b
+  on a.CUSTOMER_TYPE = b.CUSTOMER_TYPE
+  and a.dealer_code = b.customer_code 
+  LEFT JOIN  MATL_GROUP1_DATA C
+  ON A.MATERIAL_NUM = C.MATERIAL_NUM
+  AND C.RN = 1 
+  LEFT JOIN DM.DM_RPT_BIC_AZEGY_O0042_T  D
+  ON A.PRODUCT_LEVEL3_CODE = D.PRODH3ID
+--   LEFT JOIN DWIMD.DWI_MD_DATA_OPERATION_CUST_R E
+--   ON A.DEALER_CODE = E.CUSTOMER_CODE
+  left join 
+  (SELECT E1.KUNNR
+      ,E1.BZIRK   -- 营运中心编码
+	  ,E1.BZIRK_NAME   -- 运营中心名称  
+  FROM DWIPI.DWI_WF_ZSD_ZMKB_T E1
+  GROUP BY 
+		E1.KUNNR
+      ,E1.BZIRK   -- 营运中心编码
+	  ,E1.BZIRK_NAME   -- 运营中心名称 
+	  )  E 
+  on e.kunnr = lpad(A.DEALER_CODE,10,'0') 
+--   where   A.MATL_GROUP_CODE = '1000010'
+--   AND  A.customer_type  = 'CT'
+  LEFT JOIN DM.DM_PRODUCT_LEVEL_CO_RANK_T F
+  ON A.PRODUCT_LEVEL3_CODE = F.PRODUCT_LEVEL3_CODE
+  ;

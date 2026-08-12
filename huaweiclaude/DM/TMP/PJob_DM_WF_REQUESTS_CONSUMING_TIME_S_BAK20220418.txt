@@ -1,0 +1,94 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/03/22 10:14:50 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DM.DM_WF_REQUESTS_CONSUMING_TIME_S
+select A.l1lc --L1流程
+	  ,COUNT(DISTINCT CONCAT(request_code,wf_name)) AS WF_COUNT
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '财经平台' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS CJ_gz_hour  --东鹏||财经平台
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '财经平台' THEN coalesce(A.node_count,0) ELSE 0 END) AS CJ_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '财经平台' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '财经平台' THEN coalesce(A.node_count,0) ELSE 0 END) as cj_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '瓷砖事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Cz_gz_hour  --东鹏||瓷砖事业部
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '瓷砖事业部' THEN coalesce(A.node_count,0) ELSE 0 END) AS Cz_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '瓷砖事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '瓷砖事业部' THEN coalesce(A.node_count,0) ELSE 0 END) as Cz_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '国际创新中心' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Cx_gz_hour  --东鹏||国际创新中心
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '国际创新中心' THEN coalesce(A.node_count,0) ELSE 0 END) AS Cx_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '国际创新中心' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '国际创新中心' THEN coalesce(A.node_count,0) ELSE 0 END) as cx_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '家居事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Jj_gz_hour  --东鹏||家居事业部
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '家居事业部' THEN coalesce(A.node_count,0) ELSE 0 END) AS Jj_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '家居事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '家居事业部' THEN coalesce(A.node_count,0) ELSE 0 END) as Jj_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '流程信息平台' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Xx_gz_hour  --东鹏||流程信息平台
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '流程信息平台' THEN coalesce(A.node_count,0) ELSE 0 END) AS Xx_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '流程信息平台' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '流程信息平台' THEN coalesce(A.node_count,0) ELSE 0 END) as Xx_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '人资运营平台' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Hr_gz_hour  --东鹏||人资运营平台
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '人资运营平台' THEN coalesce(A.node_count,0) ELSE 0 END) AS Hr_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '人资运营平台' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '人资运营平台' THEN coalesce(A.node_count,0) ELSE 0 END) as Hr_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '生态新材事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Xc_gz_hour  --东鹏||生态新材事业部
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '生态新材事业部' THEN coalesce(A.node_count,0) ELSE 0 END) AS Xc_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '生态新材事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '生态新材事业部' THEN coalesce(A.node_count,0) ELSE 0 END) as Xc_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '卫浴事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Wy_gz_hour  --东鹏||卫浴事业部
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '卫浴事业部' THEN coalesce(A.node_count,0) ELSE 0 END) AS Wy_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '卫浴事业部' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '卫浴事业部' THEN coalesce(A.node_count,0) ELSE 0 END) as Wy_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '战略品牌平台' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Zl_gz_hour  --东鹏||战略品牌平台
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '战略品牌平台' THEN coalesce(A.node_count,0) ELSE 0 END) AS Zl_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '战略品牌平台' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '战略品牌平台' THEN coalesce(A.node_count,0) ELSE 0 END) as Zl_Avg_gz_hour
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '综合支持平台' THEN coalesce(A.gz_hour,0) ELSE 0 END) AS Zh_gz_hour  --东鹏||综合支持平台
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '综合支持平台' THEN coalesce(A.node_count,0) ELSE 0 END) AS Zh_node_count
+      ,SUM(CASE WHEN A.LEV2_DEPT_NAME = '综合支持平台' THEN coalesce(A.gz_hour,0) ELSE 0 END)/SUM(CASE WHEN A.LEV2_DEPT_NAME = '综合支持平台' THEN coalesce(A.node_count,0) ELSE 0 END) as Zh_Avg_gz_hour
+      ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE
+      ,A.STAT_MONTH	  
+from DM.DM_WF_REQUESTS_CONSUMING_TIME_T A
+WHERE A.STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval 1 days,1,7),'-','')
+and A.LEV2_DEPT_NAME in('财经平台','瓷砖事业部','国际创新中心'
+,'家居事业部','流程信息平台','人资运营平台','生态新材事业部','卫浴事业部'
+,'战略品牌平台','综合支持平台')
+and coalesce(A.l1lc,'') not in('','/')
+--QCS-D1-001-客诉处理流程(洁具专用)、PIT-A2-001-系统/业务流程开发与优化申请流程、ADM-A9-001-合同审批签约流程和通用流程
+and coalesce(A.wf_name,'') not in('QCS-D1-001-客诉处理流程(洁具专用)','PIT-A2-001-系统/业务流程开发与优化申请流程'
+,'ADM-A9-001-合同审批签约流程','PIT-A6-001-通用流程(内部)','PIT-A6-003-通用流程(外部)'
+)
+and substr(A.receive_date,1,7) = SUBSTR(CURRENT_DATE - interval 1 days,1,7)
+-- and A.STAT_MONTH = REPLACE(SUBSTR(CURRENT_DATE - interval 1 days,1,7),'-','')
+GROUP BY A.l1lc
+        ,A.STAT_MONTH
+
+ UNION ALL
+ 
+select l1lc --L1流程
+	  ,WF_COUNT --流程数
+      ,CJ_gz_hour --东鹏||财经平台/耗时(工作时间:小时)
+      ,CJ_node_count --东鹏||财经平台/节点数
+      ,cj_Avg_gz_hour --东鹏||财经平台/平均耗时
+      ,Cz_gz_hour --东鹏||瓷砖事业部/耗时(工作时间:小时)
+      ,Cz_node_count --东鹏||瓷砖事业部/节点数
+      ,Cz_Avg_gz_hour --东鹏||瓷砖事业部/平均耗时
+      ,Cx_gz_hour --东鹏||国际创新中心/耗时(工作时间:小时)
+      ,Cx_node_count --东鹏||国际创新中心/节点数
+      ,cx_Avg_gz_hour --东鹏||国际创新中心/平均耗时
+      ,Jj_gz_hour --东鹏||家居事业部/耗时(工作时间:小时)
+      ,Jj_node_count --东鹏||家居事业部/节点数
+      ,Jj_Avg_gz_hour --东鹏||家居事业部/平均耗时
+      ,Xx_gz_hour --东鹏||流程信息平台/耗时(工作时间:小时)
+      ,Xx_node_count --东鹏||流程信息平台/节点数
+      ,Xx_Avg_gz_hour --东鹏||流程信息平台/平均耗时
+      ,Hr_gz_hour --东鹏||人资运营平台/耗时(工作时间:小时)
+      ,Hr_node_count --东鹏||人资运营平台/节点数
+      ,Hr_Avg_gz_hour --东鹏||人资运营平台/平均耗时
+      ,Xc_gz_hour --东鹏||生态新材事业部/耗时(工作时间:小时)
+      ,Xc_node_count --东鹏||生态新材事业部/节点数
+      ,Xc_Avg_gz_hour --东鹏||生态新材事业部/平均耗时
+      ,Wy_gz_hour --东鹏||卫浴事业部/耗时(工作时间:小时)
+      ,Wy_node_count --东鹏||卫浴事业部/节点数
+      ,Wy_Avg_gz_hour --东鹏||卫浴事业部/平均耗时
+      ,Zl_gz_hour --东鹏||战略品牌平台/耗时(工作时间:小时)
+      ,Zl_node_count --东鹏||战略品牌平台/节点数
+      ,Zl_Avg_gz_hour --东鹏||战略品牌平台/平均耗时
+      ,Zh_gz_hour --东鹏||综合支持平台/耗时(工作时间:小时)
+      ,Zh_node_count --东鹏||综合支持平台/节点数
+      ,Zh_Avg_gz_hour --东鹏||综合支持平台/平均耗时
+	  ,DW_LAST_UPDATE_DATE
+	  ,STAT_MONTH
+  FROM DM.DM_WF_REQUESTS_CONSUMING_TIME_S
+ WHERE STAT_MONTH < REPLACE(SUBSTR(CURRENT_DATE - interval 1 days,1,7),'-','')  
+;

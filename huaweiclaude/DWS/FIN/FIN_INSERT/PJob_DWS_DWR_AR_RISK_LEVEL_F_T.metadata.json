@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DWR_AR_RISK_LEVEL_F_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/FIN/FIN_INSERT",
+    "description": "项目风险等级表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

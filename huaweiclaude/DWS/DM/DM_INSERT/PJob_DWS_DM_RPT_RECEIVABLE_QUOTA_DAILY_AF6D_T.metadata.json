@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DWS_DM_RPT_RECEIVABLE_QUOTA_DAILY_AF6D_T",
+    "type": "DWSSQL",
+    "directory": "/DWS/DM/DM_INSERT",
+    "description": "每日15日后应收余额表",
+    "connectionName": "dp_dws_prod",
+    "database": "DP_DWS"
+}

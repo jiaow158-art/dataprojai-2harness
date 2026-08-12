@@ -1,0 +1,8 @@
+{
+    "name": "PJob_DM_BO_TMS_SHIP_ORDER_T",
+    "type": "HiveSQL",
+    "directory": "/DM/DM_CT",
+    "description": "一单到底自营工程物流运输汇总表",
+    "connectionName": "dp_mrs_hive_prod",
+    "database": "dwrotd"
+}

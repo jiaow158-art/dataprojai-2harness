@@ -1,0 +1,15 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004210
+-- create time: 2026/05/11 10:31:37 GMT+08:00
+-- ******************************************************************** --
+INSERT OVERWRITE TABLE DWRDIM.DWR_DIM_MAT_SITE_CAT_D
+SELECT BUKRS AS SITE_CODE --基地编码
+      ,MATNR AS MATERIAL_NUM --物料编号
+      ,MAKTX AS MATERIAL_NAME --物料描述
+	  ,ZCLASS AS MATERIAL_CAT_NAME --品类
+	  ,ZSERIAL AS MATERIAL_SER_NAME --系列
+	  ,ZHOUDU AS DIMENSION --规格
+	  ,CURRENT_TIMESTAMP AS DW_LAST_UPDATE_DATE --DW数据同步时间
+  FROM SDI.SDI_ZTCO08CLASS_1001
+ WHERE MANDT = 800

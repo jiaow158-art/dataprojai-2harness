@@ -1,0 +1,91 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: DP_10004701
+-- create time: 2023/11/04 10:59:50 GMT+08:00
+-- description:需求预测项目：经销商历史销售数据
+-- history list:
+-- UPDATE FROM 工号 时间<年月日> 修改描述内容
+-- ******************************************************************** --
+--SQL性能优化设置
+-- set hive.cbo.enable=true;
+-- set hive.mapjoin.smalltable.filesize=100000000;
+-- set hive.auto.convert.join.noconditionaltask.size=200000000;
+-- set hive.mapred.local.mem=4096;
+--设置动态分区为非严格模式
+set hive.exec.dynamic.partition=true; 
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+with tem as 
+(
+select 
+	substring(t1.doc_date,1,4) as stat_year
+	,substring(t1.doc_date,1,7) as stat_month    -- 年月
+	,t2.cust_num as cust_num -- 引用经销商的cust_num 母客编逻辑
+	,t6.cust_name as cust_name
+	,t2.sales_center_code -- 业务部门代码
+	,t2.sales_center -- 业务部门
+	,coalesce(case when t4.prod_property IN('A0001', 'A0002', 'C0002') then   -- 只针对 产品所有权 =瓷砖产品、梦之家产品、ART+ 定义
+         case when t4.tow_lev_channel_code in('A003','A004') then '世界印象'   -- 二级渠道=art+/iw
+               WHEN t4.product_level2_code IN ('1001') THEN '玻化砖'   --产品层次2=玻化砖
+               WHEN t4.product_level2_code IN ('1006', '1007', '1104') THEN '抛釉砖'  -- 产品层次2=晶理石/晶玉瓷/抛釉、晶玉配套
+               WHEN t4.product_level2_code = '1003' AND t4.dimension = '1500X750' OR t4.dimension = '1800X900' THEN '大板'  -- 产品层次2=岩板且规格=1500X750或者1800X900
+               WHEN t4.product_level2_code = '1003' AND (t4.dimension != '1500X750' AND t4.dimension != '1800X900') THEN '超大板' -- 产品层次2=岩板且规格≠1500X750或者1800X900
+               WHEN t4.product_level2_code IN ('1002', '1103') THEN '瓷片'  -- 产品层次2=瓷片/瓷片配套
+               WHEN t4.product_level2_code = '1017' THEN '精瓷中板'   -- 产品层次2=精瓷中板
+               WHEN t4.product_level2_code IN ('1004', '1102') THEN '仿古砖'  -- 产品层次2=仿古砖/仿古砖配套
+               WHEN t4.product_level2_code = '1018' THEN '景观砖'  -- 产品层次2=景观砖
+               ELSE  '其他瓷砖' END 
+              END,'其他品类') as fin_cate   -- 财务品类
+	,t4.dimension as dimension   -- 财务规格
+	,t1.material_num as material_num--产品编码
+	,t4.material_name as material_name  -- 产品名称
+	,t1.sale_area as sales_area          -- 面积（平方米）
+	,case 
+	    when t4.prod_property_name = 'ART产品' then 'ART'
+	    when t4.prod_property_name = 'DPI产品' then 'DPI'
+	    when t4.prod_property_name in('瓷砖产品','梦之家产品')  then '瓷砖'
+		else  '1+N' end n_cate_flag  -- 1+n 品类 as n_cate_flag  -- 1+n 品类
+	,'' as dw_last_update_date
+from DWROTD.DWR_WM_B1_SALES_ORDER_F t1
+join dm.dm_dp_api_cust_general t2 on lpad(t1.dealer_code,10,0)  = t2.z_cust_num
+left join dwimd.dwi_md_data_material_general_t t4 on t1.material_num = t4.material_num
+--left join DM.DM_RPT_PROD_LEVEL_T t5 on coalesce(t4.product_level3_code,t4.product_level2_code,t4.product_level1_code) = t5.prod_code3 and t5.PROD_CODE3 IS NOT NULL 
+left join dwrdim.dwr_dim_cust_general_d t6 on t2.cust_num  = t6.cust_num and t6.end_date = '4712-12-31'
+where 1=1
+and customer_type = 'CT'
+and t1.doc_date >= '2021-01-01'
+and t4.prod_property  = 'A0001' --仅需要瓷砖产品
+--and t1.dealer_code  = '0000311440'
+)
+
+INSERT OVERWRITE TABLE dm.dm_dp_api_cust_sales_throught_sum partition (stat_month_ym)
+select 
+	stat_year
+	,stat_month
+	,cust_num
+	,cust_name
+	,sales_center_code
+	,sales_center
+	,fin_cate
+	,dimension
+	,material_num
+	,material_name
+	,sum(sales_area) as sales_area
+	,n_cate_flag
+	,current_timestamp() as dw_last_update_date
+	,stat_month as stat_month_ym
+from tem
+WHERE stat_month>='2023-01'
+group by 
+	stat_year
+	,stat_month
+	,cust_num
+	,cust_name
+	,sales_center_code
+	,sales_center
+	,fin_cate
+	,dimension
+	,material_num
+	,material_name
+	,n_cate_flag
+;

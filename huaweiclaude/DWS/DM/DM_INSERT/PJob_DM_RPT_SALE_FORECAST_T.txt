@@ -1,0 +1,54 @@
+-- DWS sql 
+-- ******************************************************************** --
+-- author: huangwenbin
+-- create time: 2022/05/13 10:14:56 GMT+08:00
+-- ******************************************************************** --
+DELETE FROM DM.DM_RPT_SALE_FORECAST_T
+WHERE stat_month >= 
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END
+          ;
+
+ INSERT INTO DM.DM_RPT_SALE_FORECAST_T
+select case when  substr(a.calmonth,-2,2)='01' then  substr(a.calmonth,1,4)||'02' else a.calmonth end  as stat_month --统计月份
+      ,b.SALES_GRP --WBS销售组
+      ,c."/BIC/ZPRODH3" as prod_code3 --产品层次3
+	  ,COALESCE(d.lve2_code,'其他品类') as prod_name3 --产品层次3名称
+	  ,e.lev4_code as sale_grp_name1 --销售组名称
+	  ,f.LEV5_NAME as sale_grp_name2 --WBS销售组名称 
+	  ,c."SIZE_DIM" as DIMENSION--规格
+	  ,a.salesorg as sale_org --销售组织
+	  ,a.division as prod_org --产品组
+	  ,a.distr_chan as sale_channel --分销渠道
+	  ,a.sales_grp as sale_grp --销售组
+	  ,a.wbs_elemt as wbs_num --WBS号
+	  ,a.material as material_num --物料编码
+	  ,a.sold_to as cust_num --客户编码
+	  ,a.zxsyj_dy --当月销售业绩
+	  ,a.zxsmj_dy --当月销售面积
+	  ,current_timestamp as dw_last_update_date
+	  ,e.lev5_code as sub_grp_name1 --子销售组名称
+	  ,f.LEV6_NAME as sub_grp_name2 --子WBS销售组名称
+	  ,a.DOC_NUMBER --销售凭证
+	  ,e.lev3_code as sale_grp_name0 --三级部门
+	  ,COALESCE(d.lve3_code,'其他杂类') as prod_name4
+from dm.dm_rpt_azmsd_o2251_t a 
+left join DM.DM_RPT_BI0_PWBS_ELEMT_T b
+on a.wbs_elemt  = b.wbs_elemt
+left join dm.dm_rpt_bi0_pmaterial_t c
+on a.material = c."MATERIAL"
+left join DM.DM_RPT_PROD_LEVEL_T d
+on c."/BIC/ZPRODH3" = d.prod_code3
+left join DM.DM_RPT_SALE_GRP_T e
+on a.sales_grp = e.SALE_GRP
+left join DM.DM_RPT_SALE_GRP_T f
+on b.sales_grp = f.SALE_GRP
+WHERE a.calmonth >= 
+CASE WHEN SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',9,2) <= '06'
+     THEN REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 MONTH',1,7),'-','')
+         ELSE REPLACE(SUBSTR(CURRENT_DATE - INTERVAL '1 DAY',1,7),'-','')
+          END
+          
+;

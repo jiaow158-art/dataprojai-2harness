@@ -1,0 +1,47 @@
+-- HIVE sql 
+-- ******************************************************************** --
+-- author: dp_dgc_admin
+-- create time: 2022/05/27 15:01:13 GMT+08:00
+-- ******************************************************************** --
+with lookup_data as(
+	select t.lookup_type,t.lookup_code ,t.meaning 
+	from sdi.Sdi_BASE_LOOKUP_VALUES_1027 t 
+	where t.enabled_flag = 'Y' 
+	and  t.lookup_type IN ('ICPOS_STORE_TYPE','ICPOS_STORE_STATUS','ICPOS_STORE_NATURE','ICPOS_SHOP_TYPE')
+)
+INSERT OVERWRITE TABLE DWIOTD.DWI_SO_SHOP_DATA_T
+select t1.customer_name , -- 经销商名称
+       t1.customer_code , -- 客户编码
+       t2.marketing_Department, -- 营销部
+       t1.store_Name	,--	门店名称
+		t1.store_Code	,--	门店编码
+		t3.meaning as store_Type	,--	店面类型
+		t4.meaning as store_Status	,--	店面状态
+		t1.province	,--	省份
+		t1.city	,--	城市
+		t1.county	,--	区/县
+		t1.address	,--	详细地址
+		t1.store_Filing_Date	,--	店面建档时间
+		t1.operation_Type	,--	经营中
+		t1.completion_Date	,--	完工时间
+		t1.distributor_Code	,--	分销商编码（B1系统客编）
+		t1.distributor_Name	,--	分销商名称（B1系统客户名称）
+		t5.meaning as store_Nature	,--	店面性质
+		t6.meaning as shop_Type	,--	门店类型
+		--t1.store_Status	,--	店面状态
+		current_timestamp() as dw_last_update_date -- 数据同步时间
+from sdi.Sdi_ICPOS_STORE_1027 t1
+left join sdi.sdi_ICPOS_STORE_CONTACTS_1027 t2
+on t1.store_id = t2.store_id 
+left join lookup_data t3
+on t1.store_Type = t3.lookup_code 
+and t3.lookup_type = 'ICPOS_STORE_TYPE'
+left join lookup_data t4
+on t1.store_Status = t4.lookup_code 
+and t4.lookup_type = 'ICPOS_STORE_STATUS'
+left join lookup_data t5
+on t1.store_Nature = t5.lookup_code 
+and t5.lookup_type = 'ICPOS_STORE_NATURE'
+left join lookup_data t6
+on t1.shop_Type = t6.lookup_code 
+and t6.lookup_type = 'ICPOS_SHOP_TYPE';
