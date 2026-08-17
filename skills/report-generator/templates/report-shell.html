@@ -815,7 +815,7 @@
           var dom = document.getElementById(chId);
           if (!dom) return;
           try {
-            var mergedOption = deepMerge(darkBase, ch.option || {});
+            var mergedOption = deepMerge(JSON.parse(JSON.stringify(darkBase)), ch.option || {});
             var fns = null;
             if (ch.valueFormat) {
               fns = formatFactory(ch.valueFormat, ch.tooltipTemplate || 'multi');
@@ -833,6 +833,7 @@
                 if (!ax.axisLabel.formatter) ax.axisLabel.formatter = fns.axis;
               });
               if (!mergedOption.tooltip) mergedOption.tooltip = { trigger: 'axis' };
+              if (!mergedOption.tooltip.trigger) mergedOption.tooltip.trigger = 'axis';
               if (!mergedOption.tooltip.formatter) mergedOption.tooltip.formatter = fns.tooltip;
               if (mergedOption.tooltip.trigger === 'item' || ch.tooltipTemplate === 'pie') {
                 mergedOption.tooltip.trigger = 'item';
