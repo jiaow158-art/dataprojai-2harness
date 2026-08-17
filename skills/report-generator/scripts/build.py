@@ -10,6 +10,7 @@
 """
 import argparse
 import datetime
+import html as html_mod
 import json
 import os
 import sys
@@ -38,9 +39,10 @@ def build_html(data, echarts_lib, title, meta):
     with open(TEMPLATE, "r", encoding="utf-8") as f:
         html = f.read()
     html = html.replace("{{ECHARTS_LIB}}", "<script>\n" + echarts_lib + "\n</script>")
-    html = html.replace("{{REPORT_TITLE}}", title)
-    html = html.replace("{{REPORT_META}}", meta)
-    html = html.replace("{{REPORT_JSON}}", json.dumps(data, ensure_ascii=False))
+    html = html.replace("{{REPORT_TITLE}}", html_mod.escape(title))
+    html = html.replace("{{REPORT_META}}", html_mod.escape(meta))
+    # "</" → "<\/"：JSON 合法转义，浏览器 JS 解析等价，且防止字符串值里的 </script> 撕裂 HTML script 块
+    html = html.replace("{{REPORT_JSON}}", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
     return html
 
 
@@ -54,8 +56,15 @@ def check_server():
 
 
 def do_build(json_path, domain, out_dir):
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        print("[FAIL] JSON 解析失败: %s" % e)
+        return 1
+    except OSError as e:
+        print("[FAIL] 无法读取 %s: %s" % (json_path, e))
+        return 1
     errs = validate_report.validate_data(data)
     if errs:
         print("构建中止：report.json 校验失败")

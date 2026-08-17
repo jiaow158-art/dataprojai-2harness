@@ -55,3 +55,37 @@ def test_build_rejects_invalid_json(tmp_path):
                        capture_output=True, text=True, encoding="utf-8")
     assert r.returncode != 0
     assert "provenance.query" in (r.stdout + r.stderr)
+
+
+def test_build_survives_script_tag_in_text(tmp_path):
+    """analysis text 含 </script> 不得撕裂 HTML script 块。"""
+    import re as _re
+    r = _sample()
+    r["sections"][0]["analysis"][0]["text"] = "结论 </script><script>alert(1)</script> 完"
+    jf = tmp_path / "s.json"
+    jf.write_text(json.dumps(r, ensure_ascii=False), encoding="utf-8")
+    out = subprocess.run([sys.executable, BUILD_PY, "--json", str(jf), "--out", str(tmp_path)],
+                         capture_output=True, text=True, encoding="utf-8")
+    assert out.returncode == 0, out.stdout + out.stderr
+    html = list(tmp_path.glob("report_*.html"))[0].read_text(encoding="utf-8")
+    # 数据段里的 </script> 必须已转义为 <\/（build.py 的 replace("</", "<\\/") 产物）
+    assert "<\\/script><script>alert(1)<\\/script>" in html, "转义缺失"
+    assert "</script><script>" not in html, "数据段出现裸 </script>，script 块被撕裂"
+    # echarts 库 script 之外，渲染 script 段应完整（未被数据内容撕成多段）
+    scripts = _re.findall(r"<script>[\s\S]*?</script>", html)
+    assert len(scripts) == 2, "script 块数量异常: %d" % len(scripts)
+    # round-trip：抽出的 JSON 仍含原始 text
+    sys.path.insert(0, os.path.normpath(os.path.join(SKILL_DIR, "..", "scripts")))
+    import validate_report as vr
+    data = vr.extract_json_from_html(html)
+    assert data["sections"][0]["analysis"][0]["text"] == "结论 </script><script>alert(1)</script> 完"
+
+
+def test_build_bad_json_syntax_graceful(tmp_path):
+    jf = tmp_path / "broken.json"
+    jf.write_text('{"title": ', encoding="utf-8")
+    out = subprocess.run([sys.executable, BUILD_PY, "--json", str(jf), "--out", str(tmp_path)],
+                         capture_output=True, text=True, encoding="utf-8")
+    assert out.returncode == 1
+    assert "[FAIL]" in out.stdout and "Traceback" not in out.stdout + out.stderr
+    assert not list(tmp_path.glob("report_*.html"))
