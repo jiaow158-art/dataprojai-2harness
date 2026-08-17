@@ -455,31 +455,6 @@
     return div.innerHTML;
   }
 
-  /* ---- Helper: revive function strings from JSON ---- */
-  function reviveFunctions(obj) {
-    if (!obj || typeof obj !== 'object') return obj;
-    if (Array.isArray(obj)) {
-      for (var i = 0; i < obj.length; i++) {
-        if (typeof obj[i] === 'string' && /^\s*function\s*\(/.test(obj[i])) {
-          try { obj[i] = eval('(' + obj[i] + ')'); } catch(e) {}
-        } else if (typeof obj[i] === 'object' && obj[i] !== null) {
-          reviveFunctions(obj[i]);
-        }
-      }
-    } else {
-      for (var key in obj) {
-        if (!obj.hasOwnProperty(key)) continue;
-        var val = obj[key];
-        if (typeof val === 'string' && /^\s*function\s*\(/.test(val)) {
-          try { obj[key] = eval('(' + val + ')'); } catch(e) {}
-        } else if (typeof val === 'object' && val !== null) {
-          reviveFunctions(val);
-        }
-      }
-    }
-    return obj;
-  }
-
   /* ---- Helper: deep merge (source into target) ---- */
   function deepMerge(target, source) {
     var result = {};
@@ -498,6 +473,54 @@
       }
     }
     return result;
+  }
+
+  /* ---- Format factory: valueFormat 声明 → ECharts formatter ---- */
+  var FORMAT_REGISTRY = {
+    yi:             { div: 100000000, unit: '亿',  sep: false },
+    wan:            { div: 10000,     unit: '万',  sep: true  },
+    percent:        { div: 1,         unit: '%',   sep: false },
+    signed_percent: { div: 1,         unit: '%',   sep: false, sign: true },
+    sqm_wan:        { div: 10000,     unit: '万㎡', sep: false },
+    yuan:           { div: 1,         unit: '元',  sep: true  }
+  };
+  var FORMAT_DEFAULT_DEC = { yi: 2, wan: 0, percent: 1, signed_percent: 1, sqm_wan: 1, yuan: 0 };
+
+  function parseValueFormat(vf) {
+    var m = /^([a-z_]+)(?::(\d))?$/.exec(vf || '');
+    if (!m || !FORMAT_REGISTRY[m[1]]) return null;
+    return {
+      name: m[1],
+      dec: m[2] !== undefined ? parseInt(m[2], 10) : FORMAT_DEFAULT_DEC[m[1]]
+    };
+  }
+
+  function formatValue(v, spec) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    var cfg = FORMAT_REGISTRY[spec.name];
+    var n = v / cfg.div;
+    var out = cfg.sep
+      ? n.toLocaleString('zh-CN', { minimumFractionDigits: spec.dec, maximumFractionDigits: spec.dec })
+      : n.toFixed(spec.dec);
+    return (cfg.sign && v > 0 ? '+' : '') + out + cfg.unit;
+  }
+
+  function formatFactory(vf, template) {
+    var spec = parseValueFormat(vf);
+    if (!spec) return null;
+    return {
+      axis: function (v) { return formatValue(v, spec); },
+      label: function (p) { return formatValue(p.value, spec); },
+      tooltip: (template === 'pie')
+        ? function (p) { return p.name + ': ' + formatValue(p.value, spec) + ' (' + p.percent + '%)'; }
+        : function (params) {
+            var r = params[0].name + '<br/>';
+            params.forEach(function (p) {
+              r += p.marker + ' ' + p.seriesName + ': ' + formatValue(p.value, spec) + '<br/>';
+            });
+            return r;
+          }
+    };
   }
 
   /* ---- ECharts light base option ---- */
@@ -793,7 +816,38 @@
           if (!dom) return;
           try {
             var mergedOption = deepMerge(darkBase, ch.option || {});
-            mergedOption = reviveFunctions(mergedOption);
+            var fns = null;
+            if (ch.valueFormat) {
+              fns = formatFactory(ch.valueFormat, ch.tooltipTemplate || 'multi');
+              if (!fns) {
+                dom.innerHTML = '<div class="chart-error">非法 valueFormat: ' + escapeHTML(ch.valueFormat)
+                  + ' — 允许 yi/wan/percent/signed_percent/sqm_wan/yuan（可带 :N）</div>';
+                return;
+              }
+            }
+            if (fns) {
+              var yAxes = mergedOption.yAxis;
+              (Array.isArray(yAxes) ? yAxes : [yAxes]).forEach(function (ax) {
+                if (!ax) return;
+                ax.axisLabel = ax.axisLabel || {};
+                if (!ax.axisLabel.formatter) ax.axisLabel.formatter = fns.axis;
+              });
+              if (!mergedOption.tooltip) mergedOption.tooltip = { trigger: 'axis' };
+              if (!mergedOption.tooltip.formatter) mergedOption.tooltip.formatter = fns.tooltip;
+              if (mergedOption.tooltip.trigger === 'item' || ch.tooltipTemplate === 'pie') {
+                mergedOption.tooltip.trigger = 'item';
+              }
+              (mergedOption.series || []).forEach(function (se) {
+                se.label = se.label || {};
+                if (se.type === 'pie') {
+                  if (!se.label.formatter) se.label.formatter = function (p) {
+                    return p.name + '\n' + p.percent + '%';
+                  };
+                } else if (!se.label.formatter) {
+                  se.label.formatter = fns.label;
+                }
+              });
+            }
             var instance = echarts.init(dom);
             instance.setOption(mergedOption);
             chartInstances.push(instance);
@@ -863,6 +917,8 @@
   } else {
     provSection.style.display = 'none';
   }
+
+  window.__REPORT_VALID__ = true;
 
 })();
 </script>
