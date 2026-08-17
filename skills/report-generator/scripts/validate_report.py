@@ -201,8 +201,8 @@ def validate_html(html, node_check=True):
     if "__REPORT_VALID__" not in html:
         errs.append("[html] 缺少 __REPORT_VALID__ 标记（模板过旧或渲染脚本被破坏）")
     if node_check and shutil.which("node"):
-        m = re.search(r"<script>\s*\(function\(\)\s*\{.*?\}\)\(\);?\s*</script>\s*</body>", html, re.S)
-        inline_js = m.group(0) if m else ""
+        m = re.search(r"<script>\s*(\(function\(\)\s*\{.*?\}\)\(\);?)\s*</script>\s*</body>", html, re.S)
+        inline_js = m.group(1) if m else ""
         if inline_js:
             fd, tmp = tempfile.mkstemp(suffix=".js")
             try:
