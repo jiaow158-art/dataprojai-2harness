@@ -1,7 +1,4 @@
 """validator 单测：合规过、负路径逐条拦截。"""
-import sys
-import os
-
 import validate_report as vr  # conftest 已注入 scripts/ 到 sys.path
 
 
@@ -71,3 +68,35 @@ def test_duplicate_id_fails():
     r = _base_report(); r["sections"][1]["id"] = "trend"
     errs = vr.validate_data(r)
     assert any("重复" in e for e in errs)
+
+
+def test_eval_blacklist_fails():
+    r = _base_report()
+    r["insight"] = "用 eval(data) 计算"
+    errs = vr.validate_data(r)
+    assert any("旧函数格式" in e for e in errs)
+
+
+def test_unhashable_id_does_not_crash():
+    r = _base_report()
+    r["sections"][0]["id"] = {"a": 1}
+    errs = vr.validate_data(r)
+    assert isinstance(errs, list)
+    assert any(".id" in e for e in errs)
+
+
+def test_bool_pagesize_fails():
+    r = _base_report()
+    r["sections"][1]["table"]["pageSize"] = True
+    errs = vr.validate_data(r)
+    assert any("pageSize" in e for e in errs)
+
+
+def test_validate_html_placeholder_and_marker():
+    dirty = "<html>{{REPORT_JSON}}</html>"
+    errs = vr.validate_html(dirty, node_check=False)
+    assert any("占位符" in e for e in errs)
+    assert any("__REPORT_VALID__" in e for e in errs)
+    clean = '<html><script>(function(){ window.__REPORT_VALID__ = true; })();</script></body></html>'
+    errs2 = vr.validate_html(clean, node_check=False)
+    assert errs2 == [], f"干净HTML不应报错: {errs2}"

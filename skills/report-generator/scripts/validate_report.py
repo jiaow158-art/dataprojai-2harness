@@ -78,6 +78,8 @@ def validate_data(data):
         sid = s.get("id")
         if not str(sid or "").strip():
             err(p + ".id", "不能为空")
+        elif not isinstance(sid, str):
+            err(p + ".id", "必须是字符串")
         else:
             if sid in seen_ids:
                 err(p + ".id", "重复 id %r" % sid)
@@ -163,7 +165,7 @@ def _validate_table_section(s, p, err):
     if not isinstance(tbl.get("rows"), list) or not tbl["rows"]:
         err(p + ".table.rows", "必须是非空数组")
     ps = tbl.get("pageSize")
-    if ps is not None and (not isinstance(ps, int) or ps < 1):
+    if ps is not None and (isinstance(ps, bool) or not isinstance(ps, int) or ps < 1):
         err(p + ".table.pageSize", "必须是 >=1 的整数")
 
 
