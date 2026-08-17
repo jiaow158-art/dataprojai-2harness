@@ -1,4 +1,7 @@
-"""Generate HTML report for 瓷砖事业部北京区域业绩分析"""
+"""Generate HTML report for 瓷砖事业部北京区域业绩分析
+
+[DEPRECATED 2026-08] 已废弃 — 统一改用 skills/report-generator/scripts/build.py。此脚本留存仅作历史参考，内含硬编码数据/路径，勿在新报告使用。
+"""
 import json
 
 # ---- REPORT JSON ----

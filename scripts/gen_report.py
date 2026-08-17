@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Assemble the sales performance H1 2026 report HTML."""
+"""Assemble the sales performance H1 2026 report HTML.
+
+[DEPRECATED 2026-08] 已废弃 — 统一改用 skills/report-generator/scripts/build.py。此脚本留存仅作历史参考，内含硬编码数据/路径，勿在新报告使用。
+"""
 import json, os
 
 BASE = "/home/dp-user/dataprojv2"

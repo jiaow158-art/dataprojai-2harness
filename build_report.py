@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""组装销售业绩分析报告 HTML"""
+"""组装销售业绩分析报告 HTML
+
+[DEPRECATED 2026-08] 已废弃 — 统一改用 skills/report-generator/scripts/build.py。此脚本留存仅作历史参考，内含硬编码数据/路径，勿在新报告使用。
+"""
 from __future__ import annotations
 
 import json

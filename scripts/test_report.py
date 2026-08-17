@@ -1,6 +1,8 @@
 """
 Integration test: generate a report from the dark-pro report-shell.html template.
 Verifies placeholder substitution, ECharts embedding, and section rendering.
+
+[DEPRECATED 2026-08] 已废弃 — 统一改用 skills/report-generator/scripts/build.py。此脚本留存仅作历史参考，内含硬编码数据/路径，勿在新报告使用。
 """
 import json
 import os

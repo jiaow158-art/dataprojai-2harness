@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Build sales-performance HTML report for June 2026 budget deviation analysis."""
+"""Build sales-performance HTML report for June 2026 budget deviation analysis.
+
+[DEPRECATED 2026-08] 已废弃 — 统一改用 skills/report-generator/scripts/build.py。此脚本留存仅作历史参考，内含硬编码数据/路径，勿在新报告使用。
+"""
 
 import json
 import os
