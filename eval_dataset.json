@@ -10,7 +10,7 @@
       "sales-performance"
     ],
     "description": "Offline evaluation dataset for Skills accuracy tracking",
-    "total": 55,
+    "total": 57,
     "passed": 30,
     "failed": 0,
     "runner": "run_eval.py"
@@ -2045,6 +2045,22 @@
     },
     {
       "domain": "sales-performance",
+      "pattern": "org_monthly_with_mom",
+      "question": "2026年5月瓷砖事业部环比对比",
+      "sql": "WITH m AS (SELECT calmonth, SUM(ambperformance) AS actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth IN ('2026-04','2026-05') AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth) SELECT MAX(CASE WHEN calmonth='2026-05' THEN actual END) AS cur_month, MAX(CASE WHEN calmonth='2026-04' THEN actual END) AS prev_month, (MAX(CASE WHEN calmonth='2026-05' THEN actual END) - MAX(CASE WHEN calmonth='2026-04' THEN actual END)) / NULLIF(MAX(CASE WHEN calmonth='2026-04' THEN actual END),0) * 100 AS mom_rate FROM m",
+      "row_count": 1,
+      "elapsed_ms": 357,
+      "data": [
+        {
+          "cur_month": "505206331.1828240000",
+          "prev_month": "472816360.5523800000",
+          "mom_rate": "6.85043355788356712400"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "sales-performance",
       "pattern": "channel_breakdown",
       "question": "2026年5月瓷砖事业部按整合渠道1达成",
       "sql": "SELECT integrate_channel, integrate_channel__t, SUM(ambperformance) as actual FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth = '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') AND integrate_channel IS NOT NULL GROUP BY integrate_channel, integrate_channel__t ORDER BY actual DESC",
@@ -2641,6 +2657,52 @@
         {
           "calmonth": "2026-05",
           "actual": "65702540.8501420000"
+        }
+      ],
+      "checksum": "rows=5"
+    },
+    {
+      "domain": "sales-performance",
+      "pattern": "cost_margin_trend",
+      "question": "瓷砖事业部2026年1-5月成本与毛利趋势",
+      "sql": "SELECT calmonth, SUM(ambperformance) AS actual, SUM(actual_cost_exclude_logistics) AS cost_ex_log, SUM(gross_profit_after_sharing) AS gross_profit, SUM(gross_profit_after_sharing)/NULLIF(SUM(ambperformance),0)*100 AS margin_pct FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth BETWEEN '2026-01' AND '2026-05' AND node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','') GROUP BY calmonth ORDER BY calmonth",
+      "row_count": 5,
+      "elapsed_ms": 6129,
+      "data": [
+        {
+          "calmonth": "2026-01",
+          "actual": "235326388.2424600000",
+          "cost_ex_log": "166843071.9067800000",
+          "gross_profit": "61747361.7244750000",
+          "margin_pct": "26.23903004913152695100"
+        },
+        {
+          "calmonth": "2026-02",
+          "actual": "45844138.7265000000",
+          "cost_ex_log": "34112805.2888780000",
+          "gross_profit": "11047088.2935030000",
+          "margin_pct": "24.09705711652355650900"
+        },
+        {
+          "calmonth": "2026-03",
+          "actual": "427430907.2870940000",
+          "cost_ex_log": "297570767.4088470000",
+          "gross_profit": "100803149.9114900000",
+          "margin_pct": "23.58349576339438614200"
+        },
+        {
+          "calmonth": "2026-04",
+          "actual": "472816360.5523800000",
+          "cost_ex_log": "317488474.1968980000",
+          "gross_profit": "110333122.4948930000",
+          "margin_pct": "23.33530133474938610100"
+        },
+        {
+          "calmonth": "2026-05",
+          "actual": "505206331.1828240000",
+          "cost_ex_log": "334080608.4267700000",
+          "gross_profit": "131457727.8220540000",
+          "margin_pct": "26.02060182307614330400"
         }
       ],
       "checksum": "rows=5"

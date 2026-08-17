@@ -278,6 +278,69 @@ GROUP BY LEFT(calday, 6)
 ORDER BY mon;
 ```
 
+### 模式 J：月度环比 MoM（Mix 表）
+
+**环比 vs 同比**（极易混，动手前先确认用户要哪个）：
+- **同比 YoY** = 本月 vs **去年同月** → 用业绩表 `ct_sales_performance_t` 的 `last_year_*` 字段（见模式 B）
+- **环比 MoM** = 本月 vs **上月** → **Mix 表 `calmonth` 自连接 / `LAG`**，**没有专用字段，必须自己算上月**
+
+**J1. 单月环比**（与单月同比模式 B 对照）：
+
+```sql
+WITH m AS (
+  SELECT calmonth, SUM(ambperformance) AS actual
+  FROM dm.dm_fin_operations_mix_sum_t
+  WHERE calmonth IN ('2026-04','2026-05')
+    AND node_desc2 = '瓷砖事业部'
+    AND data_source IN ('S', 'T', 'D', '')   -- node_desc2层级
+  GROUP BY calmonth
+)
+SELECT MAX(CASE WHEN calmonth='2026-05' THEN actual END) AS cur_month,
+       MAX(CASE WHEN calmonth='2026-04' THEN actual END) AS prev_month,
+       (MAX(CASE WHEN calmonth='2026-05' THEN actual END)
+        - MAX(CASE WHEN calmonth='2026-04' THEN actual END))
+       / NULLIF(MAX(CASE WHEN calmonth='2026-04' THEN actual END), 0) * 100 AS mom_rate
+FROM m;
+```
+
+**J2. 多月环比趋势**（`LAG` 窗口函数，首月 mom 为 NULL；同比趋势见模式 A/B）：
+
+```sql
+SELECT calmonth,
+       SUM(ambperformance) AS actual,
+       LAG(SUM(ambperformance)) OVER (ORDER BY calmonth) AS prev_month,
+       (SUM(ambperformance) - LAG(SUM(ambperformance)) OVER (ORDER BY calmonth))
+         / NULLIF(LAG(SUM(ambperformance)) OVER (ORDER BY calmonth), 0) * 100 AS mom_rate
+FROM dm.dm_fin_operations_mix_sum_t
+WHERE calmonth BETWEEN '2026-01' AND '2026-05'
+  AND node_desc2 = '瓷砖事业部'
+  AND data_source IN ('S', 'T', 'D', '')   -- node_desc2层级
+GROUP BY calmonth
+ORDER BY calmonth;
+```
+
+> 提示：环比异常（如 2 月骤降）多由春节/季末结算造成，解读时结合日历。用户说"对比上月/环比"→ 走本模式；说"对比去年/同比"→ 走模式 B。
+
+### 模式 K：成本与毛利（Mix 表，业务标准口径）
+
+**成本口径（2026-08 业务确认）**：用户说"实际成本"→ `actual_cost_exclude_logistics`（**剔除物流成本**，业务标准口径）。`act_cost_sum_amt`（含分摊）与业绩表 `month_a_cost` 为旧口径，**非业务首选**，混用前必须说明。毛利用 `gross_profit_after_sharing`（分摊后毛利）。成本/毛利口径两表不同，**禁止跨表混算**。
+
+```sql
+SELECT calmonth,
+       SUM(ambperformance) AS actual,
+       SUM(actual_cost_exclude_logistics) AS cost_ex_logistics,
+       SUM(gross_profit_after_sharing) AS gross_profit,
+       SUM(gross_profit_after_sharing) / NULLIF(SUM(ambperformance), 0) * 100 AS margin_pct
+FROM dm.dm_fin_operations_mix_sum_t
+WHERE calmonth BETWEEN '2026-01' AND '2026-05'
+  AND node_desc2 = '瓷砖事业部'
+  AND data_source IN ('S', 'T', 'D', '')   -- node_desc2层级
+GROUP BY calmonth
+ORDER BY calmonth;
+```
+
+> 参考：瓷砖事业部月毛利率通常 23%~26%，异常偏离先查 data_source 与口径。跨多月多列 SUM 较慢（~8s），在 30s 超时内可接受。
+
 ## 数据质量检查项
 
 生成结果前检查：

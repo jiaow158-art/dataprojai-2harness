@@ -36,16 +36,19 @@ DM/业绩表本身**没有** "最后更新时间" 字段；系统改用 `pg_stat
 |----------|-----------|-----------|------|
 | 月达成额（含税，最常用） | `ambperformance` | `month_achievement` | 两表口径一致，日常"业绩"默认指这个 |
 | 月不含税净额 | `notax_sales_net_amt` | `month_notax` | 两表口径一致 |
-| 月销售面积 | `s_zxsmj` | `month_sales_area` | 两表口径一致 |
+| 月销售面积 | `zxsmj` | `month_sales_area` | 两表口径一致（2026-08 业务确认 zxsmj 为准；`s_zxsmj` 仅用于成交单价计算，不可混用） |
+| 月销售数量 | `zxssl` | — | 2026-08 业务确认 |
 | 年累计达成额 | 按月 SUM | `year_achievement` | Mix 表无 year 列，需 SUM |
 | 去年同期月达成 | — | `last_year_month_achievement` | **仅业绩表有** |
+| 上月达成（环比 MoM） | Mix 表 `calmonth` 自连接或 `LAG`（**无专用字段**） | `calday` 自连接（无专用字段） | 环比必须自己算上月，与同比（`last_year_*`）不同；详见 analyst 模式 J |
 | 目标销售额 | `target_sales_amt` (需 JOIN 目标表) | 同 | 目标表 |
-| 预算达成额 | `ambperformance_ys` | — | **仅 Mix 表有** |
-| 预测达成额 | `ambperformance_yc` | — | **仅 Mix 表有** |
-| 实际成本 | `act_cost_sum_amt` | `month_a_cost` | 口径不同（Mix 含分摊） |
+| 预算销售额 | `ambperformance_ys` | — | **仅 Mix 表有**；2026-08 业务确认名称"预算销售额"（原"预算达成额"） |
+| 预测销售额 | `ambperformance_yc` | — | **仅 Mix 表有**；2026-08 业务确认名称"预测销售额"（原"预测达成额"） |
+| 实际成本（业务标准口径） | `actual_cost_exclude_logistics` | —（无对应字段） | **2026-08 业务确认：实际成本取剔除物流成本口径，仅 Mix 表有** |
+| 实际成本（含分摊旧口径） | `act_cost_sum_amt` | `month_a_cost` | 口径不同（Mix 含分摊），非业务首选 |
 | 分摊后毛利 | `gross_profit_after_sharing` | `month_a_gross_profit` | 口径不同 |
 
-**歧义陷阱**：用户说"业绩"时，默认指 `ambperformance` / `month_achievement`（含税达成额）。"不含税"或"净额"→ `notax_sales_net_amt`。"面积"→ `s_zxsmj`。
+**歧义陷阱**：用户说"业绩"时，默认指 `ambperformance` / `month_achievement`（含税达成额）。"不含税"或"净额"→ `notax_sales_net_amt`。"面积"→ `zxsmj`。
 
 ### 1.2 维度映射
 
@@ -173,6 +176,8 @@ Mix 表有 7 个产品维度，按粒度从粗到细排列：
 4. **`prod_property` vs `external_matl_group`** 近似但不同：prod_property 按业务线分（A=瓷砖/B=卫浴/C=辅材/D=新材），external_matl_group 按对外品牌分（东鹏/梦之家/DPI CASA）。
 5. **`product_series_name` 不是业务"系列"**：该字段值为规格编号（840/612/715），与 `dimension` 一一对应（840=800×400, 612=1200×600, 715=1500×750）。用户说"系列/产品系列"时应使用 `product_brand_name`（列注释为"产品系列描述"，实际存储天然理石/柔光理石等风格系列）。
 
+**物料主数据 JOIN（2026-08 开通）**：Mix 未内嵌的产品属性——产品等级 `reserved_field6_name`、二级渠道 `tow_lev_channel_name`、产品所有权 `prod_property_name`、高值说明 `product_position_name` 等——可 JOIN 物料主数据 `dwimd.dwi_md_data_material_general_t`（26.2万行，aiuser 已可读，关联键 `material_num`，已验证与 Mix 对齐）取 `*_name` 中文，**不要硬编码码表**。⚠️ 其中 `product_position_name` 手工维护有漏，不可用于高值口径（见二-C）。字段全量清单见 docs/业绩域-指标与维度-业务确认表.xlsx ⑥（2026-08 业务逐项确认）。
+
 ### 二-B-1、用户说"下钻到产品维度"时的字段默认优先级
 
 用户只说"下钻到产品维度"、**没指定具体层级**时，按下表选默认字段（基于业务常用度+粒度合理性）：
@@ -250,6 +255,8 @@ AND (d.product_series_name IN ('918', '超大板')  -- 规格系列=918或超大
 ```
 
 **注意**：高值产品的「日业绩」(`high_value_day_achievement`) 口径略有不同——品牌范围更宽（`product_brand_code IN ('A1','A13','A14','A16','A18')`），且额外排除特惠品（`integrate_channel2 != 'GD04'`）。
+
+**⚠️ 2026-08 业务确认**：不可用物料主数据 `product_position_name`（"高值说明"=高值/非高值）替代上述判定规则——该字段为手工维护、存在漏维护，仅作参考，**不构成高值业绩口径**。
 
 #### 2. 世界印象 (`word_impression_*`)
 
@@ -538,8 +545,8 @@ GROUP BY org_code;
 | 类型 | 字段 | 来源 | 单位 | 说明 |
 |------|------|------|------|------|
 | 目标 | `target_sales_amt` | dm_dp_api_sales_target | **万元** | 需 ×10000 转元 |
-| 预算 | `ambperformance_ys` | Mix 表内置 | 元 | 年初编制 |
-| 预测 | `ambperformance_yc` | Mix 表内置 | 元 | 动态调整 |
+| 预算销售额 | `ambperformance_ys` | Mix 表内置 | 元 | 年初编制（2026-08 业务确认名） |
+| 预测销售额 | `ambperformance_yc` | Mix 表内置 | 元 | 动态调整（2026-08 业务确认名） |
 
 用户说"目标完成率"和"预算达成率"是不同概念，口语经常混用。
 
@@ -600,4 +607,5 @@ WHERE stat_year = '2026' AND stat_month = '2026-05'
 15. **【P0 组织层级固定枚举】** sales-performance 域 mix 表的 `node_desc2` 只有 **5 个有效事业部**值（按数据频次）：`瓷砖事业部` / `卫浴事业部` / `国际营销中心` / `丽适岩板` / `公司层面`（另含少量 `null` 和 `过渡部门`）。用户说"XX事业部/XX营销中心/XX岩板"→ **必须用 `node_desc2 = '精确名'`**，禁用 `LIKE '%XX%'`，因为：(a) 名称是固定枚举值，等值匹配即可；(b) `node_desc3` 里有"瓷砖国际营销中心"等含相同子串的子部门，LIKE 会跨事业部污染。子部门（如"营销一部/营销二部/卫浴营销部"）在 `node_desc3`。
 16. **【P0 聚合查询的"伪 1 行"】** `SELECT SUM(...) FROM ... WHERE <错误过滤>` 即使 0 行匹配，聚合仍返回 **1 行 NULL**。trace 里 step4 报告"1 row"看着正常，review 也会通过——这是**隐性失败**。对策：(a) 过滤条件含组织/渠道/产品时，先单独 `SELECT COUNT(*) WHERE ...` 验证有匹配行；(b) 报告里若关键指标为 NULL，必须明确说"该筛选下无数据"，禁止编造结论。
 17. **【P1 跨表下钻可行性】** 在 `dm_dp_api_sales_target` 上做产品/客户/物料/品牌下钻 = **必然失败**（该表只 14 列，无产品/客户/物料维度）。在 `ct_sales_performance_t` 上做品牌/品类/规格下钻 = **必然失败**（无产品维度字段）。下钻前必查上方「二-B-2 跨表下钻可行性表」。
+18. **【待调研·业务提出 2026-08】区域业绩按"客户/工程 WBS"归属区分**：Mix 表 `region_province_name` 为内置区域（随客户销售区域走），业绩域表内无 WBS 归属字段；工程 WBS 主数据在跨域 [wbs-master](../../sources-of-truth/business-context/wbs-master.md)（129万 WBS 元素）。若需按 WBS 归属区域业绩，须调研 LTC/订单链路表后另行扩展——当前超出本 Skill 覆盖范围，遇此类问题用 Unbook 话术引导并记录缺口。
 18. **【P1 预计算分类字段】** `ct_sales_performance_t` 独有 `high_value_*` / `large_spec_*` / `package_*` / `n1_*` / `gd04_*` / `qjcp_*` / `iw_*` / `fc_*` / `word_impression_*` / `engineering_adjust_*` / `share_warehouse_*` / `other_adjust_*` 共 **12 组预计算产品分类字段**。用户问"高值/大规格/套餐/特惠品/旗舰产品/辅材/IW/世界印象/工程差价积分/共享仓"→ 换 ct_sales_performance_t 用对应字段，不要在 mix 表上硬过滤。**判定规则详见上方「二-C」章节**（含每类的渠道、产品所有权、等级、品牌编码等完整 WHERE 条件）。
