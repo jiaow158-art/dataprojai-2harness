@@ -7,10 +7,11 @@
       "fin-cost",
       "inventory",
       "ar",
-      "sales-performance"
+      "sales-performance",
+      "sku-profitability"
     ],
     "description": "Offline evaluation dataset for Skills accuracy tracking",
-    "total": 57,
+    "total": 66,
     "passed": 30,
     "failed": 0,
     "runner": "run_eval.py"
@@ -2706,6 +2707,273 @@
         }
       ],
       "checksum": "rows=5"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_pareto",
+      "question": "2026年上半年仿古砖品类销售额TOP20的SKU及累计占比如何？",
+      "sql": "WITH ranked AS (\n  SELECT material_num, MAX(material_name) AS material_name,\n         ROUND(SUM(ambperformance)) AS amt, ROUND(SUM(zxsmj)) AS area\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-01' AND '2026-06'\n    AND data_source IN ('S','T','D','')\n    AND category_name = '仿古砖'\n  GROUP BY material_num\n), r2 AS (SELECT *, ROW_NUMBER() OVER (ORDER BY amt DESC) AS rnk FROM ranked)\nSELECT rnk, material_num, material_name, amt, area,\n       ROUND(100.0 * SUM(amt) OVER (ORDER BY rnk ROWS UNBOUNDED PRECEDING)\n             / SUM(amt) OVER (), 1) AS cum_pct\nFROM r2 ORDER BY rnk LIMIT 20;",
+      "row_count": 20,
+      "elapsed_ms": 6041,
+      "data": [
+        {
+          "rnk": 2,
+          "material_num": "T09YV152500_A",
+          "material_name": "1500X750菱花白",
+          "amt": "28209795",
+          "area": "569919",
+          "cum_pct": "3.5"
+        },
+        {
+          "rnk": 3,
+          "material_num": "YV272500_A",
+          "material_name": "1200X600菱花白",
+          "amt": "24229303",
+          "area": "481095",
+          "cum_pct": "6.4"
+        },
+        {
+          "rnk": 4,
+          "material_num": "YV802500_A",
+          "material_name": "800X800菱花白",
+          "amt": "22477962",
+          "area": "610219",
+          "cum_pct": "9.2"
+        }
+      ],
+      "checksum": "f6b498726ea2efa53731cecce30dbab6"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_trend_mom",
+      "question": "物料FG802702_A近半年销售额环比变化如何？",
+      "sql": "SELECT calmonth, ROUND(SUM(ambperformance)) AS amt, ROUND(SUM(zxsmj)) AS area,\n       ROUND(100.0 * (SUM(ambperformance) - LAG(SUM(ambperformance)) OVER (ORDER BY calmonth))\n             / NULLIF(LAG(SUM(ambperformance)) OVER (ORDER BY calmonth), 0), 1) AS mom_pct\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE material_num = 'FG802702_A' AND calmonth BETWEEN '2026-02' AND '2026-07'\n  AND data_source IN ('S','T','D','')\nGROUP BY calmonth ORDER BY calmonth;",
+      "row_count": 6,
+      "elapsed_ms": 5547,
+      "data": [
+        {
+          "calmonth": "2026-02",
+          "amt": "121100",
+          "area": "4168",
+          "mom_pct": null
+        },
+        {
+          "calmonth": "2026-03",
+          "amt": "4632468",
+          "area": "133528",
+          "mom_pct": "3725.3"
+        },
+        {
+          "calmonth": "2026-04",
+          "amt": "4408290",
+          "area": "122375",
+          "mom_pct": "-4.8"
+        }
+      ],
+      "checksum": "e2edea405520759349c6c9d9caeebe19"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_margin_quadrant",
+      "question": "近3个月SKU毛利率与销售增长率四象限数据（销售额TOP30）",
+      "sql": "WITH cur AS (\n  SELECT material_num, SUM(ambperformance) AS amt, SUM(gross_profit_after_sharing) AS gp\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-05' AND '2026-07' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n), prev AS (\n  SELECT material_num, SUM(ambperformance) AS amt\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-02' AND '2026-04' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n)\nSELECT c.material_num, ROUND(c.amt) AS amt,\n       ROUND(100.0*c.gp/NULLIF(c.amt,0),1) AS gp_rate,\n       ROUND(100.0*(c.amt-p.amt)/NULLIF(p.amt,0),1) AS growth_pct\nFROM cur c JOIN prev p USING (material_num)\nORDER BY c.amt DESC LIMIT 30;",
+      "row_count": 30,
+      "elapsed_ms": 5312,
+      "data": [
+        {
+          "material_num": "FG802702_A",
+          "amt": "18747147",
+          "gp_rate": "29.9",
+          "growth_pct": "104.6"
+        },
+        {
+          "material_num": "T09YV152500_A",
+          "amt": "17701712",
+          "gp_rate": "43.9",
+          "growth_pct": "47.1"
+        },
+        {
+          "material_num": "YV272500_A",
+          "amt": "16566982",
+          "gp_rate": "42.7",
+          "growth_pct": "87.2"
+        }
+      ],
+      "checksum": "f031d6ab7fc3c59f40975fcf05dab572"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_turnover_dos",
+      "question": "7月末库存可售天数最长的50个SKU是哪些？",
+      "sql": "WITH stock AS (\n  SELECT material, SUM(zsjkcje) AS stock_amt\n  FROM dm.dm_fin_stock_d_accage_list_c_t_2023\n  WHERE calmonth = '202607' GROUP BY material\n), cost AS (\n  SELECT material_num, AVG(m_cost) AS avg_m_cost, AVG(m_amt) AS avg_m_amt FROM (\n    SELECT material_num, calmonth, SUM(act_cost_sum_amt) AS m_cost, SUM(ambperformance) AS m_amt\n    FROM dm.dm_fin_operations_mix_sum_t\n    WHERE calmonth BETWEEN '2026-02' AND '2026-07' AND data_source IN ('S','T','D','')\n    GROUP BY material_num, calmonth) t\n  GROUP BY material_num\n)\nSELECT s.material, ROUND(s.stock_amt) AS stock_amt,\n       ROUND(s.stock_amt / NULLIF(c.avg_m_cost/30.0,0), 0) AS dos_days,\n       ROUND(s.stock_amt / NULLIF(c.avg_m_amt,0), 2) AS stock_sales_ratio\nFROM stock s JOIN cost c ON s.material = c.material_num\nORDER BY dos_days DESC NULLS LAST LIMIT 50;",
+      "row_count": 50,
+      "elapsed_ms": 5760,
+      "data": [
+        {
+          "material": "FV19D00168_B",
+          "stock_amt": "573328",
+          "dos_days": "467768",
+          "stock_sales_ratio": "8430.87"
+        },
+        {
+          "material": "T09FGP190743_A",
+          "stock_amt": "920727",
+          "dos_days": "370763",
+          "stock_sales_ratio": "5936.42"
+        },
+        {
+          "material": "T05F261534_A",
+          "stock_amt": "865365",
+          "dos_days": "260835",
+          "stock_sales_ratio": "4279.46"
+        }
+      ],
+      "checksum": "c5c37affe063feee255ec97b06da7fde"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_health_flag",
+      "question": "2026年前7个月在库SKU的健康状态分布（正常/滞销/缺货）？",
+      "sql": "SELECT health_flag, COUNT(*) AS cnt FROM (\n  SELECT COALESCE(a.material_num, s.material) AS material,\n         COALESCE(a.active_months,0) AS active_months,\n         ROUND(100.0*COALESCE(a.active_months,0)/7,0) AS active_rate,\n         ROUND(COALESCE(s.stock_amt,0)) AS stock_amt,\n         CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'\n              WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'\n              ELSE '正常' END AS health_flag\n  FROM (\n    SELECT material_num, COUNT(DISTINCT start_month) AS active_months\n    FROM dm.dm_product_inout_stock_t\n    WHERE start_month BETWEEN '2026-01' AND '2026-07'\n      AND (out_stock_qty > 0 OR out_stock_area > 0)\n    GROUP BY material_num\n  ) a FULL OUTER JOIN (\n    SELECT material, SUM(zsjkcje) AS stock_amt\n    FROM dm.dm_fin_stock_d_accage_list_c_t_2023\n    WHERE calmonth = '202607' GROUP BY material\n  ) s ON a.material_num = s.material\n) t GROUP BY health_flag ORDER BY health_flag;",
+      "row_count": 2,
+      "elapsed_ms": 2299,
+      "data": [
+        {
+          "health_flag": "正常",
+          "cnt": 41821
+        },
+        {
+          "health_flag": "滞销",
+          "cnt": 22415
+        }
+      ],
+      "checksum": "d50a3199b051a43e171f4a4c9756335c"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_newproduct_split",
+      "question": "2026年上半年新品与老品的销售额拆分如何？",
+      "sql": "WITH new_sku AS (\n  SELECT material_num FROM dwimd.dwi_md_data_material_general_t\n  WHERE product_listed_date >= '2025-07'\n), split AS (\n  SELECT CASE WHEN n.material_num IS NOT NULL THEN '新品' ELSE '老品' END AS sku_type,\n         ROUND(SUM(m.ambperformance)) AS amt,\n         COUNT(DISTINCT m.material_num) AS sku_cnt\n  FROM dm.dm_fin_operations_mix_sum_t m\n  LEFT JOIN new_sku n ON m.material_num = n.material_num\n  WHERE m.calmonth BETWEEN '2026-01' AND '2026-06' AND m.data_source IN ('S','T','D','')\n  GROUP BY 1\n)\nSELECT sku_type, sku_cnt, amt FROM split ORDER BY amt DESC;",
+      "row_count": 2,
+      "elapsed_ms": 5939,
+      "data": [
+        {
+          "sku_type": "老品",
+          "sku_cnt": 18894,
+          "amt": "2218039631"
+        },
+        {
+          "sku_type": "新品",
+          "sku_cnt": 952,
+          "amt": "519576661"
+        }
+      ],
+      "checksum": "1e698911f9a322bb72f93e29f966d8ef"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_channel_pivot",
+      "question": "物料FG802702_A在各整合渠道的销售额与毛利率？",
+      "sql": "SELECT integrate_channel__t AS channel,\n       ROUND(SUM(ambperformance)) AS amt,\n       ROUND(SUM(gross_profit_after_sharing)) AS gp,\n       ROUND(100.0*SUM(gross_profit_after_sharing)/NULLIF(SUM(ambperformance),0),1) AS gp_rate\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE material_num = 'FG802702_A' AND calmonth BETWEEN '2026-01' AND '2026-07'\n  AND data_source IN ('S','T','D','')\nGROUP BY integrate_channel__t ORDER BY amt DESC;",
+      "row_count": 4,
+      "elapsed_ms": 5372,
+      "data": [
+        {
+          "channel": "零售渠道",
+          "amt": "25983764",
+          "gp": "7818941",
+          "gp_rate": "30.1"
+        },
+        {
+          "channel": "工程渠道",
+          "amt": "2126117",
+          "gp": "445281",
+          "gp_rate": "20.9"
+        },
+        {
+          "channel": "整装渠道",
+          "amt": "387946",
+          "gp": "156025",
+          "gp_rate": "40.2"
+        }
+      ],
+      "checksum": "a1c2df14a3453929fa73d034d6165e8d"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_fall_top10",
+      "question": "7月末存货跌价TOP10的SKU？",
+      "sql": "SELECT material, MAX(material___t) AS material_name,\n       ROUND(SUM(aging_sum_fall_amt)) AS fall_amt,\n       ROUND(SUM(zsjkcje)) AS stock_amt,\n       ROUND(SUM(aging_1_2_year_fall_amt)) AS fall_1_2y,\n       ROUND(SUM(aging_2_3_year_fall_amt)) AS fall_2_3y,\n       ROUND(SUM(aging_3_4_year_fall_amt)) AS fall_3_4y,\n       ROUND(SUM(aging_4_year_fall_amt)) AS fall_4y\nFROM dm.dm_fin_stock_d_accage_list_c_t_2023\nWHERE calmonth = '202607'\nGROUP BY material ORDER BY fall_amt DESC LIMIT 10;",
+      "row_count": 10,
+      "elapsed_ms": 1317,
+      "data": [
+        {
+          "material": "QFG271005_A",
+          "material_name": "1200X600波兰灰",
+          "fall_amt": "1993485",
+          "stock_amt": "6644952",
+          "fall_1_2y": "0",
+          "fall_2_3y": "1993485",
+          "fall_3_4y": "0",
+          "fall_4y": "0"
+        },
+        {
+          "material": "MG29769977_A",
+          "material_name": "2800X1200起源珍珠白光面岩板 6mm  惊爆",
+          "fall_amt": "1419056",
+          "stock_amt": "2838111",
+          "fall_1_2y": "0",
+          "fall_2_3y": "0",
+          "fall_3_4y": "0",
+          "fall_4y": "1419056"
+        },
+        {
+          "material": "MG29772912_A",
+          "material_name": "2800X1200鱼肚金光面 6mm  惊爆",
+          "fall_amt": "1037607",
+          "stock_amt": "2075214",
+          "fall_1_2y": "0",
+          "fall_2_3y": "0",
+          "fall_3_4y": "0",
+          "fall_4y": "1037607"
+        }
+      ],
+      "checksum": "35e9f1212f2699be526c552af757fc49"
+    },
+    {
+      "domain": "sku-profitability",
+      "pattern": "sku_score_top20",
+      "question": "SKU综合效益评分TOP20及处置建议？",
+      "sql": "WITH cur AS (\n  SELECT material_num, SUM(ambperformance) AS amt, SUM(gross_profit_after_sharing) AS gp\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-05' AND '2026-07' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n), act AS (\n  SELECT material_num, COUNT(DISTINCT start_month) AS active_months\n  FROM dm.dm_product_inout_stock_t\n  WHERE start_month BETWEEN '2026-01' AND '2026-07'\n    AND (out_stock_qty > 0 OR out_stock_area > 0)\n  GROUP BY material_num\n), stk AS (\n  SELECT material, SUM(zsjkcje) AS stock_amt, SUM(aging_sum_fall_amt) AS fall_amt\n  FROM dm.dm_fin_stock_d_accage_list_c_t_2023 WHERE calmonth='202607' GROUP BY material\n), base AS (\n  SELECT c.material_num, c.amt, c.gp, COALESCE(a.active_months,0) AS active_months,\n         COALESCE(s.stock_amt,0) AS stock_amt, COALESCE(s.fall_amt,0) AS fall_amt\n  FROM cur c\n  LEFT JOIN act a ON c.material_num=a.material_num\n  LEFT JOIN stk s ON c.material_num=s.material\n  WHERE c.amt > 0\n), scored AS (\n  SELECT *,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY amt),1) AS s_sales,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY gp),1) AS s_gp,\n    ROUND(100*active_months/7.0,1) AS s_active,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt DESC),1) AS s_stock_inv,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt/NULLIF(amt,0) DESC),1) AS s_turnover\n  FROM base\n), final AS (\n  SELECT *, ROUND(s_sales*0.25+s_gp*0.30+s_active*0.20+s_stock_inv*0.15+s_turnover*0.10,1) AS score\n  FROM scored\n)\nSELECT material_num, ROUND(amt) AS amt, ROUND(fall_amt) AS fall_amt, stock_amt, score,\n       CASE WHEN score>=80 THEN '加大投入' WHEN score>=60 THEN '保留优化'\n            WHEN score>=40 THEN '调价降本' ELSE '降库存' END AS action\nFROM final ORDER BY score DESC LIMIT 20;",
+      "row_count": 20,
+      "elapsed_ms": 8213,
+      "data": [
+        {
+          "material_num": null,
+          "amt": "7587087",
+          "fall_amt": "0",
+          "stock_amt": "0",
+          "score": "71.6",
+          "action": "保留优化"
+        },
+        {
+          "material_num": "MV31792245_A",
+          "amt": "1475712",
+          "fall_amt": "0",
+          "stock_amt": "0E-10",
+          "score": "70.9",
+          "action": "保留优化"
+        },
+        {
+          "material_num": "YF27D04400_A",
+          "amt": "1331851",
+          "fall_amt": "0",
+          "stock_amt": "0E-10",
+          "score": "70.6",
+          "action": "保留优化"
+        }
+      ],
+      "checksum": "160e181149eaae3f0da244c79199378b"
     }
   ]
 }
