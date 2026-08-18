@@ -28,6 +28,9 @@ description: 库存仓储领域数据知识库。当用户询问库存账龄、�
 | [cxc-daily.md](references/cxc-daily.md) | 仓协销日报(CXC)、期初期末库存、出入库面积、销售出库 |
 | [inout-stock.md](references/inout-stock.md) | 产品出入库明细、入库量/面积、出库量/面积、期末库存 |
 | [safestock-lowturnover.md](references/safestock-lowturnover.md) | 安全库存、低周转库存、残次品库存、缺货超期、库存周转率 |
+| [stock-fall-list.md](references/stock-fall-list.md) | **存货跌价（上市口径）**。计提比例、库龄分段、天级细分、跌价 TOP |
+| [chdj-capital-cost.md](references/chdj-capital-cost.md) | **阿米巴存货价值/资金成本**。stat_month=YYYY-MM |
+| [capital-cost-table.md](references/capital-cost-table.md) | **库存资金成本表** |
 | [data-lineage.md](references/data-lineage.md) | 数据血缘、表之间如何关联、从源表到报表的路径 |
 
 ## 跨域共享参考

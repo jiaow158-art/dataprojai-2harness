@@ -272,6 +272,20 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 
 ---
 
+## 存货跌价与资金成本
+
+| 概念 | 权威字段 | 所在表 |
+|---|---|---|
+| 跌价准备（预计算，含计提比例 0%/20%/30%/50%/50%） | `aging_sum_fall_amt` | `dm_fin_stock_d_accage_list_c_t_2023`（上市口径，calmonth=YYYYMM） |
+| 库存金额（上市口径） | `zsjkcje` | 同上 |
+| 库龄分段金额（天级可聚半年口径） | `aging_*_amt` | 同上 |
+| 存货价值（阿米巴口径） | `inventory_value` | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） |
+| 库存资金成本 | `capital_cost*` | 同上 / `dm_fin_stock_capital_cost_t` |
+
+**口径决策**：问跌价/库龄/上市口径库存 → 上市口径表；问阿米巴分摊/资金成本 → CHDJ 表。两套库存金额（14.3亿 vs 6.35亿，202607）不可混用。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)。
+
+---
+
 ## 八、关联维度表
 
 | 维度 | 表 | 关联键 |
