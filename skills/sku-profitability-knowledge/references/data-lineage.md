@@ -15,7 +15,7 @@
 ## 关联键
 
 ```
-Mix.material_num = 出入库.material_num = 上市口径.material = capital_cost_t.material_num = 主数据.material_num
+Mix.material_num = 出入库.material_num = 上市口径.material = capital_cost_t.material_code = CHDJ.material_num = 主数据.material_num
 ```
 
 - Mix ↔ 主数据：品类/产品层次/上市日期丰富维度（JOIN 主数据取最新版本）
