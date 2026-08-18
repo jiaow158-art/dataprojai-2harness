@@ -17,6 +17,13 @@
 | `material_name` | 物料名称 |
 | `material_id` | 代理键 |
 
+### 上市与新品字段
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `product_listed_date` | varchar | 上市日期，格式：`YYYY-MM`（月度精度，如 `2024-09`）。填充率 3.8%（10,071/262,088）——空值表示未填，判空用 `LENGTH(TRIM(...))>0` |
+| `new_product_code` / `new_product_name` | varchar | 新品编码/名称，填充率 12.1%（31,764/262,088）。取值示例：`A002`（编码形态）；大量为 null。圈定新品批次：配合上市日期（如 `product_listed_date >= 'YYYY-MM'`）或 new_product_code 非空 |
+
 ### 分类层级
 
 | 字段 | 说明 | 唯一值数 |
