@@ -139,20 +139,21 @@ def _validate_chart_section(s, p, err):
             n = _count_data_points(opt)
             if n > MAX_DATA_POINTS:
                 err(cp + ".option", "数据点 %d 超上限 %d（先聚合再报告）" % (n, MAX_DATA_POINTS))
-        for si, se in enumerate(opt.get("series") or []):
-            if isinstance(se, dict):
-                svf = se.get("valueFormat")
-                if svf is not None and (not isinstance(svf, str) or not VALUE_FORMAT_RE.match(svf)):
-                    err(cp + ".option.series[%d].valueFormat" % si,
-                        "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % svf)
-        yax = opt.get("yAxis")
-        ax_list = yax if isinstance(yax, list) else ([yax] if yax else [])
-        for yi_, ax in enumerate(ax_list):
-            if isinstance(ax, dict):
-                avf = ax.get("valueFormat")
-                if avf is not None and (not isinstance(avf, str) or not VALUE_FORMAT_RE.match(avf)):
-                    err(cp + ".option.yAxis[%d].valueFormat" % yi_,
-                        "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % avf)
+            for si, se in enumerate(opt.get("series") or []):
+                if isinstance(se, dict):
+                    svf = se.get("valueFormat")
+                    if svf is not None and (not isinstance(svf, str) or not VALUE_FORMAT_RE.match(svf)):
+                        err(cp + ".option.series[%d].valueFormat" % si,
+                            "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % svf)
+            yax = opt.get("yAxis")
+            ax_list = yax if isinstance(yax, list) else ([yax] if yax else [])
+            for yi_, ax in enumerate(ax_list):
+                if isinstance(ax, dict):
+                    avf = ax.get("valueFormat")
+                    if avf is not None and (not isinstance(avf, str) or not VALUE_FORMAT_RE.match(avf)):
+                        ax_path = ("yAxis[%d]" % yi_) if isinstance(yax, list) else "yAxis"
+                        err(cp + ".option." + ax_path + ".valueFormat",
+                            "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % avf)
     ana = s.get("analysis")
     if not isinstance(ana, list) or not ana:
         err(p + ".analysis", "chart-with-analysis 必须有非空 analysis[]")
@@ -178,17 +179,19 @@ def _validate_table_section(s, p, err):
         err(p + ".table.columns", "必须是非空数组")
     if not isinstance(tbl.get("rows"), list) or not tbl["rows"]:
         err(p + ".table.rows", "必须是非空数组")
+    rows = tbl["rows"] if isinstance(tbl.get("rows"), list) else []
     ps = tbl.get("pageSize")
     if ps is not None and (isinstance(ps, bool) or not isinstance(ps, int) or ps < 1):
         err(p + ".table.pageSize", "必须是 >=1 的整数")
-    for ri, row in enumerate(tbl["rows"]):
+    for ri, row in enumerate(rows):
         if not isinstance(row, list):
             err(p + ".table.rows[%d]" % ri, "必须是数组")
             continue
         for ci, cell in enumerate(row):
             if isinstance(cell, dict):
-                if not str(cell.get("v") or "").strip():
-                    err(p + ".table.rows[%d][%d].v" % (ri, ci), "不能为空")
+                v_val = cell.get("v")
+                if not isinstance(v_val, str) or not v_val.strip():
+                    err(p + ".table.rows[%d][%d].v" % (ri, ci), "必须是非空字符串")
                 if cell.get("tone") not in ("good", "warn", "bad", "na"):
                     err(p + ".table.rows[%d][%d].tone" % (ri, ci),
                         "非法值 %r，允许 good/warn/bad/na" % cell.get("tone"))

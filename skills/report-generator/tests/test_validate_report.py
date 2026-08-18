@@ -155,3 +155,30 @@ def test_tone_cell_missing_v_fails():
     r["sections"][1]["table"]["rows"] = [["1", {"tone": "good"}]]
     errs = vr.validate_data(r)
     assert any("rows[0][1].v" in e for e in errs), errs
+
+
+def test_chart_option_nondict_does_not_crash():
+    r = _base_report()
+    r["sections"][0]["chart"]["option"] = None
+    errs = vr.validate_data(r)
+    assert any("option" in e for e in errs) or errs  # 不得抛异常
+    r["sections"][0]["chart"]["option"] = ["x"]
+    errs = vr.validate_data(r)
+    assert isinstance(errs, list)
+
+
+def test_table_rows_missing_does_not_crash():
+    r = _base_report()
+    r["sections"][1]["table"]["rows"] = None
+    errs = vr.validate_data(r)
+    assert isinstance(errs, list)
+    r["sections"][1]["table"].pop("rows")
+    errs = vr.validate_data(r)
+    assert any("rows" in e for e in errs)
+
+
+def test_tone_cell_nonstring_v_fails():
+    r = _base_report()
+    r["sections"][1]["table"]["rows"] = [["1", {"v": 123, "tone": "good"}]]
+    errs = vr.validate_data(r)
+    assert any("rows[0][1].v" in e for e in errs), errs
