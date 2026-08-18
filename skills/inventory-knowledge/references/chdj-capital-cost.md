@@ -20,14 +20,21 @@
 | `percentage` | 销售/工厂比例 |
 | `prod_channal` / `prod_channal_name` | 产品渠道（注意拼写 channal） |
 | `base_name` / `zww010___t` | 基地/产区 |
-| `zdpsyb` | 事业部 |
+| `plant` / `plant___t` | 工厂 |
+| `stor_loc` / `stor_loc___t` | 库存地点 |
+| `sales_grp` | 销售组 |
+| `comp_code` | 公司 |
+| `stockcat` | 库存类型（含 'K'，与上市口径表排除 K 不同，口径差的可查证据） |
+| `distribution_channel` | 渠道 |
+| `ext_grp` | 外部物料组 |
+| `zdpsyb` | 事业部（码表见 [org-hierarchy.md](../../sources-of-truth/business-context/org-hierarchy.md) node2 枚举，去 H 前缀；11000011/11000012 为卫浴旧组织，ETL 注释标注） |
 | `product_level_code` / `prod_line_name` | 产品层次/产品线 |
 
 ## 陷阱
 
 1. **日期格式 YYYY-MM**（上市口径表是 YYYYMM），同一查询混用两张表时必须分别处理。
 2. 存货价值口径 6.35亿 ≠ 上市口径 14.3亿（阿米巴核算范围不同），**不可跨表加减**。
-3. `capital_cost` 出现负值（2026-08 合计 -35.7万），使用前先与财务确认符号约定；确认前 SKU 效益计算中该减项标注"口径待确认"。
+3. `capital_cost` 出现负值（2026-08 合计 -35.7万），使用前先与财务确认符号约定；确认前 SKU 效益计算中该减项标注"口径待确认"。同名字段 capital_cost 在 dm_fin_stock_capital_cost_t（上市口径，month=YYYYMM）为正值且公式已验证；上市口径或需正号成本时用彼表。
 4. 表内无 `calmonth` 字段，时间过滤字段名是 `stat_month`。
 
 ## 常见查询模式
@@ -40,7 +47,7 @@ SELECT material_num, MAX(material_name) AS material_name,
 FROM dm.dm_ambv2_chdj_grp_t
 WHERE stat_month = '2026-08'
 GROUP BY material_num
-ORDER BY capital_cost ASC
+ORDER BY ABS(SUM(capital_cost)) DESC
 LIMIT 20;
 ```
 
@@ -50,5 +57,6 @@ LIMIT 20;
 
 ## 关联文档
 
+- [metrics.md](metrics.md) — 语义层（决策树、日期格式总览、口径决策）
 - [stock-fall-list.md](stock-fall-list.md) — 上市口径跌价（另一套库存口径）
 - [capital-cost-table.md](capital-cost-table.md) — 库存资金成本表

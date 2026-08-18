@@ -103,8 +103,14 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 ├── 涉及"低周转出库"/"残次品出库"？
 │   ├── 低周转 → dm.dm_wm_low_turnover_stockout_detail_t
 │   └── 残次品 → dm.dm_wm_defective_product_stockout_t
-├── 涉及"库存周转率"？
+├── 涉及“库存周转率”？
 │   └── 用 dm.dm_otd_wm_stock_turnover_m（40行，预计算）
+├── 涉及“跌价准备”/“库龄分段金额”/“上市口径库存金额”？
+│   └── 用 dm.dm_fin_stock_d_accage_list_c_t_2023
+├── 涉及“库存资金成本”（上市口径、批次级、正值）？
+│   └── 用 dm.dm_fin_stock_capital_cost_t
+├── 涉及“阿米巴存货价值”/“分摊资金成本”（符号待确认）？
+│   └── 用 dm.dm_ambv2_chdj_grp_t
 └── 不确定？
     └── 默认用 dm.dm_fin_stock_detail_accage_t_2023（最全，但查询必须带 calmonth 过滤）
 ```
@@ -171,7 +177,7 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 
 | 表名 | 行数 | 关键时间字段 | 主要用途 |
 |------|------|-------------|----------|
-| dm_product_inout_stock_t | 99万 | start_month (YYYYMM) | 产品出入库汇总 |
+| dm_product_inout_stock_t | 99万 | start_month (YYYY-MM) | 产品出入库汇总 |
 | dm_otd_wm_stock_stat_month_t | 105万 | month_date | 库存月报+库龄分段 |
 | dm_dp_api_warehouse_stock | 1.7万 | dw_last_update_date | 仓库库存快照 API |
 | dm_dp_api_stockout_oudue | 0.5万 | stat_month_ym | 缺货超期 |
@@ -190,10 +196,13 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | dm_fin_stock_detail_accage_t | `calmonth` | YYYYMM | `'202606'` |
 | dm_rpt_wm_cxc_day_sum | `stat_date` | YYYYMMDD | `'20260606'` |
 | dm_b1_transit_inventory_t | `doc_month` | YYYY-MM | `'2026-06'` |
-| dm_product_inout_stock_t | `start_month` | YYYYMM | `'202606'` |
+| dm_product_inout_stock_t | `start_month` | YYYY-MM | `'2026-06'` |
 | dm_otd_wm_stock_stat_month_t | `month_date` | 需确认 | 不同数据源可能不同 |
 | dm_otd_wm_stock_turnover_m | `stat_month` | text | |
 | 低周转/残次品表 | `voucher_post_date` | timestamp | `'2026-06-01'` |
+| dm_fin_stock_d_accage_list_c_t_2023 | `calmonth` | YYYYMM | `'202608'` |
+| dm_fin_stock_capital_cost_t | `month` | YYYYMM | `'202608'` |
+| dm_ambv2_chdj_grp_t | `stat_month` | YYYY-MM | `'2026-08'` |
 
 ⚠️ **最大陷阱**：同一个库不同表的时间字段格式不一致！YYYYMM vs YYYY-MM vs YYYYMMDD vs timestamp。
 
@@ -248,8 +257,8 @@ WHERE stat_date = '20260606'
 -- 低周转/残次品表：用 timestamp 过滤
 WHERE voucher_post_date >= '2026-01-01'
 
--- 产品出入库表：start_month 格式 YYYYMM
-WHERE start_month = '202606'
+-- 产品出入库表：start_month 格式 YYYY-MM
+WHERE start_month = '2026-06'
 
 -- dm_product_inout_stock_t 规格字段带下划线
 SELECT dimension_ FROM dm.dm_product_inout_stock_t
@@ -272,7 +281,7 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 
 ---
 
-## 存货跌价与资金成本
+## 八、存货跌价与资金成本
 
 | 概念 | 权威字段 | 所在表 |
 |---|---|---|
@@ -282,11 +291,11 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 | 存货价值（阿米巴口径） | `inventory_value` | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） |
 | 库存资金成本 | `capital_cost*` | 同上 / `dm_fin_stock_capital_cost_t` |
 
-**口径决策**：问跌价/库龄/上市口径库存 → 上市口径表；问阿米巴分摊/资金成本 → CHDJ 表。两套库存金额（14.3亿 vs 6.35亿，202607）不可混用。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)。
+**口径决策**：问跌价/库龄/上市口径库存金额 → dm_fin_stock_d_accage_list_c_t_2023；问库存资金成本 → 默认 dm_fin_stock_capital_cost_t（上市口径、批次级、正值、公式已验证），阿米巴分摊口径才用 dm_ambv2_chdj_grp_t（其 capital_cost 为负值、符号语义待 ETL 确认）。两套库存金额（14.3亿 vs 6.35亿，2026-08）不可混用。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)。
 
 ---
 
-## 八、关联维度表
+## 九、关联维度表
 
 | 维度 | 表 | 关联键 |
 |------|-----|--------|

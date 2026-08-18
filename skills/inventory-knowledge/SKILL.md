@@ -30,7 +30,7 @@ description: 库存仓储领域数据知识库。当用户询问库存账龄、�
 | [safestock-lowturnover.md](references/safestock-lowturnover.md) | 安全库存、低周转库存、残次品库存、缺货超期、库存周转率 |
 | [stock-fall-list.md](references/stock-fall-list.md) | **存货跌价（上市口径）**。计提比例、库龄分段、天级细分、跌价 TOP |
 | [chdj-capital-cost.md](references/chdj-capital-cost.md) | **阿米巴存货价值/资金成本**。stat_month=YYYY-MM |
-| [capital-cost-table.md](references/capital-cost-table.md) | **库存资金成本表** |
+| [capital-cost-table.md](references/capital-cost-table.md) | **库存资金成本（上市口径，批次级，month=YYYYMM，正值）** |
 | [data-lineage.md](references/data-lineage.md) | 数据血缘、表之间如何关联、从源表到报表的路径 |
 
 ## 跨域共享参考
@@ -58,7 +58,10 @@ DWS 层实际需要的过滤：
   - `dm_fin_stock_detail_accage_t_2023`：`calmonth` (YYYYMM)
   - `dm_b1_transit_inventory_t`：`doc_month` (YYYY-MM)
   - `dm_rpt_wm_cxc_day_sum`：`stat_date` (YYYYMMDD)
-  - `dm_product_inout_stock_t`：`start_month` (YYYYMM)
+  - `dm_product_inout_stock_t`：`start_month` (YYYY-MM)
+  - `dm_fin_stock_d_accage_list_c_t_2023`：`calmonth` (YYYYMM)
+  - `dm_fin_stock_capital_cost_t`：`month` (YYYYMM)
+  - `dm_ambv2_chdj_grp_t`：`stat_month` (YYYY-MM)
   - 低周转/残次品表：`voucher_post_date` (timestamp)
 - 大表（>1000万行）必须带时间范围过滤，避免全表扫描
 - 在途库存必须排除预测月份：`doc_month <= '当前月'`
