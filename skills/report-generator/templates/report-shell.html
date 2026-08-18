@@ -305,6 +305,10 @@
     font-weight: 600;
   }
   .data-table td.neg { color: var(--color-up); }
+    .data-table td.tone-good { color: #2e9e5b; font-weight: 600; }
+    .data-table td.tone-warn { color: #c9930a; font-weight: 600; }
+    .data-table td.tone-bad { color: #e05252; font-weight: 600; }
+    .data-table td.tone-na { color: #8a94a6; }
 
   /* ---- Pagination ---- */
   .pagination {
@@ -482,9 +486,10 @@
     percent:        { div: 1,         unit: '%',   sep: false },
     signed_percent: { div: 1,         unit: '%',   sep: false, sign: true },
     sqm_wan:        { div: 10000,     unit: '万㎡', sep: false },
-    yuan:           { div: 1,         unit: '元',  sep: true  }
+    yuan:           { div: 1,         unit: '元',  sep: true  },
+    int:            { div: 1,         unit: '',   sep: true  }
   };
-  var FORMAT_DEFAULT_DEC = { yi: 2, wan: 0, percent: 1, signed_percent: 1, sqm_wan: 1, yuan: 0 };
+  var FORMAT_DEFAULT_DEC = { yi: 2, wan: 0, percent: 1, signed_percent: 1, sqm_wan: 1, yuan: 0, int: 0 };
 
   function parseValueFormat(vf) {
     var m = /^([a-z_]+)(?::(\d))?$/.exec(vf || '');
@@ -728,9 +733,15 @@
         rowHTML += '<tr><td>' + (i + 1) + '</td>';
         tbl.rows[i].forEach(function(cell, ci) {
           var cls = '';
-          var text = String(cell);
+          var tone = '';
+          var raw = cell;
+          if (cell !== null && typeof cell === 'object') {
+            tone = cell.tone || '';
+            raw = cell.v;
+          }
+          var text = String(raw);
           /* Detect numeric cells: pure number, no Chinese unit suffix */
-          if (typeof cell === 'number' || (!isNaN(parseFloat(text)) && isFinite(text) && text.trim() !== '')) {
+          if (typeof raw === 'number' || (!isNaN(parseFloat(text)) && isFinite(text) && text.trim() !== '')) {
             /* Skip values that already have Chinese formatting */
             if (/[亿万%％]$/.test(text)) {
               cls = '';
@@ -745,6 +756,7 @@
           if (!isNaN(numVal) && numVal < 0) {
             cls += ' neg';
           }
+          if (tone) cls = cls ? cls + ' tone-' + tone : 'tone-' + tone;
           rowHTML += '<td class="' + cls + '">' + escapeHTML(text) + '</td>';
         });
         rowHTML += '</tr>';
@@ -816,36 +828,62 @@
           if (!dom) return;
           try {
             var mergedOption = deepMerge(JSON.parse(JSON.stringify(darkBase)), ch.option || {});
-            var fns = null;
-            if (ch.valueFormat) {
-              fns = formatFactory(ch.valueFormat, ch.tooltipTemplate || 'multi');
-              if (!fns) {
-                dom.innerHTML = '<div class="chart-error">非法 valueFormat: ' + escapeHTML(ch.valueFormat)
-                  + ' — 允许 yi/wan/percent/signed_percent/sqm_wan/yuan（可带 :N）</div>';
-                return;
-              }
+            /* ---- v2.1: valueFormat 就近作用域 (series > chart; yAxis > chart) ---- */
+            var chartSpec = parseValueFormat(ch.valueFormat || '');
+            if (ch.valueFormat && !chartSpec) {
+              dom.innerHTML = '<div class="chart-error">非法 valueFormat: ' + escapeHTML(ch.valueFormat)
+                + ' — 允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int（可带 :N）</div>';
+              return;
             }
-            if (fns) {
-              var yAxes = mergedOption.yAxis;
-              (Array.isArray(yAxes) ? yAxes : [yAxes]).forEach(function (ax) {
-                if (!ax) return;
+            var seriesSpecs = [];
+            (mergedOption.series || []).forEach(function (se) {
+              if (se && se.valueFormat && !parseValueFormat(se.valueFormat)) {
+                dom.innerHTML = '<div class="chart-error">非法 series valueFormat: ' + escapeHTML(se.valueFormat) + '</div>';
+              }
+              seriesSpecs.push(parseValueFormat((se && se.valueFormat) || '') || chartSpec);
+            });
+            /* yAxis 轴标签：就近取格式 */
+            var yAxes = mergedOption.yAxis;
+            (Array.isArray(yAxes) ? yAxes : [yAxes]).forEach(function (ax) {
+              if (!ax) return;
+              var axSpec = parseValueFormat(ax.valueFormat || '') || chartSpec;
+              if (axSpec) {
                 ax.axisLabel = ax.axisLabel || {};
-                if (!ax.axisLabel.formatter) ax.axisLabel.formatter = fns.axis;
-              });
+                if (!ax.axisLabel.formatter) ax.axisLabel.formatter = function (v) { return formatValue(v, axSpec); };
+              }
+            });
+            /* tooltip：逐系列取格式 */
+            if (seriesSpecs.length) {
               if (!mergedOption.tooltip) mergedOption.tooltip = { trigger: 'axis' };
               if (!mergedOption.tooltip.trigger) mergedOption.tooltip.trigger = 'axis';
-              if (!mergedOption.tooltip.formatter) mergedOption.tooltip.formatter = fns.tooltip;
+              if (!mergedOption.tooltip.formatter) {
+                mergedOption.tooltip.formatter = (ch.tooltipTemplate === 'pie')
+                  ? function (p) {
+                      var sp = seriesSpecs[p.seriesIndex] || chartSpec;
+                      return p.name + ': ' + (sp ? formatValue(p.value, sp) : p.value) + ' (' + p.percent + '%)';
+                    }
+                  : function (params) {
+                      var r = params[0].name + '<br/>';
+                      params.forEach(function (p) {
+                        var sp = seriesSpecs[p.seriesIndex] || chartSpec;
+                        r += p.marker + ' ' + p.seriesName + ': ' + (sp ? formatValue(p.value, sp) : p.value) + '<br/>';
+                      });
+                      return r;
+                    };
+              }
               if (mergedOption.tooltip.trigger === 'item' || ch.tooltipTemplate === 'pie') {
                 mergedOption.tooltip.trigger = 'item';
               }
-              (mergedOption.series || []).forEach(function (se) {
+              (mergedOption.series || []).forEach(function (se, i) {
+                if (!se) return;
                 se.label = se.label || {};
                 if (se.type === 'pie') {
                   if (!se.label.formatter) se.label.formatter = function (p) {
                     return p.name + '\n' + p.percent + '%';
                   };
                 } else if (!se.label.formatter) {
-                  se.label.formatter = fns.label;
+                  var sp2 = seriesSpecs[i];
+                  if (sp2) se.label.formatter = function (p) { return formatValue(p.value, sp2); };
                 }
               });
             }
