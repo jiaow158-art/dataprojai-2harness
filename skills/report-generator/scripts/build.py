@@ -79,7 +79,7 @@ def do_build(json_path, domain, out_dir):
     out_path = os.path.join(out_dir, fname)
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
-    post = validate_report.validate_html(html, node_check=False)
+    post = validate_report.validate_html(html, node_check=True)
     if post:
         print("生成后校验失败")
         for e in post:

@@ -510,23 +510,6 @@
     return (cfg.sign && v > 0 ? '+' : '') + out + cfg.unit;
   }
 
-  function formatFactory(vf, template) {
-    var spec = parseValueFormat(vf);
-    if (!spec) return null;
-    return {
-      axis: function (v) { return formatValue(v, spec); },
-      label: function (p) { return formatValue(p.value, spec); },
-      tooltip: (template === 'pie')
-        ? function (p) { return p.name + ': ' + formatValue(p.value, spec) + ' (' + p.percent + '%)'; }
-        : function (params) {
-            var r = params[0].name + '<br/>';
-            params.forEach(function (p) {
-              r += p.marker + ' ' + p.seriesName + ': ' + formatValue(p.value, spec) + '<br/>';
-            });
-            return r;
-          }
-    };
-  }
 
   /* ---- ECharts light base option ---- */
   var darkBase = {
@@ -756,7 +739,9 @@
           if (!isNaN(numVal) && numVal < 0) {
             cls += ' neg';
           }
-          if (tone) cls = cls ? cls + ' tone-' + tone : 'tone-' + tone;
+          if (tone === 'good' || tone === 'warn' || tone === 'bad' || tone === 'na') {
+            cls = cls ? cls + ' tone-' + tone : 'tone-' + tone;
+          }
           rowHTML += '<td class="' + cls + '">' + escapeHTML(text) + '</td>';
         });
         rowHTML += '</tr>';
@@ -836,12 +821,17 @@
               return;
             }
             var seriesSpecs = [];
+            var badSeriesVf = null;
             (mergedOption.series || []).forEach(function (se) {
               if (se && se.valueFormat && !parseValueFormat(se.valueFormat)) {
-                dom.innerHTML = '<div class="chart-error">非法 series valueFormat: ' + escapeHTML(se.valueFormat) + '</div>';
+                badSeriesVf = se.valueFormat;
               }
               seriesSpecs.push(parseValueFormat((se && se.valueFormat) || '') || chartSpec);
             });
+            if (badSeriesVf) {
+              dom.innerHTML = '<div class="chart-error">非法 series valueFormat: ' + escapeHTML(badSeriesVf) + '</div>';
+              return;
+            }
             /* yAxis 轴标签：就近取格式 */
             var yAxes = mergedOption.yAxis;
             (Array.isArray(yAxes) ? yAxes : [yAxes]).forEach(function (ax) {
