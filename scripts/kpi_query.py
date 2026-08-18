@@ -113,11 +113,12 @@ def main() -> int:
     unit_price_prev = round(sales_prev / qty_prev, 1) if sales_prev is not None and qty_prev else None
     unit_price_ly = round(sales_ly / qty_ly, 1) if sales_ly is not None and qty_ly else None
 
+    # 金额类指标缩放到「万」显示（原始值为元）
     kpis = [
-        {"key": "sales", "label": "销售额（本月）", "value": sales, "unit": "万", "mom": pct(sales, sales_prev), "yoy": pct(sales, sales_ly)},
+        {"key": "sales", "label": "销售额（本月）", "value": round(sales / 10000, 1) if sales is not None else None, "unit": "万", "mom": pct(sales, sales_prev), "yoy": pct(sales, sales_ly)},
         {"key": "orders", "label": "订单数（本月）", "value": qty, "unit": "单", "mom": pct(qty, qty_prev), "yoy": pct(qty, qty_ly)},
         {"key": "unit_price", "label": "客单价（本月）", "value": unit_price, "unit": "元", "mom": pct(unit_price, unit_price_prev), "yoy": pct(unit_price, unit_price_ly)},
-        {"key": "gross_profit", "label": "毛利额（本月）", "value": gp, "unit": "万", "mom": pct(gp, gp_prev), "yoy": pct(gp, gp_ly)},
+        {"key": "gross_profit", "label": "毛利额（本月）", "value": round(gp / 10000, 1) if gp is not None else None, "unit": "万", "mom": pct(gp, gp_prev), "yoy": pct(gp, gp_ly)},
         {"key": "inventory_warning", "label": "库存预警商品", "value": float(warning_row["cnt"]) if warning_row and warning_row["cnt"] else None, "unit": "个", "mom": None, "yoy": None},
     ]
     print(json.dumps({"month": month_key(*cur_m), "kpis": kpis}, ensure_ascii=False))
