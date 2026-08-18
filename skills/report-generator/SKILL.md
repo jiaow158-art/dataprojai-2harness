@@ -51,7 +51,7 @@ description: 跨域报告生成工具。当用户在收到 Analyst 输出后说"
 
 ## valueFormat 格式声明表（核心协议）
 
-数值一律以**原始数值**传入 series.data，展示格式用 `valueFormat` 字符串声明，模板的 formatFactory 自动生成 axis/label/tooltip formatter。可带 `:N` 覆盖小数位。
+数值一律以**原始数值**传入 series.data，展示格式用 `valueFormat` 字符串声明，模板按就近作用域把格式声明装配为 ECharts formatter。可带 `:N` 覆盖小数位。
 
 | 声明 | 示例输出 | 说明 |
 |------|----------|------|
@@ -61,10 +61,13 @@ description: 跨域报告生成工具。当用户在收到 Analyst 输出后说"
 | `signed_percent` | `+6.9%` / `-19.3%` | 带符号，默认 1 位小数 |
 | `sqm_wan` | `120.5万㎡` | 面积，万㎡ 量纲 |
 | `yuan` | `334,080,608元` | 千分位整数元 |
+| `int` / `int:1` | `1,234` / `1,234.5` | 千分位整数无单位（天数/排名/计数） |
 
 **tooltipTemplate**（chart 可选字段）：
 - `multi`（默认）：多系列悬停，逐系列列值
 - `pie`：`名称: 3.4亿 (26%)` 带占比
+
+**作用域（v2.1）**：`chart.valueFormat` 为图级默认；`series[].valueFormat`、`yAxis[].valueFormat` 就近覆盖（帕累托：柱 yi + 线 percent 双轴双格式）。表格单元格支持条件着色：`字符串` 或 `{"v": "...", "tone": "good|warn|bad|na"}`（绿/黄/红/灰）。高级图表（帕累托/四象限气泡/热力图/瀑布）的完整 option 配方见 [references/chart-recipes.md](references/chart-recipes.md)。
 
 ⛔ 数据里不允许任何 JS 函数：`formatter`/`symbolSize`/`color` 函数一律改用 `valueFormat` 声明，旧函数串被 validator 黑名单直接拒绝。
 
@@ -227,6 +230,10 @@ python3 skills/report-generator/scripts/build.py --selftest
 5. **饼图分类 ≤8**（超出归"其他"）；大表 >50 行分页
 6. **ECharts 本地内嵌**（`templates/echarts.min.js`），离线可开
 7. **build.py 自动校验 + 复验**；server 未起只给路径，不给假 URL
+
+## 图表配方（v2.1）
+
+SKU 效益等分析报告的帕累托、四象限气泡、热力图、瀑布图，直接套用 [references/chart-recipes.md](references/chart-recipes.md) 的 option 模板（纯 JSON、逐点 symbolSize 预计算、声明式 markLine）。数据点超 200 先 TOP-N。
 
 ## 已废弃脚本
 

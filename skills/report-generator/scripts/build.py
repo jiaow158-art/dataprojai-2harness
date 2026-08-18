@@ -103,11 +103,13 @@ SELFTEST_JSON = {
         {"id": "trend", "tab": "趋势", "type": "chart-with-analysis",
          "chart": {"id": "c1", "title": "图", "valueFormat": "yi:2",
                    "option": {"xAxis": {"type": "category", "data": ["1月", "2月"]},
-                              "yAxis": {"type": "value"},
-                              "series": [{"name": "s", "type": "line", "data": [1, 2]}]}},
+                              "yAxis": [{"type": "value", "valueFormat": "yi:2"},
+                                        {"type": "value", "valueFormat": "percent"}],
+                              "series": [{"name": "s", "type": "line", "data": [1, 2], "valueFormat": "int"},
+                                         {"name": "p", "type": "line", "yAxisIndex": 1, "data": [50, 100], "valueFormat": "percent"}]}},
          "analysis": [{"label": "a", "color": "blue", "text": "t"}]},
         {"id": "data", "tab": "明细", "type": "table",
-         "table": {"columns": ["A"], "rows": [["1"]]}}
+         "table": {"columns": ["A", "B"], "rows": [["1", {"v": "2", "tone": "good"}]]}}
     ],
     "provenance": {"query": "SELECT 1"}
 }
