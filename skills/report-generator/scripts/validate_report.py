@@ -23,7 +23,7 @@ import subprocess
 import sys
 import tempfile
 
-VALUE_FORMAT_RE = re.compile(r"^(yi|wan|percent|signed_percent|sqm_wan|yuan)(:[0-9])?$")
+VALUE_FORMAT_RE = re.compile(r"^(yi|wan|percent|signed_percent|sqm_wan|yuan|int)(:[0-9])?$")
 FUNC_BLACKLIST = re.compile(r"function\s*\(|\beval\s*\(")
 PLACEHOLDERS = ("{{REPORT_JSON}}", "{{REPORT_TITLE}}", "{{REPORT_META}}", "{{ECHARTS_LIB}}")
 MAX_DATA_POINTS = 200
@@ -126,9 +126,9 @@ def _validate_chart_section(s, p, err):
             err(cp + ".title", "不能为空")
         vf = c.get("valueFormat")
         if not vf:
-            err(cp + ".valueFormat", "必填（yi/wan/percent/signed_percent/sqm_wan/yuan，:N 小数位）")
+            err(cp + ".valueFormat", "必填（yi/wan/percent/signed_percent/sqm_wan/yuan/int，:N 小数位）")
         elif not isinstance(vf, str) or not VALUE_FORMAT_RE.match(vf):
-            err(cp + ".valueFormat", "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan 可带 :N" % vf)
+            err(cp + ".valueFormat", "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % vf)
         tt = c.get("tooltipTemplate")
         if tt is not None and tt not in ("multi", "pie"):
             err(cp + ".tooltipTemplate", "非法值 %r，允许 multi/pie" % tt)
@@ -139,6 +139,20 @@ def _validate_chart_section(s, p, err):
             n = _count_data_points(opt)
             if n > MAX_DATA_POINTS:
                 err(cp + ".option", "数据点 %d 超上限 %d（先聚合再报告）" % (n, MAX_DATA_POINTS))
+        for si, se in enumerate(opt.get("series") or []):
+            if isinstance(se, dict):
+                svf = se.get("valueFormat")
+                if svf is not None and (not isinstance(svf, str) or not VALUE_FORMAT_RE.match(svf)):
+                    err(cp + ".option.series[%d].valueFormat" % si,
+                        "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % svf)
+        yax = opt.get("yAxis")
+        ax_list = yax if isinstance(yax, list) else ([yax] if yax else [])
+        for yi_, ax in enumerate(ax_list):
+            if isinstance(ax, dict):
+                avf = ax.get("valueFormat")
+                if avf is not None and (not isinstance(avf, str) or not VALUE_FORMAT_RE.match(avf)):
+                    err(cp + ".option.yAxis[%d].valueFormat" % yi_,
+                        "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % avf)
     ana = s.get("analysis")
     if not isinstance(ana, list) or not ana:
         err(p + ".analysis", "chart-with-analysis 必须有非空 analysis[]")
@@ -167,6 +181,19 @@ def _validate_table_section(s, p, err):
     ps = tbl.get("pageSize")
     if ps is not None and (isinstance(ps, bool) or not isinstance(ps, int) or ps < 1):
         err(p + ".table.pageSize", "必须是 >=1 的整数")
+    for ri, row in enumerate(tbl["rows"]):
+        if not isinstance(row, list):
+            err(p + ".table.rows[%d]" % ri, "必须是数组")
+            continue
+        for ci, cell in enumerate(row):
+            if isinstance(cell, dict):
+                if not str(cell.get("v") or "").strip():
+                    err(p + ".table.rows[%d][%d].v" % (ri, ci), "不能为空")
+                if cell.get("tone") not in ("good", "warn", "bad", "na"):
+                    err(p + ".table.rows[%d][%d].tone" % (ri, ci),
+                        "非法值 %r，允许 good/warn/bad/na" % cell.get("tone"))
+            elif not isinstance(cell, (str, int, float)) or isinstance(cell, bool):
+                err(p + ".table.rows[%d][%d]" % (ri, ci), "单元格必须是字符串/数值或 {v, tone} 对象")
 
 
 def _count_data_points(opt):
