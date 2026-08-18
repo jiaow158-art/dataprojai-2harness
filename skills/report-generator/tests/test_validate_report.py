@@ -100,3 +100,58 @@ def test_validate_html_placeholder_and_marker():
     clean = '<html><script>(function(){ window.__REPORT_VALID__ = true; })();</script></body></html>'
     errs2 = vr.validate_html(clean, node_check=False)
     assert errs2 == [], f"干净HTML不应报错: {errs2}"
+
+
+# ---------- v2.1 扩展 ----------
+
+def test_series_level_valueformat_passes():
+    r = _base_report()
+    r["sections"][0]["chart"]["option"]["series"] = [
+        {"name": "a", "type": "bar", "data": [1, 2], "valueFormat": "yi"},
+        {"name": "b", "type": "line", "data": [10, 20], "valueFormat": "percent"}]
+    assert vr.validate_data(r) == []
+
+
+def test_series_level_bad_valueformat_fails():
+    r = _base_report()
+    r["sections"][0]["chart"]["option"]["series"] = [
+        {"name": "a", "type": "bar", "data": [1], "valueFormat": "billion"}]
+    errs = vr.validate_data(r)
+    assert any("series[0].valueFormat" in e for e in errs), errs
+
+
+def test_yaxis_level_valueformat_validated():
+    r = _base_report()
+    opt = r["sections"][0]["chart"]["option"]
+    opt["yAxis"] = [{"type": "value", "valueFormat": "yi:1"},
+                    {"type": "value", "valueFormat": "percent"}]
+    assert vr.validate_data(r) == []
+    opt["yAxis"][1]["valueFormat"] = "pct"
+    errs = vr.validate_data(r)
+    assert any("yAxis[1].valueFormat" in e for e in errs), errs
+
+
+def test_int_format_accepted():
+    r = _base_report()
+    r["sections"][0]["chart"]["valueFormat"] = "int"
+    assert vr.validate_data(r) == []
+
+
+def test_tone_cell_passes():
+    r = _base_report()
+    r["sections"][1]["table"]["rows"] = [["1", {"v": "正常", "tone": "good"}, {"v": "—", "tone": "na"}]]
+    assert vr.validate_data(r) == []
+
+
+def test_tone_cell_bad_enum_fails():
+    r = _base_report()
+    r["sections"][1]["table"]["rows"] = [["1", {"v": "x", "tone": "green"}]]
+    errs = vr.validate_data(r)
+    assert any("tone" in e for e in errs), errs
+
+
+def test_tone_cell_missing_v_fails():
+    r = _base_report()
+    r["sections"][1]["table"]["rows"] = [["1", {"tone": "good"}]]
+    errs = vr.validate_data(r)
+    assert any("rows[0][1].v" in e for e in errs), errs
