@@ -45,7 +45,7 @@
 
 1. `dm_product_inout_stock_t` 的规格字段是 `dimension_`（有下划线后缀），不是 `dimension`
 2. 湖南基地有 `dm_product_inout_stock_hunan_t`（21 列）和 `dm_original_product_inout_stock_hunan_t`（31 列含金额/成本中心）
-3. 时间字段为 `start_month`（YYYYMM 格式）
+3. 时间字段为 `start_month`（YYYY-MM 格式）
 
 ## 常见查询模式
 
