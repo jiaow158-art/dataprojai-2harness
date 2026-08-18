@@ -106,7 +106,7 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 
 **A. 库存口径查**
 - [ ] 跌价/库龄相关查询是否使用了上市口径表（`dm_fin_stock_d_accage_list_c_t_2023`，calmonth='YYYYMM'）？
-- [ ] 资金成本是否使用 `capital_cost_t`（正值）？阿米巴才用 CHDJ，混用即打回
+- [ ] 资金成本是否使用 `dm_fin_stock_capital_cost_t`（正值）？阿米巴才用 CHDJ，混用即打回
 - [ ] 库存余额字段是 `zsjkcje`（资金金额）还是面积？与用户需求是否一致？
 
 **B. 日期格式查**
@@ -236,7 +236,7 @@ WITH act AS (
 )
 SELECT COALESCE(a.material_num, s.material) AS material,
        COALESCE(a.active_months,0) AS active_months,
-       ROUND(100.0*COALESCE(a.active_months,0)/7,0) AS active_rate,
+       ROUND(100.0*COALESCE(a.active_months,0)/7,0) AS active_rate, -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
        ROUND(COALESCE(s.stock_amt,0)) AS stock_amt,
        CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'
             WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'
@@ -244,6 +244,8 @@ SELECT COALESCE(a.material_num, s.material) AS material,
 FROM act a FULL OUTER JOIN stock s ON a.material_num = s.material
 ORDER BY stock_amt DESC NULLS LAST LIMIT 100;
 ```
+
+> 注：此处"缺货"用全窗口有动销即视为有需求的宽口径（月粒度）；库存=0 且 0 动销的 SKU 判"正常"实为停售/无数据态，精细"当月有需求"口径见 knowledge/inventory-side-patterns.md。
 
 ### 模式 F：新品增量/蚕食（问题6）
 
@@ -263,7 +265,7 @@ WITH new_sku AS (
 SELECT sku_type, sku_cnt, amt FROM split ORDER BY amt DESC;
 ```
 
-> **品类内蚕食率**：上述模式为集团/全品类总量拆分。若用户需要品类内蚕食分析，需两期对比版本——替代销售额=老品(上期-本期)正值合计、净增量=新品销售额-替代销售额、蚕食率=替代/新品。口径详见 knowledge `references/newproduct-decision-patterns.md`。
+> **品类内蚕食率**：上述模式为集团/全品类总量拆分。若用户需要品类内蚕食分析，需两期对比版本——替代销售额=老品(上期-本期)正值合计、净增量=新品销售额-替代销售额、蚕食率=替代/新品。口径详见 knowledge `references/newproduct-decision-patterns.md`。回答时必须声明：product_listed_date 填充率仅 3.8%，新品圈定结果偏小属正常（metrics.md 陷阱 9）。
 
 ### 模式 G：渠道 x SKU 透视（问题7）
 
@@ -318,14 +320,14 @@ WITH cur AS (
   FROM cur c
   LEFT JOIN act a ON c.material_num=a.material_num
   LEFT JOIN stk s ON c.material_num=s.material
-  WHERE c.amt > 0
+  WHERE c.amt > 0  -- cur 期来自 Mix 在售主集——零销量死库存 SKU 不进评分（清仓候选去模式 E 滞销清单找）
 ), scored AS (
   SELECT *,
     ROUND(100*PERCENT_RANK() OVER (ORDER BY amt),1) AS s_sales,
     ROUND(100*PERCENT_RANK() OVER (ORDER BY gp),1) AS s_gp,
-    ROUND(100*active_months/7.0,1) AS s_active,
+    ROUND(100*active_months/7.0,1) AS s_active, -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
     ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt DESC),1) AS s_stock_inv,
-    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt/NULLIF(amt,0) ASC),1) AS s_turnover
+    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt/NULLIF(amt,0) DESC),1) AS s_turnover
   FROM base
 ), final AS (
   SELECT *, ROUND(s_sales*0.25+s_gp*0.30+s_active*0.20+s_stock_inv*0.15+s_turnover*0.10,1) AS score
@@ -333,9 +335,11 @@ WITH cur AS (
 )
 SELECT material_num, ROUND(amt) AS amt, ROUND(fall_amt) AS fall_amt, stock_amt, score,
        CASE WHEN score>=80 THEN '加大投入' WHEN score>=60 THEN '保留优化'
-            WHEN score>=40 THEN '调价降本' ELSE '清仓淘汰' END AS action
+            WHEN score>=40 THEN '调价降本' ELSE '降库存' END AS action
 FROM final ORDER BY score DESC LIMIT 20;
 ```
+
+> 注：<40 判"降库存"；"清仓淘汰"为复核档——低分且效益利润为负且上市口径表 zisqc='Y' 才升级清仓（口径见 knowledge metrics.md 第三节）。
 
 ## 数据质量检查项
 
