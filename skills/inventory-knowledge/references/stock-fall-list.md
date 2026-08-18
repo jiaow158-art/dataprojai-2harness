@@ -23,14 +23,15 @@
 ## 账龄金额/数量/面积字段
 
 - 年段：`aging_1_year_amt`、`aging_1_2_year_amt`、`aging_2_3_year_amt`、`aging_3_4_year_amt`、`aging_4_year_amt`
-- 天级细分（三套后缀 `_amt`/`_qty`/`_area`）：`aging_0_30_*`、`aging_31_60_*`、`aging_61_90_*`、`aging_91_180_*`、`aging_181_270_*`、`aging_271_360_*`（→可聚出"半年内/半年-一年"口径**金额**；**跌价只有年段口径**）
-- 库存总额：`zsjkcje`（实际库存金额）
+- 天级细分（三套后缀 `_amt`/`_qty`/`_area`）：`aging_0_30_*`、`aging_31_60_*`、`aging_61_90_*`、`aging_91_180_*`、`aging_181_270_*`、`aging_271_360_*`，另有 aging_361_450_* ~ aging_1441_*（90天一档至1440天+，覆盖1~4年天级细分）（→可聚出"半年内/半年-一年"口径**金额**；**跌价只有年段口径**）
+- 库存总额：zsjkcje（实际库存金额；与本域 stock-accage.md 同名字段同源，彼处称"资金占压金额"）
 
 ## 关键维度
 
 | 字段 | 说明 |
 |---|---|
 | `material` / `material___t` | 物料编码/描述（对应 Mix 表 `material_num`） |
+| `query_date` | 快照日期 YYYYMMDD，每个 calmonth 恒定一个值，过滤用 calmonth 即可 |
 | `zisqc` | 是否清仓（处置建议分析用） |
 | `category` / `category_name` | 品类 |
 | `product_position` / `product_position_name` | 产品定位 |
@@ -84,7 +85,7 @@ LIMIT 20;
 ## 血缘
 
 - **源系统**：SAP 库存明细账龄数据
-- **DWR 层**：`dm.dm_fin_stock_detail_accage_t_2023`（财务口径库龄明细主表，按 batch + calmonth 粒度存储）
+- **上游明细表（DM 层）**：`dm.dm_fin_stock_detail_accage_t_2023`（财务口径库龄明细主表，按 batch + calmonth 粒度存储）
 - **维度关联**：
   - `dm.dm_rpt_prod_category_t` — 产品品类/定位（ON `zprodh3 = prod_level3_code`）
   - `dwimd.dwi_md_data_material_general_t` — 物料主数据（ON `material = material_num`，取 length/width 算面积）
