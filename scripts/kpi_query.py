@@ -60,7 +60,13 @@ def pct(cur: float | None, base: float | None) -> float | None:
 def main() -> int:
     try:
         cur_m, prev_m, ly_m = resolve_months()
-        keys = [month_key(*cur_m), month_key(*prev_m), month_key(*ly_m)]
+        # 最近 6 个月（升序，当月最后）— 供趋势线使用
+        months = [cur_m]
+        m = cur_m
+        for _ in range(5):
+            m = prev_month(*m)
+            months.insert(0, m)
+        keys = [month_key(*x) for x in months]
         placeholders = ",".join(["%s"] * len(keys))
         conn = get_conn()
         try:
@@ -92,6 +98,16 @@ def main() -> int:
             return None
         return float(row[field])
 
+    def spark(field: str, transform=None) -> list[float | None] | None:
+        """最近 6 个月的真实序列（升序，当月最后）；任一月缺失则整体 null。"""
+        out: list[float | None] = []
+        for month in months:
+            v = val(month, field)
+            if v is None:
+                return None
+            out.append(round(transform(v), 1) if transform else v)
+        return out
+
     sales = val(cur_m, "sales")
     qty = val(cur_m, "qty")
     area = val(cur_m, "area")
@@ -111,13 +127,33 @@ def main() -> int:
             return None
         return round(cur / base * 100, 1)
 
+    def achieve_spark() -> list[float | None] | None:
+        out: list[float | None] = []
+        for month in months:
+            s = val(month, "sales")
+            b = val(month, "budget")
+            if s is None or b is None or b == 0:
+                return None
+            out.append(round(s / b * 100, 1))
+        return out
+
+    def unit_price_spark() -> list[float | None] | None:
+        out: list[float | None] = []
+        for month in months:
+            s = val(month, "sales")
+            q = val(month, "qty")
+            if s is None or q is None or q == 0:
+                return None
+            out.append(round(s / q, 1))
+        return out
+
     # 金额类指标缩放到「万」显示（原始值为元）；面积缩放为「万㎡」
     kpis = [
-        {"key": "sales", "label": "业绩（本月）", "value": round(sales / 10000, 1) if sales is not None else None, "unit": "万", "mom": pct(sales, sales_prev), "yoy": pct(sales, sales_ly)},
-        {"key": "area", "label": "销售面积（本月）", "value": round(area / 10000, 1) if area is not None else None, "unit": "万㎡", "mom": pct(area, area_prev), "yoy": pct(area, area_ly)},
-        {"key": "unit_price", "label": "客单价（本月）", "value": unit_price, "unit": "元", "mom": pct(unit_price, unit_price_prev), "yoy": pct(unit_price, unit_price_ly)},
-        {"key": "gross_profit", "label": "毛利额（本月）", "value": round(gp / 10000, 1) if gp is not None else None, "unit": "万", "mom": pct(gp, gp_prev), "yoy": pct(gp, gp_ly)},
-        {"key": "budget_achieve", "label": "预算达成率（本月）", "value": achieve(sales, budget), "unit": "%", "mom": pct(achieve(sales, budget), achieve(sales_prev, budget_prev)), "yoy": pct(achieve(sales, budget), achieve(sales_ly, budget_ly))},
+        {"key": "sales", "label": "业绩（本月）", "value": round(sales / 10000, 1) if sales is not None else None, "unit": "万", "mom": pct(sales, sales_prev), "yoy": pct(sales, sales_ly), "spark": spark("sales", lambda v: v / 10000)},
+        {"key": "area", "label": "销售面积（本月）", "value": round(area / 10000, 1) if area is not None else None, "unit": "万㎡", "mom": pct(area, area_prev), "yoy": pct(area, area_ly), "spark": spark("area", lambda v: v / 10000)},
+        {"key": "unit_price", "label": "客单价（本月）", "value": unit_price, "unit": "元", "mom": pct(unit_price, unit_price_prev), "yoy": pct(unit_price, unit_price_ly), "spark": unit_price_spark()},
+        {"key": "gross_profit", "label": "毛利额（本月）", "value": round(gp / 10000, 1) if gp is not None else None, "unit": "万", "mom": pct(gp, gp_prev), "yoy": pct(gp, gp_ly), "spark": spark("gross_profit", lambda v: v / 10000)},
+        {"key": "budget_achieve", "label": "预算达成率（本月）", "value": achieve(sales, budget), "unit": "%", "mom": pct(achieve(sales, budget), achieve(sales_prev, budget_prev)), "yoy": pct(achieve(sales, budget), achieve(sales_ly, budget_ly)), "spark": achieve_spark()},
     ]
     print(json.dumps({"month": month_key(*cur_m), "kpis": kpis}, ensure_ascii=False))
     return 0
