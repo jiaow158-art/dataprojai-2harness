@@ -8,6 +8,21 @@
 - **数据量 / 时间范围**：约 238 万行/月；最新月份 202608，自 2024-03-02 起持续刷新
 - **时间字段与格式**：`month` = **YYYYMM**（如 '202608'，注意与 CHDJ 表的 YYYY-MM 不同！）
 
+## 公式与计算逻辑（ETL: PJob_DWS_DM_FIN_STOCK_CAPITAL_COST_T 实证）
+
+```text
+capital_cost = ((NVL(期初余额,0) + NVL(期末余额,0))/2 − 202012余额) × 0.04 / 12
+```
+
+- **期初余额** = `LAG(期末余额)` 窗口：分区 = 事业部+事业部描述+公司+工厂+物料+物料名称+批次+库存地点+库存类别+大区，按 month 升序 → **每个物料-批次组合的首月期初=0**
+- **202012余额** = 源表 `calmonth='202012'` 的 `zsjkcje` 按**同一分区键**聚合，硬锚定
+- **期末余额** = 当月源表 `zsjkcje` 聚合
+- "期初+期末=0 则成本=0"的零判断版**已按财务要求取消**（2023-07-29，逻辑注释保留在 ETL 脚本中）
+- `capital_cost_sum` = 年内累计（**分年计算不跨年**：上年段与当年段各自 SUM 窗口）
+- **事实源**：`dm_fin_stock_detail_accage_t_2023`（zsjkcje，过滤 `(stockcat IS NULL OR stockcat<>'K')`），经中间表 `DM_FIN_STOCK_CAPITAL_M1_T`（TRUNCATE-INSERT）
+- **刷新**：目标表 **TRUNCATE 全量重算**，仅保留近 2 年（`${PERIOD_ID_Y}`-1 年 1 月 ~ `${PERIOD_ID_M}`）
+- `sales_group_code` 映射（ETL 硬编码）：非全资公司 → `upload.upload_division_comp_t`（END_DATE='9999-12-31'）；11000010→R4R；11000003 按大区→RR5/R8R/RY9/P76/R6D；11000002→R2T；11000001→R40
+
 ## 核心字段
 
 | 字段 | 类型 | 含义 |
@@ -37,14 +52,15 @@
 
 ## 陷阱
 
-1. **日期格式 YYYYMM**（如 '202608'），与 CHDJ 表的 `stat_month`（YYYY-MM）不同。跨表查询时必须分别处理时间字段格式。
-2. **与 CHDJ 表的 capital_cost 符号相反**：本表 2026-08 资金成本合计 +58.4万（正值），CHDJ 表同期合计 -35.7万（负值）。两套核算体系（上市口径 vs 阿米巴口径），**不可混用**。
-3. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：上市口径含全部库存，阿米巴口径核算范围不同（2026-08 实况：zdpsyb=11000002 卫浴事业部 3.91亿占 61%、11000001 瓷砖事业部 2.32亿、11240102 国际营销中心 560万、11000011 卫浴旧组织 460万、11250401 丽适岩板 160万）。跨表金额加减无意义。
-
-   **zdpsyb 码表说明**：CHDJ 表无 `zdpsyb___t` 描述字段，编码为组织架构 node2 去掉 H 前缀（如 `H11000001` → `11000001`）。解码见 [org-hierarchy.md](../../sources-of-truth/business-context/org-hierarchy.md) 的 node2 枚举表。`11000011`/`11000012` 为卫浴旧组织编码，ETL 注释标注为"卫浴之前的组织"，org-hierarchy.md 未收录。
-4. **物料字段名不同**：本表用 `material_code`，CHDJ 表用 `material_num`，上市口径明细表用 `material`。
-5. **plant___t / stor_loc___t 大量为空**（早期数据），使用时用 `LENGTH(TRIM(plant___t)) > 0` 过滤或使用编码关联。
-6. **closing_balance_202012 为基准扣除项**：ETL 公式为 `((期初+期末)/2 − 202012余额) × 4%/12`，202012 基数大的物料资金成本低。
+1. **日期格式 YYYYMM**（如 '202608'），CHDJ 表是 `stat_month`（YYYY-MM）。跨表查询分别处理时间格式。
+2. **TRUNCATE 滚动窗口只留近 2 年**：查更早月份（如 2024 年初）可能已滚出表外，返回 0 行不是数据丢失而是窗口限制。
+3. **capital_cost 可为负**：平均余额 < 202012 基线时公式结果为负（去库存期常态）。**不是符号约定错误**——负值=该物料组合库存已降至 2020 年末基线之下。2026-08 全集团合计为正（+58.4万）不代表各范围子集为正。
+4. **CHDJ 的 capital_cost 取自本表但不可 SUM 原始列**（V6 实证）：CHDJ 原始列在分摊行结构中重复携带全额（单物料放大 ~9×，2026-08 全表 -35.3万 vs 本表 +58.1万 符号都反）；其 `capital_cost_conv`（分摊列）合计才与本表吻合（0.3%）。要 CHDJ 维度金额 → SUM conv 列；要准确金额 → 直接用本表。
+5. **LAG 分区键含 material_name**：物料改名 → 分区断裂 → 期初余额变 0 → 当月资金成本突降。追查单物料资金成本异常时先查物料名称是否变过。
+6. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：后者实为**管理口径减值**（非库存价值，2026-08-19 ETL 实证），概念不同不可比。见 [chdj-capital-cost.md](chdj-capital-cost.md)。
+7. `stock_type` 列承接源表 `stockcat`（库存类别），已排除 'K'。
+8. `plant___t`/`stor_loc___t` 早期数据大量为空，用 `LENGTH(TRIM(x))>0` 过滤或用编码。
+9. zdpsyb 码表：组织架构 node2 去 H 前缀；11000011/11000012 为卫浴旧组织（org-hierarchy.md 未收录）。
 
 ## 常见查询模式
 
