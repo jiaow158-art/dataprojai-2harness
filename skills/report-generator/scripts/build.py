@@ -138,14 +138,17 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="REPORT_JSON v2 → HTML builder")
     ap.add_argument("--json", dest="json_path")
     ap.add_argument("--domain", default="report")
-    ap.add_argument("--out", default=DEFAULT_OUT)
+    ap.add_argument("--out", default=None)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
-        return do_selftest(args.out)
+        return do_selftest(args.out or DEFAULT_OUT)
     if not args.json_path:
         ap.error("需要 --json 或 --selftest")
-    return do_build(args.json_path, args.domain, args.out)
+    # 未显式指定 --out 时，HTML 输出到 JSON 所在目录（保证与输入同目录，
+    # 受限用户环境的 reports/user:* 隔离因此自动成立）。
+    out_dir = args.out or os.path.dirname(os.path.abspath(args.json_path))
+    return do_build(args.json_path, args.domain, out_dir)
 
 
 if __name__ == "__main__":

@@ -42,12 +42,28 @@ description: 跨域报告生成工具。当用户在收到 Analyst 输出后说"
    - `provenance` 必须有 `query`（完整 SQL，供审计）
 3. **一条命令构建**：
    ```bash
-   python3 skills/report-generator/scripts/build.py --json report.json --domain sales-performance
+   /usr/bin/python3 skills/report-generator/scripts/build.py --json reports/xxx.json --domain sales-performance
    ```
    - 校验不过 → 逐条打印 `[FAIL] 字段路径: 原因`，修完重跑；不通过不出 HTML
-   - 通过 → 产物写入 `reports/report_{domain}_{YYYYMMDD}.html`（目录自动创建）
-   - build.py 自动检测报告服务器：在跑则打印 URL，未跑则只给本地路径（不给假 URL）
+   - 通过 → 产物写入 JSON 同目录下的 `report_{domain}_{YYYYMMDD}.html`（目录自动创建）
    - Windows 下用 `python`；服务器用 `/usr/bin/python3`
+
+## 输出目录（强制规则）
+
+**先用 `ls reports/` 检查是否存在 `user:*` 子目录**：
+
+- 存在 `user:*` 子目录（受限用户环境）→ **必须**将 JSON 与 HTML 都写入你的用户目录 `reports/user:<id>/`：
+  ```bash
+  /usr/bin/python3 skills/report-generator/scripts/build.py --json reports/user:4/ct.json --domain sales-performance
+  ```
+  JSON 必须先用 Write 工具写入该目录（Write 路径校验只允许写 `reports/user:<id>/`）。
+- 不存在 `user:*` 子目录 → 输出到 `reports/` 根目录。
+
+## 报告访问链接（强制规则）
+
+**禁止**在回答中输出 `http://...:8080/...` 或 `http://localhost:8080/...` 之类的链接——用户通过系统 UI 的「打开报告」按钮访问（系统自动生成 `/reports/...` 链接）。回答中只需说明"报告已生成"即可。
+
+（Report Server 章节的 8080 端口表仅适用于 CLI/独立部署场景，与 Web 界面用户无关。）
 
 ## valueFormat 格式声明表（核心协议）
 
