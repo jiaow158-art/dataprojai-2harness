@@ -5,7 +5,7 @@
 - 业绩：ambperformance（含税月达成额）
 - 销售面积：zxsmj（月销售面积，瓷砖行业经典指标）
 - 客单价：业绩 / 月销售数量（zxssl）
-- 毛利额：gross_profit_after_sharing（分摊后毛利）
+- 毛利额：amb_profit_amt（阿米巴毛利额，2026-08-19 业务确认；原 gross_profit_after_sharing 为旧口径）
 - 预算达成率：业绩 / 预算销售额（ambperformance_ys）
 月度时效：当前日期 <= 次月 5 日时最近可用月为上月（本月数据未入库）。
 """
@@ -77,7 +77,7 @@ def main() -> int:
                            SUM(ambperformance)        AS sales,
                            SUM(zxssl)                 AS qty,
                            SUM(zxsmj)                 AS area,
-                           SUM(gross_profit_after_sharing) AS gross_profit,
+                           SUM(amb_profit_amt)        AS gross_profit,  -- 2026-08-19 业务确认：毛利额=阿米巴毛利额口径（原 gross_profit_after_sharing 为旧口径）
                            SUM(ambperformance_ys)     AS budget
                     FROM dm.dm_fin_operations_mix_sum_t
                     WHERE calmonth IN ({placeholders})

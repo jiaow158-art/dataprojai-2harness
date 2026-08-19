@@ -323,14 +323,16 @@ ORDER BY calmonth;
 
 ### 模式 K：成本与毛利（Mix 表，业务标准口径）
 
-**成本口径（2026-08 业务确认）**：用户说"实际成本"→ `actual_cost_exclude_logistics`（**剔除物流成本**，业务标准口径）。`act_cost_sum_amt`（含分摊）与业绩表 `month_a_cost` 为旧口径，**非业务首选**，混用前必须说明。毛利用 `gross_profit_after_sharing`（分摊后毛利）。成本/毛利口径两表不同，**禁止跨表混算**。
+**成本口径（2026-08 业务确认）**：用户说"实际成本"→ `actual_cost_exclude_logistics`（**剔除物流成本**，业务标准口径）。`act_cost_sum_amt`（含分摊）与业绩表 `month_a_cost` 为旧口径，**非业务首选**，混用前必须说明。成本/毛利口径两表不同，**禁止跨表混算**。
+
+**毛利率口径（2026-08-19 业务确认）**：毛利率 = `amb_profit_amt`（阿米巴毛利额）÷ `ambperformance`（阿米巴业绩额），**业务标准口径**。`gross_profit_after_sharing`（分摊后毛利）为旧口径——其值约为阿米巴毛利的 2 倍（瓷砖事业部月度：旧口径 23%~26% vs 阿米巴口径 12%~17%），两口径**禁止混报**，回答时声明用的是哪一个。
 
 ```sql
 SELECT calmonth,
        SUM(ambperformance) AS actual,
        SUM(actual_cost_exclude_logistics) AS cost_ex_logistics,
-       SUM(gross_profit_after_sharing) AS gross_profit,
-       SUM(gross_profit_after_sharing) / NULLIF(SUM(ambperformance), 0) * 100 AS margin_pct
+       SUM(amb_profit_amt) AS amb_profit,
+       SUM(amb_profit_amt) / NULLIF(SUM(ambperformance), 0) * 100 AS margin_pct
 FROM dm.dm_fin_operations_mix_sum_t
 WHERE calmonth BETWEEN '2026-01' AND '2026-05'
   AND node_desc2 = '瓷砖事业部'
@@ -339,7 +341,7 @@ GROUP BY calmonth
 ORDER BY calmonth;
 ```
 
-> 参考：瓷砖事业部月毛利率通常 23%~26%，异常偏离先查 data_source 与口径。跨多月多列 SUM 较慢（~8s），在 30s 超时内可接受。
+> 参考：瓷砖事业部月毛利率（阿米巴口径）通常 12%~17%；若算出 23%~26% 说明误用了旧口径 gross_profit_after_sharing，先查口径。异常偏离先查 data_source 与口径。跨多月多列 SUM 较慢（~8s），在 30s 超时内可接受。
 
 ## 数据质量检查项
 
