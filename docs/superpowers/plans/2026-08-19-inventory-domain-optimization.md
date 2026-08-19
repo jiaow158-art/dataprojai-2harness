@@ -49,7 +49,7 @@
 ### D. CHDJ `dm_ambv2_chdj_grp_t`（表名陷阱：名"存货跌价分摊"）
 - **`inventory_value` = SUM(wbzq_jc_amt+ybzq_jc_amt) = 管理口径减值合计（不是库存价值！）**——推翻现有文档解读。"存货价值 6.35亿 vs 上市口径库存 14.3亿"的真解释：**减值 vs 库存金额（概念不同）+ 组织范围不同（双差异）**
 - `inventory_value_amb` = SUM(jc_aging 族) = 阿米巴结算价减值；仅瓷砖 11000001、11240102、11250401 分支非零，卫浴族分支恒 0
-- `capital_cost`/`capital_cost_sum` = **直接 SUM 自 `DM.DM_FIN_STOCK_CAPITAL_COST_T`**（悬案破案：CHDJ 负值 = 承袭源公式在"平均余额<202012基线"时的负值；且 CHDJ 范围（卫浴/瓷砖/国际/丽适）是资金成本表全集团的一部分——范围子集的负值与全表正值不矛盾）
+- `capital_cost`/`capital_cost_sum` = 取自 `DM.DM_FIN_STOCK_CAPITAL_COST_T`（同月范围子集），**但⚠️ V6 实证（已修正初判）：原始列在分摊行结构中重复携带全额——SUM 放大 ~9×/物料（样例 W1551A05TYQ：源 -13,495 → CHDJ -120,797，97 行），2026-08 全表 -35.3万 vs 源表 +58.1万 符号都反。禁止 SUM 原始列当金额；`capital_cost_conv`（分摊列）合计与源表吻合（583,383 vs 581,444，0.3%）——CHDJ 维度要金额 SUM conv 列，准确金额用源表**
 - `contributory_value`(分摊价值) = 减值 × (销售/工厂比例，null 取 1)；`capital_cost_conv`/`capital_cost_sum_conv`(分摊资金成本) = capital_cost × 同比例。比例按**年度预算**（`upload.upload_achievement_budget_t`）分摊到线组；预算年度缺失取上一年度
 - 范围：卫浴族 zdpsyb IN ('11000002','11000011','11000012')（排 plant 3A/3B/3C/39、extmatlgrp 10050、prop 表大区走独立分支）+ 瓷砖 11000001 + 11240102 + 11250401
 - 刷新：`delete ... where stat_month='${PERIOD_ID_M}'` + insert（按月）
@@ -365,7 +365,7 @@ capital_cost = ((NVL(期初余额,0) + NVL(期末余额,0))/2 − 202012余额) 
 1. **日期格式 YYYYMM**（如 '202608'），CHDJ 表是 `stat_month`（YYYY-MM）。跨表查询分别处理时间格式。
 2. **TRUNCATE 滚动窗口只留近 2 年**：查更早月份（如 2024 年初）可能已滚出表外，返回 0 行不是数据丢失而是窗口限制。
 3. **capital_cost 可为负**：平均余额 < 202012 基线时公式结果为负（去库存期常态）。**不是符号约定错误**——负值=该物料组合库存已降至 2020 年末基线之下。2026-08 全集团合计为正（+58.4万）不代表各范围子集为正。
-4. **CHDJ 的 capital_cost 直接 SUM 自本表**（2026-08-19 ETL 实证）：CHDJ 负值（-35.7万）= 本表按 CHDJ 范围（卫浴/瓷砖/国际/丽适）过滤后的子集负值，非独立核算。两表金额是"全表 vs 范围子集"关系，非两套公式。
+4. **CHDJ 的 capital_cost 取自本表但不可 SUM 原始列**（V6 实证）：CHDJ 原始列在分摊行结构中重复携带全额（单物料放大 ~9×，2026-08 全表 -35.3万 vs 本表 +58.1万 符号都反）；其 `capital_cost_conv`（分摊列）合计才与本表吻合（0.3%）。要 CHDJ 维度金额 → SUM conv 列；要准确金额 → 直接用本表。
 5. **LAG 分区键含 material_name**：物料改名 → 分区断裂 → 期初余额变 0 → 当月资金成本突降。追查单物料资金成本异常时先查物料名称是否变过。
 6. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：后者实为**管理口径减值**（非库存价值，2026-08-19 ETL 实证），概念不同不可比。见 [chdj-capital-cost.md](chdj-capital-cost.md)。
 7. `stock_type` 列承接源表 `stockcat`（库存类别），已排除 'K'。
@@ -413,8 +413,8 @@ git commit -m "docs(inventory): 资金成本表增厚—公式精确实现/滚�
 | `inventory_value` | **管理口径减值合计**（≠库存价值！） | `SUM(wbzq_jc_amt + ybzq_jc_amt)`，源：库龄明细表 jc 族（比例 0/10/40/70% + 保质期工厂白名单） |
 | `inventory_value_amb` | **阿米巴结算价减值** | `SUM(ybzq_jc_aging + wbzq_jc_aging)`；仅瓷砖 11000001 / 11240102 / 11250401 分支非零，卫浴族恒 0 |
 | `contributory_value` | 分摊减值 = 减值 × 销售/工厂比例 | 比例 null 取 1 |
-| `capital_cost` / `capital_cost_sum` | **直接 SUM 自 dm_fin_stock_capital_cost_t**（非独立核算） | 同月（month YYYYMM ↔ stat_month YYYY-MM 转换），范围过滤后聚合 |
-| `capital_cost_conv` / `capital_cost_sum_conv` | 分摊资金成本 / 分摊累计资金成本 | capital_cost(_sum) × 同比例 |
+| `capital_cost` / `capital_cost_sum` | 取自 dm_fin_stock_capital_cost_t（同月范围子集）；**⚠️ 原始列在分摊行结构中重复携带全额，SUM 放大 ~9×/物料、可反号——禁止 SUM 当金额** | 同月（month YYYYMM ↔ stat_month YYYY-MM 转换），范围过滤后聚合 |
+| `capital_cost_conv` / `capital_cost_sum_conv` | 分摊资金成本 / 分摊累计资金成本（**金额合计以本对列为准**：与源表吻合 0.3%） | capital_cost(_sum) × 同比例 |
 | `percentage` | 销售/工厂比例 | 按年度预算（upload_achievement_budget_t）分摊；预算缺失取上一年度 |
 | `sales_grp` / `sales_grp_sum` / `center_sum` | 线组 / 线组汇总 / 中心汇总（预算金额） | 分摊基数 |
 | `zdpsyb` | 事业部（码=node2 去 H 前缀） | — |
@@ -429,7 +429,7 @@ git commit -m "docs(inventory): 资金成本表增厚—公式精确实现/滚�
 
 1. **`inventory_value` 不是库存价值**：是管理口径减值（2026-08-19 ETL+DWS 双实证：明细表 jc 复算与 CHDJ 值一致）。与上市口径表 `zsjkcje`（库存金额 14.3亿）是**概念不同**（减值 vs 金额）+**范围不同**（部分事业部 vs 上市在售），"6.35亿 vs 14.3亿"不是两套库存口径之差。
 2. **问会计跌价 → 上市口径表** `aging_sum_fall_amt`（0/20/30/50/50%）；问管理减值/分摊到线组 → 本表。两套体系禁止混用或相加。
-3. **`capital_cost` 负值承袭源表公式**（平均余额<202012基线→负），非符号约定；且本表范围（卫浴/瓷砖/国际/丽适）是资金成本表全集团的范围子集——本表负、全表正不矛盾。
+3. **`capital_cost` 原始列禁止 SUM 当金额**（V6 实证）：分摊行结构中每行重复携带全额（单物料放大 ~9×，2026-08 全表 -35.3万 vs 源表 +58.1万，符号都反）。需要金额合计 → SUM `capital_cost_conv`（与源表吻合 0.3%）或直接查 `dm_fin_stock_capital_cost_t`。源表本身的负值语义（平均余额<202012基线→负）仍然成立。
 4. `stat_month` 格式 YYYY-MM；表内无 `calmonth`。
 5. `stockcat` 含 'K'（与上市口径表排除 K 不同）。
 6. **ETL 隐患**：末段以 `物料描述 = material_num`（描述 JOIN 编码）关联物料主数据取产品层次 → `product_level_code`/`prod_line_name` 可靠性受限，做产品线分析优先用物料主数据表重关联。
@@ -442,7 +442,6 @@ git commit -m "docs(inventory): 资金成本表增厚—公式精确实现/滚�
 SELECT sales_grp,
        ROUND(SUM(inventory_value)) AS impairment_mgmt,
        ROUND(SUM(contributory_value)) AS impairment_allocated,
-       ROUND(SUM(capital_cost)) AS capital_cost,
        ROUND(SUM(capital_cost_conv)) AS capital_cost_allocated
 FROM dm.dm_ambv2_chdj_grp_t
 WHERE stat_month = '2026-08'
@@ -542,7 +541,7 @@ git commit -m "docs(inventory): CHDJ解码重写—inventory_value实为管理�
 12. **`wbzq`/`ybzq`=无/有保质期**（按 bz_flag 分流），不是未/已包装；有保质期减值仅 7C/73/7220+特定库位工厂计提，其余恒 0
 13. **CHDJ `inventory_value` 实为管理口径减值**（非库存价值）：与库存金额是不同概念，与上市口径跌价是不同体系，禁止跨表加减
 14. **资金成本表 TRUNCATE 滚动窗口只留近 2 年**：更早月份查不到是窗口限制非数据丢失
-15. **资金成本可为负**（平均余额<202012基线，去库存常态）；CHDJ capital_cost 直接 SUM 自资金成本表（范围子集），负值承袭非符号翻转
+15. **资金成本可为负**（平均余额<202012基线，去库存常态）；**CHDJ `capital_cost` 原始列在分摊行结构中重复携带全额（SUM 放大反号）——CHDJ 维度金额 SUM `capital_cost_conv`，准确金额用源表**
 16. **资金成本 LAG 分区含 material_name**：物料改名断链→期初变 0→当月成本突降
 17. **CHDJ 范围限卫浴/瓷砖/国际/丽适**（非全集团）；其 zdpsyb 码=node2 去 H 前缀，11000011/11000012 为卫浴旧组织
 18. **库龄明细表 plant 7C 用 zpcrk_fc 分桶**（其余工厂用批次日期 zmmm_o017_zbatch_date）
@@ -676,7 +675,7 @@ git commit -m "docs(inventory): 血缘增补—跌价/减值/资金成本族ETL�
 
 ````markdown
 - [ ] "跌价/减值"用词：会计口径跌价（上市口径表）还是管理口径减值（CHDJ）？两套体系禁止混用
-- [ ] "资金成本"负值是否已解释（低于202012基线的公式结果，非数据错误）？
+- [ ] "资金成本"负值是否已解释（低于202012基线的公式结果，非数据错误）？CHDJ 维度要金额是否用了 capital_cost_conv 而非原始列（原始列 SUM 会放大反号）？
 ````
 
 - [ ] **Step 3: 模式 H 之后追加三个新模式**：

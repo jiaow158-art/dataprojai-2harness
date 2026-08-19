@@ -111,4 +111,38 @@ WHERE month = '202608'
 |-----------|-------------|
 | 581,444（正） | -357,000（负，-35.7 万） |
 
-**备注：** scoped_cc = 581,444 与 V5 全表合计完全一致，说明这 6 个部门覆盖了资金成本表的全部数据，且源表 capital_cost 为正数。CHDJ 层面出现 -35.7 万负值，推测 CHDJ 汇总逻辑中存在额外调整（如抵减项或口径差异），并非简单 SUM 源表。此问题不影响 V1-V5 已证实的核心口径结论，但 CHDJ capital_cost 字段解读需标注“非直接 SUM，存在汇总层调整”。
+**备注（初判）：** scoped_cc = 581,444 与 V5 全表合计完全一致，说明这 6 个部门覆盖了资金成本表的全部数据，且源表 capital_cost 为正数。CHDJ 层面出现 -35.7 万负值，推测 CHDJ 汇总逻辑中存在额外调整（如抵减项或口径差异），并非简单 SUM 源表。此问题不影响 V1-V5 已证实的核心口径结论，但 CHDJ capital_cost 字段解读需标注“非直接 SUM，存在汇总层调整”。
+
+### V6 深挖（控制器复核，同日）
+
+**探针 1：CHDJ 近月资金成本两列对照**
+
+```sql
+SELECT stat_month, ROUND(SUM(COALESCE(capital_cost,0))) AS cc_total,
+       ROUND(SUM(COALESCE(capital_cost_conv,0))) AS cc_conv_total, COUNT(*) AS rows_cnt
+FROM dm.dm_ambv2_chdj_grp_t WHERE stat_month >= '2026-05' GROUP BY stat_month ORDER BY stat_month;
+```
+
+| stat_month | cc_total（原始列 SUM） | cc_conv_total（分摊列 SUM） | rows_cnt |
+|---|---|---|---|
+| 2026-05 | -1,160,230 | 486,682 | 288,609 |
+| 2026-06 | -1,347,005 | 402,341 | 286,107 |
+| 2026-07 | -957,847 | 426,120 | 249,441 |
+| 2026-08 | -353,226 | **583,383** | 277,562 |
+
+→ 分摊列合计 583,383 与源表 202608 合计 581,444（V5）偏差仅 0.3%；原始列符号相反。
+
+**探针 2：单物料放大检查（W1551A05TYQ，202608）**
+
+| master_versions | src_cc | chdj_cc（SUM 原始列） | chdj_rows |
+|---|---|---|---|
+| 1 | -13,495.11 | -120,796.68 | 97 |
+
+→ 单物料在 CHDJ 被放大 ~9×：97 行分摊结构中原始列每行携带全额而非份额（物料主数据版本数=1，排除 SCD 扇出）。
+
+**V6 最终结论（修正初判“承袭源表负值”）：**
+
+1. CHDJ `capital_cost`（原始列）在分摊行结构中**重复携带全额**——SUM 该列按行数放大（样例 9×），2026-08 全表 -35.3万 vs 源表 +58.1万，符号都能反。**禁止 SUM 原始列当金额。**
+2. CHDJ `capital_cost_conv`（分摊列）合计与源表吻合（0.3%）——**需要 CHDJ 维度的资金成本金额时 SUM conv 列；要准确金额直接用源表 `dm_fin_stock_capital_cost_t`。**
+3. `inventory_value` 不受此影响（V3 精确一致：减值每物料单一来源分支）。
+4. 源表 capital_cost 本身可为负（平均余额<202012基线）——该语义不变，但 CHDJ 负值的主因是行结构放大而非承袭。
