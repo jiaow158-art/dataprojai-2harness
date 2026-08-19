@@ -39,7 +39,7 @@ capital_cost = ((NVL(期初余额,0) + NVL(期末余额,0))/2 − 202012余额) 
 | `closing_balance_202012` | numeric | 2020年12月余额（基准扣除额） |
 | `closing_balance_last_month` | numeric | 期初余额 |
 | `closing_balance` | numeric | 期末余额（**2026-08 合计 14.3亿**） |
-| `capital_cost` | numeric | 当月资金成本（**2026-08 合计 +58.4万**） |
+| `capital_cost` | numeric | 当月资金成本（**2026-08 合计 +58.1万，2026-08-19 复核**） |
 | `capital_cost_sum` | numeric | 累计资金成本（年初至今） |
 | `business_department_desc` | varchar(100) | 事业部描述 |
 | `sales_group_code` | varchar(100) | 销售组编码 |
@@ -54,13 +54,13 @@ capital_cost = ((NVL(期初余额,0) + NVL(期末余额,0))/2 − 202012余额) 
 
 1. **日期格式 YYYYMM**（如 '202608'），CHDJ 表是 `stat_month`（YYYY-MM）。跨表查询分别处理时间格式。
 2. **TRUNCATE 滚动窗口只留近 2 年**：查更早月份（如 2024 年初）可能已滚出表外，返回 0 行不是数据丢失而是窗口限制。
-3. **capital_cost 可为负**：平均余额 < 202012 基线时公式结果为负（去库存期常态）。**不是符号约定错误**——负值=该物料组合库存已降至 2020 年末基线之下。2026-08 全集团合计为正（+58.4万）不代表各范围子集为正。
+3. **capital_cost 可为负**：平均余额 < 202012 基线时公式结果为负（去库存期常态）。**不是符号约定错误**——负值=该物料组合库存已降至 2020 年末基线之下。2026-08 全集团合计为正（+58.1万，2026-08-19 复核）不代表各范围子集为正。
 4. **CHDJ 的 capital_cost 取自本表但不可 SUM 原始列**（V6 实证）：CHDJ 原始列在分摊行结构中重复携带全额（单物料放大 ~9×，2026-08 全表 -35.3万 vs 本表 +58.1万 符号都反）；其 `capital_cost_conv`（分摊列）合计才与本表吻合（0.3%）。要 CHDJ 维度金额 → SUM conv 列；要准确金额 → 直接用本表。
 5. **LAG 分区键含 material_name**：物料改名 → 分区断裂 → 期初余额变 0 → 当月资金成本突降。追查单物料资金成本异常时先查物料名称是否变过。
 6. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：后者实为**管理口径减值**（非库存价值，2026-08-19 ETL 实证），概念不同不可比。见 [chdj-capital-cost.md](chdj-capital-cost.md)。
 7. `stock_type` 列承接源表 `stockcat`（库存类别），已排除 'K'。
 8. `plant___t`/`stor_loc___t` 早期数据大量为空，用 `LENGTH(TRIM(x))>0` 过滤或用编码。
-9. zdpsyb 码表：组织架构 node2 去 H 前缀；11000011/11000012 为卫浴旧组织（org-hierarchy.md 未收录）。
+9. zdpsyb 码表：组织架构 node2 去 H 前缀（如 `H11000001`→`11000001`，解码见 [org-hierarchy.md](../../sources-of-truth/business-context/org-hierarchy.md) node2 枚举）；11000011/11000012 为卫浴旧组织（org-hierarchy.md 未收录）。
 
 ## 常见查询模式
 
