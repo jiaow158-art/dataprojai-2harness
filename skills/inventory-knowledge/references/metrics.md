@@ -20,8 +20,8 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | 业务口径 | DWS 字段 | 所属表 | 说明 |
 |----------|----------|--------|------|
 | 库存数量（最常用） | `quantity` | dm_fin_stock_detail_accage_t_2023 | 物料库存数量 |
-| 资金占压金额 | `zsjkcje` | dm_fin_stock_detail_accage_t_2023 | 库存占用资金的核心字段 |
-| 库存金额 | `stock_amt` | dm_fin_stock_detail_accage_t_2023 | 库存金额 |
+| 库存金额（管理口径，默认） | `zsjkcje` | dm_fin_stock_detail_accage_t_2023 | 实际库存金额，库存域默认字段 |
+| 库存金额（阿米巴结算价） | `stock_amt` | dm_fin_stock_detail_accage_t_2023 | 与 Mix 阿米巴口径对齐时使用 |
 | 库存面积 | 各个 `*_area` 字段 | 多张表 | CXC 日报、出入库、全类型库存都有面积字段 |
 | 可用库存数量 | `available_inventory_quantity` | dm_wm_all_type_stock_t | 可用库存 |
 | 总库存数量 | `total_inventory_quantity` / `all_stock_quantity` | dm_wm_all_type_stock_t | 总库存 |
@@ -127,7 +127,7 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | 粒度 | 物料+工厂+库存地点+批次+会计期间 |
 | 列数 | 183 |
 | 行数 | 1.44亿 |
-| 时间范围 | 202012 ~ 202606 |
+| 时间范围 | 202012 ~ 202608 |
 | 时间字段 | `calmonth` (YYYYMM, NOT NULL) |
 | 数量字段 | `quantity` |
 | 金额字段 | `zsjkcje`（实际库存金额-管理），`stock_amt`（阿米巴结算价）；跌价 `jchj_amt`/`jchj_aging` |

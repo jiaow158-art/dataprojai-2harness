@@ -56,6 +56,13 @@
 | wbzq_jc_amt | numeric | 无保质期减值 |
 | jchj_amt | numeric | 减值合计（管理） |
 | stock_amt | numeric | 库存金额 |
+| ybzq_bzdq_area | numeric | 已包装周期-标准地区面积 |
+| wbzq_6_area / 6_12 / 12_24 / 24 | numeric | 各库龄段面积 |
+| ybzq_bzdq_qty | numeric | 已包装周期-标准地区数量 |
+| wbzq_6_qty / 6_12 / 12_24 / 24 | numeric | 各库龄段数量 |
+| xydj_7_12_amt / _12_24_ / _24_ | numeric | 协议单价分段金额 |
+| zrzlcp_* | numeric | 自然日历产品相关字段 |
+| amb_* | numeric | 爱米巴相关字段 |
 
 ### 跌价字段（计提比例 0/10/40/70% + 保质期 70/100%）
 
@@ -68,16 +75,6 @@
 | stock_amt | 库存金额（阿米巴结算价，202607 合计 17.52亿） |
 | clear_inv_flag / clearance_reason / promote_reason | 清库存标识 / 清仓原因 / 促销原因 |
 | time_diff / next_mon_date | 时间差（天）/ 下月日期 |
-
-| 字段 | 类型 | 含义 |
-|---|---|---|
-| ybzq_bzdq_area | numeric | 已包装周期-标准地区面积 |
-| wbzq_6_area / 6_12 / 12_24 / 24 | numeric | 各库龄段面积 |
-| ybzq_bzdq_qty | numeric | 已包装周期-标准地区数量 |
-| wbzq_6_qty / 6_12 / 12_24 / 24 | numeric | 各库龄段数量 |
-| xydj_7_12_amt / _12_24_ / _24_ | numeric | 协议单价分段金额 |
-| zrzlcp_* | numeric | 自然日历产品相关字段 |
-| amb_* | numeric | 爱米巴相关字段 |
 
 ### 其他 SAP 字段
 
@@ -99,11 +96,11 @@
 
 ## 陷阱
 
-1. **表名是 `dm_fin_stock_detail_accage_t_2023`**：虽然有 `_2023` 后缀，但实际覆盖 202012 ~ 202606 全量数据，不需要跨表 UNION。不要错误使用 `dm_fin_stock_detail_accage_t`（旧表）或 `dm_fin_stock_detail_accage_others_t`。
+1. **表名是 `dm_fin_stock_detail_accage_t_2023`**：虽然有 `_2023` 后缀，但实际覆盖 202012 ~ 202608 全量数据，不需要跨表 UNION。不要错误使用 `dm_fin_stock_detail_accage_t`（旧表）或 `dm_fin_stock_detail_accage_others_t`。
 2. **SAP 风格命名**：大量 `z` 开头字段和 `___t` 后缀描述字段。`___t` 表示三下划线 + t 的文本描述（如 `plant` 是编码，`plant___t` 是名称）。
 3. **库龄字段众多**：表包含 183 列，库龄从多维度拆分——金额/数量/面积、已包装/未包装、标准库龄/协议单价/自然日历/爱米巴，查询时需确认用哪个口径。
 4. **跌价两套字段族**：管理（jchj_amt/wbzq_*_fall_amt）与阿米巴（jchj_aging/*_fall_aging）金额不同（2.877 vs 3.301亿，202607），查询显式选族。
-4. **calmonth 格式**：YYYYMM 字符串（如 '202606'），该表 calmonth 可能为空。
+4. **calmonth 格式**：YYYYMM 字符串（如 '202606'），NOT NULL（DWS 实测无 NULL 行）。
 5. **产品层次维度**：zprodh1~5 和 matl_grp_1~5 两个层级体系并存，过滤产品时优先用 matl_grp_*。
 
 ## 常见查询模式
