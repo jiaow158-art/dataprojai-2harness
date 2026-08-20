@@ -7,14 +7,14 @@
 | 1 | SKU 销售规模/排名/帕累托/核心SKU | Mix | A |
 | 2 | SKU 趋势/同比/环比 | Mix | B |
 | 3 | SKU 毛利贡献/毛利率/四象限 | Mix | C |
-| 4 | 库存周转/可售天数/库销比 | 上市口径+Mix | D |
-| 5 | 滞销/缺货/动销率 | 出入库月表+上市口径(+otd未交付) | E |
+| 4 | 库存周转/可售天数/库销比 | 内部口径（阿米巴字段族）+Mix | D |
+| 5 | 滞销/缺货/动销率 | 出入库月表+内部口径(+otd未交付) | E |
 | 6 | 新品增量/蚕食/替代 | 物料主数据+Mix | F |
 | 7 | 渠道/区域 × SKU 差异 | Mix | G |
 | 8 | 综合评分/处置建议（清仓/加大投入） | A-E+H 输出汇总 | I |
-| 9 | 库存跌价/库龄分段 | 上市口径 | H |
+| 9 | 库存跌价/库龄分段 | 内部口径（阿米巴字段族） | H |
 
-SKU 键：Mix 表 `material_num` ↔ 上市口径表 `material` ↔ 出入库表 `material_num` ↔ 主数据 `material_num`。
+SKU 键：Mix 表 `material_num` ↔ 内部口径表 `material` ↔ 出入库表 `material_num` ↔ 主数据 `material_num`。
 
 ## 二、效益利润口径（替代“净利润”）
 
@@ -24,7 +24,7 @@ SKU 键：Mix 表 `material_num` ↔ 上市口径表 `material` ↔ 出入库表
 
 ```
 效益利润 = gross_profit_after_sharing（Mix 分摊后毛利）
-         − aging_sum_fall_amt（上市口径跌价合计）
+         − jchj_aging（内部口径跌价合计-阿米巴结算价，计提 0/10/40/70%+保质期 70/100%）
          − capital_cost（资金成本：默认 dm_fin_stock_capital_cost_t 正值口径，公式已验证；
            阿米巴分摊口径 dm_ambv2_chdj_grp_t 为负值、符号待确认，仅特定要求时用）
 ```
@@ -43,11 +43,11 @@ SKU 键：Mix 表 `material_num` ↔ 上市口径表 `material` ↔ 出入库表
 
 ## 四、口径与陷阱（全部实证）
 
-1. **三套库存金额不可混用**：上市口径 14.3亿 / 阿米巴 CHDJ 6.35亿 / dm_own 1.88亿（2026-08 量级）。跌价/库龄→上市口径表；资金成本→capital_cost_t（正值）或 CHDJ（阿米巴，待确认）。`dm_own_inventory_t` 未获业务确认，不使用。
-2. **日期格式五处不同**：Mix `calmonth='2026-07'`；上市口径 `calmonth='202607'`；CHDJ `stat_month='2026-07'`；capital_cost_t `month='202608'`；出入库 `start_month='2026-07'`。跨表同月条件必须分别写。
-3. **跌价只有年段**（1年内/1-2/2-3/3-4/4年+，比例 0/20/30/50/50%）；业务“半年分段”只有金额可聚（天级细分字段），跌价金额必须按年段呈现。
+1. **两套库存金额不可混用**：内部口径管理字段 zsjkcje 14.71亿 / 阿米巴字段 stock_amt 17.52亿 / 阿米巴 CHDJ 6.35亿（2026-07 量级）。本域统一用**阿米巴字段族**（stock_amt/jchj_aging/*_aging）与 Mix 对齐；资金成本→capital_cost_t（正值）或 CHDJ（阿米巴，待确认）。`dm_own_inventory_t` 未获业务确认，不使用。上市口径表 `dm_fin_stock_d_accage_list_c_t_2023` 已弃用，禁止使用。
+2. **日期格式五处不同**：Mix `calmonth='2026-07'`；内部口径 `calmonth='202607'`；CHDJ `stat_month='2026-07'`；capital_cost_t `month='202608'`；出入库 `start_month='2026-07'`。跨表同月条件必须分别写。
+3. **跌价按 6月段**（6月内 0%、6-12月 10%、12-24月 40%、24月+ 70%），另含保质期段（到期3月内 70%、到期 100%）；业务问“年段/半年段”时按 6月段聚合呈现并声明口径。
 4. **月粒度原则（业务裁定 2026-08-18）**：动销/缺货最小按月看，库存取月末快照。“有销量天数”=「有销量月份数」；缺货 = 月末库存为 0 且当月有出库/需求。
-5. **SKU 范围口径差**：Mix 在售 6,232 vs 上市口径在库 64,605。跨表以 Mix 为主集 LEFT JOIN，或明确声明“在库口径”。
+5. **SKU 范围口径差**：Mix 在售 6,232 vs 内部口径在库 ~6.4万。跨表以 Mix 为主集 LEFT JOIN，或明确声明“在库口径”。
 6. **判空**：`LENGTH(TRIM(col))>0`（`TRIM(col)<>''` 在 GaussDB A 兼容模式下恒 NULL，会过滤掉所有行）。
 7. **Mix 必带过滤**：`data_source IN ('S','T','D','')`。
 8. **周转口径透明**：可售天数 = 月末库存金额 ÷ 日均销售成本（Mix `act_cost_sum_amt` 月均÷30）；非财务精确周转，回答时注明。
@@ -65,9 +65,10 @@ SKU 键：Mix 表 `material_num` ↔ 上市口径表 `material` ↔ 出入库表
 | 销售面积/数量 | `zxsmj` / `zxssl` | Mix |
 | 分摊后毛利 | `gross_profit_after_sharing` | Mix |
 | 实际成本 | `act_cost_sum_amt` | Mix |
-| 月末库存金额（上市口径） | `zsjkcje` | 上市口径表 |
-| 跌价合计 | `aging_sum_fall_amt` | 上市口径表 |
-| 是否清仓 | `zisqc` | 上市口径表 |
+| 月末库存金额（阿米巴结算价） | `stock_amt` | 内部口径表 dm_fin_stock_detail_accage_t_2023 |
+| 跌价合计（阿米巴） | `jchj_aging` | 内部口径表 |
+| 是否清仓 | `zisqc`（值域 Y/N） | 内部口径表 |
+| 库龄分段金额（阿米巴） | `wbzq_6_aging`~`wbzq_24_aging` | 内部口径表 |
 | 月度出库量/面积 | `out_stock_qty` / `out_stock_area` | 出入库月表 |
 | 月末库存量/面积 | `stock_qty_month_end` / `stock_area_month_end` | 出入库月表 |
 | 库存资金成本（正值主口径） | `capital_cost` | dm_fin_stock_capital_cost_t |

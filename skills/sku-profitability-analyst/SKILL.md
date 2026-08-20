@@ -31,7 +31,7 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 | 表 | 用途 | 日期字段 | 日期格式 |
 |----|------|----------|----------|
 | `dm.dm_fin_operations_mix_sum_t` | 销售额/毛利/成本（阿米巴口径） | `calmonth` | YYYY-MM |
-| `dm.dm_fin_stock_d_accage_list_c_t_2023` | 库存余额/跌价/库龄（上市口径） | `calmonth` | YYYYMM |
+| `dm.dm_fin_stock_detail_accage_t_2023` | 库存余额/跌价/库龄（内部口径，**阿米巴字段族**） | `calmonth` | YYYYMM |
 | `dm.dm_product_inout_stock_t` | 出入库明细（动销判断） | `start_month` | YYYY-MM |
 | `dwimd.dwi_md_data_material_general_t` | 物料主数据（上市日期） | `product_listed_date` | YYYY-MM |
 
@@ -86,7 +86,7 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 | 表 | 日期字段 | 格式 | 示例 |
 |----|----------|------|------|
 | Mix（销售额/毛利） | `calmonth` | YYYY-MM | `'2026-01'` |
-| 上市口径（库存/跌价） | `calmonth` | YYYYMM | `'202607'` |
+| 内部口径（库存/跌价，阿米巴字段族） | `calmonth` | YYYYMM | `'202607'` |
 | 出入库 | `start_month` | YYYY-MM | `'2026-01'` |
 | 物料主数据 | `product_listed_date` | YYYY-MM | `'2025-07'` |
 
@@ -105,13 +105,14 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 在输出结果之前，扮演"质疑者"角色，逐条挑战自己刚才生成的 SQL 和结论：
 
 **A. 库存口径查**
-- [ ] 跌价/库龄相关查询是否使用了上市口径表（`dm_fin_stock_d_accage_list_c_t_2023`，calmonth='YYYYMM'）？
+- [ ] 跌价/库龄/库存余额是否使用了内部口径表（`dm_fin_stock_detail_accage_t_2023`，calmonth='YYYYMM'）？
+- [ ] 库存金额是否用阿米巴字段 `stock_amt`（不是管理口径 `zsjkcje`）？跌价用 `jchj_aging`（不是 `jchj_amt`）？
 - [ ] 资金成本是否使用 `dm_fin_stock_capital_cost_t`（正值）？阿米巴才用 CHDJ，混用即打回
 - [ ] 库存余额字段是 `zsjkcje`（资金金额）还是面积？与用户需求是否一致？
 
 **B. 日期格式查**
 - [ ] Mix 表 `calmonth` 是否为 `YYYY-MM` 格式？
-- [ ] 上市口径表 `calmonth` 是否为 `YYYYMM` 格式？
+- [ ] 内部口径表 `calmonth` 是否为 `YYYYMM` 格式？
 - [ ] 出入库 `start_month` 是否为 `YYYY-MM` 格式？
 - [ ] CHDJ 相关查询日期格式是否为 `YYYY-MM`？
 
@@ -202,8 +203,8 @@ ORDER BY c.amt DESC LIMIT 50;
 
 ```sql
 WITH stock AS (
-  SELECT material, SUM(zsjkcje) AS stock_amt
-  FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+  SELECT material, SUM(stock_amt) AS stock_amt
+  FROM dm.dm_fin_stock_detail_accage_t_2023
   WHERE calmonth = '202607' GROUP BY material
 ), cost AS (
   SELECT material_num, AVG(m_cost) AS avg_m_cost, AVG(m_amt) AS avg_m_amt FROM (
@@ -230,19 +231,24 @@ WITH act AS (
     AND (out_stock_qty > 0 OR out_stock_area > 0)
   GROUP BY material_num
 ), stock AS (
-  SELECT material, SUM(zsjkcje) AS stock_amt
-  FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+  SELECT material, SUM(stock_amt) AS stock_amt
+  FROM dm.dm_fin_stock_detail_accage_t_2023
   WHERE calmonth = '202607' GROUP BY material
+), joined AS (
+  SELECT COALESCE(a.material_num, s.material) AS material,
+         COALESCE(a.active_months,0) AS active_months,
+         COALESCE(s.stock_amt,0) AS stock_amt,
+         CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'
+              WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'
+              ELSE '正常' END AS health_flag
+  FROM act a FULL OUTER JOIN stock s ON a.material_num = s.material
 )
-SELECT COALESCE(a.material_num, s.material) AS material,
-       COALESCE(a.active_months,0) AS active_months,
-       ROUND(100.0*COALESCE(a.active_months,0)/7,0) AS active_rate, -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
-       ROUND(COALESCE(s.stock_amt,0)) AS stock_amt,
-       CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'
-            WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'
-            ELSE '正常' END AS health_flag
-FROM act a FULL OUTER JOIN stock s ON a.material_num = s.material
-ORDER BY stock_amt DESC NULLS LAST LIMIT 100;
+-- 按健康标记聚合（验证修正：原模板 SELECT 含非聚合列 + GROUP BY health_flag 在 GaussDB 非法，
+-- 修正为派生表后按 health_flag 聚合，202607 实测 2 行：正常 45,948 / 滞销 18,774，无缺货）
+SELECT health_flag, COUNT(*) AS sku_cnt,
+       ROUND(SUM(stock_amt)) AS stock_amt,
+       ROUND(100.0*SUM(active_months)/(7.0*COUNT(*)),1) AS avg_active_rate -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
+FROM joined GROUP BY health_flag ORDER BY health_flag;
 ```
 
 > 注：此处"缺货"用全窗口有动销即视为有需求的宽口径（月粒度）；库存=0 且 0 动销的 SKU 判"正常"实为停售/无数据态，精细"当月有需求"口径见 knowledge/inventory-side-patterns.md。
@@ -284,13 +290,12 @@ GROUP BY integrate_channel__t ORDER BY amt DESC;
 
 ```sql
 SELECT material, MAX(material___t) AS material_name,
-       ROUND(SUM(aging_sum_fall_amt)) AS fall_amt,
-       ROUND(SUM(zsjkcje)) AS stock_amt,
-       ROUND(SUM(aging_1_2_year_fall_amt)) AS fall_1_2y,
-       ROUND(SUM(aging_2_3_year_fall_amt)) AS fall_2_3y,
-       ROUND(SUM(aging_3_4_year_fall_amt)) AS fall_3_4y,
-       ROUND(SUM(aging_4_year_fall_amt)) AS fall_4y
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+       ROUND(SUM(jchj_aging)) AS fall_amt,
+       ROUND(SUM(stock_amt)) AS stock_amt,
+       ROUND(SUM(wbzq_6_12_fall_aging)) AS fall_6_12m,
+       ROUND(SUM(wbzq_12_24_fall_aging)) AS fall_12_24m,
+       ROUND(SUM(wbzq_24_fall_aging)) AS fall_24m
+FROM dm.dm_fin_stock_detail_accage_t_2023
 WHERE calmonth = '202607'
 GROUP BY material ORDER BY fall_amt DESC LIMIT 10;
 ```
@@ -312,8 +317,8 @@ WITH cur AS (
     AND (out_stock_qty > 0 OR out_stock_area > 0)
   GROUP BY material_num
 ), stk AS (
-  SELECT material, SUM(zsjkcje) AS stock_amt, SUM(aging_sum_fall_amt) AS fall_amt
-  FROM dm.dm_fin_stock_d_accage_list_c_t_2023 WHERE calmonth='202607' GROUP BY material
+  SELECT material, SUM(stock_amt) AS stock_amt, SUM(jchj_aging) AS fall_amt
+  FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth='202607' GROUP BY material
 ), base AS (
   SELECT c.material_num, c.amt, c.gp, COALESCE(a.active_months,0) AS active_months,
          COALESCE(s.stock_amt,0) AS stock_amt, COALESCE(s.fall_amt,0) AS fall_amt
@@ -339,7 +344,7 @@ SELECT material_num, ROUND(amt) AS amt, ROUND(fall_amt) AS fall_amt, stock_amt, 
 FROM final ORDER BY score DESC LIMIT 20;
 ```
 
-> 注：<40 判"降库存"；"清仓淘汰"为复核档——低分且效益利润为负且上市口径表 zisqc='Y' 才升级清仓（口径见 knowledge metrics.md 第三节）。
+> 注：<40 判"降库存"；"清仓淘汰"为复核档——低分且效益利润为负且内部口径表（dm_fin_stock_detail_accage_t_2023）zisqc='Y' 才升级清仓（口径见 knowledge metrics.md 第三节）。
 
 ## 数据质量检查项
 

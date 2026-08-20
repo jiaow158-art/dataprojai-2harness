@@ -4,14 +4,14 @@
 
 ## 问题4 库存周转 / 可售天数
 
-- 表：上市口径表（月末库存金额 `zsjkcje`，calmonth=YYYYMM）× Mix（月均销售成本 `act_cost_sum_amt`，calmonth=YYYY-MM）
+- 表：内部口径表（月末库存金额 `stock_amt` 阿米巴结算价，calmonth=YYYYMM）× Mix（月均销售成本 `act_cost_sum_amt`，calmonth=YYYY-MM）
 - 可售天数 = 月末库存金额 ÷ (近 N 月平均月成本 ÷ 30)，N 默认 6
 - 库销比 = 月末库存金额 ÷ 近 N 月销售额（评分公式的周转代理指标）
 - 透明声明：非财务精确周转
 
 ## 问题5 滞销 / 缺货 / 动销（月粒度原则）
 
-- 表：出入库月表（动销，start_month=YYYY-MM）+ 上市口径表（月末库存，calmonth=YYYYMM）+（可选）otd 未交付订单
+- 表：出入库月表（动销，start_month=YYYY-MM）+ 内部口径表（月末库存 `stock_amt`，calmonth=YYYYMM）+（可选）otd 未交付订单
 - 动销率 = 有出库月份数 ÷ 统计期月份数（出库 = `out_stock_qty>0 OR out_stock_area>0`）
 - 滞销 = 有库存且统计期内 0 动销（业务参考线：库销比>60 天计入滞销 SKU 数）
 - 缺货 = 月末库存为 0 且当月有出库/需求；数量级补充 = otd 未交付订单
@@ -19,7 +19,7 @@
 
 ## 问题9 库存跌价
 
-- 表：上市口径表单表（calmonth=YYYYMM）
-- 跌价 = `aging_sum_fall_amt`（预计算，比例 0/20/30/50/50%）
-- 分段呈现按年段；"半年分段"只有金额（天级细分聚合），透明说明
+- 表：内部口径表单表（`dm_fin_stock_detail_accage_t_2023`，calmonth=YYYYMM）
+- 跌价 = `jchj_aging`（阿米巴减值合计，比例 0/10/40/70% + 保质期 70/100%）
+- 分段呈现按 6月段（`wbzq_6_12_fall_aging`/12-24/24+）；业务问"年段/半年段"按 6月段聚合并声明口径
 - 处置联动：`zisqc`（是否清仓，值域 Y/N）+ 跌价 TOP 榜
