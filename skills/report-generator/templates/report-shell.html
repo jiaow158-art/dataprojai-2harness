@@ -861,10 +861,11 @@
                         /* item 触发（散点）：params 是单个对象，seriesName=产品名；value 是 [x, y] */
                         var sp = seriesSpecs[p.seriesIndex] || chartSpec;
                         var v = p.value;
+                        var ys0 = Array.isArray(yAxes) ? yAxes[0] : yAxes;
                         var txt = Array.isArray(v)
                           ? v.map(function (vv, idx) {
-                              var ysp = (idx === 1 && yAxes && yAxes[0] && yAxes[0].valueFormat)
-                                ? parseValueFormat(yAxes[0].valueFormat) : null;
+                              var ysp = (idx === 1 && ys0 && ys0.valueFormat)
+                                ? parseValueFormat(ys0.valueFormat) : null;
                               return formatValue(vv, ysp || sp || chartSpec);
                             }).join(', ')
                           : (sp ? formatValue(v, sp) : v);
