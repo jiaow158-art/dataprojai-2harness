@@ -3,7 +3,7 @@
 ## 快速参考
 
 - **DWS 表名**：`dm.dm_fin_stock_capital_cost_t`
-- **业务含义**：按物料×工厂×批次×库存地点核算的库存资金成本（上市口径），公式为 `((期初+期末)/2 − 202012余额) × 4%/12`
+- **业务含义**：按物料×工厂×批次×库存地点核算的库存资金成本，公式为 `((期初+期末)/2 − 202012余额) × 4%/12`
 - **实体粒度**：一行 = month × 事业部 × 公司 × 工厂 × 物料 × 批次 × 库存地点 × 库存类别
 - **数据量 / 时间范围**：约 238 万行/月；最新月份 202608，自 2024-03-02 起持续刷新
 - **时间字段与格式**：`month` = **YYYYMM**（如 '202608'，注意与 CHDJ 表的 YYYY-MM 不同！）
@@ -38,11 +38,11 @@
 ## 陷阱
 
 1. **日期格式 YYYYMM**（如 '202608'），与 CHDJ 表的 `stat_month`（YYYY-MM）不同。跨表查询时必须分别处理时间字段格式。
-2. **与 CHDJ 表的 capital_cost 符号相反**：本表 2026-08 资金成本合计 +58.4万（正值），CHDJ 表同期合计 -35.7万（负值）。两套核算体系（上市口径 vs 阿米巴口径），**不可混用**。
-3. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：上市口径含全部库存，阿米巴口径核算范围不同（2026-08 实况：zdpsyb=11000002 卫浴事业部 3.91亿占 61%、11000001 瓷砖事业部 2.32亿、11240102 国际营销中心 560万、11000011 卫浴旧组织 460万、11250401 丽适岩板 160万）。跨表金额加减无意义。
+2. **与 CHDJ 表的 capital_cost 符号相反**：本表 2026-08 资金成本合计 +58.4万（正值），CHDJ 表同期合计 -35.7万（负值）。两套核算体系（资金成本表 vs 阿米巴 CHDJ），**不可混用**。
+3. **closing_balance 14.3亿 ≠ CHDJ inventory_value 6.35亿**：资金成本表口径含全部库存，阿米巴口径核算范围不同（2026-08 实况：zdpsyb=11000002 卫浴事业部 3.91亿占 61%、11000001 瓷砖事业部 2.32亿、11240102 国际营销中心 560万、11000011 卫浴旧组织 460万、11250401 丽适岩板 160万）。跨表金额加减无意义。
 
    **zdpsyb 码表说明**：CHDJ 表无 `zdpsyb___t` 描述字段，编码为组织架构 node2 去掉 H 前缀（如 `H11000001` → `11000001`）。解码见 [org-hierarchy.md](../../sources-of-truth/business-context/org-hierarchy.md) 的 node2 枚举表。`11000011`/`11000012` 为卫浴旧组织编码，ETL 注释标注为"卫浴之前的组织"，org-hierarchy.md 未收录。
-4. **物料字段名不同**：本表用 `material_code`，CHDJ 表用 `material_num`，上市口径明细表用 `material`。
+4. **物料字段名不同**：本表用 `material_code`，CHDJ 表用 `material_num`，内部口径明细表（dm_fin_stock_detail_accage_t_2023）用 `material`。
 5. **plant___t / stor_loc___t 大量为空**（早期数据），使用时用 `LENGTH(TRIM(plant___t)) > 0` 过滤或使用编码关联。
 6. **closing_balance_202012 为基准扣除项**：ETL 公式为 `((期初+期末)/2 − 202012余额) × 4%/12`，202012 基数大的物料资金成本低。
 
@@ -62,12 +62,12 @@ ORDER BY balance DESC;
 
 ## 血缘
 
-源表：`DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023`（上市口径库存明细）
+源表：`DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023`（财务/内部口径库存明细主表）
 ETL 脚本：`huaweiclaude/DM/PJob_DM_FIN_STOCK_CAPITAL_COST_T.txt`
 DWS 层加载：`huaweiclaude/DWS/FIN/FIN_INSERT/PJob_DWS_DM_FIN_STOCK_CAPITAL_COST_T.txt`
 
 ## 关联文档
 
 - [metrics.md](metrics.md) — 语义层（决策树、日期格式总览、口径决策）
-- [stock-fall-list.md](stock-fall-list.md) — 上市口径跌价表
+- [stock-fall-list.md](stock-fall-list.md) — 内部口径跌价表
 - [chdj-capital-cost.md](chdj-capital-cost.md) — 阿米巴存货价值/资金成本表

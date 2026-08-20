@@ -26,7 +26,7 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | 可用库存数量 | `available_inventory_quantity` | dm_wm_all_type_stock_t | 可用库存 |
 | 总库存数量 | `total_inventory_quantity` / `all_stock_quantity` | dm_wm_all_type_stock_t | 总库存 |
 | 在途数量 | `deliver_qty` | dm_b1_transit_inventory_t | 供应商已发货未入库 |
-| 库龄分段金额 | `wbzq_6_amt` / `wbzq_6_12_amt` / `wbzq_12_24_amt` / `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | 未包装周期分段 |
+| 库龄分段金额 | `wbzq_6_amt` / `wbzq_6_12_amt` / `wbzq_12_24_amt` / `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | 无保质期分段（管理口径） |
 | 入库面积 | `stock_in_area_month` / `stock_in_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径入库 |
 | 出库面积（销售） | `sales_stock_out_area_month` / `sales_stock_out_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径销售出库 |
 
@@ -39,7 +39,7 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | 库龄分段（宽表） | `stock_age_seg` | dm_otd_wm_stock_stat_month_t | 0-3月/3-6月/6-12月/12-24月/24月+ |
 | 库存类型 | `stock_type` | dm_otd_wm_stock_stat_month_t | 可用库存/冻结库存/质检库存/在途库存 |
 | 库龄分段（明细） | `wbzq_6_amt` ~ `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | wbzq=未包装周期, ybzq=已包装周期 |
-| 包装标志 | `bz_flag` | dm_fin_stock_detail_accage_t_2023 | 区分已包装/未包装 |
+| 保质期标识 | `bz_flag` | dm_fin_stock_detail_accage_t_2023 | Y=有保质期，N=无保质期 |
 
 ### 1.3 组织维度
 
@@ -105,9 +105,9 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 │   └── 残次品 → dm.dm_wm_defective_product_stockout_t
 ├── 涉及“库存周转率”？
 │   └── 用 dm.dm_otd_wm_stock_turnover_m（40行，预计算）
-├── 涉及“跌价准备”/“库龄分段金额”/“上市口径库存金额”？
-│   └── 用 dm.dm_fin_stock_d_accage_list_c_t_2023
-├── 涉及“库存资金成本”（上市口径、批次级、正值）？
+├── 涉及“跌价准备”/“库龄分段金额”/“库存金额（管理口径）”？
+│   └── 用 dm.dm_fin_stock_detail_accage_t_2023（jchj_amt / wbzq_*_fall_amt / zsjkcje）
+├── 涉及“库存资金成本”（批次级、正值）？
 │   └── 用 dm.dm_fin_stock_capital_cost_t
 ├── 涉及“阿米巴存货价值”/“分摊资金成本”（符号待确认）？
 │   └── 用 dm.dm_ambv2_chdj_grp_t
@@ -130,7 +130,7 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | 时间范围 | 202012 ~ 202606 |
 | 时间字段 | `calmonth` (YYYYMM, NOT NULL) |
 | 数量字段 | `quantity` |
-| 金额字段 | `zsjkcje`（资金占压），`stock_amt`（库存金额） |
+| 金额字段 | `zsjkcje`（实际库存金额-管理），`stock_amt`（阿米巴结算价）；跌价 `jchj_amt`/`jchj_aging` |
 | 库龄字段 | `wbzq_6_amt`~`wbzq_24_amt`（金额），`wbzq_6_qty`~`wbzq_24_qty`（数量），`wbzq_6_area`~`wbzq_24_area`（面积） |
 | 关键维度 | plant, stor_loc, stockcat, stocktype, batch, material, matl_grp_1~5, zprodh1~5, wbs_elemt, vendor |
 | ⚠️ 陷阱 | calmonth 格式 YYYYMM（如 '202606'）；`___t` 后缀=描述；库龄多套口径并存（标准/爱米巴/自然日历/协议单价） |
@@ -200,7 +200,6 @@ description: 库存仓储域语义层 — 编译后的指标定义、概念映�
 | dm_otd_wm_stock_stat_month_t | `month_date` | 需确认 | 不同数据源可能不同 |
 | dm_otd_wm_stock_turnover_m | `stat_month` | text | |
 | 低周转/残次品表 | `voucher_post_date` | timestamp | `'2026-06-01'` |
-| dm_fin_stock_d_accage_list_c_t_2023 | `calmonth` | YYYYMM | `'202608'` |
 | dm_fin_stock_capital_cost_t | `month` | YYYYMM | `'202608'` |
 | dm_ambv2_chdj_grp_t | `stat_month` | YYYY-MM | `'2026-08'` |
 
@@ -272,7 +271,7 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 2. **物料字段名不一致**：`material`（SAP风格，`___t`后缀）vs `material_num`（新风格，`_name`后缀）。查询时注意表用的是哪套
 3. **`___t` 后缀**：三个下划线 + t，SAP 风格文本字段。如 `plant` → `plant___t`，`zprodh1` → `zprodh1___t`
 4. **规格字段**：`dm_product_inout_stock_t` 中是 `dimension_`（单下划线后缀），其他表是 `dimension`
-5. **库龄多套口径**：标准(wbzq/ybzq)、协议单价(xydj/xyzjdj)、爱米巴(amb_)、自然日历(zrzlcp_)。用户未指定口径时默认用标准
+5. **库龄多套口径**：管理(wbzq/ybzq+fall_amt)、阿米巴(*_aging)、协议单价(xydj/xyzjdj)、自然日历(zrzlcp_)。用户未指定时默认管理口径；SKU 效益域配 Mix 用阿米巴口径
 6. **在途库存含预测**：`dm_b1_transit_inventory_t` 有 2030 年数据，必须过滤 doc_month
 7. **`dm.dm_fin_stock_detail_accage_t` 是旧表/子集**（91列，不含面积/数量细分字段），查询用 `_2023` 后缀完整版
 8. **CXC 日报变体**：`_0630`（6/30快照）、`_tmp`（临时表），查询用主表 `dm_rpt_wm_cxc_day_sum`
@@ -285,13 +284,16 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 
 | 概念 | 权威字段 | 所在表 |
 |---|---|---|
-| 跌价准备（预计算，含计提比例 0%/20%/30%/50%/50%） | `aging_sum_fall_amt` | `dm_fin_stock_d_accage_list_c_t_2023`（上市口径，calmonth=YYYYMM） |
-| 库存金额（上市口径） | `zsjkcje` | 同上 |
-| 库龄分段金额（天级可聚半年口径） | `aging_*_amt` | 同上 |
+| 跌价合计（管理口径，计提 0%/10%/40%/70% + 保质期 70%/100%） | `jchj_amt` | `dm_fin_stock_detail_accage_t_2023`（calmonth=YYYYMM） |
+| 跌价分段（无保质期） | `wbzq_6_fall_amt`(0%) / `wbzq_6_12_fall_amt`(10%) / `wbzq_12_24_fall_amt`(40%) / `wbzq_24_fall_amt`(70%) | 同上 |
+| 跌价分段（有保质期） | `ybzq_bzdq_3_fall_amt`(70%) / `ybzq_bzdq_fall_amt`(100%) | 同上 |
+| 库存金额（管理口径） | `zsjkcje` | 同上 |
+| 库龄分段金额 | `wbzq_6_amt` ~ `wbzq_24_amt`（+`ybzq_*`） | 同上 |
+| 阿米巴口径（可选） | `stock_amt` / `jchj_aging` / `wbzq_*_aging` | 同上 |
 | 存货价值（阿米巴口径） | `inventory_value` | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） |
-| 库存资金成本 | `capital_cost*` | 同上 / `dm_fin_stock_capital_cost_t` |
+| 库存资金成本 | `capital_cost*` | `dm_fin_stock_capital_cost_t`（month=YYYYMM，正值） / `dm_ambv2_chdj_grp_t` |
 
-**口径决策**：问跌价/库龄/上市口径库存金额 → dm_fin_stock_d_accage_list_c_t_2023；问库存资金成本 → 默认 dm_fin_stock_capital_cost_t（上市口径、批次级、正值、公式已验证），阿米巴分摊口径才用 dm_ambv2_chdj_grp_t（其 capital_cost 为负值、符号语义待 ETL 确认）。两套库存金额（14.3亿 vs 6.35亿，2026-08）不可混用。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)。
+**口径决策**：问跌价/库龄/库存金额 → dm_fin_stock_detail_accage_t_2023（管理字段族默认；SKU 效益域配 Mix 用阿米巴字段族）；问库存资金成本 → 默认 dm_fin_stock_capital_cost_t（批次级、正值、公式已验证），阿米巴分摊口径才用 dm_ambv2_chdj_grp_t（其 capital_cost 为负值、符号语义待 ETL 确认）。库存金额三套口径（管理 14.71亿 / 阿米巴 17.52亿 / CHDJ 6.35亿，2026-07）不可混用。上市口径表 `dm_fin_stock_d_accage_list_c_t_2023` 已弃用，禁止使用。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)。
 
 ---
 
