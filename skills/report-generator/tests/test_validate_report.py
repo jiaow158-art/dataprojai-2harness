@@ -182,3 +182,36 @@ def test_tone_cell_nonstring_v_fails():
     r["sections"][1]["table"]["rows"] = [["1", {"v": 123, "tone": "good"}]]
     errs = vr.validate_data(r)
     assert any("rows[0][1].v" in e for e in errs), errs
+
+
+# ---------- 散点守卫（四象限修复） ----------
+
+def test_scatter_multi_named_points_fails():
+    """单 series 多个命名散点（四象限病根）必须被拒绝。"""
+    r = _base_report()
+    r["sections"][0]["chart"]["option"] = {
+        "tooltip": {"trigger": "item"},
+        "series": [{"name": "系列", "type": "scatter",
+                    "data": [{"name": "素色", "value": [32.2, 36.0], "symbolSize": 60},
+                             {"name": "质臻", "value": [-5.9, 44.8], "symbolSize": 47}]}]}
+    errs = vr.validate_data(r)
+    assert any("series[0]" in e and "拆分" in e for e in errs), errs
+
+
+def test_scatter_per_product_series_passes():
+    """每产品独立 series（每系列一个命名点）应通过。"""
+    r = _base_report()
+    r["sections"][0]["chart"]["option"] = {
+        "tooltip": {"trigger": "item"},
+        "series": [
+            {"name": "素色", "type": "scatter", "data": [{"value": [32.2, 36.0], "symbolSize": 60}]},
+            {"name": "质臻", "type": "scatter", "data": [{"value": [-5.9, 44.8], "symbolSize": 47}]}]}
+    assert vr.validate_data(r) == []
+
+
+def test_scatter_unnamed_array_points_pass():
+    """热力图/无命名数组点的散点不受影响。"""
+    r = _base_report()
+    r["sections"][0]["chart"]["option"] = {
+        "series": [{"name": "s", "type": "scatter", "data": [[1, 2], [3, 4]]}]}
+    assert vr.validate_data(r) == []
