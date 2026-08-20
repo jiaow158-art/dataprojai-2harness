@@ -40,7 +40,7 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 ### 第 1 步：读语义层
 
 **必须先读** `sku-profitability-knowledge/references/metrics.md`，获取：
-- 概念→字段映射（ambperformance / gross_profit_after_sharing / zsjkcje 等）
+- 概念→字段映射（ambperformance / gross_profit_after_sharing / stock_amt / jchj_aging 等）
 - 表选择决策树
 - 日期格式速查
 - 已知陷阱清单
@@ -108,7 +108,7 @@ description: SKU效益分析执行器，接收单个SKU或SKU组的效益问题�
 - [ ] 跌价/库龄/库存余额是否使用了内部口径表（`dm_fin_stock_detail_accage_t_2023`，calmonth='YYYYMM'）？
 - [ ] 库存金额是否用阿米巴字段 `stock_amt`（不是管理口径 `zsjkcje`）？跌价用 `jchj_aging`（不是 `jchj_amt`）？
 - [ ] 资金成本是否使用 `dm_fin_stock_capital_cost_t`（正值）？阿米巴才用 CHDJ，混用即打回
-- [ ] 库存余额字段是 `zsjkcje`（资金金额）还是面积？与用户需求是否一致？
+- [ ] 库存余额字段是 `stock_amt`（阿米巴金额）还是面积？与用户需求是否一致？
 
 **B. 日期格式查**
 - [ ] Mix 表 `calmonth` 是否为 `YYYY-MM` 格式？
@@ -345,7 +345,7 @@ FROM final ORDER BY score DESC LIMIT 20;
 
 生成结果前检查：
 1. 结果金额数量级是否合理（头部SKU月销售额通常百万~千万级）
-2. 库存余额（zsjkcje）是否有意外的负值或零值
+2. 库存余额（stock_amt）是否有意外的负值或零值
 3. 可售天数是否在合理范围（<10天可能缺货，>180天可能滞销）
 4. 毛利率是否在合理范围（陶瓷行业通常 20%~35%）
 
