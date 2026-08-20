@@ -234,21 +234,16 @@ WITH act AS (
   SELECT material, SUM(stock_amt) AS stock_amt
   FROM dm.dm_fin_stock_detail_accage_t_2023
   WHERE calmonth = '202607' GROUP BY material
-), joined AS (
-  SELECT COALESCE(a.material_num, s.material) AS material,
-         COALESCE(a.active_months,0) AS active_months,
-         COALESCE(s.stock_amt,0) AS stock_amt,
-         CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'
-              WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'
-              ELSE '正常' END AS health_flag
-  FROM act a FULL OUTER JOIN stock s ON a.material_num = s.material
 )
--- 按健康标记聚合（验证修正：原模板 SELECT 含非聚合列 + GROUP BY health_flag 在 GaussDB 非法，
--- 修正为派生表后按 health_flag 聚合，202607 实测 2 行：正常 45,948 / 滞销 18,774，无缺货）
-SELECT health_flag, COUNT(*) AS sku_cnt,
-       ROUND(SUM(stock_amt)) AS stock_amt,
-       ROUND(100.0*SUM(active_months)/(7.0*COUNT(*)),1) AS avg_active_rate -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
-FROM joined GROUP BY health_flag ORDER BY health_flag;
+SELECT COALESCE(a.material_num, s.material) AS material,
+       COALESCE(a.active_months,0) AS active_months,
+       ROUND(100.0*COALESCE(a.active_months,0)/7,0) AS active_rate, -- 分母=统计期月份数（示例 7 对应 2026-01~2026-07），调整时间区间时同步改
+       ROUND(COALESCE(s.stock_amt,0)) AS stock_amt,
+       CASE WHEN COALESCE(s.stock_amt,0)=0 AND COALESCE(a.active_months,0)>0 THEN '缺货'
+            WHEN COALESCE(s.stock_amt,0)>0 AND COALESCE(a.active_months,0)=0 THEN '滞销'
+            ELSE '正常' END AS health_flag
+FROM act a FULL OUTER JOIN stock s ON a.material_num = s.material
+ORDER BY stock_amt DESC NULLS LAST LIMIT 100;
 ```
 
 > 注：此处"缺货"用全窗口有动销即视为有需求的宽口径（月粒度）；库存=0 且 0 动销的 SKU 判"正常"实为停售/无数据态，精细"当月有需求"口径见 knowledge/inventory-side-patterns.md。
