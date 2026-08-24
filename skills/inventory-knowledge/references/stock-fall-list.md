@@ -20,6 +20,20 @@
 | `aging_4_year_fall_amt` | 4年以上跌价 | 50% |
 | `aging_sum_fall_amt` | **跌价合计（预计算，直接 SUM 用）** | — |
 
+### 跌价公式精确实现（ETL: PJob_DWS_DM_FIN_STOCK_D_ACCAGE_LIST_C_T_2023 实证）
+
+| 字段 | 天级桶组成 | 比例 |
+|---|---|---|
+| `aging_1_year_fall_amt` | 0~360 天（0_30+31_60+61_90+91_180+181_270+271_360） | ×0 |
+| `aging_1_2_year_fall_amt` | 361_450+451_540+541_630+631_720 | ×0.2 |
+| `aging_2_3_year_fall_amt` | 721_810+811_900+901_990+991_1080 | ×0.3 |
+| `aging_3_4_year_fall_amt` | 1081_1170+1171_1260+1261_1350+1351_1440 | ×0.5 |
+| `aging_4_year_fall_amt` | aging_1441 | ×0.5 |
+| `aging_sum_fall_amt` | 五段之和（ETL 预计算） | — |
+
+2026-07 全表复算验证：reported 与 recalc 偏差 <0.1%（见 docs/superpowers/verification/2026-08-19-inventory-etl-verification.md）。
+`query_date` = 调度参数 `${PERIOD_ID_D}` 直填，每 calmonth 一个值。
+
 ## 账龄金额/数量/面积字段
 
 - 年段：`aging_1_year_amt`、`aging_1_2_year_amt`、`aging_2_3_year_amt`、`aging_3_4_year_amt`、`aging_4_year_amt`
@@ -46,7 +60,7 @@
 
 1. **大表必带 calmonth 过滤**：600万行/月，无过滤查询会超时。
 2. **跌价只有年段**，业务问"半年分段跌价"时透明说明，金额可用天级细分聚合。
-3. **口径独此一家**：本表库存金额（14.3亿）与 CHDJ 阿米巴口径（6.35亿）、`dm_own_inventory_t`（1.88亿）不可混用。问跌价/库龄→本表；问库存资金成本→`dm_fin_stock_capital_cost_t`（正值主口径）；问阿米巴分摊→CHDJ。
+3. **口径独此一家（会计口径）**：本表跌价（0/20/30/50/50%）与库龄明细表 jc 族**管理口径减值**（0/10/40/70%）、CHDJ `inventory_value`（=管理减值合积分摊）是**三套体系**，禁止混用或相加。问会计跌价/库龄→本表；问库存资金成本→`dm_fin_stock_capital_cost_t`（正值主口径）；问管理减值/线组分摊→CHDJ。
 4. `material` 在本表 6.4万 SKU，Mix 表在售仅 6,232——跨表 JOIN 前声明对齐口径（通常以 Mix 为主集 LEFT JOIN 本表）。
 5. 判空用 `LENGTH(TRIM(col))>0`，不要用 `TRIM(col)<>''`。
 
