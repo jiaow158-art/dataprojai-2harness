@@ -3,7 +3,7 @@
 ## 快速参考
 
 - **DWS 表名**：`dm.dm_fin_stock_capital_cost_t`
-- **业务含义**：按物料×工厂×批次×库存地点核算的库存资金成本（上市口径），公式为 `((期初+期末)/2 − 202012余额) × 4%/12`
+- **业务含义**：按物料×工厂×批次×库存地点核算的库存资金成本，公式为 `((期初+期末)/2 − 202012余额) × 4%/12`
 - **实体粒度**：一行 = month × 事业部 × 公司 × 工厂 × 物料 × 批次 × 库存地点 × 库存类别
 - **数据量 / 时间范围**：约 238 万行/月；最新月份 202608，自 2024-03-02 起持续刷新
 - **时间字段与格式**：`month` = **YYYYMM**（如 '202608'，注意与 CHDJ 表的 YYYY-MM 不同！）
@@ -61,6 +61,7 @@ capital_cost = ((NVL(期初余额,0) + NVL(期末余额,0))/2 − 202012余额) 
 7. `stock_type` 列承接源表 `stockcat`（库存类别），已排除 'K'。
 8. `plant___t`/`stor_loc___t` 早期数据大量为空，用 `LENGTH(TRIM(x))>0` 过滤或用编码。
 9. zdpsyb 码表：组织架构 node2 去 H 前缀（如 `H11000001`→`11000001`，解码见 [org-hierarchy.md](../../sources-of-truth/business-context/org-hierarchy.md) node2 枚举）；11000011/11000012 为卫浴旧组织（org-hierarchy.md 未收录）。
+10. **物料字段名不同**：本表用 `material_code`，CHDJ 表用 `material_num`，内部口径明细表（dm_fin_stock_detail_accage_t_2023）用 `material`。
 
 ## 常见查询模式
 
@@ -78,12 +79,12 @@ ORDER BY balance DESC;
 
 ## 血缘
 
-源表：`DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023`（上市口径库存明细）
+源表：`DM.DM_FIN_STOCK_DETAIL_ACCAGE_T_2023`（财务/内部口径库存明细主表）
 ETL 脚本：`huaweiclaude/DM/PJob_DM_FIN_STOCK_CAPITAL_COST_T.txt`
 DWS 层加载：`huaweiclaude/DWS/FIN/FIN_INSERT/PJob_DWS_DM_FIN_STOCK_CAPITAL_COST_T.txt`
 
 ## 关联文档
 
 - [metrics.md](metrics.md) — 语义层（决策树、日期格式总览、口径决策）
-- [stock-fall-list.md](stock-fall-list.md) — 上市口径跌价表
+- [stock-fall-list.md](stock-fall-list.md) — 内部口径跌价表
 - [chdj-capital-cost.md](chdj-capital-cost.md) — 阿米巴存货价值/资金成本表

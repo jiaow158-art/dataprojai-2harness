@@ -27,29 +27,31 @@
 
 ## 2. 四象限气泡（散点+分割线）
 
-要点：逐点 `symbolSize` 由分析师预计算（建议 `8 + 52 * sqrt(v/max_v)`，√面积感知）；分割线用声明式 markLine（xAxis/yAxis 值）。
+要点：逐点 `symbolSize` 由分析师预计算（建议 `8 + 52 * sqrt(v/max_v)`，√面积感知）；分割线用声明式 markLine（xAxis/yAxis 值）。**每个产品一个独立 series**（series name = 产品名）——图例列出全部产品、气泡独立配色、悬停 tooltip 显示产品名。**严禁**把多个命名数据点塞进同一个 scatter series（validator 会拒绝构建）。
 
 ```json
 {
   "id": "quad", "title": "SKU 效益四象限", "valueFormat": "signed_percent:1",
   "option": {
     "tooltip": {"trigger": "item"},
+    "color": ["#2563EB", "#06B6D4", "#7C3AED", "#DB2777", "#F59E0B",
+              "#10B981", "#EF4444", "#8B5CF6", "#EC4899", "#14B8A6"],
     "xAxis": {"type": "value", "name": "销售增长率%"},
     "yAxis": {"type": "value", "name": "毛利率%"},
-    "series": [{
-      "name": "SKU", "type": "scatter",
-      "data": [
-        {"name": "SKU-A", "value": [12.5, 30.2], "symbolSize": 40},
-        {"name": "SKU-B", "value": [-8.1, 15.0], "symbolSize": 22}
-      ],
-      "markLine": {
-        "symbol": "none", "lineStyle": {"type": "dashed"},
-        "data": [{"xAxis": 0}, {"yAxis": 25}]
-      }
-    }]
+    "series": [
+      {"name": "SKU-A", "type": "scatter", "data": [{"value": [12.5, 30.2], "symbolSize": 40}]},
+      {"name": "SKU-B", "type": "scatter", "data": [{"value": [-8.1, 15.0], "symbolSize": 22}]},
+      {"name": "SKU-C", "type": "scatter", "data": [{"value": [3.2, 9.8], "symbolSize": 15}]}
+    ]
   }
 }
 ```
+
+规则：
+- **每产品一个 series**，数据点是单个对象 `{"value": [x, y], "symbolSize": n}`，不带 `name`（产品名在 `series.name` 上）。
+- **markLine 分割线只挂在 `series[0]`**；不要挂独立空系列（会污染图例）。
+- **series 数 > 8 时 chart 级声明 `color`**（上例 10 色，防 palette 循环撞色）。
+- 气泡标签由模板自动开启（直标产品名）；如确需关闭，显式写 `"label": {"show": false}`。
 
 ## 3. 热力图（渠道 × SKU）
 

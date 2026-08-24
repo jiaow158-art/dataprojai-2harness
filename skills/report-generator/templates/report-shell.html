@@ -846,31 +846,57 @@
             if (seriesSpecs.length) {
               if (!mergedOption.tooltip) mergedOption.tooltip = { trigger: 'axis' };
               if (!mergedOption.tooltip.trigger) mergedOption.tooltip.trigger = 'axis';
+              if (mergedOption.tooltip.trigger === 'item' || ch.tooltipTemplate === 'pie') {
+                mergedOption.tooltip.trigger = 'item';
+              }
+              var isItemTrigger = mergedOption.tooltip.trigger === 'item';
               if (!mergedOption.tooltip.formatter) {
                 mergedOption.tooltip.formatter = (ch.tooltipTemplate === 'pie')
                   ? function (p) {
                       var sp = seriesSpecs[p.seriesIndex] || chartSpec;
                       return p.name + ': ' + (sp ? formatValue(p.value, sp) : p.value) + ' (' + p.percent + '%)';
                     }
-                  : function (params) {
-                      var r = params[0].name + '<br/>';
-                      params.forEach(function (p) {
+                  : (isItemTrigger
+                    ? function (p) {
+                        /* item 触发（散点）：params 是单个对象，seriesName=产品名；value 是 [x, y] */
                         var sp = seriesSpecs[p.seriesIndex] || chartSpec;
-                        r += p.marker + ' ' + p.seriesName + ': ' + (sp ? formatValue(p.value, sp) : p.value) + '<br/>';
+                        var v = p.value;
+                        var ys0 = Array.isArray(yAxes) ? yAxes[0] : yAxes;
+                        var txt = Array.isArray(v)
+                          ? v.map(function (vv, idx) {
+                              var ysp = (idx === 1 && ys0 && ys0.valueFormat)
+                                ? parseValueFormat(ys0.valueFormat) : null;
+                              return formatValue(vv, ysp || sp || chartSpec);
+                            }).join(', ')
+                          : (sp ? formatValue(v, sp) : v);
+                        var label = p.seriesName || p.name || '';
+                        return (p.marker ? p.marker + ' ' : '') + label + ': ' + txt;
+                      }
+                    : function (params) {
+                        var r = params[0].name + '<br/>';
+                        params.forEach(function (p) {
+                          var sp = seriesSpecs[p.seriesIndex] || chartSpec;
+                          r += p.marker + ' ' + p.seriesName + ': ' + (sp ? formatValue(p.value, sp) : p.value) + '<br/>';
+                        });
+                        return r;
                       });
-                      return r;
-                    };
-              }
-              if (mergedOption.tooltip.trigger === 'item' || ch.tooltipTemplate === 'pie') {
-                mergedOption.tooltip.trigger = 'item';
               }
               (mergedOption.series || []).forEach(function (se, i) {
                 if (!se) return;
+                var hasExplicitLabel = !!se.label;
                 se.label = se.label || {};
                 if (se.type === 'pie') {
                   if (!se.label.formatter) se.label.formatter = function (p) {
                     return p.name + '\n' + p.percent + '%';
                   };
+                } else if (se.type === 'scatter') {
+                  /* Fix B：散点气泡直标产品名（seriesName）；JSON 显式声明 label 则尊重原样 */
+                  if (!hasExplicitLabel) {
+                    se.label.show = true;
+                    se.label.position = 'top';
+                    if (!se.label.formatter) se.label.formatter = function (p) { return p.seriesName; };
+                    if (!se.labelLayout) se.labelLayout = { hideOverlap: true };
+                  }
                 } else if (!se.label.formatter) {
                   var sp2 = seriesSpecs[i];
                   if (sp2) se.label.formatter = function (p) { return formatValue(p.value, sp2); };

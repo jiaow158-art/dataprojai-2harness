@@ -2,7 +2,7 @@
 
 ## 快速参考
 
-- **DWS 表名**：`dm.dm_fin_stock_detail_accage_t_2023`（1.44亿行，183 列，202012 ~ 202606+，持续刷新）
+- **DWS 表名**：`dm.dm_fin_stock_detail_accage_t_2023`（1.44亿行，183 列，202012 ~ 202608，持续刷新）
 - **业务含义**：按物料+工厂+批次+库存地点+会计期间记录库存余额和金额，内嵌**四套库龄口径**与**两套减值估算**。库存分析最核心的单表，也是跌价/资金成本族的唯一事实源。
 - **实体粒度**：一行 = 一个物料在一个工厂/库存地点/批次的月度库存快照
 - **时间格式**：`calmonth` = YYYYMM（NOT NULL，可能存在空值行需排除）
@@ -61,20 +61,33 @@ jchj_amt = ybzq_jc_amt + wbzq_jc_amt（减值合计·管理口径）
 | `xydj_7_12_amt`/`_12_24_`/`_24_` | 协议单价分段金额 |
 | `zrzlcp_*` | 自然账龄四段（金额/数量/面积） |
 
+### 跌价字段（计提比例 0/10/40/70% + 保质期 70/100%，预计算可直接 SUM）
+
+| 字段 | 含义 |
+|---|---|
+| wbzq_6_fall_amt / wbzq_6_12_fall_amt / wbzq_12_24_fall_amt / wbzq_24_fall_amt | 无保质期各段跌价（0%/10%/40%/70%） |
+| ybzq_bzdq_3_fall_amt / ybzq_bzdq_fall_amt | 有保质期跌价（到期3月内 70% / 已到期 100%） |
+| jchj_amt | 减值合计-管理（= 各段之和，可直接 SUM；亦 = wbzq_jc_amt+ybzq_jc_amt，2026-08-19 复算 0% 偏差） |
+| jchj_aging / wbzq_*_fall_aging / ybzq_*_fall_aging | 同上结构，阿米巴结算价口径（减值合计-阿米巴 3.301亿，202607） |
+| stock_amt | 库存金额（阿米巴结算价，202607 合计 17.52亿） |
+| clear_inv_flag / clearance_reason / promote_reason | 清库存标识 / 清仓原因 / 促销原因 |
+| time_diff / next_mon_date | 时间差（天）/ 下月日期 |
+
 ### 维度字段
 
 `calmonth`/`calyear`、`material`/`material___t`、`plant`/`plant___t`、`stor_loc`/`stor_loc___t`、`batch`、`stockcat`/`stocktype`（+`___t`）、`comp_code`（+`___t`）、`extmatlgrp`、`matl_grp_1~5`（+`___t`）、`zprodh1~5`（+`___t`）、`wbs_elemt`、`vendor`、`val_class`、`unit`、`zdpsyb`（事业部）、`zdpzgsdq`（子公司大区）、`zyl01`（产品渠道）、`zyl06`（产品等级）、`zww010`（产区）、`zisqc`（清仓）、`ziswx`（自制/外协）、`matl_type`、`zmatltype`
 
 ## 陷阱
 
-1. **表名带 `_2023` 但覆盖 202012 起全量**，不要跨表 UNION；`dm_fin_stock_detail_accage_t`（91列旧表）与 `_others_t` 不用
+1. **表名带 `_2023` 但覆盖 202012 起全量**（最新 202608），不要跨表 UNION；`dm_fin_stock_detail_accage_t`（91列旧表）与 `_others_t` 不用
 2. **`___t` 后缀** = 三下划线+t 文本描述（`plant` → `plant___t`）
-3. **四套库龄口径并存**（标准 wbzq/zrzlcp、协议单价 xydj、阿米巴 *_aging、减值 jc 族），用户未指定时默认标准 `wbzq_*_amt`
+3. **四套库龄口径并存**（标准 wbzq/zrzlcp、协议单价 xydj、阿米巴 *_aging、减值 jc/fall 族），用户未指定时默认标准 `wbzq_*_amt`
 4. **wbzq/ybzq 是保质期维度不是包装维度**；ybzq 字段只会在 bz_flag='Y' 行有值（2026-08 实证排他性）
 5. **jc 减值有保质期工厂白名单**（7C/73/7220），其余工厂 `ybzq_jc_amt` 恒 0——按事业部汇总减值时勿以为漏算
 6. **plant 7C 分桶日期字段不同**（zpcrk_fc），跨工厂库龄对比存在口径微差
-7. 大表必带 `calmonth` 过滤；`calmonth` 可能为空的行需排除
+7. 大表必带 `calmonth` 过滤；calmonth NOT NULL（DWS 实测无 NULL 行）
 8. zprodh 与 matl_grp 两套产品层级并存，过滤产品优先 `matl_grp_*`
+9. **跌价两套字段族**：管理（jchj_amt/wbzq_*_fall_amt，2.877亿）与阿米巴（jchj_aging/*_fall_aging，3.301亿）（202607），查询显式选族；`stock_amt`（阿米巴 17.52亿）≠ `zsjkcje`（管理 14.71亿）
 
 ## 常见查询模式
 

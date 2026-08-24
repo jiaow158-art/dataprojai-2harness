@@ -89,3 +89,14 @@ def test_build_bad_json_syntax_graceful(tmp_path):
     assert out.returncode == 1
     assert "[FAIL]" in out.stdout and "Traceback" not in out.stdout + out.stderr
     assert not list(tmp_path.glob("report_*.html"))
+
+
+def test_template_scatter_label_and_item_tooltip_present():
+    """模板必须含散点标签自动开启与 item-trigger 单参数 tooltip 分支（静态回归护栏）。"""
+    import pathlib
+    tpl = (pathlib.Path(SKILL_DIR) / ".." / "templates" / "report-shell.html").resolve()
+    src = tpl.read_text(encoding="utf-8")
+    assert "labelLayout" in src          # Fix B：散点标签防重叠
+    assert "hasExplicitLabel" in src     # Fix B：尊重 JSON 显式 label
+    assert "isItemTrigger" in src        # Fix A：item 触发单参数分支
+    assert "return p.seriesName" in src  # Fix B：气泡直标产品名

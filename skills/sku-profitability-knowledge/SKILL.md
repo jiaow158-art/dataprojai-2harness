@@ -7,7 +7,7 @@ description: SKU效益分析领域数据知识库。当用户询问单个SKU/物
 
 ## 作用
 
-本 Skill 是路由层。SKU 效益问题是**跨表专题**：一张 SQL 通常横跨 Mix 表（销售/毛利）+ 出入库月表（动销）+ 上市口径跌价表（库存/跌价）+ 物料主数据（新品标识）。根据问题类型路由到对应参考文档。
+本 Skill 是路由层。SKU 效益问题是**跨表专题**：一张 SQL 通常横跨 Mix 表（销售/毛利）+ 出入库月表（动销）+ 内部口径库存表（库存/跌价，阿米巴字段族） + 物料主数据（新品标识）。根据问题类型路由到对应参考文档。
 
 ## 可用的参考文档
 
@@ -32,8 +32,8 @@ description: SKU效益分析领域数据知识库。当用户询问单个SKU/物
 |---|---|
 | Mix 主表 `dm_fin_operations_mix_sum_t` | `../../sales-performance-knowledge/references/operations-mix-sum.md` |
 | 出入库月表 `dm_product_inout_stock_t` | `../../inventory-knowledge/references/inout-stock.md` |
-| 上市口径跌价表 | `../../inventory-knowledge/references/stock-fall-list.md` |
-| 资金成本（上市口径/阿米巴） | `../../inventory-knowledge/references/capital-cost-table.md`、`chdj-capital-cost.md` |
+| 内部口径跌价表（阿米巴字段族） | `../../inventory-knowledge/references/stock-fall-list.md` |
+| 资金成本（正值口径/阿米巴） | `../../inventory-knowledge/references/capital-cost-table.md`、`chdj-capital-cost.md` |
 | 未交付订单（缺货补充口径） | `../../otd-fulfillment-knowledge/references/no-deliver-order-dtl.md` |
 
 ## 跨域共享参考

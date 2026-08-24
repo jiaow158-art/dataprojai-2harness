@@ -145,6 +145,12 @@ def _validate_chart_section(s, p, err):
                     if svf is not None and (not isinstance(svf, str) or not VALUE_FORMAT_RE.match(svf)):
                         err(cp + ".option.series[%d].valueFormat" % si,
                             "非法值 %r，允许 yi/wan/percent/signed_percent/sqm_wan/yuan/int 可带 :N" % svf)
+                    if se.get("type") == "scatter":
+                        sdata = se.get("data") or []
+                        named = sum(1 for dp in sdata if isinstance(dp, dict) and dp.get("name"))
+                        if named >= 2:
+                            err(cp + ".option.series[%d]" % si,
+                                "散点含 %d 个命名点，应拆分为每产品独立 series（每个 series 一个数据点）" % named)
             yax = opt.get("yAxis")
             ax_list = yax if isinstance(yax, list) else ([yax] if yax else [])
             for yi_, ax in enumerate(ax_list):
