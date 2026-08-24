@@ -43,7 +43,7 @@ jchj_amt = ybzq_jc_amt + wbzq_jc_amt（减值合计·管理口径）
 *_jc_aging = 同比例作用于 *_aging 桶（阿米巴结算价）= 阿米巴结算价减值
 ```
 
-> 减值三系对照（会计上市/管理/阿米巴结算价）见 [metrics.md](metrics.md) 第八节。**本表 jc 族与上市口径表 `aging_*_fall_amt` 是两套体系，禁止混用或相加。**
+> 减值体系对照（管理默认/阿米巴/上市非默认）见 [metrics.md](metrics.md) 第八节。**本表 jc/fall 族与上市口径表 `aging_*_fall_amt` 是两套体系，禁止混用或相加；上市口径表非默认（仅特殊要求且须声明）。**
 
 ## 核心字段
 
@@ -134,8 +134,8 @@ ORDER BY calmonth;
 - **下游（本表是跌价/资金成本族唯一事实源）**：
   - → `dm_fin_stock_capital_cost_t`（资金成本，取 zsjkcje，排 stockcat K）
   - → `dm_ambv2_chdj_grp_t`（CHDJ：jc 族减值 → inventory_value/inventory_value_amb）
-  - → `dm_fin_stock_d_accage_list_c_t_2023`（上市口径表）
+  - → `dm_fin_stock_d_accage_list_c_t_2023`（上市口径表，非默认——仅特殊要求）
 
 ## 交叉引用
 
-- 语义层 → [metrics.md](metrics.md)；上市口径跌价 → [stock-fall-list.md](stock-fall-list.md)；CHDJ → [chdj-capital-cost.md](chdj-capital-cost.md)；资金成本 → [capital-cost-table.md](capital-cost-table.md)；库存统计月报 → [stock-stat-month.md](stock-stat-month.md)
+- 语义层 → [metrics.md](metrics.md)；内部口径跌价（管理/阿米巴字段族）→ [stock-fall-list.md](stock-fall-list.md)；CHDJ → [chdj-capital-cost.md](chdj-capital-cost.md)；资金成本 → [capital-cost-table.md](capital-cost-table.md)；库存统计月报 → [stock-stat-month.md](stock-stat-month.md)

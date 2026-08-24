@@ -573,13 +573,13 @@ SAP 库存账龄明细
             │              ├─ inventory_value_amb = SUM(jc_aging 族)        │
             │              └─ capital_cost = 取自资金成本表（⚠️原始列分摊行重复携带全额，金额用 conv 列或源表）┘
             └─ PJob_DWS_DM_FIN_STOCK_D_ACCAGE_LIST_C_T_2023（delete-insert by calmonth）
-                 └─ dm.dm_fin_stock_d_accage_list_c_t_2023（上市口径跌价，calmonth=YYYYMM）
+                 └─ dm.dm_fin_stock_d_accage_list_c_t_2023（上市口径跌价，calmonth=YYYYMM，**非默认——仅特殊要求且须声明**）
                       └─ 天级桶×{0,0.2,0.3,0.5,0.5} → aging_*_fall_amt
 
 CHDJ 维度依赖：dwi_md_data_material_general_t（渠道/物料）、dm_rpt_sales_group_t（线组→node 层级）、
 upload_achievement_budget_t（年度预算比例）、upload_loc_comp_relate_t（库位→公司）、upload_division_comp_t（公司→销售组）
 ```
 
-关键 ETL 事实：① 明细表 jc 减值公式 0/10/40/70%（双脚本一致）；② 上市口径跌价 0/20/30/50/50% 天级桶精确映射；③ 资金成本公式 ((期初+期末)/2−202012余额)×4%/12，零判断已取消；④ CHDJ 1973 行、7 个 UNION 分支（卫浴族/瓷砖/国际/丽适等）。
+关键 ETL 事实：① 明细表 jc 减值公式 0/10/40/70%（双脚本一致，与预计算 fall 字段族吻合）；② 上市口径跌价 0/20/30/50/50% 天级桶精确映射（该表非默认，仅特殊要求）；③ 资金成本公式 ((期初+期末)/2−202012余额)×4%/12，零判断已取消；④ CHDJ 1973 行、7 个 UNION 分支（卫浴族/瓷砖/国际/丽适等）。业务裁定（2026-08-24）：数据分析默认内部口径（管理族 jchj_amt），上市口径仅特殊要求使用且须声明。
 
 已知 ETL 隐患：CHDJ 末段 `物料描述 = material_num` JOIN → product_level_code/prod_line_name 可靠性受限。

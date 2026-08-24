@@ -51,7 +51,7 @@ description: 库存仓储分析工作流。当用户询问库存数量、库龄�
 | 缺货超期 | `dm.dm_dp_api_stockout_oudue` | 按销售区域 |
 | 低周转/残次品出库 | `dm.dm_wm_low_turnover_stockout_detail_t` / `_defective_product_` | 凭证级明细 |
 | 库存周转率 | `dm.dm_otd_wm_stock_turnover_m` | 预计算，40行 |
-| 会计口径跌价（上市） | `dm.dm_fin_stock_d_accage_list_c_t_2023` | 计提比例内嵌 0/20/30/50/50%，calmonth=YYYYMM |
+| 存货跌价/减值（内部口径，默认管理族） | `dm.dm_fin_stock_detail_accage_t_2023` | `jchj_amt`/`wbzq_*_fall_amt` 计提 0/10/40/70%+保质期 70/100%；阿米巴族 `jchj_aging`/`*_fall_aging`，calmonth=YYYYMM |
 | 管理减值/线组分摊 | `dm.dm_ambv2_chdj_grp_t` | stat_month=YYYY-MM，inventory_value=管理减值（非库存价值） |
 | 库存资金成本 | `dm.dm_fin_stock_capital_cost_t` | month=YYYYMM，可为负，滚动窗口近2年 |
 
@@ -107,7 +107,7 @@ WHERE start_month = '202606'
 - [ ] "物料"是用 `material`（SAP风格）还是 `material_num`（新风格）？
 - [ ] 用户说的"库龄"是指无保质期产品库龄(wbzq，按批次日期 6/12/24月)还是有保质期到期口径(ybzq)？金额/数量/面积哪个版本？
 - [ ] "出入库"是按面积（CXC日报口径）还是按数量（inout_stock 口径）？
-- [ ] "跌价/减值"用词：会计口径跌价（上市口径表 aging_sum_fall_amt）还是管理口径减值（CHDJ inventory_value）？两套体系禁止混用
+- [ ] "跌价/减值"用词：内部管理口径（jchj_amt，默认）还是阿米巴口径（jchj_aging，配 Mix/销售侧）还是线组分摊（CHDJ inventory_value）？多套体系禁止混用；上市口径表非默认（仅用户明确要求且须声明口径）
 - [ ] "资金成本"负值是否已解释（低于202012基线的公式结果，非数据错误）？CHDJ 维度要金额是否用了 capital_cost_conv 而非原始列（原始列 SUM 会放大反号）？
 
 **C. 过滤条件是否完整？**
@@ -253,38 +253,40 @@ GROUP BY start_month, product_brand_name
 ORDER BY start_month, in_qty DESC;
 ```
 
-### 模式 I：跌价分析族（会计口径，上市口径表）
+### 模式 I：跌价分析族（内部口径·管理族，默认）
 
 ```sql
 -- I1 月度跌价趋势
 SELECT calmonth,
-       ROUND(SUM(aging_sum_fall_amt)) AS fall_total,
-       ROUND(SUM(aging_1_2_year_fall_amt)) AS fall_1_2y,
-       ROUND(SUM(aging_2_3_year_fall_amt)) AS fall_2_3y,
-       ROUND(SUM(aging_3_4_year_fall_amt + aging_4_year_fall_amt)) AS fall_over3y
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,
+       ROUND(SUM(COALESCE(wbzq_6_12_fall_amt,0))) AS fall_6_12m,
+       ROUND(SUM(COALESCE(wbzq_12_24_fall_amt,0))) AS fall_12_24m,
+       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS fall_over2y
+FROM dm.dm_fin_stock_detail_accage_t_2023
 WHERE calmonth BETWEEN '202601' AND '202607'
 GROUP BY calmonth ORDER BY calmonth;
 
 -- I2 跌价 TOP 物料
 SELECT material, MAX(material___t) AS material_name,
-       ROUND(SUM(aging_sum_fall_amt)) AS fall_amt,
+       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_amt,
        ROUND(SUM(zsjkcje)) AS stock_amt,
-       ROUND(SUM(aging_sum_fall_amt)/NULLIF(SUM(zsjkcje),0)*100,1) AS fall_pct
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+       ROUND(SUM(COALESCE(jchj_amt,0))/NULLIF(SUM(zsjkcje),0)*100,1) AS fall_pct
+FROM dm.dm_fin_stock_detail_accage_t_2023
 WHERE calmonth = '202607'
 GROUP BY material ORDER BY fall_amt DESC LIMIT 20;
 
--- I3 按事业部的跌价结构（长龄段占比）
+-- I3 按事业部的跌价结构（2年+长龄段占比）
 SELECT zdpsyb___t,
-       ROUND(SUM(aging_sum_fall_amt)) AS fall_total,
-       ROUND(SUM(aging_3_4_year_fall_amt + aging_4_year_fall_amt)) AS fall_3y_plus,
-       ROUND(SUM(aging_3_4_year_fall_amt + aging_4_year_fall_amt)
-             /NULLIF(SUM(aging_sum_fall_amt),0)*100,1) AS long_ratio_pct
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023
+       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,
+       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS fall_over2y,
+       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))
+             /NULLIF(SUM(COALESCE(jchj_amt,0)),0)*100,1) AS long_ratio_pct
+FROM dm.dm_fin_stock_detail_accage_t_2023
 WHERE calmonth = '202607'
 GROUP BY zdpsyb___t ORDER BY fall_total DESC;
 ```
+
+> 与 Mix/销售侧对齐时换阿米巴族：`jchj_aging`/`wbzq_*_fall_aging`/`stock_amt`（数值不同：202607 管理 2.877亿 vs 阿米巴 3.301亿，禁止混用）。上市口径表非默认——仅用户明确要求且须声明口径。
 
 ### 模式 J：资金成本分析（正值主口径，资金成本表）
 
@@ -302,19 +304,19 @@ ORDER BY month_cost DESC;
 
 > 注意：capital_cost 可为负（平均余额<202012基线）；跨年查累计注意 TRUNCATE 滚动窗口只留近 2 年。
 
-### 模式 K：双口径对照（业务问"两个数对不上"时）
+### 模式 K：多口径对照（业务问"两个数对不上"时）
 
-业务高频困惑：CHDJ `inventory_value`（6.35亿）vs 上市口径库存金额（14.3亿）/会计跌价（1.43亿）。标准解释：**三者是不同概念**——管理口径减值（0/10/40/70%，范围限卫浴/瓷砖/国际/丽适）vs 库存金额 vs 会计跌价（0/20/30/50/50%，上市在售范围），不是口径误差。
+业务高频困惑：内部管理减值（2.877亿）vs 阿米巴减值（3.301亿）vs CHDJ 线组分摊（6.35亿）。标准解释：**数值不同是口径与范围双重差异**——管理族（jchj_amt，金额基数 zsjkcje）vs 阿米巴族（jchj_aging，金额基数 stock_amt）vs CHDJ（管理减值按预算比例分摊到线组/渠道，**范围限卫浴/瓷砖/国际/丽适非全集团，且 inventory_value 不是库存价值**），不是数据错误。
 
 ```sql
-SELECT 'CHDJ管理减值' AS metric, ROUND(SUM(inventory_value)) AS amt
-FROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07'
+SELECT '内部管理减值' AS metric, ROUND(SUM(COALESCE(jchj_amt,0))) AS amt
+FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'
 UNION ALL
-SELECT '上市口径库存金额', ROUND(SUM(zsjkcje))
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023 WHERE calmonth = '202607'
+SELECT '内部阿米巴减值', ROUND(SUM(COALESCE(jchj_aging,0)))
+FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'
 UNION ALL
-SELECT '上市口径会计跌价', ROUND(SUM(aging_sum_fall_amt))
-FROM dm.dm_fin_stock_d_accage_list_c_t_2023 WHERE calmonth = '202607';
+SELECT 'CHDJ线组分摊(部分事业部)', ROUND(SUM(inventory_value))
+FROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07';
 ```
 
 回答时必须附概念对照表（见 inventory-knowledge metrics.md 第 8.1 节），并说明各口径适用场景。
