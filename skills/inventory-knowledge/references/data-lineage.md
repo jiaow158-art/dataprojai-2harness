@@ -556,3 +556,30 @@ dm_otd_wm_stock_stat_month_t (库存月报)
 ### 湖南基地独立
 
 出入库表有湖南基地独立表（`dm_original_product_inout_stock_hunan_t` 和 `dm_product_inout_stock_hunan_t`），其他基地数据在通用表。湖南基地独立表额外含成本中心(cost_center)、总账科目(gl_account_no)、均价(avgprice)。
+
+## 库存跌价/减值与资金成本族血缘（2026-08-19 ETL 实证）
+
+```text
+SAP 库存账龄明细
+  └─ Hive ETL: PJob_DM_FIN_STOCK_DETAIL_ACCAGE_T_2023（DWS 版 PJob_DWS_… 已废弃，逻辑一致）
+       └─ dm.dm_fin_stock_detail_accage_t_2023（库龄明细主表，唯一事实源）
+            ├─ PJob_DWS_DM_FIN_STOCK_CAPITAL_COST_T（TRUNCATE 全量，近2年窗口，中间表 DM_FIN_STOCK_CAPITAL_M1_T）
+            │    └─ dm.dm_fin_stock_capital_cost_t（资金成本，month=YYYYMM）
+            │         └─┐
+            ├─ jc 减值族（zdpsyb 范围过滤）────────────────────────┤
+            │    └─ PJob_DWS_DM_AMBV2_CHDJ_GRP_T（按预算比例分摊到线组/渠道）  │
+            │         └─ dm.dm_ambv2_chdj_grp_t（stat_month=YYYY-MM）        │
+            │              ├─ inventory_value = SUM(jc_amt 族) 管理减值      │
+            │              ├─ inventory_value_amb = SUM(jc_aging 族)        │
+            │              └─ capital_cost = 取自资金成本表（⚠️原始列分摊行重复携带全额，金额用 conv 列或源表）┘
+            └─ PJob_DWS_DM_FIN_STOCK_D_ACCAGE_LIST_C_T_2023（delete-insert by calmonth）
+                 └─ dm.dm_fin_stock_d_accage_list_c_t_2023（上市口径跌价，calmonth=YYYYMM）
+                      └─ 天级桶×{0,0.2,0.3,0.5,0.5} → aging_*_fall_amt
+
+CHDJ 维度依赖：dwi_md_data_material_general_t（渠道/物料）、dm_rpt_sales_group_t（线组→node 层级）、
+upload_achievement_budget_t（年度预算比例）、upload_loc_comp_relate_t（库位→公司）、upload_division_comp_t（公司→销售组）
+```
+
+关键 ETL 事实：① 明细表 jc 减值公式 0/10/40/70%（双脚本一致）；② 上市口径跌价 0/20/30/50/50% 天级桶精确映射；③ 资金成本公式 ((期初+期末)/2−202012余额)×4%/12，零判断已取消；④ CHDJ 1973 行、7 个 UNION 分支（卫浴族/瓷砖/国际/丽适等）。
+
+已知 ETL 隐患：CHDJ 末段 `物料描述 = material_num` JOIN → product_level_code/prod_line_name 可靠性受限。
