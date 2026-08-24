@@ -2975,39 +2975,39 @@
     {
       "domain": "inventory",
       "pattern": "inventory_fall_top10",
-      "question": "2026年7月跌价准备最高的前10个物料是哪些？",
-      "sql": "SELECT material, MAX(material___t) AS material_name,\n       ROUND(SUM(aging_sum_fall_amt)) AS fall_amt,\n       ROUND(SUM(zsjkcje)) AS stock_amt\nFROM dm.dm_fin_stock_d_accage_list_c_t_2023\nWHERE calmonth = '202607'\nGROUP BY material ORDER BY fall_amt DESC LIMIT 10;",
+      "question": "2026年7月存货跌价（减值）最高的前10个物料是哪些？",
+      "sql": "SELECT material, MAX(material___t) AS material_name,\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_amt,\n       ROUND(SUM(zsjkcje)) AS stock_amt\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth = '202607'\nGROUP BY material ORDER BY fall_amt DESC LIMIT 10;",
       "row_count": 10,
-      "elapsed_ms": 1159,
+      "elapsed_ms": 886,
       "data": [
-        {"material": "QFG271005_A", "material_name": "1200X600波兰灰", "fall_amt": "1993485", "stock_amt": "6644952"},
-        {"material": "MG29769977_A", "material_name": "2800X1200起源珍珠白光面岩板 6mm  惊爆", "fall_amt": "1419056", "stock_amt": "2838111"},
-        {"material": "MG29772912_A", "material_name": "2800X1200鱼肚金光面 6mm  惊爆", "fall_amt": "1037607", "stock_amt": "2075214"},
-        {"material": "W825105T0X_FR", "material_name": "W8251智能马桶陶瓷体305墙距_福瑞：1070104587", "fall_amt": "1036538", "stock_amt": "2073075"},
-        {"material": "QFG801034_A", "material_name": "800X800卡帕灰", "fall_amt": "890923", "stock_amt": "11719495"},
-        {"material": "FG607064_A", "material_name": "600X600爱琴海灰", "fall_amt": "769817", "stock_amt": "4151561"},
-        {"material": "LN63720_A", "material_name": "600X300岁月720", "fall_amt": "700333", "stock_amt": "3272157"},
-        {"material": "W310105TYQ", "material_name": "W3101连体坐便器白色双档顶按305坑距", "fall_amt": "673920", "stock_amt": "3369601"},
-        {"material": "CSG849124_A", "material_name": "800X400塔斯灰", "fall_amt": "647600", "stock_amt": "2418200"},
-        {"material": "T05FA261407_A", "material_name": "2600X800轻纱", "fall_amt": "645651", "stock_amt": "1291301"}
+        {"material": "QFG271005_A", "material_name": "1200X600波兰灰", "fall_amt": "4651466", "stock_amt": "6644952"},
+        {"material": "QFG801034_A", "material_name": "800X800卡帕灰", "fall_amt": "2512043", "stock_amt": "11719495"},
+        {"material": "MG29769977_A", "material_name": "2800X1200起源珍珠白光面岩板 6mm  惊爆", "fall_amt": "1986678", "stock_amt": "2838111"},
+        {"material": "YG802072_A", "material_name": "800X800聚晶（广州子公司）", "fall_amt": "1495997", "stock_amt": "2137452"},
+        {"material": "FG607064_A", "material_name": "600X600爱琴海灰", "fall_amt": "1459588", "stock_amt": "4151561"},
+        {"material": "MG29772912_A", "material_name": "2800X1200鱼肚金光面 6mm  惊爆", "fall_amt": "1452650", "stock_amt": "2075214"},
+        {"material": "W825105T0X_FR", "material_name": "W8251智能马桶陶瓷体305墙距_福瑞：1070104587", "fall_amt": "1451153", "stock_amt": "2073075"},
+        {"material": "FG271610_A", "material_name": "1200X600意大利白", "fall_amt": "1427557", "stock_amt": "2039367"},
+        {"material": "CSG849124_A", "material_name": "800X400塔斯灰", "fall_amt": "1391109", "stock_amt": "2484818"},
+        {"material": "W310105TYQ", "material_name": "W3101连体坐便器白色双档顶按305坑距", "fall_amt": "1347840", "stock_amt": "3369601"}
       ],
       "checksum": "rows=10"
     },
     {
       "domain": "inventory",
       "pattern": "inventory_fall_trend",
-      "question": "今年以来上市口径存货跌价准备每月总额走势？",
-      "sql": "SELECT calmonth, ROUND(SUM(aging_sum_fall_amt)) AS fall_total\nFROM dm.dm_fin_stock_d_accage_list_c_t_2023\nWHERE calmonth BETWEEN '202601' AND '202607'\nGROUP BY calmonth ORDER BY calmonth;",
+      "question": "今年以来存货跌价（减值）每月总额走势？",
+      "sql": "SELECT calmonth, ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth BETWEEN '202601' AND '202607'\nGROUP BY calmonth ORDER BY calmonth;",
       "row_count": 7,
-      "elapsed_ms": 4092,
+      "elapsed_ms": 5038,
       "data": [
-        {"calmonth": "202601", "fall_total": "127318657"},
-        {"calmonth": "202602", "fall_total": "130839599"},
-        {"calmonth": "202603", "fall_total": "132067162"},
-        {"calmonth": "202604", "fall_total": "134081596"},
-        {"calmonth": "202605", "fall_total": "138292401"},
-        {"calmonth": "202606", "fall_total": "139300631"},
-        {"calmonth": "202607", "fall_total": "141707822"}
+        {"calmonth": "202601", "fall_total": "270210286"},
+        {"calmonth": "202602", "fall_total": "283457058"},
+        {"calmonth": "202603", "fall_total": "284052865"},
+        {"calmonth": "202604", "fall_total": "285938486"},
+        {"calmonth": "202605", "fall_total": "290593124"},
+        {"calmonth": "202606", "fall_total": "287306597"},
+        {"calmonth": "202607", "fall_total": "287708186"}
       ],
       "checksum": "rows=7"
     },
@@ -3028,30 +3028,31 @@
     },
     {
       "domain": "inventory",
-      "pattern": "inventory_chdj_vs_listed",
-      "question": "为什么阿米巴存货减值和上市口径跌价对不上？两个数各是多少？",
-      "sql": "SELECT 'CHDJ管理减值' AS metric, ROUND(SUM(inventory_value)) AS amt\nFROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07'\nUNION ALL\nSELECT '上市口径会计跌价', ROUND(SUM(aging_sum_fall_amt))\nFROM dm.dm_fin_stock_d_accage_list_c_t_2023 WHERE calmonth = '202607';",
-      "row_count": 2,
-      "elapsed_ms": 616,
+      "pattern": "inventory_impairment_calibers",
+      "question": "为什么内部管理减值、阿米巴减值和CHDJ线组分摊的数对不上？各是多少？",
+      "sql": "SELECT '内部管理减值' AS metric, ROUND(SUM(COALESCE(jchj_amt,0))) AS amt\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\nUNION ALL\nSELECT '内部阿米巴减值', ROUND(SUM(COALESCE(jchj_aging,0)))\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\nUNION ALL\nSELECT 'CHDJ线组分摊(部分事业部)', ROUND(SUM(inventory_value))\nFROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07';",
+      "row_count": 3,
+      "elapsed_ms": 391,
       "data": [
-        {"metric": "CHDJ管理减值", "amt": "566417168"},
-        {"metric": "上市口径会计跌价", "amt": "141707822"}
+        {"metric": "内部管理减值", "amt": "287708186"},
+        {"metric": "内部阿米巴减值", "amt": "330102360"},
+        {"metric": "CHDJ线组分摊(部分事业部)", "amt": "566417168"}
       ],
-      "checksum": "rows=2"
+      "checksum": "rows=3"
     },
     {
       "domain": "inventory",
       "pattern": "inventory_aging_fall_link",
-      "question": "各事业部3年以上长库龄段的跌价敞口有多大？",
-      "sql": "SELECT zdpsyb___t,\n       ROUND(SUM(aging_3_4_year_fall_amt + aging_4_year_fall_amt)) AS long_fall,\n       ROUND(SUM(aging_sum_fall_amt)) AS total_fall,\n       ROUND(SUM(aging_3_4_year_fall_amt + aging_4_year_fall_amt)\n             /NULLIF(SUM(aging_sum_fall_amt),0)*100,1) AS long_ratio_pct\nFROM dm.dm_fin_stock_d_accage_list_c_t_2023\nWHERE calmonth = '202607'\nGROUP BY zdpsyb___t ORDER BY long_fall DESC;",
+      "question": "各事业部2年以上长库龄段的跌价敞口有多大？",
+      "sql": "SELECT zdpsyb___t,\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS long_fall,\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS total_fall,\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))\n             /NULLIF(SUM(COALESCE(jchj_amt,0)),0)*100,1) AS long_ratio_pct\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth = '202607'\nGROUP BY zdpsyb___t ORDER BY long_fall DESC;",
       "row_count": 5,
-      "elapsed_ms": 1075,
+      "elapsed_ms": 538,
       "data": [
-        {"zdpsyb___t": "瓷砖事业部", "long_fall": "50097807", "total_fall": "111245280", "long_ratio_pct": "45.0"},
-        {"zdpsyb___t": "卫浴事业部", "long_fall": "13553300", "total_fall": "23664427", "long_ratio_pct": "57.3"},
-        {"zdpsyb___t": "国际营销中心", "long_fall": "3118562", "total_fall": "3588746", "long_ratio_pct": "86.9"},
-        {"zdpsyb___t": "卫浴事业部-非全资", "long_fall": "2033029", "total_fall": "2833795", "long_ratio_pct": "71.7"},
-        {"zdpsyb___t": "丽适岩板", "long_fall": "0", "total_fall": "375575", "long_ratio_pct": "0.0"}
+        {"zdpsyb___t": "瓷砖事业部", "long_fall": "141639129", "total_fall": "233262625", "long_ratio_pct": "60.7"},
+        {"zdpsyb___t": "卫浴事业部", "long_fall": "24879349", "total_fall": "42584113", "long_ratio_pct": "58.4"},
+        {"zdpsyb___t": "国际营销中心", "long_fall": "4554742", "total_fall": "5568529", "long_ratio_pct": "81.8"},
+        {"zdpsyb___t": "卫浴事业部-非全资", "long_fall": "3119388", "total_fall": "4655009", "long_ratio_pct": "67.0"},
+        {"zdpsyb___t": "丽适岩板", "long_fall": "0", "total_fall": "1637910", "long_ratio_pct": "0.0"}
       ],
       "checksum": "rows=5"
     }
