@@ -1,0 +1,9 @@
+# M0-T13: exec_script 工具插件（受控执行唯一通道，spec §8.4）。
+# 本清单经 dsh.plugin add 的 bundle 声明挂入 profile（findings dsh-api.md §4.1）。
+# WORKDIR/RESULTS/ASSETS/RUNNER 由环境变量注入（!!js，会话级固定）；
+# 文件内不含任何值，亦不含密钥。
+# 验证记录：m0/tests/tool_loop_check.md
+- insert:
+    - id: m0-exec-script
+      name: 'm0-exec-script-plugin/exec-script.ts'
+      config: {}

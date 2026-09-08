@@ -4,6 +4,8 @@
 # 本地模拟形态：Docker Desktop on Windows (WSL2 backend)，Git Bash 调用
 #
 # 用法: RESULTS_DIR=... ASSETS_DIR=... bash run_in_sandbox.sh <workdir> <script> [args...]
+# 解释器: SANDBOX_INTERPRETER=bash 时用 bash 执行脚本，默认 python（M0-T13，
+# 供 dsh exec_script 工具插件复用；缺省行为与既有调用/红队完全一致）
 set -euo pipefail
 WORKDIR="$(cd "$1" && pwd)"; SCRIPT="$2"; shift 2 || true
 # SCRIPT 默认相对 /workdir；以 / 开头则按容器内绝对路径执行。
@@ -13,6 +15,7 @@ WORKDIR="$(cd "$1" && pwd)"; SCRIPT="$2"; shift 2 || true
 case "$SCRIPT" in /*) SCRIPT_PATH="$SCRIPT" ;; *) SCRIPT_PATH="/workdir/${SCRIPT}" ;; esac
 : "${RESULTS_DIR:?need RESULTS_DIR}"; : "${ASSETS_DIR:?need ASSETS_DIR}"
 IMAGE="${SANDBOX_IMAGE:-dataplat-script:m0}"
+INTERP="${SANDBOX_INTERPRETER:-python}"
 MEM="${SANDBOX_MEM:-2g}"; CPUS="${SANDBOX_CPUS:-1}"
 PIDS="${SANDBOX_PIDS:-64}"; TMO="${SANDBOX_TIMEOUT_S:-120}"
 
@@ -44,7 +47,7 @@ timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   -v "$(winpath "${WORKDIR}"):/workdir" \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   -w /workdir \
-  "${IMAGE}" python "${SCRIPT_PATH}" "$@" || RC=$?
+  "${IMAGE}" "${INTERP}" "${SCRIPT_PATH}" "$@" || RC=$?
 docker rm -f "${CNAME}" >/dev/null 2>&1 || true
 if [ "${RC}" -eq 124 ] || [ "${RC}" -eq 137 ]; then
   echo "SANDBOX: exit ${RC} — SANDBOX_TIMEOUT_S=${TMO}s 超时被杀（或容器 OOM），容器已强制清理" >&2
