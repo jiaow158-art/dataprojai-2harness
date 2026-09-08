@@ -11,6 +11,7 @@
 **范围决策：** 本计划只覆盖 M0。M1（网关/任务恢复）、M2（回归）、M3/M4 的计划依赖 M0 的 spike 结论（skill 兼容结局、dsh 插件 API、隔离验证结果），在 M0 go/no-go 后另出。
 
 **运行环境约定：**
+> **执行环境变更（2026-09-08，用户确认）：M0 全部任务先在本机 Windows 本地模拟执行，暂不部署服务器。** 原"服务器"字样的任务在本机执行：Linux 专属命令用本机等价物（Git Bash / Docker Desktop），差异记入 `m0/findings/`。沙箱隔离若无 Docker Desktop 则降级并在 REPORT.md 记录风险。
 - **本机** = Windows 工作副本 `D:\dataprojai-2harness`（Python: `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe`，pytest 9.1.1 可用）
 - **服务器** = Linux（claudecodeui 同机，仓库路径 `/home/dp-user/dataprojv2`，DWS 与 DeepSeek API 均可达）。服务器侧任务的产出经 git push/pull 与本机同步
 - dsh 的实际 CLI 参数/配置格式/插件 API 尚未实测——凡涉及处，任务内含**发现步骤**（确切命令 + 把实测结果记入 `m0/findings/dsh-api.md`），后续步骤按记录值实施。**禁止凭猜测编写 dsh 调用**
@@ -213,9 +214,10 @@ def _rows(n):
 
 @pytest.fixture
 def result_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("RESULT_DIR", str(tmp_path))
-    monkeypatch.setenv("RESULT_PREVIEW_ROWS", "200")
-    monkeypatch.setenv("RESULT_DATA_BUDGET_ROWS", "50000")
+    # 注意：RESULT_* 是模块导入时常量，必须 patch 模块属性而非环境变量
+    monkeypatch.setattr(srv, "RESULT_DIR", str(tmp_path), raising=False)
+    monkeypatch.setattr(srv, "RESULT_PREVIEW_ROWS", 200, raising=False)
+    monkeypatch.setattr(srv, "RESULT_DATA_BUDGET_ROWS", 50000, raising=False)
     return tmp_path
 
 
@@ -257,7 +259,7 @@ def test_no_autolimit_in_dual_mode(result_dir, monkeypatch):
 
 
 def test_legacy_mode_unchanged(monkeypatch):
-    monkeypatch.delenv("RESULT_DIR", raising=False)
+    monkeypatch.setattr(srv, "RESULT_DIR", "", raising=False)
     seen = {}
     def fake_sync(sql, params=None):
         seen["sql"] = sql
@@ -384,7 +386,7 @@ def tool_run_query(**kwargs):
         return json.dumps({
             "status": "ok",
             "row_count": len(rows),
-            "truncated": len(rows) > len(preview),
+            "truncated": False,  # 完整结果已落盘，预览裁剪不构成数据截断（truncated 仅用于超预算未落盘分支）
             "result_ref": meta["result_ref"] if meta else None,
             "result_path": meta["path"] if meta else None,
             "schema": list(rows[0].keys()) if rows else [],
