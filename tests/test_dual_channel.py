@@ -35,6 +35,7 @@ def test_preview_limited_full_saved(result_dir, monkeypatch):
     saved = json.loads(f.read_text(encoding="utf-8"))
     assert saved["row_count"] == 800           # 落盘完整
     assert saved["data"] == _rows(800)
+    assert saved["truncated"] is False         # 落盘文件完整性标注
 
 
 def test_over_budget_truncated_no_file(result_dir, monkeypatch):
@@ -72,3 +73,18 @@ def test_legacy_mode_unchanged(monkeypatch):
 def test_write_guard_unchanged(result_dir):
     resp = _parse(srv.tool_run_query(sql="DELETE FROM t"))
     assert "error" in resp
+
+
+def test_dual_channel_error_contract(result_dir, monkeypatch):
+    def boom(sql, budget):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(srv, "execute_bounded", boom)
+    resp = _parse(srv.tool_run_query(sql="SELECT * FROM t"))
+    assert resp["status"] == "error"           # 与 legacy 错误契约对齐
+    assert "boom" in resp["message"]
+
+
+def test_result_ref_contains_pid(result_dir, monkeypatch):
+    monkeypatch.setattr(srv, "execute_bounded", lambda sql, budget: (_rows(5), False))
+    resp = _parse(srv.tool_run_query(sql="SELECT * FROM t"))
+    assert str(os.getpid()) in resp["result_ref"]  # ref 跨进程唯一

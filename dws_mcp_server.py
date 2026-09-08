@@ -102,17 +102,20 @@ def save_result(sql, rows):
         return None
     os.makedirs(RESULT_DIR, exist_ok=True)
     _RESULT_SEQ += 1
-    ref = f"r-{time.strftime('%Y%m%d%H%M%S')}-{_RESULT_SEQ}"
+    ref = f"r-{time.strftime('%Y%m%d%H%M%S')}-{os.getpid()}-{_RESULT_SEQ}"
     path = os.path.join(RESULT_DIR, f"{ref}.json")
     payload = {
         "result_ref": ref,
         "sql": sql,
         "row_count": len(rows),
         "columns": list(rows[0].keys()) if rows else [],
+        "truncated": False,  # over-budget results are never saved — saved files are always complete
         "data": rows,
     }
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, default=str)
+    os.replace(tmp, path)
     return {"result_ref": ref, "path": path, "row_count": len(rows)}
 
 
@@ -130,30 +133,33 @@ def tool_run_query(**kwargs):
 
     # Dual-channel mode: no auto-LIMIT; full result to file, preview to model.
     if RESULT_DIR:
-        rows, over_budget = execute_bounded(sql, RESULT_DATA_BUDGET_ROWS)
-        if over_budget:
+        try:
+            rows, over_budget = execute_bounded(sql, RESULT_DATA_BUDGET_ROWS)
+            if over_budget:
+                preview = rows[:RESULT_PREVIEW_ROWS]
+                return json.dumps({
+                    "status": "ok",
+                    "row_count": f"> {RESULT_DATA_BUDGET_ROWS}",
+                    "truncated": True,
+                    "guidance": (f"结果超过数据量预算 {RESULT_DATA_BUDGET_ROWS} 行，已截断且未保存。"
+                                 "请在 SQL 内重新聚合（GROUP BY/SUM），或按日期/组织分批查询。"
+                                 "不得以截断数据生成报告。"),
+                    "schema": list(rows[0].keys()) if rows else [],
+                    "data": preview,
+                }, ensure_ascii=False, default=str)
+            meta = save_result(sql, rows)
             preview = rows[:RESULT_PREVIEW_ROWS]
             return json.dumps({
                 "status": "ok",
-                "row_count": f"> {RESULT_DATA_BUDGET_ROWS}",
-                "truncated": True,
-                "guidance": (f"结果超过数据量预算 {RESULT_DATA_BUDGET_ROWS} 行，已截断且未保存。"
-                             "请在 SQL 内重新聚合（GROUP BY/SUM），或按日期/组织分批查询。"
-                             "不得以截断数据生成报告。"),
+                "row_count": len(rows),
+                "truncated": False,  # full set saved to file — preview clip is not data loss
+                "result_ref": meta["result_ref"] if meta else None,
+                "result_path": meta["path"] if meta else None,
                 "schema": list(rows[0].keys()) if rows else [],
                 "data": preview,
             }, ensure_ascii=False, default=str)
-        meta = save_result(sql, rows)
-        preview = rows[:RESULT_PREVIEW_ROWS]
-        return json.dumps({
-            "status": "ok",
-            "row_count": len(rows),
-            "truncated": False,  # full set saved to file — preview clip is not data loss
-            "result_ref": meta["result_ref"] if meta else None,
-            "result_path": meta["path"] if meta else None,
-            "schema": list(rows[0].keys()) if rows else [],
-            "data": preview,
-        }, ensure_ascii=False, default=str)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     # Legacy mode (RESULT_DIR unset): unchanged behavior.
     if "limit" not in low:
@@ -258,7 +264,14 @@ def tool_search_tables(**kwargs):
 TOOLS = [
     {
         "name": "run_query",
-        "description": "Execute a read-only SQL query on DWS (GaussDB). Use after exploring schema with describe_table or search_tables. Auto-adds LIMIT 200 if omitted. IMPORTANT: use WHERE filters with date/period conditions on large tables like dm.dm_fact_finance_cost_f.",
+        "description": ("Execute a read-only SQL query on DWS (GaussDB). Use after exploring schema "
+                        "with describe_table or search_tables. Two modes by server config: "
+                        "without RESULT_DIR the SQL is auto-appended LIMIT 200 if omitted; "
+                        "with RESULT_DIR the SQL is never rewritten — the full result set "
+                        "(up to the row budget) is saved server-side and a preview of at most "
+                        "RESULT_PREVIEW_ROWS rows plus a result_ref is returned. "
+                        "IMPORTANT: use WHERE filters with date/period conditions on large tables "
+                        "like dm.dm_fact_finance_cost_f."),
         "inputSchema": {
             "type": "object",
             "properties": {
