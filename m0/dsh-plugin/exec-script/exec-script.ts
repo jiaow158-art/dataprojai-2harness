@@ -48,12 +48,12 @@ function pathViolation(script: string): string | null {
   if (/^[A-Za-z]:/.test(script)) {
     return `invalid script "${script}": must be a relative path inside the sandbox workdir (no drive letters)`
   }
-  if (/^[A-Za-z]:[\\/]/.test(script) || script.includes('..')) {
-    return `invalid script "${script}": path traversal (..) is not allowed`
-  }
-  // 显式列出允许的分隔符形态，统一转成 /（沙箱内是 Linux 路径）
+  // 沙箱内是 Linux 路径；反斜杠先于 .. 检查（a\..\x 报反斜杠而非 traversal）
   if (script.includes('\\')) {
     return `invalid script "${script}": use forward slashes (/) as path separators`
+  }
+  if (script.includes('..')) {
+    return `invalid script "${script}": path traversal (..) is not allowed`
   }
   return null
 }
@@ -79,6 +79,18 @@ interface ExecResult {
   stderr: string
   spawnError?: string
 }
+
+/** 每条流（stdout/stderr 各自）的捕获上限（安全复审 LOW：无界捕获实测致 Node RSS 1.46GB）。 */
+const MAX_OUTPUT_CHARS = 2_000_000
+
+/** 追加并封顶：超限即丢弃后续内容并置 capped（防 RSS 膨胀），尾部标记由调用方附加。 */
+function appendCapped(prev: string, chunk: string): { text: string; capped: boolean } {
+  if (prev.length >= MAX_OUTPUT_CHARS) return { text: prev, capped: true }
+  if (prev.length + chunk.length <= MAX_OUTPUT_CHARS) return { text: prev + chunk, capped: false }
+  return { text: prev + chunk.slice(0, MAX_OUTPUT_CHARS - prev.length), capped: true }
+}
+
+const TRUNCATION_MARKER = '\n[sandbox: output truncated at 2MB]'
 
 /** 拉起 run_in_sandbox.sh，收集 stdout/stderr/退出码；exec.signal 贯穿子进程。 */
 function runSandbox(
@@ -110,11 +122,27 @@ function runSandbox(
     )
     let stdout = ''
     let stderr = ''
+    let stdoutCapped = false
+    let stderrCapped = false
     let spawnError: string | undefined
-    child.stdout!.on('data', (d: Buffer) => { stdout += d.toString('utf8') })
-    child.stderr!.on('data', (d: Buffer) => { stderr += d.toString('utf8') })
+    child.stdout!.on('data', (d: Buffer) => {
+      const r = appendCapped(stdout, d.toString('utf8'))
+      stdout = r.text
+      stdoutCapped = stdoutCapped || r.capped
+    })
+    child.stderr!.on('data', (d: Buffer) => {
+      const r = appendCapped(stderr, d.toString('utf8'))
+      stderr = r.text
+      stderrCapped = stderrCapped || r.capped
+    })
     child.on('error', (err) => { spawnError = String(err) })
-    child.on('close', (code, sig) => resolve({ code, signal: sig, stdout, stderr, spawnError }))
+    child.on('close', (code, sig) => resolve({
+      code,
+      signal: sig,
+      stdout: stdoutCapped ? stdout + TRUNCATION_MARKER : stdout,
+      stderr: stderrCapped ? stderr + TRUNCATION_MARKER : stderr,
+      spawnError,
+    }))
   })
 }
 
@@ -142,7 +170,8 @@ export function apply(ctx: Context) {
       '(/assets is the report-generator skill root: /assets/templates/report-shell.html,',
       '/assets/scripts/build.py, /assets/references/report-schema.json), and /workdir writable.',
       'Print results to stdout — whatever the script prints comes back to you verbatim;',
-      'a non-zero exit code is returned as an error result with the full stdout/stderr (e.g. a Python traceback).',
+      'a non-zero exit code is returned as an error result with the full stdout/stderr (e.g. a Python traceback);',
+      'output over 2MB per stream is truncated with an explicit marker.',
     ].join(' '),
     parameters: {
       script: {

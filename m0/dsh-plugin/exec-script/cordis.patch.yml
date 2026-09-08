@@ -7,3 +7,21 @@
     - id: m0-exec-script
       name: 'm0-exec-script-plugin/exec-script.ts'
       config: {}
+
+# 安全复审修复 HIGH：spec §8.4 工具白名单 = skill + MCP + 受控执行。
+# dsh-base 在 win32 上启用 tool-pwsh（原生 shell，绕过沙箱边界）与 tool-web
+# （web_search/web_fetch 网络工具），均在白名单外。本 bundle 层在 base/headless
+# 之后应用，按 id 字段级覆盖 disabled（实测语义：target[key]=value，name 保留）。
+- id: tool-pwsh
+  disabled: true
+- id: tool-web
+  disabled: true
+
+# 安全复审修复 MEDIUM：dsh 会话 cwd 改为任务 workdir 后，project-dsh skill root
+# （<repo>/.dsh/skills 按 .git 祖先探测）不再命中；用 customSkillDirs（rank 300，
+# findings dsh-api.md §2.1）显式指回。路径经环境变量注入，不硬编码；
+# 从仓库根 cwd 运行时该变量不设 → [] → 行为与原状完全一致（避免双重注册）。
+- id: skill-filesystem
+  config:
+    customSkillDirs: !!js >-
+      process.env.M0_PROJECT_SKILL_DIR ? [process.env.M0_PROJECT_SKILL_DIR] : []

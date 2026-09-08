@@ -25,7 +25,8 @@ WORKDIR / RESULTS / ASSETS / RUNNER 全部来自 dsh 进程环境变量（会话
 ```
 
 返回（成功）：`{ exitCode, stdout, stderr }`；退出码非 0 时抛错 → 模型收到 isError 结果，
-消息含退出码与完整 stdout/stderr（Traceback 可读回传）。
+消息含退出码与完整 stdout/stderr（Traceback 可读回传）。每条流超 2MB 截断并尾加
+`[sandbox: output truncated at 2MB]` 标记（安全复审 LOW）。
 
 ## 环境变量（dsh 启动前注入）
 
@@ -36,6 +37,19 @@ WORKDIR / RESULTS / ASSETS / RUNNER 全部来自 dsh 进程环境变量（会话
 | `M0_ASSETS_DIR` | 资产根（容器 /assets，只读；通常 = `skills/report-generator`） |
 | `M0_SANDBOX_RUNNER` | `run_in_sandbox.sh` 绝对路径 |
 | `M0_SANDBOX_BASH` | 可选，Git Bash exe（默认 `C:/Program Files/Git/bin/bash.exe`） |
+| `M0_PROJECT_SKILL_DIR` | 可选，cwd 不在仓库内时把项目 skill 目录（`<repo>/.dsh/skills`）显式指回（customSkillDirs，rank 300） |
+
+## 安全复审后的会话形态（重要）
+
+- **原生 shell/网络工具已禁用**：bundle patch 按 id 覆盖 `tool-pwsh`、`tool-web`
+  （= web_search/web_fetch）为 `disabled: true`——spec §8.4 白名单（skill + MCP +
+  受控执行）之外，且绕过 exec_script 沙箱边界。
+- **dsh 会话 cwd = 任务 workdir**：workspace-write 的写域恰为 workdir。
+  **workdir 必须放在平台 Temp 树之外**（如 `D:\m0-sessions\<task>\workdir`）——
+  `workspace-write` 模式硬编码豁免 `os.tmpdir()`（dsh-sandbox `writableRoots`，不可
+  配置关闭），workdir 若在 Temp 内则其上一级落在豁免区可写（实测）。
+- 沙箱子进程 env 为固定白名单（PATH/SYSTEMROOT/RESULTS_DIR/ASSETS_DIR/SANDBOX_*），
+  宿主其余环境变量（含密钥类）不可达——与红队断言 1 一致。
 
 ## 安装（$DSH_HOME 内，仓库外）
 
@@ -46,9 +60,11 @@ cd m0/dsh-plugin/exec-script && pnpm install
 # 2. 注册进 headless profile（官方 bundle 机制，findings dsh-api.md §4.1）
 dsh plugin --profile headless add "D:/dataprojai-2harness/m0/dsh-plugin/exec-script"
 
-# 3. 每次会话注入环境变量后运行
+# 3. 每次会话：cwd 切到任务 workdir（Temp 树外！），注入环境变量后运行
+cd <wd>
 M0_SANDBOX_WORKDIR=<wd> M0_RESULTS_DIR=<res> M0_ASSETS_DIR=<assets> \
 M0_SANDBOX_RUNNER=<repo>/m0/sandbox/run_in_sandbox.sh \
+M0_PROJECT_SKILL_DIR=<repo>/.dsh/skills \
 dsh --profile headless "<task>"
 ```
 
