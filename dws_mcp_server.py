@@ -21,6 +21,13 @@ DWS_PASSWORD = os.environ.get("DWS_PASSWORD", "")
 DWS_CONNECT_TIMEOUT = int(os.environ.get("DWS_CONNECT_TIMEOUT", "15"))
 DWS_QUERY_TIMEOUT = int(os.environ.get("DWS_QUERY_TIMEOUT", "120000"))
 
+# --- Dual-channel result config (spec D13): preview for model, full set to file ---
+RESULT_DIR = os.environ.get("RESULT_DIR", "")
+RESULT_PREVIEW_ROWS = int(os.environ.get("RESULT_PREVIEW_ROWS", "200"))
+RESULT_DATA_BUDGET_ROWS = int(os.environ.get("RESULT_DATA_BUDGET_ROWS", "50000"))
+_RESULT_SEQ = 0
+_CURSOR_SEQ = 0
+
 SERVER_NAME = "dws-mcp-server"
 SERVER_VERSION = "1.1.0"
 
@@ -64,6 +71,51 @@ def execute_sync(sql, params=None):
             conn.close()
 
 
+def execute_bounded(sql, budget):
+    """Execute SQL with server-side cursor, fetch at most budget+1 rows.
+    Returns (rows, over_budget) — over_budget=True means result exceeds budget."""
+    global _CURSOR_SEQ
+    start = time.time()
+    conn = None
+    try:
+        conn = get_conn()
+        _CURSOR_SEQ += 1
+        with conn.cursor(name=f"mcp_q{_CURSOR_SEQ}",
+                         cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.itersize = 5000
+            cur.execute(sql, None)
+            fetched = cur.fetchmany(budget + 1)
+        over = len(fetched) > budget
+        rows = [dict(r) for r in fetched[:budget]]
+        log_stderr(f"bounded query: {len(rows)} rows, over_budget={over}, "
+                   f"{(time.time()-start)*1000:.0f}ms")
+        return rows, over
+    finally:
+        if conn:
+            conn.close()
+
+
+def save_result(sql, rows):
+    """Write full result set to RESULT_DIR. Returns metadata dict or None."""
+    global _RESULT_SEQ
+    if not RESULT_DIR or rows is None:
+        return None
+    os.makedirs(RESULT_DIR, exist_ok=True)
+    _RESULT_SEQ += 1
+    ref = f"r-{time.strftime('%Y%m%d%H%M%S')}-{_RESULT_SEQ}"
+    path = os.path.join(RESULT_DIR, f"{ref}.json")
+    payload = {
+        "result_ref": ref,
+        "sql": sql,
+        "row_count": len(rows),
+        "columns": list(rows[0].keys()) if rows else [],
+        "data": rows,
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, default=str)
+    return {"result_ref": ref, "path": path, "row_count": len(rows)}
+
+
 # --- Tool implementations ---
 
 def tool_run_query(**kwargs):
@@ -76,9 +128,36 @@ def tool_run_query(**kwargs):
     if not any(low.startswith(kw) for kw in ["select", "with", "describe", "show", "explain"]):
         return json.dumps({"error": "Only SELECT/DESCRIBE/SHOW/EXPLAIN/WITH allowed."}, ensure_ascii=False)
 
+    # Dual-channel mode: no auto-LIMIT; full result to file, preview to model.
+    if RESULT_DIR:
+        rows, over_budget = execute_bounded(sql, RESULT_DATA_BUDGET_ROWS)
+        if over_budget:
+            preview = rows[:RESULT_PREVIEW_ROWS]
+            return json.dumps({
+                "status": "ok",
+                "row_count": f"> {RESULT_DATA_BUDGET_ROWS}",
+                "truncated": True,
+                "guidance": (f"结果超过数据量预算 {RESULT_DATA_BUDGET_ROWS} 行，已截断且未保存。"
+                             "请在 SQL 内重新聚合（GROUP BY/SUM），或按日期/组织分批查询。"
+                             "不得以截断数据生成报告。"),
+                "schema": list(rows[0].keys()) if rows else [],
+                "data": preview,
+            }, ensure_ascii=False, default=str)
+        meta = save_result(sql, rows)
+        preview = rows[:RESULT_PREVIEW_ROWS]
+        return json.dumps({
+            "status": "ok",
+            "row_count": len(rows),
+            "truncated": False,  # full set saved to file — preview clip is not data loss
+            "result_ref": meta["result_ref"] if meta else None,
+            "result_path": meta["path"] if meta else None,
+            "schema": list(rows[0].keys()) if rows else [],
+            "data": preview,
+        }, ensure_ascii=False, default=str)
+
+    # Legacy mode (RESULT_DIR unset): unchanged behavior.
     if "limit" not in low:
         sql += " LIMIT 200"
-
     rows, msg = execute_sync(sql)
     MAX_ROWS = 500
     truncated = len(rows) > MAX_ROWS
