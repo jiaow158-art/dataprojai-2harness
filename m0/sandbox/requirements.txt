@@ -1,0 +1,2 @@
+# 金样管线（report-generator scripts/）为纯标准库，无第三方依赖 —— m0/env-manifest.md
+# 若后续盘点出依赖，在此逐行列出并锁定版本
