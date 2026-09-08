@@ -282,6 +282,37 @@ Body of probe skill. references/ and templates/ live beside SKILL.md as plain fi
 - dsh 只扫 root **顶层一层**（不递归 `**/SKILL.md`），与 Claude Code 相同
 - 迁移可用字段映射：Claude Code 无 whenToUse；dsh 的 `disable-model-invocation` 语义近似 Claude Code 的禁用面
 
+### 2.4 T7 skill 加载 spike —— 实测结论：**直接兼容**（2026-09-08，防伪验证）
+
+> Task 7 实测。技能 spec：`m0/spike/hello-skill/`（canonical 副本），运行副本放 `.dsh/skills/`（rank 100 project-dsh root）。
+> 会话日志取证方式：§5.3/§5.4 的 `session.jsonl.zstd`（Python `zstandard` 解压 JSONL）。
+
+**a) hello 技能防伪验证（Step 2）——标记串命中，references 真实读取**
+
+- 调用（§1.1 实测命令）：`dsh --profile headless "hello-m0 测试"` → stdout 原文 `M0-SKILL-OK-7f3a`，exit 0（随机标记串，模型不可能编造）
+- 会话日志证据链（session `fb1abe0b-dbd7-4101-b219-0628c5ddf4bf`，事件原文）：
+  1. `user/message` 后注入 `<available_skills>`（含 `hello-m0`，description 原文可见）
+  2. `tool/call` → `{"name": "skill", "arguments": "{\"name\": \"hello-m0\"}"}`
+  3. `tool/result` → `<skill_content name="hello-m0">` + `<skill_resources>`（"Base directory for this skill: D:\dataprojai-2harness\.dsh\skills\hello-skill"）+ `<skill_instructions>`（SKILL.md 正文）
+  4. 第二个 `tool/result`：模型按正文指示**真实读文件** `references/answer.md`，返回 `<content>1: M0-SKILL-OK-7f3a</content>` —— 标记串确来自磁盘
+
+**b) 真实域格式兼容验证（Step 3）——inventory-knowledge 整目录零修改直接工作**
+
+- 注册方式：`cp -r skills/inventory-knowledge .dsh/skills/`（SKILL.md 与 11 个 references 文件零修改）
+- 提问：`2024年Q3瓷砖事业部库存跌价TOP10应该查哪张表？只回答表名和选取理由。`
+- 回答（stdout 原文节选）：引用 `dm.dm_fin_stock_detail_accage_t_2023`（跌价字段族 `jchj_amt` / `wbzq_*_fall_amt`），并给出仅存在于 references 文件中的细节：计提比例 0/10/40/70%（内部口径）、calmonth YYYYMM 过滤、`___t` 描述字段、**主动避坑**（勿用 91 列旧表与上市口径表 `dm_fin_stock_d_accage_list_c_t_2023`）——泛泛而谈不可能命中
+- 会话日志证据（session `9bf98cd6-b9b5-4b78-9966-138bfef81151`）：`available_skills` 列出 `inventory-knowledge` → `skill({name: "inventory-knowledge"})` → `<skill_instructions>` 为 SKILL.md 正文原样 → 模型随后读 `references/metrics.md` 与 `references/stock-fall-list.md`（遵守"必须首先查阅 metrics.md"的正文规则）
+
+**c) Claude Code 扩展 frontmatter 字段在 dsh 下的行为（§2.3 遗留问题）**
+
+- `allowed-tools`：未实测到行为差异证据——本仓库两个被测技能 frontmatter 均只含 name/description；`~/.agents/skills/` 中含 `allowed-tools` 的技能（agent-browser）在 §2.3 的 available-skills 目录中正常出现，无告警无丢弃（扩展字段至少不致命；其工具限制是否在 dsh 内生效**未测，存疑**）
+- `whenToUse`：日志中的命中经溯源为其他技能正文的普通文本（描述某 workflow 的 meta 参数），**非 frontmatter 解析证据**
+- 结论修正 §2.3 推测：无告警出现 → 扩展字段不阻碍加载；但 `allowed-tools` 的**语义**（工具白名单）在 dsh 是否生效仍未验证——若迁移的 skill 依赖它做安全边界，需逐个验证或剥掉
+
+**d) T8（转换器）决策依据：无需转换器**
+
+Claude Code 格式 SKILL.md（name/description frontmatter + 正文 + references/ 资源）在 dsh 0.1.2-rc.1 下**零修改直接兼容**：目录结构同构（`<name>/SKILL.md` + references/），发现机制同构（`.dsh/skills/` project root，rank 100；`~/.agents/skills/` user root，rank 500），skill 工具契约同形（skill({name}) → skill_content/skill_instructions/skill_resources）。T8 若执行，仅剩迁移脚本性质工作（拷贝目录），不存在格式转换缺口。
+
 ---
 
 ## 3. MCP server 注册
@@ -512,7 +543,7 @@ T16（多轮）结论：程序化多轮走 **SDK session_id 复用**或 **ACP se
 | 项 | 状态 |
 |---|---|
 | headless JSON/结构化事件流输出开关 | **官方文档未覆盖，需实验确定**；当前最小结论：help 中无 `--json` 类 flag；结构化事件走 SDK `session.event` 通知或离线解析 `session.jsonl.zstd` |
-| Claude Code 扩展 frontmatter 字段（如 allowed-tools）在 dsh 下的行为 | 需 T7 实测（推测落入 metadata，见 §2.3） |
+| Claude Code 扩展 frontmatter 字段（如 allowed-tools）在 dsh 下的行为 | **部分解决（T7，§2.4c）**：扩展字段不阻碍加载（含 allowed-tools 的技能正常出现在目录中）；但其工具限制语义是否生效未测，存疑 |
 | tui profile（`--resume` 实际行为） | 未安装未实测（安装命令已记录，§5.2），需后续实验确定 |
 | MCP server 桥接的端到端实跑 | 配置格式与样例为文档原文；本机未实跑外部 MCP server（留 T9） |
 | 自定义工具插件的端到端实跑 | 插件形态/样例为文档原文；本机未实跑自定义插件加载（留 T13） |
