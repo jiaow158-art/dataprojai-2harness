@@ -1,0 +1,610 @@
+{
+ "title": "2026年8月经营分析报告",
+ "subtitle": "销售业绩 · 财务费用 · 应收 · 库存（四域） | 期间 2026-08 全月，对比 2026-07 / 2025-08 | 生成 2026-09-05",
+ "kpis": [
+  {
+   "label": "含税达成额",
+   "value": "5.21亿",
+   "change": "环比+13.0%｜同比-12.5%",
+   "direction": "up"
+  },
+  {
+   "label": "目标达成率",
+   "value": "79.6%",
+   "change": "环比+2.2pp（瓷砖11中心）",
+   "direction": "up"
+  },
+  {
+   "label": "阿米巴毛利率",
+   "value": "13.14%",
+   "change": "同比-0.83pp",
+   "direction": "down"
+  },
+  {
+   "label": "期间费用率",
+   "value": "25.1%",
+   "change": "同比+1.0pp",
+   "direction": "up"
+  },
+  {
+   "label": "应收余额",
+   "value": "33.63亿",
+   "change": "同比-11.2%",
+   "direction": "down"
+  },
+  {
+   "label": "应收逾期率",
+   "value": "68.4%",
+   "change": "同比+9.3pct",
+   "direction": "up"
+  },
+  {
+   "label": "库存金额",
+   "value": "14.74亿",
+   "change": "同比-10.6%",
+   "direction": "down"
+  },
+  {
+   "label": "长龄库存(24月+)",
+   "value": "2.50亿",
+   "change": "同比+15.8%",
+   "direction": "up"
+  }
+ ],
+ "insight": "8月经营呈「环比回暖、同比承压」：集团含税达成额5.21亿、环比+13.0%，但同比-12.5%，三大渠道齐跌、目标达成率79.6%（缺口1.05亿），阿米巴毛利率13.14%、同比-0.83pp。资产端「去化与老化并存」：应收余额33.63亿同比-11.2%，但逾期率68.4%、一年+9.3pct（4年以上账龄一年+167%）；库存14.74亿同比-10.6%，但24月+长龄2.50亿逆势+15.8%。费用端管理费用同比+27.0%（山西停工损失366万）、研发超预算65.9%，需重点管控。",
+ "sections": [
+  {
+   "id": "sales",
+   "tab": "销售业绩",
+   "type": "chart-with-analysis",
+   "chart": [
+    {
+     "id": "chart-channel",
+     "title": "整合渠道8月业绩与同比（外协OEM同比+307%低基数未入图）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "工程GD03",
+        "零售GD01",
+        "整装GD02",
+        "国贸GD06",
+        "电商GD07",
+        "外协OEM",
+        "流通GD10",
+        "艺耐GD09",
+        "家装GD08"
+       ]
+      },
+      "yAxis": [
+       {
+        "type": "value",
+        "valueFormat": "yi:1"
+       },
+       {
+        "type": "value",
+        "valueFormat": "signed_percent:0"
+       }
+      ],
+      "series": [
+       {
+        "name": "8月业绩",
+        "type": "bar",
+        "data": [
+         216700000,
+         207700000,
+         60900000,
+         14700000,
+         7700000,
+         5900000,
+         4200000,
+         2100000,
+         1200000
+        ]
+       },
+       {
+        "name": "同比",
+        "type": "line",
+        "yAxisIndex": 1,
+        "valueFormat": "signed_percent:0",
+        "data": [
+         -11.3,
+         -15.6,
+         -17.5,
+         60.8,
+         -0.6,
+         null,
+         -21.5,
+         -47.3,
+         -47.8
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "id": "chart-bu",
+     "title": "事业部业绩结构（8月）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "pie",
+     "option": {
+      "series": [
+       {
+        "name": "事业部业绩",
+        "type": "pie",
+        "radius": "65%",
+        "data": [
+         {
+          "name": "瓷砖事业部",
+          "value": 436700000
+         },
+         {
+          "name": "卫浴事业部",
+          "value": 65500000
+         },
+         {
+          "name": "国际营销中心",
+          "value": 17400000
+         },
+         {
+          "name": "丽适岩板",
+          "value": 1500000
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "analysis": [
+    {
+     "label": "回暖信号",
+     "color": "blue",
+     "text": "8月环比+13.0%，零售回弹+23.1%为最大单点拉动；国贸+60.8%、外协OEM低基数高增，出海与代工是仅有的同比增长引擎。"
+    },
+    {
+     "label": "结构风险",
+     "color": "pink",
+     "text": "同比-12.5%：零售-15.6%、整装-17.5%、工程-11.3%三大渠道齐跌；工程2.17亿连续第2个月超过零售2.08亿，渠道结构从零售主导向工程主导切换，需关注工程回款与价差。"
+    },
+    {
+     "label": "节奏观察",
+     "color": "cyan",
+     "text": "月末冲量依赖加重：末8日贡献全月35.3%、8/31单日3,284万占6.3%；目标缺口1.05亿集中在华东(76.3%)、鲁豫晋(71.2%)、赣皖(75.8%)。"
+    }
+   ]
+  },
+  {
+   "id": "fin-cost",
+   "tab": "财务费用",
+   "type": "chart-with-analysis",
+   "chart": [
+    {
+     "id": "chart-expense",
+     "title": "期间费用结构（8月，万元）",
+     "valueFormat": "wan:0",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "营业费用",
+        "管理费用",
+        "研发支出",
+        "物流费用",
+        "财务费用"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "8月实际",
+        "type": "bar",
+        "data": [
+         32260000,
+         32710000,
+         17880000,
+         12830000,
+         1310000
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "id": "chart-budget",
+     "title": "预算执行率（财务费用预算仅编14万，949%异常未入图）",
+     "valueFormat": "percent:1",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "营业费用",
+        "管理费用",
+        "研发支出",
+        "物流费用"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "执行率",
+        "type": "bar",
+        "data": [
+         100.2,
+         93.0,
+         165.9,
+         95.9
+        ],
+        "markLine": {
+         "data": [
+          {
+           "yAxis": 100
+          }
+         ],
+         "lineStyle": {
+          "type": "dashed"
+         }
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "analysis": [
+    {
+     "label": "费用管控",
+     "color": "blue",
+     "text": "营业费用同比-25.5%（工资-229万、新媒体广告-208万），压缩见效；期间费用合计0.97亿、同比-7.6%，环比-4.0%。"
+    },
+    {
+     "label": "超支预警",
+     "color": "pink",
+     "text": "管理费用同比+27.0%：山西生产制造部停工损失366万（去年为0）+租赁物业分摊口径变化净+331万；研发执行率165.9%超预算；财务费用预算仅编制14万（实际131万），编制覆盖明显缺失。"
+    },
+    {
+     "label": "毛利承压",
+     "color": "cyan",
+     "text": "管理口径毛利率26.05%、同比+0.34pp但毛利额-10.2%；阿米巴口径毛利率13.14%、同比-0.83pp——收入下行+折扣除量共同压毛利，建议拆分折扣与产品结构归因。"
+    }
+   ]
+  },
+  {
+   "id": "ar",
+   "tab": "应收风险",
+   "type": "chart-with-analysis",
+   "chart": [
+    {
+     "id": "chart-ar-trend",
+     "title": "应收余额与逾期趋势（月末时点）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "2025-08",
+        "2026-07",
+        "2026-08"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "应收余额",
+        "type": "line",
+        "data": [
+         3787000000,
+         3376000000,
+         3363000000
+        ]
+       },
+       {
+        "name": "逾期应收",
+        "type": "line",
+        "data": [
+         2238000000,
+         2316000000,
+         2301000000
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "id": "chart-aging",
+     "title": "账龄结构（2026-08末，主营应收科目正余额口径）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "未逾期",
+        "逾期1-30天",
+        "31-60天",
+        "61-90天",
+        "91-365天",
+        "1-2年",
+        "2-4年",
+        "4年以上"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "余额",
+        "type": "bar",
+        "data": [
+         1062000000,
+         56000000,
+         47000000,
+         62000000,
+         346000000,
+         219000000,
+         660000000,
+         912000000
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "analysis": [
+    {
+     "label": "余额改善",
+     "color": "blue",
+     "text": "应收余额33.63亿、同比-11.2%（-4.24亿），环比-0.4%基本企稳；未逾期应收同比-31.5%，新发生业务风险暴露收敛。"
+    },
+    {
+     "label": "逾期恶化",
+     "color": "pink",
+     "text": "逾期率68.4%、一年+9.3pct；4年以上账龄9.12亿、一年+167%，超2年账龄占46.7%（15.71亿）——计提减值与出清处置迫在眉睫。"
+    },
+    {
+     "label": "客户集中",
+     "color": "cyan",
+     "text": "Top10逾期客户全部为地产暴雷链（恒大/荣盛/金科/蓝光/世茂/碧桂园/当代等），合计约5.4亿、占逾期23.5%、几乎全额逾期；8月回款4.77亿、同比-12.9%，回款客户数-11%。"
+    }
+   ]
+  },
+  {
+   "id": "inventory",
+   "tab": "库存运营",
+   "type": "chart-with-analysis",
+   "chart": [
+    {
+     "id": "chart-inv-trend",
+     "title": "库存金额与长龄库存趋势（月末，管理口径）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "2025-08",
+        "2026-07",
+        "2026-08"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "库存金额",
+        "type": "line",
+        "data": [
+         1648000000,
+         1471000000,
+         1474000000
+        ]
+       },
+       {
+        "name": "24月+长龄",
+        "type": "line",
+        "data": [
+         518000000,
+         474000000,
+         479000000
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "id": "chart-stock-aging",
+     "title": "库龄结构（2026-08末）",
+     "valueFormat": "yi:2",
+     "tooltipTemplate": "multi",
+     "option": {
+      "xAxis": {
+       "type": "category",
+       "data": [
+        "0-6月",
+        "6-12月",
+        "12-24月",
+        "24月以上"
+       ]
+      },
+      "yAxis": {
+       "type": "value"
+      },
+      "series": [
+       {
+        "name": "金额",
+        "type": "bar",
+        "data": [
+         833000000,
+         162000000,
+         229000000,
+         250000000
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "analysis": [
+    {
+     "label": "总量去化",
+     "color": "blue",
+     "text": "库存14.74亿、同比-10.6%，数量-17.8%；周转改善（8月出库/平均库存25.3%/月，年化3.03次 vs 去年2.84次）；工厂端丰城东鹏占30.0%。"
+    },
+    {
+     "label": "长龄风险",
+     "color": "pink",
+     "text": "24月+长龄2.50亿逆势+15.8%、占比17.0%（超10%滞销警戒线3.9pp），去化几乎全部来自0-6月与12-24月段；减值2.83亿中61.9%集中于24月+段（按70%足额计提）。"
+    },
+    {
+     "label": "结构与成本",
+     "color": "cyan",
+     "text": "库存单价同比+约9%——同比水位大降但8月资金成本仅-39.4%，指向高值化结构性上移，需验证为提价/产品结构所致；卫浴非全资(31.5%)与国际营销中心(23.6%)24月+占比最高，需专项清库。"
+    }
+   ]
+  },
+  {
+   "id": "detail",
+   "tab": "明细数据",
+   "type": "table",
+   "table": {
+    "title": "瓷砖11销售中心 8月目标达成明细（达成率≥85%绿｜75-85%黄｜<75%红；目标表覆盖10/11中心）",
+    "columns": [
+     "销售中心",
+     "实际(百万元)",
+     "目标(百万元)",
+     "达成率"
+    ],
+    "rows": [
+     [
+      "华北运营中心",
+      "37.0",
+      "40.8",
+      {
+       "v": "90.8%",
+       "tone": "good"
+      }
+     ],
+     [
+      "东北运营中心",
+      "12.6",
+      "14.5",
+      {
+       "v": "87.0%",
+       "tone": "good"
+      }
+     ],
+     [
+      "湘鄂运营中心",
+      "31.2",
+      "37.3",
+      {
+       "v": "83.7%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "粤西运营中心",
+      "42.7",
+      "51.9",
+      {
+       "v": "82.2%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "战略工程中心",
+      "38.2",
+      "46.6",
+      {
+       "v": "81.9%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "西南运营中心",
+      "46.4",
+      "59.1",
+      {
+       "v": "78.6%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "西北运营中心",
+      "29.1",
+      "37.2",
+      {
+       "v": "78.4%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "华东运营中心",
+      "68.4",
+      "89.6",
+      {
+       "v": "76.3%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "赣皖运营中心",
+      "28.0",
+      "36.9",
+      {
+       "v": "75.8%",
+       "tone": "warn"
+      }
+     ],
+     [
+      "鲁豫晋运营中心",
+      "33.6",
+      "47.2",
+      {
+       "v": "71.2%",
+       "tone": "bad"
+      }
+     ]
+    ]
+   }
+  }
+ ],
+ "provenance": {
+  "source": "dm_fin_operations_mix_sum_t / dm_dp_api_sales_target / dm_fact_finance_cost_f / dwrfin_cost_sales_gross_profit_d / dwr_ar_receivable_aging_2023_info_f / dwr_ar_collection_detail_f / dm_fin_stock_detail_accage_t_2023 / dm_fin_stock_capital_cost_t / dm_otd_wm_stock_turnover_m / dm_rpt_wm_cxc_day_sum（DWS dm + dwrfin 层）",
+  "lastUpdate": "2026-09-05（8月数据已完整入库；各表快照至 2026-09-03 ~ 09-05）",
+  "skillVersion": "sales-performance / fin-cost / ar / inventory analyst+knowledge（6步工作流+对抗审查）",
+  "query": "销售: SELECT calmonth, SUM(ambperformance) FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth IN ('2025-08','2026-07','2026-08') AND data_source IN ('S','T','D','') GROUP BY calmonth; 渠道下钻 GROUP BY integrate_channel, integrate_channel__t; 达成率=实际(node_name5+integrate_channel聚合)/目标(dm.dm_dp_api_sales_target, org_type='业务单位', 万元×10000)。\n费用: SELECT month, SUM(amount), SUM(budget_cost) FROM dm.dm_fact_finance_cost_f WHERE month IN ('2025-08','2026-07','2026-08') GROUP BY month, functional_scope; 毛利: SELECT months, SUM(gross_profit), SUM(notax_sales_net_amt) FROM dwrfin.dwrfin_cost_sales_gross_profit_d WHERE months IN ('202508','202607','202608') GROUP BY months。\n应收: SELECT query_date, SUM(local_currency_balance_sum) FROM dwrfin.dwr_ar_receivable_aging_2023_info_f WHERE query_date IN ('2025-08-31','2026-07-31','2026-08-31') AND general_ledger_account IN ('0011310100','0011310110','0011310300','0011310600','0011310700','0011310800') AND local_currency_balance_sum>0 GROUP BY query_date, 账龄段; 回款: dwrfin.dwr_ar_collection_detail_f WHERE year+month IN ('2025-08','2026-07','2026-08')。\n库存: SELECT calmonth, SUM(zsjkcje), SUM(wbzq_6_amt), SUM(wbzq_6_12_amt), SUM(wbzq_12_24_amt), SUM(wbzq_24_amt), SUM(COALESCE(jchj_amt,0)) FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth IN ('202508','202607','202608') GROUP BY calmonth; 资金成本: dm.dm_fin_stock_capital_cost_t WHERE month IN ('202508','202607','202608'); 周转: dm_otd_wm_stock_turnover_m stat_month IN ('2026-08','2026-07','2025-08'); CXC: dm_rpt_wm_cxc_day_sum stat_date BETWEEN 20260801 AND 20260831。",
+  "filters": [
+   "期间: 2025-08 / 2026-07 / 2026-08（应收/库存取月末时点快照 2026-08-31）",
+   "销售口径: 集团=瓷砖+卫浴+国际营销中心+丽适岩板，data_source IN ('S','T','D','') 剔除事业部内部交易U",
+   "应收主口径: 主营应收科目正余额净敞口（剔除±300亿挂账科目0011310200）",
+   "库存口径: 管理口径 zsjkcje，无保质期库龄按批次日期 6/12/24月分桶"
+  ],
+  "limitations": [
+   "毛利率双口径：阿米巴13.14%（销售域，含税收入分母）与管理26.05%（财务域，不含税净额分母）不可直接比较",
+   "目标表仅覆盖瓷砖11国内中心（2,711万/6.2%业绩无目标），达成率79.6%为11中心口径；目标表无2025-08数据，达成率无同比",
+   "预算执行率中研发/财务费用预算编制覆盖不足，超支结论需以预算系统复核",
+   "库存渠道zyl01为近似整合渠道映射（0.31亿未标注）；周转预计算表范围疑为瓷砖事业部；CXC为面积口径",
+   "DSO≈211天为回款代理口径粗估（周转天数表停更于2022-12）"
+  ],
+  "dataQuality": [
+   "dm_ar_receivable_accage_t / dm_ar_overdue_receivables_t 三期快照金额完全相等，疑似停更冻结，本期已弃用",
+   "广州恒大应收：DM报表口径4.40亿 vs 主口径0.96亿（余额大部分落在被剔除的0011310200挂账科目），建议财务核对",
+   "8月销售快照 ct_sales_performance_t last_analyze 为08-20，仅用于口径核对、不作为主口径",
+   "丽适岩板阿米巴毛利率小样本异常，未采用",
+   "销售表2026-08含32个calday（跨月关账日），全月口径以calmonth为准"
+  ]
+ }
+}

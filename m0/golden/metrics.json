@@ -1,0 +1,40 @@
+{
+  "report_question": "（推断）出一份2026年8月经营分析报告，覆盖销售业绩、财务费用、应收风险、库存运营四个域，本期2026-08对比2026-07与2025-08，含渠道业绩、事业部结构、费用预算执行、应收账龄、库存库龄、瓷砖11销售中心目标达成明细。注：任务书给定的SKU效益提问原文与金样文件实际内容不符，见 trace.md 第0/2节。",
+  "metrics": [
+    {
+      "name": "含税达成额（2026-08，集团口径）",
+      "sql": "SELECT ROUND(SUM(ambperformance)/100000000,2) FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth IN ('2025-08','2026-07','2026-08') AND data_source IN ('S','T','D','') AND calmonth='2026-08' GROUP BY calmonth",
+      "expect_hint": "KPI卡'含税达成额 5.21亿'。实测(2026-09-08)=5.21，环比(4.61)+13.0%、同比(5.95)-12.5%亦对上。口径：Mix表 ambperformance，data_source IN ('S','T','D','')剔除内部交易U，calmonth='YYYY-MM'格式"
+    },
+    {
+      "name": "目标达成率（2026-08，瓷砖11销售中心口径）",
+      "sql": "WITH act AS (SELECT node_name5, SUM(ambperformance) AS amt FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth='2026-08' AND data_source IN ('S','T','D','') GROUP BY node_name5), tgt AS (SELECT sales_center_code, SUM(target_sales_amt)*10000 AS tgt FROM dm.dm_dp_api_sales_target WHERE org_type='业务单位' AND stat_month_ym='2026-08' GROUP BY sales_center_code) SELECT ROUND(100.0*SUM(a.amt)/SUM(t.tgt),1) FROM act a JOIN tgt t ON a.node_name5=t.sales_center_code",
+      "expect_hint": "KPI卡'目标达成率 79.6%'。实测=79.6（11中心，实际4.10亿/目标5.15亿）。口径：目标表 target_sales_amt 单位万元×10000；JOIN键 node_name5=sales_center_code；目标表无2025-08数据（达成率无同比，与报告声明一致）"
+    },
+    {
+      "name": "应收余额与逾期（2026-08末，主营应收科目正余额口径）",
+      "sql": "SELECT ROUND(SUM(local_currency_balance_sum)/100000000,2) AS balance_yi, ROUND(SUM(overdue_receivables)/100000000,2) AS overdue_yi FROM dwrfin.dwr_ar_receivable_aging_2023_info_f WHERE query_date='2026-08-31' AND general_ledger_account IN ('0011310100','0011310110','0011310300','0011310600','0011310700','0011310800') AND local_currency_balance_sum>0 GROUP BY query_date",
+      "expect_hint": "KPI卡'应收余额 33.63亿'、'逾期率 68.4%'。实测(2026-09-08) balance_yi=33.63、overdue_yi=23.01（23.01/33.63=68.4%，同比+9.3pct对上）。科目列表剔除±300亿挂账科目0011310200，query_date='YYYY-MM-DD'。趋势系列(37.90/33.76/33.63亿)同口径换 query_date 实测复现"
+    },
+    {
+      "name": "库存金额与24月+长龄（2026-08末，管理口径）",
+      "sql": "SELECT ROUND(SUM(zsjkcje)/100000000,2) AS stock_yi, ROUND(SUM(wbzq_24_amt)/100000000,2) AS over24_yi FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth IN ('202508','202607','202608') AND calmonth='202608' GROUP BY calmonth",
+      "expect_hint": "KPI卡'库存金额 14.74亿'、'长龄库存(24月+) 2.50亿'。实测stock_yi=14.74、over24_yi=2.50（同比2.16→+15.8%、占比17.0%均对上）。库龄结构图8.33/1.62/2.29/2.50亿=wbzq_6/6_12/12_24/24_amt逐段验证一致。口径：calmonth='YYYYMM'，大表(600万行/月)必须带calmonth过滤"
+    },
+    {
+      "name": "期间费用结构（2026-08，万元，functional_scope 5501-5504）",
+      "sql": "SELECT functional_scope, ROUND(SUM(amount)/10000,0) AS amt_wan, ROUND(100.0*SUM(amount)/NULLIF(SUM(budget_cost),0),1) AS exec_pct FROM dm.dm_fact_finance_cost_f WHERE month IN ('2025-08','2026-07','2026-08') AND month='2026-08' AND functional_scope IN ('5501','5502','5503','5504') GROUP BY functional_scope ORDER BY functional_scope",
+      "expect_hint": "费用图：营业费用3,226万/管理费用3,271万/研发1,788万/物流1,283万/财务131万；预算执行率100.2%/93.0%/165.9%/95.9%（财务949%异常未入图）。实测全部逐项对上。口径：month='YYYYMM'"
+    },
+    {
+      "name": "数据明细行数（应收账龄明细，同口径 COUNT(*)）",
+      "sql": "SELECT COUNT(*) FROM dwrfin.dwr_ar_receivable_aging_2023_info_f WHERE query_date IN ('2025-08-31','2026-07-31','2026-08-31') AND general_ledger_account IN ('0011310100','0011310110','0011310300','0011310600','0011310700','0011310800') AND local_currency_balance_sum>0",
+      "expect_hint": "报告口径对应的底层明细行数，实测=50,508 行 >> 200（T15 验证 dsh 双通道落盘不截断用）。备用更大口径：Mix 表三个月明细 802,567 行；CXC 日表 8 月 45,722 行；回款明细 8 月 222,370 行（合计4.77亿已验证）"
+    },
+    {
+      "name": "渠道业绩结构（2026-08，整合渠道）",
+      "sql": "SELECT integrate_channel, ROUND(SUM(CASE WHEN calmonth='2026-08' THEN ambperformance ELSE 0 END)/100000000,4) AS aug26_yi FROM dm.dm_fin_operations_mix_sum_t WHERE calmonth IN ('2025-08','2026-08') AND data_source IN ('S','T','D','') GROUP BY integrate_channel ORDER BY aug26_yi DESC",
+      "expect_hint": "渠道图8月业绩：GD03工程2.1666/GD01零售2.0772/GD02整装0.6092/GD06国贸0.1472/GD07电商0.0773/GD05外协0.0586亿（图示2.167/2.077/0.609/0.147/0.077/0.059）——逐项对上；GD06同比+60.8%亦复现。注意：本SQL返回12行（T15脚本需遍历全部行或只取首行GD03，fetchone()取到的是GD03=2.1666）"
+    }
+  ]
+}
