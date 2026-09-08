@@ -2,15 +2,15 @@
   "mcpServers": {
     "dws": {
       "type": "stdio",
-      "command": "/usr/bin/python3",
+      "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
       "args": [
-        "/home/dp-user/dataprojv2/dws_mcp_server.py"
+        "D:\\dataprojai-2harness\\dws_mcp_server.py"
       ],
       "env": {
-        "DWS_HOST": "${DWS_HOST}",
-        "DWS_PORT": "${DWS_PORT}",
-        "DWS_DBNAME": "${DWS_DBNAME}",
-        "DWS_USER": "${DWS_USER}",
+        "DWS_HOST": "121.37.200.214",
+        "DWS_PORT": "8000",
+        "DWS_DBNAME": "DP_DWS",
+        "DWS_USER": "aiuser",
         "DWS_PASSWORD": "${DWS_PASSWORD}"
       }
     }
