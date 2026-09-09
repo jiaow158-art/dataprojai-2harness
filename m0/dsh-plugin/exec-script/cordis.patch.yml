@@ -17,6 +17,16 @@
 - id: tool-web
   disabled: true
 
+# 终审追加（控制器采纳审查裁定）：tool-workflow 描述明示在宿主 worker 线程执行任意
+# JS（与 pwsh 同级的宿主侧执行通道，绕过 exec_script 沙箱），连同其 worker-thread
+# 提供者一并禁用；tool-ralph 为无界自治循环派生器。M0 放行前不启用。
+- id: tool-workflow
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-ralph
+  disabled: true
+
 # 安全复审修复 MEDIUM：dsh 会话 cwd 改为任务 workdir 后，project-dsh skill root
 # （<repo>/.dsh/skills 按 .git 祖先探测）不再命中；用 customSkillDirs（rank 300，
 # findings dsh-api.md §2.1）显式指回。路径经环境变量注入，不硬编码；

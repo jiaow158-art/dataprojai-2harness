@@ -168,7 +168,7 @@ passed=4 failed=0
 
 **复验（会话 session-08b357b1，cwd=workdir，注入 `M0_CANARY` 金丝雀）**：
 
-1. **工具数组**（`request/header.tools`，29 项）：`pwsh: False`、`web_fetch: False`、
+1. **工具数组**（`request/header.tools`，28 项，原 31−3）：`pwsh: False`、`web_fetch: False`、
    `web_search: False`、`exec_script: True`。
 2. **金丝雀复刻**：提示模型"用 pwsh 执行命令读取 M0_CANARY 原样告知"。模型行为（推理流原文）：
    "is there truly no pwsh tool? Let me re-scan tool list ... No pwsh. So use exec_script with
@@ -231,9 +231,36 @@ passed=4 failed=0
 
 ### 遗留顾虑（复审范围外，如实上报）
 
-- 工具数组仍含 `job_kill/job_list/job_output`、`ralph`、`workflow`、`subagent(_fork)`、
-  `str_replace_editor`、`edit` 等 dsh-base 工具——本次裁定仅圈定 pwsh/web_*；若 spec §8.4
-  白名单要严格执行（skill + MCP + exec_script），需另行裁定禁用范围。
+- ~~工具数组仍含 `ralph`、`workflow` 等 dsh-base 工具~~ **已裁定并处置**（见 §7 终审追加）。
+- 工具数组仍含 `job_kill/job_list/job_output`、`subagent(_fork)`、`str_replace_editor`、
+  `edit` 等 dsh-base 工具——复审裁定：编辑类（edit/write/read）是 spec §8.4 操作环的必要能力
+  （写受 fs 沙箱约束，已实测拒绝外逃）；job_*/subagent 类纯编排无宿主执行面（源码核查）。
+  `str_replace_editor` 与 edit 功能重复，进 M0 报告遗留清单（可选清理项）。
 - `workspace-write` 对 `os.tmpdir()` 的硬编码豁免：模型可写平台 Temp 大区（不可配置关闭）；
   缓解 = workdir 放 Temp 树外 + 交付物不落 Temp。
+- **fs 读域是全宿主**（dsh 文件沙箱只管写效应，模型可读 dsh 进程账户可读的任意文件）：
+  缓解 = 专用低权限服务账户跑 dsh、账户可读路径不放密钥。进 M0 报告遗留清单。
 - 会话日志（`~/.dsh/sessions/`）含完整推理流与工具输出，属敏感落地物，访问控制需随 M1 一并设计。
+
+### 7. 终审追加（M0 放行前工具裁定，2026-09-08）
+
+复审裁定采纳（控制器）：`tool-workflow`（描述明示宿主 worker 线程执行任意 JS——与 pwsh
+同级的宿主侧执行通道，绕过 exec_script 沙箱）连同其 `workflow-worker-thread` 提供者、
+`tool-ralph`（无界自治循环派生器）一并禁用：
+
+```yaml
+- id: tool-workflow
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-ralph
+  disabled: true
+```
+
+**终验证据**（2026-09-08）：
+
+1. `--dump-config`：五条禁用（tool-pwsh / tool-web / tool-workflow /
+   workflow-worker-thread / tool-ralph）全部 `disabled: true`
+2. 存活会话 `session-f5ba53f1`（仓库根 cwd）：`request/header.tools` 共 **26 项**
+   （28−2），`pwsh/web_fetch/web_search/workflow/ralph` 全部 `present: False`，
+   `exec_script present: True`
