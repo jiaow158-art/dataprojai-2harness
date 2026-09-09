@@ -1,0 +1,47 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+
+# M0-T9: DWS MCP server (dual-channel run_query, spec D13).
+# SECURITY: DWS_PASSWORD injected from ambient env via !!js at config-load —
+# the value is never stored in this file. This explicit env map is REQUIRED
+# because the dsh stdio bridge scrubs ambient vars matching
+# /KEY|PASSWORD|SECRET|TOKEN/i (and DSH_*) from the child environment before
+# merging this map on top.
+- insert:
+    - id: mcp-dws
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: dws
+        transport: stdio
+        command: '{{MCP_PYTHON}}'
+        args: ['{{MCP_SCRIPT}}']
+        env:
+          DWS_HOST: '121.37.200.214'
+          DWS_PORT: '8000'
+          DWS_DBNAME: 'DP_DWS'
+          DWS_USER: 'aiuser'
+          DWS_PASSWORD: !!js process.env.DWS_PASSWORD
+{{RESULT_DIR_LINE}}
+          RESULT_PREVIEW_ROWS: '200'
+
+# T13 whitelist: disable host-side execution + network + autonomous loop tools.
+# Semantically identical to m0/dsh-plugin/exec-script/cordis.patch.yml (the
+# plugin's own bundle patch applies the same entries; duplication is harmless
+# and keeps this profile patch self-contained per M0-T16 §8 handover).
+- id: tool-pwsh
+  disabled: true
+- id: tool-web
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-ralph
+  disabled: true
+
+# Project skill root reroute (session cwd may sit outside the repo).
+- id: skill-filesystem
+  config:
+    customSkillDirs: !!js >-
+      process.env.M0_PROJECT_SKILL_DIR ? [process.env.M0_PROJECT_SKILL_DIR] : []

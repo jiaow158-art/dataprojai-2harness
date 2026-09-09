@@ -1,0 +1,17 @@
+{
+  "name": "dsh-profile-{{PROFILE_NAME}}",
+  "private": true,
+  "dependencies": {
+    "m0-exec-script-plugin": "link:{{PLUGIN_DIR}}"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "{{APP_BUNDLE}}",
+        "m0-exec-script-plugin"
+      ],
+      "patchReload": "startup"
+    }
+  }
+}
