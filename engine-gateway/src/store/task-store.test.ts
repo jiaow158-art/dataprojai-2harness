@@ -63,7 +63,7 @@ test("事件 seq 递增与 afterSeq 重放（claim 内部事件占 seq=1）", ()
   }
   const all = store.listEvents(run_id, 0);
   assert.deepEqual(all.map((e) => e.seq), [1, 2, 3, 4, 5, 6]);
-  assert.equal(all[0].type, "stage_changed"); // A.1 获权时同步写入的内部事件
+  assert.equal(all[0].type, "stage"); // A.1 获权时同步写入的内部事件（spec §5 词表）
   const replay = store.listEvents(run_id, 2);
   assert.deepEqual(replay.map((e) => e.seq), [3, 4, 5, 6]); // 连续无缺口
   assert.deepEqual(replay[0].payload, { i: 2 }); // payload JSON 往返
@@ -108,7 +108,7 @@ test("围栏写：B 接管后 A 的 heartbeat/updateStage/appendEvent/finalize �
   assert.equal(row.stage, "querying");
   assert.equal(row.lease_owner, "workerB");
   assert.equal(row.status, "running");
-  // seq1=A claim 的 stage_changed，seq2=A 的 progress，seq3=B claim 的 stage_changed
+  // seq1=A claim 的 stage，seq2=A 的 progress，seq3=B claim 的 stage
   assert.equal(store.listEvents(run_id, 0).length, 3);
 });
 
@@ -218,7 +218,8 @@ test("sessionHistory：成功任务含回答摘要与 result_ref 清单，失败
   assert.ok(l1);
   store.appendEvent(l1, "sql", { sql: "SELECT 1", result_ref: "refs/r1.json" });
   store.appendEvent(l1, "sql", { sql: "SELECT 2", result_ref: "refs/r2.json" });
-  store.appendEvent(l1, "final_answer", "2025 年净利润为 X 亿元");
+  // spec §5：answer 事件 payload 形状 {markdown}
+  store.appendEvent(l1, "answer", { markdown: "2025 年净利润为 X 亿元" });
   store.finalize(l1, "succeeded");
 
   const bad = createIn("hist", "h2", "应收账款呢");
@@ -239,4 +240,28 @@ test("sessionHistory：成功任务含回答摘要与 result_ref 清单，失败
   assert.equal(h2.status, "failed");
   assert.equal(h2.final_answer, null);
   assert.deepEqual(h2.result_refs, []);
+});
+
+test("deadline 接管臂：超预算任务不可被 claim，reaper 判 failed/UNRECOVERABLE（A.4）", () => {
+  // 场景①：deadline 已过的 queued 任务（reap 回队路径）claim 被拒
+  const t = createIn("sdl", "dl-1");
+  const l1 = store.claimLease(t.run_id, "w1", 90_000, 1); // budgetS=1 → deadline=created_at+1s
+  assert.ok(l1);
+  const deadline = store.getTask(t.run_id)!.deadline!;
+  assert.ok(deadline > 0, "deadline 首次 claim 固化");
+  db.prepare("UPDATE tasks SET deadline=? WHERE run_id=?").run(Date.now() - 1000, t.run_id);
+  expireLease(t.run_id);
+  const reaped = store.reapExpired(Date.now(), 3);
+  assert.equal(reaped.find((x) => x.run_id === t.run_id)?.status, "failed");
+  assert.equal(store.getTask(t.run_id)?.error_code, "UNRECOVERABLE");
+
+  // 场景②：deadline 已过但任务仍 queued（boot 自愈/回队后过预算）——claim 直接 false
+  const q = createIn("sdl", "dl-2");
+  db.prepare("UPDATE tasks SET deadline=? WHERE run_id=?").run(Date.now() - 1000, q.run_id);
+  assert.equal(store.claimLease(q.run_id, "w2", 90_000, 3600), false); // WITHIN_BUDGET 接管臂
+  assert.equal(store.getTask(q.run_id)?.status, "queued"); // 未被误置 running
+  // 只能走 reaper 终态
+  const reaped2 = store.reapExpired(Date.now(), 3);
+  assert.equal(reaped2.find((x) => x.run_id === q.run_id)?.status, "failed");
+  assert.equal(store.getTask(q.run_id)?.error_code, "UNRECOVERABLE");
 });

@@ -9,6 +9,17 @@
 //   A.3 幂等：提交层 UNIQUE(client_submission_id) 同事务 catch；事件层 seq=MAX(seq)+1
 //       同步事务内分配；结果层 publications INSERT OR IGNORE
 //   A.4 恢复：deadline 首次 claim 固化；reapExpired 用同一条围栏条件 UPDATE 原子判定
+//
+// ---- 事件词表契约（冻结，spec §5 规范事件；T5 归一化/T7 编排/T8 SSE 共同遵守）----
+// events.type 只允许以下六类，payload 形状如下（JSON.stringify 后入库，读取一律 parse）：
+//   "stage"  → {stage: "queued|analyzing|querying|script_running|report_checking|repairing|publishing", text?}
+//              另含内部字段 attempt（接管/围栏自愈时的 claim 事件）
+//   "sql"    → {sql, rows, truncated, result_ref, elapsed_ms}
+//   "answer" → {markdown}                      最终回答（sessionHistory 摘要即取此）
+//   "report" → {path}                          发布后才有
+//   "error"  → {code, message}
+//   "done"   → {run_id, status, engine, elapsed_ms, tokens, recovered}
+// 词表扩充须先改 spec 再改此处——消费方（SSE 前端/历史注入）按 type 分派，私造类型即断线。
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -81,6 +92,7 @@ export interface ReapedTask {
 
 const FENCE = "run_id = ? AND attempt = ? AND lease_owner = ?";
 const LEASE_FREE = "(lease_owner IS NULL OR lease_expires_at IS NULL OR lease_expires_at < ?)";
+const WITHIN_BUDGET = "(deadline IS NULL OR deadline >= ?)";
 
 export class TaskStore {
   private db: Database.Database;
@@ -144,8 +156,9 @@ export class TaskStore {
 
   /**
    * 原子获权（A.1 L1）：单条条件 UPDATE——status='queued'，或 status='running' 但租约
-   * 已过期/无主（接管与 boot 自愈路径），且租约空闲才放行。rowcount 判定胜负；
-   * 成功时 attempt+1、deadline 首次固化（A.4）、同步写 stage_changed 事件
+   * 已过期/无主（接管与 boot 自愈路径），且租约空闲、未过 deadline（A.4 接管臂：超预算
+   * 任务不可被接管续跑，只能走 reaper 的 deadline 分支终态 failed）才放行。
+   * rowcount 判定胜负；成功时 attempt+1、deadline 首次固化（A.4）、同步写 stage 事件
    * （seq 在同一同步事务内 MAX(seq)+1 分配，A.3 事件层）。
    */
   claimLease(runId: string, workerId: string, ttlMs: number, budgetS: number): Lease | false {
@@ -156,12 +169,12 @@ export class TaskStore {
           `UPDATE tasks
            SET status='running', lease_owner=?, lease_expires_at=?,
                attempt=attempt+1, deadline=COALESCE(deadline, created_at + ? * 1000), updated_at=?
-           WHERE run_id=? AND status IN ('queued','running') AND ${LEASE_FREE}`,
+           WHERE run_id=? AND status IN ('queued','running') AND ${LEASE_FREE} AND ${WITHIN_BUDGET}`,
         )
-        .run(workerId, ts + ttlMs, budgetS, ts, runId, ts);
+        .run(workerId, ts + ttlMs, budgetS, ts, runId, ts, ts);
       if (r.changes === 0) return false;
       const attempt = this.getTask(runId)!.attempt;
-      this.insertEventUnfenced(runId, "stage_changed", { to: "running", attempt }, ts);
+      this.insertEventUnfenced(runId, "stage", { stage: "queued", to: "running", attempt }, ts);
       return { run_id: runId, attempt, lease_owner: workerId };
     })();
   }
@@ -282,6 +295,8 @@ export class TaskStore {
    *   cancel_requested → cancelled；attempt 达 maxAttempts 或 deadline<now → failed/UNRECOVERABLE；
    *   否则回 queued（lease 清空、stage 复位、attempt 不动，下次 claim 时 +1）。
    * 围栏含 lease_expires_at < now：过期瞬间被原主 heartbeat 续上的任务自动落空。
+   * 另处理 queued 且 deadline 已过的任务（接管臂拒 claim 后的僵尸收尾：boot 自愈回队
+   * 或回队后过预算——否则永久卡 queued 且堵死会话队首）→ failed/UNRECOVERABLE。
    */
   reapExpired(now: number, maxAttempts: number): ReapedTask[] {
     const expired = this.db
@@ -296,23 +311,42 @@ export class TaskStore {
       const overDeadline = t.deadline != null && t.deadline < now;
       const verdict: TaskStatus =
         t.cancel_requested === 1 ? "cancelled" : overLimit || overDeadline ? "failed" : "queued";
+      // 逐行事务包裹：围栏判定基于行快照（cancel_requested/deadline）与条件 UPDATE 必须
+      // 原子成立——未来第二连接场景下防止 requestCancel 落在 SELECT→UPDATE 窗口被清（取消丢失）。
+      const applied = this.db.transaction((): boolean => {
+        const r = this.db
+          .prepare(
+            `UPDATE tasks SET status=?, error_code=?, error_message=?, cancel_requested=0,
+                              lease_owner=NULL, lease_expires_at=NULL, stage=NULL, updated_at=?
+             WHERE ${FENCE} AND status='running' AND lease_expires_at < ?`,
+          )
+          .run(
+            verdict,
+            verdict === "failed" ? "UNRECOVERABLE" : null,
+            verdict === "failed" ? (overLimit ? "reaper: attempt 超限" : "reaper: deadline 已过") : null,
+            now,
+            t.run_id,
+            t.attempt,
+            t.lease_owner,
+            now,
+          );
+        return r.changes > 0;
+      })();
+      if (applied) out.push({ run_id: t.run_id, status: verdict });
+    }
+    // queued 且已过 deadline：接管臂使 claim 永远 false，此处是唯一终态出口
+    const zombies = this.db
+      .prepare("SELECT run_id FROM tasks WHERE status='queued' AND deadline IS NOT NULL AND deadline < ?")
+      .all(now) as { run_id: string }[];
+    for (const z of zombies) {
       const r = this.db
         .prepare(
-          `UPDATE tasks SET status=?, error_code=?, error_message=?, cancel_requested=0,
-                            lease_owner=NULL, lease_expires_at=NULL, stage=NULL, updated_at=?
-           WHERE ${FENCE} AND status='running' AND lease_expires_at < ?`,
+          `UPDATE tasks SET status='failed', error_code='UNRECOVERABLE',
+                            error_message='reaper: deadline 已过（queued）', updated_at=?
+           WHERE run_id=? AND status='queued' AND deadline < ?`,
         )
-        .run(
-          verdict,
-          verdict === "failed" ? "UNRECOVERABLE" : null,
-          verdict === "failed" ? (overLimit ? "reaper: attempt 超限" : "reaper: deadline 已过") : null,
-          now,
-          t.run_id,
-          t.attempt,
-          t.lease_owner,
-          now,
-        );
-      if (r.changes > 0) out.push({ run_id: t.run_id, status: verdict });
+        .run(now, z.run_id, now);
+      if (r.changes > 0) out.push({ run_id: z.run_id, status: "failed" });
     }
     return out;
   }
@@ -351,7 +385,7 @@ export class TaskStore {
       "SELECT payload FROM events WHERE run_id = ? AND type='sql' ORDER BY seq",
     );
     const answerStmt = this.db.prepare(
-      "SELECT payload FROM events WHERE run_id = ? AND type='final_answer' ORDER BY seq DESC LIMIT 1",
+      "SELECT payload FROM events WHERE run_id = ? AND type='answer' ORDER BY seq DESC LIMIT 1",
     );
     return tasks.map((t) => {
       // 失败任务仅保留问题文本（S2：模型知道问过什么、结果不可信）
@@ -364,7 +398,8 @@ export class TaskStore {
         }
       }
       const ansRow = failed ? undefined : (answerStmt.get(t.run_id) as { payload: string } | undefined);
-      const final_answer = ansRow ? (JSON.parse(ansRow.payload) as string) : null;
+      // spec §5：answer 事件 payload 形状为 {markdown}——摘要取 markdown 字段
+      const final_answer = ansRow ? ((JSON.parse(ansRow.payload) as { markdown?: string }).markdown ?? null) : null;
       return { run_id: t.run_id, question: t.question, status: t.status, result_refs: refs, final_answer };
     });
   }
