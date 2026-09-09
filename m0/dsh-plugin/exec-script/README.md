@@ -37,6 +37,8 @@ WORKDIR / RESULTS / ASSETS / RUNNER 全部来自 dsh 进程环境变量（会话
 | `M0_ASSETS_DIR` | 资产根（容器 /assets，只读；通常 = `skills/report-generator`） |
 | `M0_SANDBOX_RUNNER` | `run_in_sandbox.sh` 绝对路径 |
 | `M0_SANDBOX_BASH` | 可选，Git Bash exe（默认 `C:/Program Files/Git/bin/bash.exe`） |
+| `SANDBOX_RUN_ID` | 可选（M1 网关注入），设置后沙箱容器名为 `<run_id>-a<attempt>-<pid>`——接管者清理旧 attempt 容器不误杀新 attempt（附录 A.1）；未设置时容器用缺省名 |
+| `SANDBOX_ATTEMPT` | 可选，run 的 attempt 序号（缺省 0），仅在 `SANDBOX_RUN_ID` 设置时生效 |
 | `M0_PROJECT_SKILL_DIR` | 可选，cwd 不在仓库内时把项目 skill 目录（`<repo>/.dsh/skills`）显式指回（customSkillDirs，rank 300） |
 
 ## 安全复审后的会话形态（重要）

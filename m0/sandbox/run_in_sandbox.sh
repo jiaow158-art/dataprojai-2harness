@@ -6,6 +6,8 @@
 # 用法: RESULTS_DIR=... ASSETS_DIR=... bash run_in_sandbox.sh <workdir> <script> [args...]
 # 解释器: SANDBOX_INTERPRETER=bash 时用 bash 执行脚本，默认 python（M0-T13，
 # 供 dsh exec_script 工具插件复用；缺省行为与既有调用/红队完全一致）
+# 容器名: SANDBOX_RUN_ID=<run_id> [SANDBOX_ATTEMPT=<n>] 时容器名为
+#         <run_id>-a<n>-<pid>（M1 网关注入，见下方 CNAME 注释）；未设置时用缺省名
 set -euo pipefail
 WORKDIR="$(cd "$1" && pwd)"; SCRIPT="$2"; shift 2 || true
 # SCRIPT 默认相对 /workdir；以 / 开头则按容器内绝对路径执行。
@@ -35,7 +37,17 @@ winpath() { cygpath -w "$1"; }
 # 超时方案（实测 2026-09-08）：Git Bash 的 GNU timeout --signal=KILL 只能杀 docker CLI
 # 客户端，守护进程侧容器会残留继续跑（实测留下 Up 状态孤儿容器）——故给容器命名，
 # 退出后无条件 docker rm -f 兜底清理；正常路径 --rm 已移除，rm -f 为无害 no-op。
-CNAME="m0sandbox-$$-$(date +%s)"
+#
+# 容器名（M1-T6，附录 A.1 双活安全）：SANDBOX_RUN_ID（可选，M1 网关注入；dsh
+# exec_script 插件从宿主进程环境透传）存在时用 "${run_id}-a${attempt}-$$" 形态——
+# 接管者按 run_id + 旧 attempt 清理（docker rm -f <run_id>-a<旧attempt>-*）不会误杀
+# 新 attempt 的容器；$$ 兜底并发唯一。未设置时保持 M0 原名（m0sandbox-$$-<epoch>，
+# 红队脚本与既有调用不传新变量，行为完全不变）。SANDBOX_ATTEMPT 缺省 0。
+if [ -n "${SANDBOX_RUN_ID:-}" ]; then
+  CNAME="${SANDBOX_RUN_ID}-a${SANDBOX_ATTEMPT:-0}-$$"
+else
+  CNAME="m0sandbox-$$-$(date +%s)"
+fi
 RC=0
 timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   --network none \

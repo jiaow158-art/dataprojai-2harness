@@ -16,6 +16,7 @@
 // docs/cookbook/adding-a-tool.md 官方原文样例，dsh 0.1.2-rc.1）。
 
 import { spawn } from 'node:child_process'
+import { access } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -92,6 +93,52 @@ function appendCapped(prev: string, chunk: string): { text: string; capped: bool
 
 const TRUNCATION_MARKER = '\n[sandbox: output truncated at 2MB]'
 
+/**
+ * 脚本宿主侧存在性等待（M1-T6）：M0-T14 实测 write→exec_script 跨文件系统同步间隙
+ * （dsh fs write 落盘 vs 本插件读盘）导致"首调必失败、重试即恢复"，浪费模型轮次。
+ * 执行前对 workdir 拼出的最终宿主路径轮询 fs access：最多 2s、50ms 间隔；超时不报
+ * 新错——保持既有行为（沙箱内 python 报 file not found，文件级错误归沙箱层）。
+ * 与沙箱路径解析规则同源（run_in_sandbox.sh）：`/` 开头 = 容器内绝对路径（非 workdir
+ * 文件，如 /assets/scripts/build.py），无从等待，直接放行。
+ */
+const SCRIPT_WAIT_TIMEOUT_MS = 2_000
+const SCRIPT_WAIT_INTERVAL_MS = 50
+
+async function waitForScript(
+  workdir: string,
+  script: string,
+  signal: AbortSignal,
+): Promise<void> {
+  if (script.startsWith('/')) return // 容器内绝对路径（/assets/...），不归本插件等待
+  const hostPath = `${workdir.replace(/[\\/]+$/, '')}/${script}`
+  const deadline = Date.now() + SCRIPT_WAIT_TIMEOUT_MS
+  for (;;) {
+    try {
+      await access(hostPath)
+      return
+    } catch {
+      if (Date.now() >= deadline || signal.aborted) return
+      await new Promise((r) => setTimeout(r, SCRIPT_WAIT_INTERVAL_MS))
+    }
+  }
+}
+
+/**
+ * 沙箱容器名参数（M1-T6，附录 A.1 双活安全）：run_id/attempt 环境变量（可选，M1 网关
+ * 注入）存在时透传给 run_in_sandbox.sh，容器名带 attempt 后缀——接管者清理旧 attempt
+ * 容器（docker rm -f <run_id>-a<旧attempt>-*）不会误杀新 attempt 的容器。
+ */
+function sandboxRunIdEnv(): { SANDBOX_RUN_ID?: string; SANDBOX_ATTEMPT?: string } {
+  const runId = process.env.SANDBOX_RUN_ID
+  if (!runId) return {}
+  return {
+    SANDBOX_RUN_ID: runId,
+    ...(process.env.SANDBOX_ATTEMPT !== undefined
+      ? { SANDBOX_ATTEMPT: process.env.SANDBOX_ATTEMPT }
+      : {}),
+  }
+}
+
 /** 拉起 run_in_sandbox.sh，收集 stdout/stderr/退出码；exec.signal 贯穿子进程。 */
 function runSandbox(
   runner: string,
@@ -117,6 +164,7 @@ function runSandbox(
           ASSETS_DIR: assetsDir,
           SANDBOX_WORKDIR: workdir,
           SANDBOX_INTERPRETER: interpreter,
+          ...sandboxRunIdEnv(),
         },
       },
     )
@@ -216,6 +264,7 @@ export function apply(ctx: Context) {
       const violation = pathViolation(args.script)
       if (violation) throw new Error(violation)
       const interpreter = interpreterOf(args.language)
+      await waitForScript(workdir!, args.script, exec.signal)
       const res = await runSandbox(
         runner, workdir!, resultsDir!, assetsDir!,
         args.script, args.args ?? [], interpreter, exec.signal,
