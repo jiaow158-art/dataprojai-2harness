@@ -286,6 +286,8 @@ WHERE (special_general_ledger IS NULL OR special_general_ledger = '')
 11. **旧版 aging_f (31列) vs 新版 _2023_info_f (82列)**：新版账龄分段细得多，优先用新版
 12. **bf vs af 前缀**：`bf_*` = Before（截止日之前），`af_*` = After（截止日之后），在 `dm_ar_receivable_accage_t` 中成对出现
 13. **跨域表 DM_FIN_AR_NODEEXCEPTION_LTC_T（LTC 节点异常）**：以 `DM_FIN_AR_*` 命名但**实际不属于 AR 应收事实**，是 LTC（Lead Time to Cash）全流程 10 节点追踪表（2247万行），数据源全部来自 SDI 商机/合同/验收录/请款/签收等节点表。AR 域只通过 `dm_ar_analysis_rpt_f` 的 36 列 LTC 节点字段间接引用它（JOIN node_desc1~9 等）。**用户问"应收账款"不要查 LTC 表；问"LTC 周期/节点超期"才用此表，且需带 period_id_m 分区裁剪**
+14. **应收余额/逾期率存在两套口径，数字不可比**：同一个"集团应收余额"，账龄表白名单口径 = **33.63 亿 / 逾期率 68.4%**，分析报表自洽口径 = **18.11 亿 / 80.0%**（2026-08 实测）。回答前必须按第九节二选一并**声明所用口径**，两套数字不可混用、不可互相"纠错"
+15. **跨域表 dm_fin_operations_mix_sum_t 的 `calmonth='S'` 脏数据**：该表 `calmonth` 正常为 'YYYY-MM'，但存在 **38 行字面值 `'S'`**（2026-09-09 实测：这 38 行 `data_source` 恰也为 `'S'`、`ambperformance` 全 NULL；成因推测为 ETL 字段串位，**待业务/ETL 确认**）。危害：`MAX(calmonth)`、`GROUP BY calmonth`、最新账期判断都会被 `'S'` 污染（'S' 字典序大于所有 '20..' 开头账期，会占据 MAX）。安全写法：加 `calmonth LIKE '____-__'`（或 `calmonth ~ '^\d{4}-\d{2}$'`）排除。金额聚合因 ambperformance 为 NULL 不受影响，但行数统计会多 38。此表为销售/费用/应收多域共用的 mix 表，属跨域陷阱
 
 ---
 
@@ -298,3 +300,68 @@ WHERE (special_general_ledger IS NULL OR special_general_ledger = '')
 | 公司信息 | dwrdim.dwr_dim_company_d | comp_code / company_code |
 
 注：应收表中已有客户描述（`cust_name`/`debitor___t`），无需单独关联客户主数据。
+
+---
+
+## 九、应收余额与逾期率口径（两个口径二选一，必须声明）
+
+**何时读本节**：用户问"集团/公司目前应收多少"、"逾期率多少"、经营分析报告的应收 KPI——这是应收域**最容易踩坑的指标**，存在两套都正确但数字不可比的口径（2026-08 实测相差 15.5 亿）。
+
+### 9.1 两口径对比
+
+| | 口径 A：主营应收科目正余额口径 | 口径 B：分析报表自洽口径 |
+|---|---|---|
+| 表 | `dwrfin.dwr_ar_receivable_aging_2023_info_f` | `dm.dm_ar_analysis_rpt_f` |
+| 过滤 | `query_date='2026-08-31'`（YYYY-MM-DD）+ 6 科目白名单 + `local_currency_balance_sum>0` | `calmonth='2026-08'`（YYYY-MM），无科目/正负过滤 |
+| 应收余额 | **33.63 亿**（`SUM(local_currency_balance_sum)`） | **18.11 亿**（`SUM(receivables_am)`） |
+| 逾期金额 | 23.01 亿（`SUM(overdue_receivables)`） | 14.49 亿（`SUM(overdue_receivables)`） |
+| 逾期率 | **68.4%** | **80.0%**（=14.49/18.11，余额=逾期+未逾期 3.62，自洽） |
+| 自洽性 | 不自洽（余额不含负余额与挂账科目，逾期可>余额） | 自洽（`receivables_am = overdue + n_overdue`） |
+| 适用场景 | 与历史正式报告/月度经营分析口径对齐（历史 KPI 趋势系列如 33.76/33.63 亿即此口径）；需账龄分段下钻 | 分析报表类需求：按客户分类/风险等级/LTC 节点等多维分析；要求"余额=逾期+未逾期"数字自洽的场景 |
+
+### 9.2 口径 A SQL 骨架（2026-08-31 实测 33.63 / 23.01，逾期率 68.4%）
+
+```sql
+SELECT ROUND(SUM(local_currency_balance_sum)/100000000,2) AS balance_yi,
+       ROUND(SUM(overdue_receivables)/100000000,2)        AS overdue_yi
+FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
+WHERE query_date = '2026-08-31'          -- YYYY-MM-DD，月末快照日
+  AND general_ledger_account IN (        -- 6 科目白名单（主营应收）
+      '0011310100','0011310110','0011310300',
+      '0011310600','0011310700','0011310800')
+  AND local_currency_balance_sum > 0     -- 剔除负余额（贷方/冲销挂账）
+GROUP BY query_date
+```
+
+要点：
+- **科目白名单是本口径的灵魂**：该表实际有 7 个总账科目，白名单=全科目**剔除 `0011310200`**。
+- `query_date` 换月末日期即得历史各期：2026-07-31 = 33.76 亿、2026-06-30 = 34.70 亿（2026-09-09 实测复现）。注：金样报告趋势系列曾出现 37.90 亿（2026-06），本次同口径实测 06-30 为 34.70、06-02 为 22.99，均非 37.90，该期数值未能复现，**待业务确认**（可能对应已重算的历史快照）。
+- **⚠️ 必须加科目过滤**：不加时全科目余额约 70 亿且负值/挂账科目混入，逾期金额（283.58 亿，见下）远大于余额，完全不可用——不要"先查总再自己挑科目"。
+
+### 9.3 口径 B SQL 骨架（2026-08 实测 18.11 = 14.49 + 3.62，逾期率 80.0%）
+
+```sql
+SELECT calmonth,
+       ROUND(SUM(COALESCE(receivables_am,0))/100000000,2)        AS recv_yi,
+       ROUND(SUM(COALESCE(overdue_receivables,0))/100000000,2)   AS od_yi,
+       ROUND(SUM(COALESCE(n_overdue_receivables,0))/100000000,2) AS nod_yi
+FROM dm.dm_ar_analysis_rpt_f
+WHERE calmonth = '2026-08'               -- YYYY-MM
+GROUP BY calmonth
+```
+
+要点：
+- 自洽性校验式：`recv_yi = od_yi + nod_yi`（18.11 = 14.49 + 3.62），先跑校验再报数。
+- 该表 208 列，支持客户分类/风险等级/合同→回款全链路等多维下钻（见 ar-analysis-rpt.md）。
+
+### 9.4 分歧根因与已知事实
+
+两口径差异主要来自 `dwr_ar_receivable_aging_2023_info_f` 的科目 `0011310200`：该科目在该表呈现 ±300 亿级的挂账/互抵特征（2026-08-31 实测：余额 43.10 亿、逾期 283.58 亿、13.3 万行），且表内存在负余额行。口径 A 靠"白名单 + 正余额"把它排除掉，才得到与历史报告一致的 33.63 亿；口径 B 的 `receivables_am` 在 DM 层已按报表规则加工，天然不含该科目噪声。**注意：0011310200 的业务含义（暂挂/清算/内部往来科目？）知识库未掌握，白名单本身也是"从历史报告数值反推"得到——以上标注均待业务确认**。
+
+### 9.5 使用建议
+
+1. **回复时必须声明口径**（"应收余额 X 亿（口径 A/B，定义见…）"），两口径数值不可相加、相减、互相对表。
+2. 与历史报告/榜单对数 → 用口径 A；做自洽的多维分析或逾期结构拆解 → 用口径 B。
+3. 若用户坚持某个数字（如"我上次看到的是 33.63"），按用户给的数字反查其口径后沿用户口径走，不替业务裁决哪套"正确"。
+4. 科目白名单成员与 0011310200 的业务含义**待业务确认**；确认后更新本节。
+5. 关联跨域陷阱：多域共用的 `dm.dm_fin_operations_mix_sum_t` 存在 `calmonth='S'` 脏数据 38 行，处理方式见第七节第 15 条。
