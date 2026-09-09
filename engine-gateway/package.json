@@ -1,0 +1,7 @@
+{
+  "name": "engine-gateway",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/config/*.test.ts"
+  }
+}
