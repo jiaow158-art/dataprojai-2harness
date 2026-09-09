@@ -2,6 +2,9 @@
   "name": "engine-gateway",
   "type": "module",
   "scripts": {
-    "test": "node --test src/config/*.test.ts"
+    "test": "node --test src/config/*.test.ts src/store/*.test.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
   }
 }
