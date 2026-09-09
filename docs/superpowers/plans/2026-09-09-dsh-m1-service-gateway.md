@@ -19,6 +19,47 @@
 
 ---
 
+## 附录 A：四大机制的不变量与恢复矩阵（2026-09-09 用户审定后深化）
+
+> 用户裁定：M1 的核心不是"让 dsh 回答问题"（M0 已证），而是 **Agent 跑几小时、出一次错、断一次连、挂一次进程之后，任务系统依然知道：谁在干什么、做到哪里、谁还有执行权、最后只产生一个结果**。以下四组不变量是 Task 4/5/7/9 的实现依据与验收标准。
+
+**A.0 总原则**：所有真相在 SQLite（单库、单连接、WAL）；所有状态迁移都是**带围栏的条件写**；副作用安全靠"唯一命名 + 围栏发布"，而非"避免并发"。
+
+### A.1 Lease 执行权
+
+- **L1 唯一执行者**：任一时刻一个 run_id 至多一个有效执行者。每次获权 `attempt+1`；执行者的全部状态写（stage/status/event/heartbeat）都走围栏条件写 `WHERE run_id=? AND attempt=? AND lease_owner=?`——rowcount=0 即被围栏：立即 kill 自己的 dsh 进程树（连带 MCP 子进程与沙箱容器）并静默退出，不写任何补偿记录。
+- **L2 心跳解耦**：租约 TTL（默认 90s）>> 心跳间隔（15s）；worker（Node 侧）活着就续租，与 dsh/模型是否静默无关——几小时的报告任务不会因模型长时间不出字而丢执行权。
+- **启动自愈（单服务部署不变量）**：网关 boot 时 `UPDATE tasks SET lease_owner=NULL WHERE status='running'`——单服务部署下旧 worker 必死，强制过期是安全的。**多实例部署此假设失效，记为部署红线**。
+- **围栏后旧 attempt 的副作用安全性（"最后只一个结果"的构造性保证）**：DWS 只读无害；result 文件名含 pid+时间戳（M0 已定型）天然不冲突；沙箱容器名带 `<run_id>-a<attempt>`（Task 6 落实）使接管者清理不会误杀新 attempt；报告发布唯一经 publications 围栏写入——四类副作用在双活窗口内全部安全。
+- **Reaper**：pool 每轮扫描 running 且租约过期的任务，用同一条围栏条件 UPDATE 原子判定：cancel_requested → cancelled；attempt 达 MAX_REPAIR_ROUNDS 或过 deadline（created_at+TASK_BUDGET_S）→ failed/UNRECOVERABLE；否则回 queued（attempt 不动，下次 claim 时 +1）。
+
+### A.2 Session 串行
+
+- **S1 串行不变量**：同 session 内前一任务到达终态前，后一任务不可 running——listRunnable 过滤与 reap 回队路径都必须满足（后一任务的等待者能看到 queued 状态而非死等）。
+- **S2 历史事实源在网关**：attempt>0 或跨进程恢复时，注入**本会话全部已成功任务**的（问题 + 最终回答摘要 + result_ref 清单）+ **失败任务的问题文本**（模型知道问过什么、结果不可信）。网关事件表是历史唯一事实源，**不依赖 dsh 进程内会话记忆**——这使网关重启后恢复不赌 dsh 的行为。
+- **S3 开放问题（Task 5 前置 spike，必须先测再写）**：dsh SDK 同 sessionId **跨进程重启**是否从 session.jsonl.zstd 恢复历史？无论结论如何 S2 的网关侧注入都实施——spike 结论只决定注入的冗余度（dsh 侧若自恢复则注入可精简为 result 清单；若不恢复则需含回答摘要）。禁止臆测，实测记录进 m0/findings/dsh-api.md §5。
+
+### A.3 幂等
+
+- **提交层**：client_submission_id 唯一约束；并发重复提交的 INSERT 冲突在同一事务内 catch 并 SELECT 返回原 run_id。
+- **结果层（恰好一次发布）**：发布顺序强制 = 先写 publications、后翻 status=succeeded；两步之间崩溃由恢复路径先查 publications 兜底 → 崩溃安全的单次发布。publications 主键 run_id，INSERT OR IGNORE。
+- **事件层**：seq 由单 SQLite 连接同步事务内 `MAX(seq)+1` 分配（better-sqlite3 同步调用天然原子单调）；SSE 重放 = listEvents(afterSeq)，客户端按 seq 去重。
+- **取消与完成竞态**：终态写入是围栏条件写，先到先得，败者写被拒，done 事件 status 以胜者为准。cancel 请求只置 `cancel_requested` 标志（无执行权者不直接写终态），由 lease 持有者在下一个事件边界或 reaper 在租约过期时落地。
+
+### A.4 恢复矩阵（谁发现 × 动作 × 去向）——Task 7 实现与 Task 9 验收的对照表
+
+| 故障 | 发现者 | 动作 | 去向 |
+|---|---|---|---|
+| dsh 子进程死亡（API 持续故障/崩溃） | worker（exit 事件） | attempt<MAX 且未过 deadline → 新 attempt：同 session、注入已有 result_ref 清单（**不重查数**，spec §9"复用已保存查询结果"）；超限 | failed/UNRECOVERABLE |
+| 网关进程死亡 | boot 自愈（A.1 L2'） | 强制过期全部 running 租约 → queued → 走恢复路径 | succeeded/failed（保历史） |
+| worker 停滞（lease 过期被接管） | 新执行者/reaper | 旧执行者下一次写被围栏 → kill 自身进程树退出 | 双活窗口副作用安全（A.1） |
+| 发布后崩溃（publications 已写、status 未翻） | 恢复路径第一步 | 读 publications → 直接置 succeeded，**不重跑** | succeeded |
+| cancel 与完成同时到达 | 围栏终态写 | 先到先得，败者被拒 | 单一终态 + done.status=胜者 |
+| 凭据无效/权限不足 | worker（错误分类识别） | 不走 attempt（重试无意义） | failed/CONFIG |
+
+- **MAX_REPAIR_ROUNDS 语义** = 基础设施故障的 attempt 总上限（默认 3）；模型会话内自纠（M0 实证 7 次）发生在单个 attempt 内部，不占 attempt。
+- **TASK_BUDGET_S** = 跨 attempt 总预算；`deadline` 列首次 claim 时固化，claim 与 heartbeat 时检查。
+
 ## Phase A — M1 前置与地基
 
 ### Task 1: ar-knowledge 应收口径沉淀（L1，知识库维护）
@@ -127,7 +168,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   status TEXT NOT NULL,                -- queued|running|succeeded|failed|cancelled
   stage TEXT,                          -- queued|analyzing|querying|script_running|report_checking|repairing|publishing
   attempt INTEGER NOT NULL DEFAULT 0,  -- 执行尝试编号（D15 接管规则）
-  lease_expires_at INTEGER,            -- 执行租约（旧实例失权判定）
+  lease_owner TEXT, lease_expires_at INTEGER,  -- 执行租约（A.1：owner+attempt 围栏）
+  cancel_requested INTEGER NOT NULL DEFAULT 0, -- 取消标志（A.3：无执行权者只置标志）
+  deadline INTEGER,                    -- created_at+TASK_BUDGET_S，首次 claim 固化（A.4）
   error_code TEXT, error_message TEXT,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
   UNIQUE(client_submission_id)
@@ -146,9 +189,9 @@ CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
 - [ ] **Step 2: task-store 接口与实现（node:test TDD：先写测试）**
 
-接口：`createTask`（幂等：同 client_submission_id 返回原 run_id）、`getTask`、`updateStage/status`、`appendEvent`（seq 严格递增）、`listEvents(runId, afterSeq)`、`recordPublication`（INSERT OR IGNORE——二次发布静默拒绝并返回既有记录）、`claimLease(runId, workerId, ttlMs)`（原子 UPDATE ... WHERE lease 过期或无主，返回是否获权——D15 接管核心）、`heartbeat`、`listRunnable`（queued 且同 session 无 running——同会话串行 D14）。
+接口（全部围栏条件写，见附录 A）：`createTask`（幂等：同 client_submission_id 返回原 run_id）、`getTask`、`fencedWrite`（内部：UPDATE ... WHERE run_id=? AND attempt=? AND lease_owner=?，rowcount=0 即失权信号）、`updateStage/status`（经 fencedWrite）、`appendEvent`（seq=MAX(seq)+1 同步事务分配，经 fencedWrite）、`listEvents(runId, afterSeq)`、`recordPublication`（INSERT OR IGNORE——二次发布静默拒绝并返回既有记录）、`claimLease(runId, workerId, ttlMs)`（原子 UPDATE ... WHERE lease 过期或无主 AND status='queued'，成功时 attempt+1、deadline 固化，返回是否获权——A.1 核心）、`heartbeat`（经 fencedWrite 续租）、`requestCancel`（只置 cancel_requested 标志，A.3）、`reapExpired`（附录 A.1 Reaper：围栏条件 UPDATE 原子判定 cancel/超限/回队）、`listRunnable`（queued 且同 session 无 running——A.2 S1，含 reap 回队路径满足）。
 
-测试用例至少覆盖：幂等创建、事件 seq 递增与 afterSeq 重放、双 worker 竞争 claimLease 只一胜、publication 二次记录被拒、同会话第二任务不进 listRunnable 直到首个终态。
+测试用例至少覆盖（附录 A 验收）：幂等创建（含并发重复提交）；事件 seq 递增与 afterSeq 重放；双 worker 竞争 claimLease 只一胜；**围栏写**：worker B 接管后 worker A 的 heartbeat/updateStage 被拒（rowcount=0）；publication 二次记录被拒；同会话第二任务不进 listRunnable 直到首个终态；**Reaper 三分支**：租约过期+cancel_requested→cancelled、attempt 达上限→failed/UNRECOVERABLE、否则回 queued；cancel_requested 与围栏终态写的竞态先到先得。
 
 - [ ] **Step 3: 跑测试 → 提交**
 
@@ -166,11 +209,15 @@ git add engine-gateway/src/store/ && git commit -m "feat(m1): 任务模型与SQL
 - Create: `engine-gateway/src/backends/dsh-events.ts`（归一化）
 - Test: `engine-gateway/src/backends/dsh-backend.test.ts`
 
+- [ ] **Step 0: S3 spike——dsh SDK 同 sessionId 跨进程重启是否恢复历史（必须先测再写）**
+
+`dsh --profile sdk` 会话 A 问一题（拿到事实 X）→ 正常 shutdown → **新进程**同 sessionId 再问"我上一问问了什么"。三种结局都记录进 m0/findings/dsh-api.md §5 并定注入冗余度：完整恢复（回答含 X→注入可精简）/ 部分恢复 / 不恢复（→A.2 S2 全量注入必需）。**禁止臆测。**
+
 - [ ] **Step 1: DshSdkClient（对 T16 60 行驱动客户端的产品化）**
 
 - spawn `dsh --profile sdk`（cwd=任务 workdir，env 注入 M0_* 四变量 + DWS 凭据 + DEEPSEEK_API_KEY）
 - JSON-RPC stdio：initialize → `session/prompt`（sessionId=逻辑会话的持久 id：`gw-<session_id>`）→ 订阅 `session.event` 通知 → `turn/end` resolve
-- 超时与 cancel：prompt 级超时（TASK_BUDGET_S）发 SDK 取消（若无取消方法则 kill 子进程树——按 SDK 实测补），进程死亡检测（exit 事件 → 拒绝 pending promise）
+- 超时与 cancel：prompt 级超时（TASK_BUDGET_S）发 SDK 取消（若无取消方法则 kill 子进程树——按 Step 0 spike 一并实测），进程死亡检测（exit 事件 → 拒绝 pending promise）
 - **单测不打真 dsh**：mock 子进程（fake stdin/stdout 按协议回放预制事件序列——用 T16 会话的真实事件结构做 fixture）
 
 - [ ] **Step 2: 事件归一化 dsh-events.ts**
@@ -229,19 +276,19 @@ git commit -m "fix(m0-plugin): exec_script存在性等待—消write→exec同�
 - Create: `engine-gateway/src/orchestrator/task-runner.ts`
 - Test: `engine-gateway/src/orchestrator/task-runner.test.ts`
 
-- [ ] **Step 1: TaskRunner 状态机（spec §5 流水线 + §9 恢复表）**
+- [ ] **Step 1: TaskRunner 状态机（spec §5 流水线 + §9 恢复表；不变量与恢复矩阵见附录 A）**
 
 职责（对单个 run_id）：
-1. claimLease 获权 → attempt+1 → stage=running
-2. **恢复入口**：attempt>0 时先查 publications（已发布→直接置 succeeded，不重跑——D15）；装载逻辑会话历史（前序任务事件 + 已有 result 文件清单）注入新会话首条 prompt 前缀（D14：历史在出队时读取）
-3. 驱动 DshBackend.ask()：归一化事件 → appendEvent（SQLite）→ 同时喂 SSE 广播器
-4. 阶段化重试（MAX_REPAIR_ROUNDS 内）：引擎进程死亡/网络类 → **新 attempt**（携带已有结果续跑，不是从零）；SQL/脚本错误 → 不重试（模型在会话内自纠，M0 已实证 7 次自纠错）——重试只针对基础设施故障
-5. 终态三分类（succeeded/failed/cancelled）+ done 事件带 status
-6. 报告发布：产物从 workdir 拷贝到 `reports/<user>/`（发布检查：HTML 非空 + 无外链 CDN——复用 compare_report.py 的检查逻辑改写为 TS）→ recordPublication（幂等）
+1. claimLease 获权（attempt+1、deadline 固化）→ stage=running；此后**一切状态写经 fencedWrite**（失权即 kill 自身 dsh 进程树并静默退出——A.1 L1）
+2. **恢复入口**（attempt>0）：①先查 publications（已发布→直接置 succeeded，不重跑——A.4）；②注入历史（A.2 S2：本会话全部已成功任务的问题+回答摘要+result_ref 清单，失败任务仅问题文本）到新会话首条 prompt 前缀；③S3 spike 结论决定注入冗余度
+3. 驱动 DshBackend.ask()：归一化事件 → appendEvent（围栏写）→ 同时喂 SSE 广播器；检查点=每个事件（无额外快照机制——事件表即保存点）
+4. 阶段化重试（按附录 A.4 矩阵）：dsh 子进程死亡/网络类基础设施故障 → 新 attempt（同 session 续跑，注入已有 result_ref 清单，不重查数）；SQL/脚本错误 → 不占 attempt（模型会话内自纠，M0 实证）；凭据类 → 直接 failed/CONFIG 不重试；cancel_requested → 在事件边界落地 cancelled
+5. 终态三分类（围栏条件写先到先得）+ done 事件带 status；**发布顺序 = 先 recordPublication 后翻 succeeded**（A.3 结果层）
+6. 报告发布：产物从 workdir 拷贝到 `reports/<user>/`（发布检查：HTML 非空 + 无外链 CDN）→ recordPublication（幂等）；沙箱容器名含 `<run_id>-a<attempt>`（接管清理不误杀——A.1）
 
-- [ ] **Step 2: 单测（mock Backend）**
+- [ ] **Step 2: 单测（mock Backend；用例覆盖附录 A.4 恢复矩阵每一行）**
 
-用例：正常完成流（事件全落库+done）；中途 kill 子进程（模拟进程死亡）→ 新 attempt 从保存点续（断言 publications 查询与历史注入调用）；已发布后恢复（不重跑直接 succeeded）；MAX_REPAIR_ROUNDS 超限 → failed/UNRECOVERABLE + 保留记录；cancel 请求 → cancelled 终态。
+正常完成流（事件全落库+done+发布顺序断言）；dsh 子进程死亡（A.4 行1：attempt<MAX 新 attempt 续跑注入 result_ref、超限 failed/UNRECOVERABLE）；网关重启恢复（行2：boot 自愈后 queued→恢复路径）；worker 停滞被接管（行3：旧 worker 围栏写被拒后 kill 自身进程树——用 mock 子进程断言 kill 调用）；发布后崩溃（行4：不重跑直接 succeeded）；cancel 与完成竞态（行5：先到先得单一终态）；凭据无效（行6：直接 failed/CONFIG 零 attempt 消耗）。
 
 - [ ] **Step 3: 跑测试 → 提交**
 
@@ -295,14 +342,15 @@ git add engine-gateway/src/server/ && git commit -m "feat(m1): HTTP/SSE服务层
 
 起网关（环境：DWS 凭据 + DEEPSEEK_API_KEY + GW_WORKROOT）→ HTTP 提交金样域的一个真实问题（inventory 简单题，eval 场景原文）→ SSE 收全套事件 → 终态 succeeded → 产物落位。记录耗时与事件数。
 
-- [ ] **Step 2: 故障注入四发（spec §11.4 固定用例映射）**
+- [ ] **Step 2: 故障注入五发（spec §11.4 固定用例 + A.1 双活窗口）**
 
 1. **提交响应丢失重试**：客户端不读响应重发同 client_submission_id → 断言同 run_id、无重复任务
 2. **工作进程退出接管**：running 中 kill 网关进程（模拟）→ 重启 → 断言新 attempt 接管、无双实例（lease 机制）、任务最终 succeeded
 3. **发布前后中断**：报告已 recordPublication 但任务未终态时重启 → 断言不重复发布、直接 succeeded
 4. **SSE 断线重连**：中途断开 → 重连带 Last-Event-ID → 断言事件无丢失无重复（前端按 seq 去重语义）
+5. **双活窗口（附录 A.1 构造性验证）**：人为冻结 worker A 心跳使其租约过期 → worker B 接管开跑 → 解冻 A：断言 A 的下一次状态写被围栏拒绝、A kill 自身进程树、最终**唯一**产物（publications 仅一条、reports/ 无第二副本、事件流无 A 的 attempt-1 重复段）
 
-每发：注入方式/观察/判定 PASS-FAIL 记入 e2e-faults.md。**这四发就是 M1 放行条件"可恢复故障用户无需手动接续"的证明材料。**
+每发：注入方式/观察/判定 PASS-FAIL 记入 e2e-faults.md。**五发全部 PASS = M1 放行条件"可恢复故障用户无需手动接续 + 只产生一个结果"的证明材料。**
 
 - [ ] **Step 3: 提交**
 
