@@ -493,6 +493,48 @@ export function apply(ctx: Context) {
 T16（多轮）结论：程序化多轮走 **SDK session_id 复用**或 **ACP session/resume**；headless 单发模式无 resume；
 会话文件为 zstd 压缩 JSONL，可离线解析（Python `zstandard` 库实测可解）。
 
+### 5.5 S3 跨进程恢复 spike（M1-T5 实测，2026-09-09）
+
+**问题**（M1 计划附录 A S3 开放问题）：dsh SDK 同 sessionId 跨进程重启（进程 A shutdown → 全新
+spawn 进程 B）是否从 session.jsonl.zstd 恢复历史？这决定 A.2 S2 网关侧注入的冗余度。
+
+**驱动形态**（照抄 T16 §2 已验证方式）：`spawn("dsh.cmd", ["--profile","sdk"], {shell: win32})` +
+stdio JSON-RPC（initialize → session/prompt → 等 turn/end → shutdown）；env 注入 M0_SANDBOX_RUNNER /
+M0_SANDBOX_WORKDIR / M0_RESULTS_DIR / M0_ASSETS_DIR / M0_PROJECT_SKILL_DIR / RESULT_DIR。
+cwd=`D:\m0-sessions\m1t5\workdir2`（Temp 树外）。
+
+**结论：不恢复（三选一之"不恢复"）——且比"不恢复"更强：跨进程复用同 sessionId 直接报错。**
+
+| 进程 | sessionId | 提问 | turn/end | 终文 |
+|---|---|---|---|---|
+| A | `s3-spike-2` | "我的代号是 PX-77，记住它…" | `{"kind":"completed"}`（84 事件中 23 个推送，23s） | "已记住。" |
+| B（全新 spawn） | 同 `s3-spike-2` | "我的代号是什么？" | `{"kind":"error","error":{"message":"session \"s3-spike-2\" already has a persisted log on disk that does not match this live session (id collision)","code":"UNKNOWN"}}` | （无） |
+| C（再次复验） | 同 `s3-spike-2` | 同 B | 同 id collision 错误，**确定性拒绝** | （无） |
+
+- 会话落盘证据：`~/.dsh/sessions/--D-m0-sessions-m1t5-m0-sessionsm1t5workdir2--/s3-spike-2/session.jsonl.zstd`
+  （22 事件，仅进程 A 的一问一答；进程 B 的错误 turn **未**追加进该文件）。
+- 机制解释（源码佐证，dsh-sdk-jsonrpc-server lib/index.js）：服务端 `getOrCreateSession` 是**纯内存
+  Map**（`this.sessions`），重启即空；同 id 再 prompt 会 `agents.create` 新 agent → 持久层发现磁盘上
+  已有同 id 会话日志但与活会话头不匹配 → 判 id collision 拒绝。**"持久化以 id 为键"成立，但
+  "跨进程按 id 恢复"协议层不存在**（对比 §5.2：ACP 面才有显式 `session/resume`）。
+- 前置事实（失败试跑归因，前代理现场 `/d/m0-sessions/m1t5/`）：spawn 时**不注入 M0_* 环境变量** →
+  m0-exec-script 插件 apply 抛 `M0_SANDBOX_RUNNER is not set` → 插件树加载失败 → initialize 应答
+  `-32603: cannot create effect on inactive context`。T16 当时能跑通是因为在已注入变量的 shell 里
+  手工驱动。**M1 网关 spawn 必须全量注入 M0_ 五变量 + RESULT_DIR + DWS_*/DEEPSEEK_API_KEY。**
+  另：前代理 spike 脚本 JS 字符串路径写成单反斜杠（`"D:\m0-sessions\..."` → `\m` 转义损坏），
+  与 T16 §6 首跑同款错误，两次踩坑记录在案。
+
+**SDK 取消机制结论：无 cancel/interrupt 方法——kill 进程树。**
+协议 types.d.ts（dsh-sdk-protocol lib/types/types.d.ts）`HarnessSdkRequestMap` 仅三方法：
+`initialize` / `session/prompt` / `shutdown`；服务端 `handleRequest` switch 同集，未知方法抛
+`unknown DeepSeek Harness SDK runtime method`。传输层 `request(method, params, signal?)` 的
+AbortSignal 仅客户端侧放弃等待（移除 pending），**不终止服务端 turn**。→ M1 超时/取消语义 =
+`taskkill /T /F`（Windows）等价 killTree，跨进程封装；turn 级优雅取消协议面不存在。
+
+**对 A.2 S2 注入的裁定：全量注入必需**（问题 + 回答摘要 + result_ref 清单）；dsh 侧跨进程零自恢复，
+不存在"精简为 result 清单"的选项。网关侧 sessionId 每次进程重启必须换新 id（错误恢复重试 =
+新 sessionId + S2 注入历史），禁止跨 spawn 复用。
+
 ---
 
 ## 6. 模型配置

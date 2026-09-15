@@ -1,0 +1,2045 @@
+[
+ {
+  "type": "turn/start",
+  "seq": 4,
+  "time": 1788921447028,
+  "data": {
+   "turn": 1
+  }
+ },
+ {
+  "type": "step/start",
+  "seq": 6,
+  "time": 1788921447244,
+  "data": {
+   "turn": 1,
+   "step": 1
+  }
+ },
+ {
+  "type": "assistant/message",
+  "seq": 166,
+  "time": 1788921450135,
+  "data": {
+   "turn": 1,
+   "step": 1,
+   "message": {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "The user is asking to analyze \"2024年Q3各事业部库存跌价准备金额\" (Inventory devaluation provision amounts by business division in 2024 Q3).\n\nThis clearly matches the invento …[TRUNC]"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_00_rtBpMLiYyHUxBowSj73k1577",
+      "name": "skill",
+      "arguments": "{\"name\": \"inventory-analyst\"}"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_01_T8nUN3bsam1ggo0vDkRa6514",
+      "name": "skill",
+      "arguments": "{\"name\": \"inventory-knowledge\"}"
+     }
+    ],
+    "source": {
+     "kind": "model",
+     "provider": "deepseek-official",
+     "model": "deepseek-v4-flash"
+    },
+    "id": "471f02fc-7925-4591-b0f2-d91e4d897c82"
+   },
+   "usage": {
+    "inputTokens": 8108,
+    "outputTokens": 197,
+    "totalTokens": 8305,
+    "cacheReadTokens": 0,
+    "reasoningTokens": 119
+   }
+  },
+  "sourceEventSeqs": [
+   [
+    13,
+    165
+   ]
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 167,
+  "time": 1788921450136,
+  "data": {
+   "turn": 1,
+   "step": 1,
+   "callId": "call_00_rtBpMLiYyHUxBowSj73k1577",
+   "name": "skill",
+   "arguments": "{\"name\": \"inventory-analyst\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 168,
+  "time": 1788921450150,
+  "data": {
+   "turn": 1,
+   "step": 1,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_00_rtBpMLiYyHUxBowSj73k1577"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_00_rtBpMLiYyHUxBowSj73k1577",
+      "content": [
+       {
+        "type": "text",
+        "text": "<skill_content name=\"inventory-analyst\">\n<skill_resources>\nBase directory for this skill: D:\\dataprojai-2harness\\skills\\inventory-analyst\nResolve relative paths mentioned by this skill against the base directory before using them. Load referenced resources only as needed.\n</skill_resources>\n\n<skill_instructions>\n# 库存仓储分析 — 工作流程\r\n\r\n## 角色\r\n\r\n你是一位资深仓储数据分析师，熟悉 SAP MM/WM 模块和公司数仓 DWS (GaussDB) 体系。\r\n在回答任何库存相关问题前，先按以下流程执行，不要跳过步骤。\r\n\r\n## 分析流程（6 步法）\r\n\r\n### 第 1 步：澄清需求\r\n\r\n库存问题天然有歧义。在动手查数据之前，确认以下信息：\r\n\r\n| 要澄清的 | 示例 |\r\n|---|---|\r\n| 时间范围 | \"当前库存\"是指最新快照还是某个月末？月末用 `calmonth`，最新用 `dw_last_update_date` |\r\n| 口径定义 | \"库存\"指数量/面积/金额？(quantity / area / zsjkcje) |\r\n| 库龄口径 | 标准(wbzq/ybzq，无/有保质期) / 协议单价(xydj) / 阿米巴(*_aging) / 自然日历(zrzlcp_)？默认标准 |\r\n| 组织范围 | 哪个工厂(plant/werks)？哪个库存地点(stor_loc)？哪个产区(product_area)？ |\r\n| 物料范围 | 哪些物料组(matl_grp) / 产品层次(zprodh) / 品类(cat)？ |\r\n| 对比基准 | 环比？同比？与安全库存对比？ |\r\n\r\n**关键问题清单**：\r\n- \"库存口径：是按数量 (quantity)、面积 (area) 还是金额 (zsjkcje)？\"\r\n- \"库龄口径：标准 wbzq/ybzq 还是其他（协议单价/爱米巴/自然日历）？\"\r\n- \"时间口径：月末快照 (calmonth) 还是最新数据 (dw_last_update_date)？\"\r\n- \"组织范围：哪些工厂/产区/库存地点？\"\r\n\r\n### 第 2 步：定位数据源\r\n\r\n**必须先读语义层** `inventory-knowledge/references/metrics.md`，按决策树选择表。\r\n\r\n| 问题类型 | 首选用表 | 决策依据 |\r\n|---|---|---|\r\n| 库存明细（物料+批次+工厂） | `dm.dm_fin_stock_detail_accage_t_2023` | 183列，1.44亿行，最全 |\r\n| 库龄分析/资金占压 | `dm.dm_fin_stock_detail_accage_t_2023` | 多维度库龄分段，183列 |\r\n| 库龄月汇总 | `dm.dm_rpt_stock_age_month_ct` | 57行，预汇总 |\r\n| 在途库存 | `dm.dm_b1_transit_inventory_t` | 唯一有 deliver/pur 区分 |\r\n| 全类型库存（可用/冻结/质检） | `dm.dm_wm_all_type_stock_t` | 14种库存数量+7种面积 |\r\n| 仓库库存快照（简版） | `dm.dm_dp_api_warehouse_stock` | 9列简表，FineReport 用 |\r\n| CXC 日报/出入库趋势 | `dm.dm_rpt_wm_cxc_day_sum` | 按天粒度，172万行 |\r\n| 产品出入库汇总 | `dm.dm_product_inout_stock_t` | 按月，99万行 |\r\n| 含金额的出入库（湖南） | `dm.dm_original_product_inout_stock_hunan_t` | 31列，含成本中心/金额 |\r\n| 库存月报统计 | `dm.dm_otd_wm_stock_stat_month_t` | 按库龄段+品类 |\r\n| 安全库存 | `dm.dm_safestock_all_stock` / `_avil_stock` / `_no_deliver` | 三张配套表 |\r\n| 缺货超期 | `dm.dm_dp_api_stockout_oudue` | 按销售区域 |\r\n| 低周转/残次品出库 | `dm.dm_wm_low_turnover_stockout_detail_t` / `_defective_product_` | 凭证级明细 |\r\n| 库存周转率 | `dm.dm_otd_wm_stock_turnover_m` | 预计算，40行 |\r\n| 存货跌价/减值（内部口径，默认管理族） | `dm.dm_fin_stock_detail_accage_t_2023` | `jchj_amt`/`wbzq_*_fall_amt` 计提 0/10/40/70%+保质期 70/100%；阿米巴族 `jchj_aging`/`*_fall_aging`，calmonth=YYYYMM |\r\n| 管理减值/线组分摊 | `dm.dm_ambv2_chdj_grp_t` | stat_month=YYYY-MM，inventory_value=管理减值（非库存价值） |\r\n| 库存资金成本 | `dm.dm_fin_stock_capital_cost_t` | month=YYYYMM，可为负，滚动窗口近2年 |\r\n\r\n### 第 3 步：应用标准过滤\r\n\r\n每条查询都必须带时间过滤。大表不带时间会全表扫描：\r\n\r\n```sql\r\n-- dm_fin_stock_detail_accage_t_2023：calmonth YYYYMM (1.44亿行，必须带 calmonth)\r\nWHERE calmonth = '202606'\r\n\r\n-- dm_b1_transit_inventory_t：doc_month YYYY-MM，排除预测\r\nWHERE doc_month = '2026-06'\r\n\r\n-- dm_rpt_wm_cxc_day_sum：stat_date YYYYMMDD\r\nWHERE stat_date BETWEEN '20260601' AND '20260606'\r\n\r\n-- 低周转/残次品表：voucher_post_date 是 timestamp\r\nWHERE voucher_post_date >= '2026-01-01'\r\n\r\n-- 产品出入库表：start_month YYYYMM\r\nWHERE start_month = '202606'\r\n```\r\n\r\n### 第 4 步：自检审查\r\n\r\n生成 SQL 后，逐条检查：\r\n\r\n- [ ] 时间字段格式：calmonth='202606' (YYYYMM) / doc_month='2026-06' (YYYY-MM) / stat_date='20260606' (YYYYMMDD)？\r\n- [ ] 物料字段：用的是 `material` (SAP风格，`___t`描述) 还是 `material_num` (新风格，`_name`描述)？\r\n- [ ] 规格字段：`dm_product_inout_stock_t` 中是 `dimension_`（有下划线后缀），其他表是 `dimension`？\r\n- [ ] 大表（1.44亿行账龄表）是否带了 calmonth 过滤？\r\n- [ ] 在途库存是否排除了 doc_month > 当前月的预测数据？\r\n- [ ] 库龄口径是否与用户要求一致（默认用标准 wbzq/ybzq 金额版，wbzq=无保质期/ybzq=有保质期）？\r\n- [ ] 工厂字段：用的是 `plant` 还是 `factory_werks_code`（不同表命名体系不同）？\r\n- [ ] 选用的表是主表还是备份表？（`_tmp`、`_0630`、`_bak` 后缀的绝对不能用）\r\n\r\n### 第 5 步：对抗性审查（Adversarial Review）\r\n\r\n**这是最关键的一步。此步骤的缺失会导致 ~6% 准确率损失。**\r\n\r\n在输出结果之前，扮演\"质疑者\"角色，逐条挑战自己刚才生成的 SQL 和结论：\r\n\r\n**A. 数据源选择是否正确？**\r\n- [ ] 有没有其他表也能回答这个问题？如果有，两张表的结果应该一致吗？\r\n- [ ] `dm_fin_stock_detail_accage_t`（91列，旧表）vs `_2023`（183列，完整版）？必须用 `_2023`\r\n- [ ] 选用的表是主表还是备份表？（`_tmp`、`_0630`、`_20240326` 后缀的表绝对不能用）\r\n- [ ] 如果用户的问题涉及\"预算\"/\"预测\"，库存域是否有对应数据？（在途库存 `doc_month` 含未来月份）\r\n\r\n**B. 业务概念映射是否唯一？**\r\n- [ ] \"库存\"在当前语境下到底指什么？（quantity / area / zsjkcje / available_inventory_quantity？）\r\n- [ ] \"工厂\"是用 `plant` 还是 `factory_werks_code`？不同表命名体系完全不同\r\n- [ ] \"物料\"是用 `material`（SAP风格）还是 `material_num`（新风格）？\r\n- [ ] 用户说的\"库龄\"是指无保质期产品库龄(wbzq，按批次日期 6/12/24月)还是有保质期到期口径(ybzq)？金额/数量/面积哪个版本？\r\n- [ ] \"出入库\"是按面积（CXC日报口径）还是按数量（inout_stock 口径）？\r\n- [ ] \"跌价/减值\"用词：内部管理口径（jchj_amt，默认）还是阿米巴口径（jchj_aging，配 Mix/销售侧）还是线组分摊（CHDJ inventory_value）？多套体系禁止混用；上市口径表非默认（仅用户明确要求且须声明口径）\r\n- [ ] \"资金成本\"负值是否已解释（低于202012基线的公式结果，非数据错误）？CHDJ 维度要金额是否用了 capital_cost_conv 而非原始列（原始列 SUM 会放大反号）？\r\n\r\n**C. 过滤条件是否完整？**\r\n- [ ] 大表是否带时间范围条件？（1.44亿行不带 calmonth 直接超时）\r\n- [ ] CXC 日报有没有误用 `_0630` 或 `_tmp` 变体表？\r\n- [ ] 在途库存是否排除了 `doc_month > '2026-06'` 的预测数据？\r\n- [ ] 库存账龄表的 calmonth 是否可能为空？空行需要排除吗？\r\n\r\n**D. 结果合理性？**\r\n- [ ] 执行前预估：这个查询大概会返回多少行？库存金额量级应该是多少？\r\n- [ ] 如果结果是 0 行或异常大/小，最可能的原因是什么？日期格式错误？表名用错（`_t` vs `_2023`）？\r\n- [ ] 库龄分段金额之和是否接近 `zsjkcje`？（偏差应 < 5%）\r\n- [ ] 是否存在某种合理的替代解释，会让同样的数字意味着完全不同的结论？\r\n\r\n### 第 6 步：输出结果\r\n\r\n- **SQL 查询**：直接给出可执行的 DWS SQL (GaussDB，兼容 PostgreSQL)\r\n- **数据解读**：用 3-5 句话说明关键发现\r\n- **口径说明**：标注使用了哪个表、什么过滤条件、有什么数据局限性\r\n- **溯源脚注**：每条回答末尾必须附带（格式见下方）\r\n- **建议**：如果发现数据质量问题或口径风险，主动提示\r\n\r\n**溯源脚注格式（必须）：**\r\n\r\n```markdown\r\n---\r\n**来源追踪**\r\n- 数据表：`{schema}.{table}`（最后更新：{dw_last_update_date}）\r\n- 数据层级：DM 层\r\n- Skill 版本：inventory-analyst / inventory-knowledge\r\n- 参考文档：{实际加载的 reference 文件名}\r\n- 已知限制：{本次查询的口径局限，如\"不含预测数据\"、\"按标准库龄口径 wbzq\"、\"不含湖南基地原始表\"}\r\n- ⚠️ 验证状态：已通过对抗性审查 / 未通过（需人工复核）\r\n```\r\n\r\n## 常用分析模式\r\n\r\n### 模式 A：库存总览与库龄结构\r\n\r\n```sql\r\nSELECT calmonth,\r\n       SUM(quantity) as total_qty,\r\n       SUM(zsjkcje) as total_amount,\r\n       SUM(wbzq_6_amt) as wbzq_0_6m,\r\n       SUM(wbzq_6_12_amt) as wbzq_6_12m,\r\n       SUM(wbzq_12_24_amt) as wbzq_12_24m,\r\n       SUM(wbzq_24_amt) as wbzq_24m_plus,\r\n       ROUND(SUM(wbzq_12_24_amt + wbzq_24_amt)\r\n             / NULLIF(SUM(zsjkcje), 0) * 100, 2) as long_aged_pct\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth >= '202601'\r\nGROUP BY calmonth\r\nORDER BY calmonth;\r\n```\r\n\r\n### 模式 B：按工厂库存 Top N\r\n\r\n```sql\r\nSELECT plant, plant___t,\r\n       COUNT(DISTINCT material) as sku_cnt,\r\n       SUM(quantity) as total_qty,\r\n       SUM(zsjkcje) as total_amount\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth = '202606'\r\nGROUP BY plant, plant___t\r\nORDER BY total_amount DESC\r\nLIMIT 20;\r\n```\r\n\r\n### 模式 C：长库龄物料清单（>24月）\r\n\r\n```sql\r\nSELECT material, material___t, plant___t, stor_loc___t,\r\n       quantity, zsjkcje, wbzq_24_amt as aged_24m_plus\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth = '202606'\r\n  AND wbzq_24_amt > 0\r\nORDER BY wbzq_24_amt DESC\r\nLIMIT 100;\r\n```\r\n\r\n### 模式 D：CXC 日报趋势（按天）\r\n\r\n```sql\r\nSELECT stat_date, belong_area_name,\r\n       stock_area_month_start, stock_area_month_end,\r\n       sales_stock_out_area_day, stock_in_area_day\r\nFROM dm.dm_rpt_wm_cxc_day_sum\r\nWHERE stat_date BETWEEN '20260601' AND '20260606'\r\n  AND belong_area_name = '清远基地'\r\nORDER BY stat_date;\r\n```\r\n\r\n### 模式 E：在途库存监控\r\n\r\n```sql\r\nSELECT doc_month, category_name, ext_cust_name,\r\n       SUM(deliver_qty) as in_transit_qty,\r\n       SUM(deliver_amount) as in_transit_amt,\r\n       SUM(pur_qty - deliver_qty) as not_shipped_qty\r\nFROM dm.dm_b1_transit_inventory_t\r\nWHERE doc_month = '2026-06'\r\nGROUP BY doc_month, category_name, ext_cust_name\r\nORDER BY in_transit_amt DESC;\r\n```\r\n\r\n### 模式 F：全类型库存健康度\r\n\r\n```sql\r\nSELECT factory_werks_code, factory_werks_name,\r\n       SUM(total_inventory_quantity) as total_qty,\r\n       SUM(available_inventory_quantity) as avail_qty,\r\n       SUM(frozen_inventory_quantity) as frozen_qty,\r\n       SUM(qc_inventory_quantity) as qc_qty,\r\n       ROUND(SUM(available_inventory_quantity) * 100.0\r\n             / NULLIF(SUM(total_inventory_quantity), 0), 2) as avail_pct\r\nFROM dm.dm_wm_all_type_stock_t\r\nGROUP BY factory_werks_code, factory_werks_name\r\nORDER BY total_qty DESC;\r\n```\r\n\r\n### 模式 G：缺货按销售区域汇总\r\n\r\n```sql\r\nSELECT sales_region, stat_month_ym,\r\n       SUM(stockout_area) as total_out,\r\n       SUM(stockout_area_ondue) as due_out\r\nFROM dm.dm_dp_api_stockout_oudue\r\nWHERE stat_year >= '2026'\r\nGROUP BY sales_region, stat_month_ym\r\nORDER BY total_out DESC;\r\n```\r\n\r\n### 模式 H：产品出入库月度趋势\r\n\r\n```sql\r\nSELECT start_month, product_brand_name,\r\n       SUM(in_stock_qty) as in_qty, SUM(out_stock_qty) as out_qty,\r\n       SUM(stock_qty_month_end) as end_qty\r\nFROM dm.dm_product_inout_stock_t\r\nWHERE start_month >= '2026-01'\r\nGROUP BY start_month, product_brand_name\r\nORDER BY start_month, in_qty DESC;\r\n```\r\n\r\n### 模式 I：跌价分析族（内部口径·管理族，默认）\r\n\r\n```sql\r\n-- I1 月度跌价趋势\r\nSELECT calmonth,\r\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,\r\n       ROUND(SUM(COALESCE(wbzq_6_12_fall_amt,0))) AS fall_6_12m,\r\n       ROUND(SUM(COALESCE(wbzq_12_24_fall_amt,0))) AS fall_12_24m,\r\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS fall_over2y\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth BETWEEN '202601' AND '202607'\r\nGROUP BY calmonth ORDER BY calmonth;\r\n\r\n-- I2 跌价 TOP 物料\r\nSELECT material, MAX(material___t) AS material_name,\r\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_amt,\r\n       ROUND(SUM(zsjkcje)) AS stock_amt,\r\n       ROUND(SUM(COALESCE(jchj_amt,0))/NULLIF(SUM(zsjkcje),0)*100,1) AS fall_pct\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth = '202607'\r\nGROUP BY material ORDER BY fall_amt DESC LIMIT 20;\r\n\r\n-- I3 按事业部的跌价结构（2年+长龄段占比）\r\nSELECT zdpsyb___t,\r\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,\r\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS fall_over2y,\r\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))\r\n             /NULLIF(SUM(COALESCE(jchj_amt,0)),0)*100,1) AS long_ratio_pct\r\nFROM dm.dm_fin_stock_detail_accage_t_2023\r\nWHERE calmonth = '202607'\r\nGROUP BY zdpsyb___t ORDER BY fall_total DESC;\r\n```\r\n\r\n> 与 Mix/销售侧对齐时换阿米巴族：`jchj_aging`/`wbzq_*_fall_aging`/`stock_amt`（数值不同：202607 管理 2.877亿 vs 阿米巴 3.301亿，禁止混用）。上市口径表非默认——仅用户明确要求且须声明口径。\r\n\r\n### 模式 J：资金成本分析（正值主口径，资金成本表）\r\n\r\n```sql\r\nSELECT business_department_desc,\r\n       ROUND(SUM(closing_balance)) AS balance,\r\n       ROUND(SUM(capital_cost)) AS month_cost,\r\n       ROUND(SUM(capital_cost_sum)) AS ytd_cost\r\nFROM dm.dm_fin_stock_capital_cost_t\r\nWHERE month = '202608'\r\n  AND LENGTH(TRIM(business_department_desc)) > 0\r\nGROUP BY business_department_desc\r\nORDER BY month_cost DESC;\r\n```\r\n\r\n> 注意：capital_cost 可为负（平均余额<202012基线）；跨年查累计注意 TRUNCATE 滚动窗口只留近 2 年。\r\n\r\n### 模式 K：多口径对照（业务问\"两个数对不上\"时）\r\n\r\n业务高频困惑：内部管理减值（2.877亿）vs 阿米巴减值（3.301亿）vs CHDJ 线组分摊（6.35亿）。标准解释：**数值不同是口径与范围双重差异**——管理族（jchj_amt，金额基数 zsjkcje）vs 阿米巴族（jchj_aging，金额基数 stock_amt）vs CHDJ（管理减值按预算比例分摊到线组/渠道，**范围限卫浴/瓷砖/国际/丽适非全集团，且 inventory_value 不是库存价值**），不是数据错误。\r\n\r\n```sql\r\nSELECT '内部管理减值' AS metric, ROUND(SUM(COALESCE(jchj_amt,0))) AS amt\r\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\r\nUNION ALL\r\nSELECT '内部阿米巴减值', ROUND(SUM(COALESCE(jchj_aging,0)))\r\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\r\nUNION ALL\r\nSELECT 'CHDJ线组分摊(部分事业部)', ROUND(SUM(inventory_value))\r\nFROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07';\r\n```\r\n\r\n回答时必须附概念对照表（见 inventory-knowledge metrics.md 第 8.1 节），并说明各口径适用场景。\r\n\r\n## 库存健康度检查项\r\n\r\n| 指标 | 计算方式 | 说明 |\r\n|---|---|---|\r\n| 长库龄占比 | `SUM(wbzq_24_amt) / SUM(zsjkcje) * 100` | >10% 需关注滞销风险 |\r\n| 可用库存占比 | `available / total_inventory * 100` | 过低说明冻结/质检过多 |\r\n| 在途库存周转 | `deliver_amount / 月均消耗` | 在途过高积压资金 |\r\n| 库存周转次数 | `turnover_times`（预计算） | <2次/年需关注 |\r\n\r\n## Validation 验证层\r\n\r\n每次生成 SQL 并执行后，必须做结果验证：\r\n\r\n1. **行数检查**：返回行数是否在预期范围内？库存明细表全量上亿行，不带 calmonth 过滤直接查会超时\r\n2. **量级检查**：库存数量是否在合理量级？月度库存金额通常亿级\r\n3. **空值检查**：calmonth 可能为空的行需要排除；`___t` 描述字段可能为空\r\n4. **口径交叉验证**：同一库存指标从账龄表和月统计表查询，偏差应在可合理解释范围内\r\n\r\n## Unbook 机制\r\n\r\n遇到以下情况时，必须对用户说明\"我无法准确回答\"，而非强行给出不可靠的结果：\r\n\r\n- 问题涉及的表/字段在现有参考文档中没有记录\r\n- 查询结果出现无法解释的异常值，且无法通过现有文档的\"陷阱\"解释\r\n- 问题需要跨领域知识（如库存 + 采购联合分析），但相关 Skill 尚未建设\r\n- 用户追问的库存口径细节超出了参考文档覆盖范围（如特殊库存类型、特定工厂的定制逻辑）\r\n\r\n升级话术模板：\r\n> \"这个问题超出了当前库存 Skill 的覆盖范围。[具体原因]。建议先补充 [具体参考文档/领域] 的知识后再查。是否需要我先帮你记录这个缺口？\"\n</skill_instructions>\n</skill_content>"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "7b6bea5e-3ce5-4309-9b34-e06ea13983bd"
+   }
+  },
+  "sourceEventSeqs": [
+   167
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 169,
+  "time": 1788921450151,
+  "data": {
+   "turn": 1,
+   "step": 1,
+   "callId": "call_01_T8nUN3bsam1ggo0vDkRa6514",
+   "name": "skill",
+   "arguments": "{\"name\": \"inventory-knowledge\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 170,
+  "time": 1788921450158,
+  "data": {
+   "turn": 1,
+   "step": 1,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_01_T8nUN3bsam1ggo0vDkRa6514"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_01_T8nUN3bsam1ggo0vDkRa6514",
+      "content": [
+       {
+        "type": "text",
+        "text": "<skill_content name=\"inventory-knowledge\">\n<skill_resources>\nBase directory for this skill: D:\\dataprojai-2harness\\skills\\inventory-knowledge\nResolve relative paths mentioned by this skill against the base directory before using them. Load referenced resources only as needed.\n</skill_resources>\n\n<skill_instructions>\n# 库存仓储领域 — 数据知识路由\r\n\r\n## 作用\r\n\r\n本 Skill 是路由层。根据用户问题类型，引导到对应的参考文档获取准确的表结构、字段含义、过滤条件和查询模式。\r\n\r\n## 可用的参考文档\r\n\r\n### 语义层（必须首先查阅）\r\n\r\n| 文档 | 说明 |\r\n|---|---|\r\n| **[metrics.md](references/metrics.md)** | **🔴 强制优先阅读**。概念→字段映射、表选择决策树、日期格式总览、标准指标公式、所有已知陷阱 |\r\n\r\n### 表级参考文档\r\n\r\n| 文档 | 对应问题类型 |\r\n|---|---|\r\n| [stock-accage.md](references/stock-accage.md) | 库存账龄分析、库龄分段、按工厂/物料/科目的库存余额和金额 |\r\n| [transit-inventory.md](references/transit-inventory.md) | 在途库存、采购在途、交货在途 |\r\n| [warehouse-stock.md](references/warehouse-stock.md) | 仓库库存查询、全类型库存（可用/冻结/质检）、按工厂/渠道/品牌的库存现状 |\r\n| [stock-stat-month.md](references/stock-stat-month.md) | 库存统计月报、按库龄分段的库存统计 |\r\n| [cxc-daily.md](references/cxc-daily.md) | 仓协销日报(CXC)、期初期末库存、出入库面积、销售出库 |\r\n| [inout-stock.md](references/inout-stock.md) | 产品出入库明细、入库量/面积、出库量/面积、期末库存 |\r\n| [safestock-lowturnover.md](references/safestock-lowturnover.md) | 安全库存、低周转库存、残次品库存、缺货超期、库存周转率 |\r\n| [stock-fall-list.md](references/stock-fall-list.md) | **存货跌价（内部口径）**。计提比例 0/10/40/70%+保质期、库龄分段、跌价 TOP |\r\n| [chdj-capital-cost.md](references/chdj-capital-cost.md) | **阿米巴存货价值/资金成本**。stat_month=YYYY-MM |\r\n| [capital-cost-table.md](references/capital-cost-table.md) | **库存资金成本（批次级，month=YYYYMM，正值）** |\r\n| [data-lineage.md](references/data-lineage.md) | 数据血缘、表之间如何关联、从源表到报表的路径 |\r\n\r\n## 跨域共享参考\r\n\r\n组织架构等跨领域主数据，存放在 Sources of Truth 层，所有 domain skill 共用：\r\n\r\n| 文档 | 说明 |\r\n|---|---|\r\n| **[组织架构](../../sources-of-truth/business-context/org-hierarchy.md)** | 10级销售组织树（node1~node10），node2 事业部枚举值，与库存表的关联方式 |\r\n\r\n## 使用方式\r\n\r\n1. **首先**加载 [metrics.md](references/metrics.md) 语义层，理解概念映射和表选择决策树\r\n2. 根据决策树确定使用哪张表\r\n3. 使用 `Read` 工具加载对应的表级参考文档\r\n4. 根据文档中的表结构、过滤条件、陷阱提示，给出查询方案或直接生成 SQL\r\n\r\n## 标准全局过滤条件\r\n\r\nSAP 源系统过滤（MANDT, KOKRS, SPRAS）已在 ETL 阶段处理，DWS 查询无需添加。\r\n\r\nDWS 层实际需要的过滤：\r\n\r\n- 时间字段格式（**不一致！**）：\r\n  - `dm_fin_stock_detail_accage_t_2023`：`calmonth` (YYYYMM)\r\n  - `dm_b1_transit_inventory_t`：`doc_month` (YYYY-MM)\r\n  - `dm_rpt_wm_cxc_day_sum`：`stat_date` (YYYYMMDD)\r\n  - `dm_product_inout_stock_t`：`start_month` (YYYY-MM)\r\n  - `dm_fin_stock_capital_cost_t`：`month` (YYYYMM)\r\n  - `dm_ambv2_chdj_grp_t`：`stat_month` (YYYY-MM)\r\n  - 低周转/残次品表：`voucher_post_date` (timestamp)\r\n- 大表（>1000万行）必须带时间范围过滤，避免全表扫描\r\n- 在途库存必须排除预测月份：`doc_month <= '当前月'`\r\n- 备份表/临时表（`_tmp`、`_0630`、`_bak` 后缀）绝对不能使用\n</skill_instructions>\n</skill_content>"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "7807b3f0-bdb8-4efd-a689-114e8a792b2a"
+   }
+  },
+  "sourceEventSeqs": [
+   169
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "step/end",
+  "seq": 171,
+  "time": 1788921450159,
+  "data": {
+   "turn": 1,
+   "step": 1
+  }
+ },
+ {
+  "type": "step/start",
+  "seq": 172,
+  "time": 1788921450175,
+  "data": {
+   "turn": 1,
+   "step": 2
+  }
+ },
+ {
+  "type": "assistant/message",
+  "seq": 538,
+  "time": 1788921454478,
+  "data": {
+   "turn": 1,
+   "step": 2,
+   "message": {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "The user asks: \"分析2024年Q3各事业部库存跌价准备金额\" (Analyze inventory devaluation provision amounts by business division for Q3 2024).\n\nI need to load the knowledge base do …[TRUNC]"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_00_6TmykWFkcIsOAkTSdxHK5875",
+      "name": "read",
+      "arguments": "{\"file_path\": \"D:\\\\dataprojai-2harness\\\\skills\\\\inventory-knowledge\\\\references\\\\metrics.md\"}"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_01_CEFbX1tmbbNC7Xueb8Er2956",
+      "name": "read",
+      "arguments": "{\"file_path\": \"D:\\\\dataprojai-2harness\\\\skills\\\\inventory-knowledge\\\\references\\\\stock-fall-list.md\"}"
+     }
+    ],
+    "source": {
+     "kind": "model",
+     "provider": "deepseek-official",
+     "model": "deepseek-v4-flash"
+    },
+    "id": "c0b58d7b-97ff-4394-b27c-a3d6e10fee73"
+   },
+   "usage": {
+    "inputTokens": 6979,
+    "outputTokens": 409,
+    "totalTokens": 15580,
+    "cacheReadTokens": 8192,
+    "reasoningTokens": 292
+   }
+  },
+  "sourceEventSeqs": [
+   [
+    173,
+    537
+   ]
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 539,
+  "time": 1788921454479,
+  "data": {
+   "turn": 1,
+   "step": 2,
+   "callId": "call_00_6TmykWFkcIsOAkTSdxHK5875",
+   "name": "read",
+   "arguments": "{\"file_path\": \"D:\\\\dataprojai-2harness\\\\skills\\\\inventory-knowledge\\\\references\\\\metrics.md\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 541,
+  "time": 1788921454517,
+  "data": {
+   "turn": 1,
+   "step": 2,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_00_6TmykWFkcIsOAkTSdxHK5875"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_00_6TmykWFkcIsOAkTSdxHK5875",
+      "content": [
+       {
+        "type": "text",
+        "text": "<path>D:\\dataprojai-2harness\\skills\\inventory-knowledge\\references\\metrics.md</path>\n<type>file</type>\n<content>\n1: ---\n2: name: inventory-metrics\n3: description: 库存仓储域语义层 — 编译后的指标定义、概念映射、维度值。Agent 必须优先查阅此文件再决定用哪张表。\n4: ---\n5: \n6: # 库存仓储域 — 语义层 (Semantic Layer)\n7: \n8: ## 使用规则（强制）\n9: \n10: 1. 收到任何库存相关问题，**必须先读本文件**，再做后续判断\n11: 2. 本文件定义的概念→字段映射是权威的，不可自行猜测\n12: 3. 每张表的选择必须经过本文件的决策树\n13: \n14: ---\n15: \n16: ## 一、核心概念 → DWS 字段映射\n17: \n18: ### 1.1 \"库存\"到底指什么？\n19: \n20: | 业务口径 | DWS 字段 | 所属表 | 说明 |\n21: |----------|----------|--------|------|\n22: | 库存数量（最常用） | `quantity` | dm_fin_stock_detail_accage_t_2023 | 物料库存数量 |\n23: | 库存金额（管理口径，默认） | `zsjkcje` | dm_fin_stock_detail_accage_t_2023 | 实际库存金额，库存域默认字段 |\n24: | 库存金额（阿米巴结算价） | `stock_amt` | dm_fin_stock_detail_accage_t_2023 | 与 Mix 阿米巴口径对齐时使用 |\n25: | 库存面积 | 各个 `*_area` 字段 | 多张表 | CXC 日报、出入库、全类型库存都有面积字段 |\n26: | 可用库存数量 | `available_inventory_quantity` | dm_wm_all_type_stock_t | 可用库存 |\n27: | 总库存数量 | `total_inventory_quantity` / `all_stock_quantity` | dm_wm_all_type_stock_t | 总库存 |\n28: | 在途数量 | `deliver_qty` | dm_b1_transit_inventory_t | 供应商已发货未入库 |\n29: | 库龄分段金额 | `wbzq_6_amt` / `wbzq_6_12_amt` / `wbzq_12_24_amt` / `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | 无保质期分段（管理口径；有保质期走 ybzq 到期口径） |\n30: | 入库面积 | `stock_in_area_month` / `stock_in_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径入库 |\n31: | 出库面积（销售） | `sales_stock_out_area_month` / `sales_stock_out_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径销售出库 |\n32: \n33: **歧义陷阱**：用户说\"库存\"时，默认指 `dm_fin_stock_detail_accage_t_2023` 的 `quantity` 和 `zsjkcje`。如果加了限定词（\"可用\"/\"在途\"/\"按面积\"），切换到对应表。\n34: \n35: ### 1.2 库龄/库存类型枚举值\n36: \n37: | 概念 | 字段 | 所属表 | 典型值 |\n38: |------|------|--------|--------|\n39: | 库龄分段（宽表） | `stock_age_seg` | dm_otd_wm_stock_stat_month_t | 0-3月/3-6月/6-12月/12-24月/24月+ |\n40: | 库存类型 | `stock_type` | dm_otd_wm_stock_stat_month_t | 可用库存/冻结库存/质检库存/在途库存 |\n41: | 库龄分段（明细） | `wbzq_6_amt` ~ `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | **wbzq=无保质期**（按批次日期 6/12/24月分桶）；有保质期产品走 ybzq_bzdq_amt（到期）/ybzq_bzdq_3_amt（3月内） |\n42: | 跌价/减值 | `jchj_amt`（管理，预计算）/`jchj_aging`（阿米巴）+ 分段 `wbzq_*_fall_amt`/`*_fall_aging` | dm_fin_stock_detail_accage_t_2023 | 计提 0/10/40/70%+保质期 70/100%，详见 stock-fall-list.md / stock-accage.md |\n43: | 保质期标识 | `bz_flag` | dm_fin_stock_detail_accage_t_2023 | Y=有保质期，N=无保质期（非包装标志） |\n44: \n45: ### 1.3 组织维度\n46: \n47: | 业务概念 | 字段 | 所属表 | 备注 |\n48: |----------|------|--------|------|\n49: | 工厂编码 | `plant` | dm_fin_stock_detail_accage_t_2023 | SAP 风格命名 |\n50: | 工厂名称 | `plant___t` | dm_fin_stock_detail_accage_t_2023 | `___t` 后缀=文本描述 |\n51: | 工厂编码（宽表风格） | `factory_werks_code` | dm_product_inout_stock_t 等 | 另一种命名风格 |\n52: | 库存地点 | `stor_loc` / `stor_loc___t` | dm_fin_stock_detail_accage_t_2023 | |\n53: | 库存地点（其他表） | `inv_location` | dm_wm_all_type_stock_t 等 | 另一种命名风格 |\n54: | 库存类别 | `stockcat` / `stockcat___t` | dm_fin_stock_detail_accage_t_2023 | |\n55: | 库存类型 | `stocktype` / `stocktype___t` | dm_fin_stock_detail_accage_t_2023 | |\n56: | 公司 | `comp_code` / `comp_code___t` | dm_fin_stock_detail_accage_t_2023 | |\n57: | 销售中心 | `sales_center_code` / `sales_center` | dm_dp_api_warehouse_stock | |\n58: | 销售区域 | `sales_region_code` / `sales_region` | dm_dp_api_stockout_oudue | |\n59: | 产区 | `product_area_code` / `product_area_name` | dm_otd_wm_stock_stat_month_t | |\n60: \n61: ### 1.4 物料/产品维度\n62: \n63: | 业务概念 | 字段 | 所属表 | 备注 |\n64: |----------|------|--------|------|\n65: | 物料号 | `material` (旧) / `material_num` (新) | 多张表 | 两张表体系用不同字段名 |\n66: | 物料描述 | `material___t` / `material_name` | 多张表 | `___t` 后缀 v.s 直接 `_name` 后缀 |\n67: | 物料组层级1-5 | `matl_grp_1` ~ `matl_grp_5` | dm_fin_stock_detail_accage_t_2023 | `___t` 后缀为描述 |\n68: | 产品层次1-5 | `zprodh1` ~ `zprodh5` | dm_fin_stock_detail_accage_t_2023 | SAP 风格，与 matl_grp 两套体系并存 |\n69: | 外部物料组 | `extmatlgrp` | dm_fin_stock_detail_accage_t_2023 | |\n70: | 物料类型 | `matl_type` | dm_fin_stock_detail_accage_t_2023 | |\n71: | 品类 | `cat` | dm_otd_wm_stock_stat_month_t, dm_rpt_wm_cxc_day_sum | |\n72: | 产品渠道 | `prod_channel` / `product_channel_name` | CXC/统计/全类型表 | |\n73: | 品牌 | `product_brand_name` / `brand_name` | 出入库/全类型表 | |\n74: | 规格 | `dimension` / `dimension_` | 多张表 | `dm_product_inout_stock_t` 有下划线后缀 |\n75: \n76: ---\n77: \n78: ## 二、表选择决策树\n79: \n80: ```\n81: 用户问题\n82: ├── 需要物料级库存明细（含批次/工厂/库存地点）？\n83: │   └── 用 dm.dm_fin_stock_detail_accage_t_2023（183列，1.44亿行，最全）\n84: ├── 需要库龄分析/资金占压？\n85: │   ├── 明细级 → dm.dm_fin_stock_detail_accage_t_2023\n86: │   └── 月汇总级 → dm.dm_rpt_stock_age_month_ct（57行）\n87: ├── 涉及\"在途库存\"？\n88: │   └── 用 dm.dm_b1_transit_inventory_t（1958万行，含预测）\n89: ├── 涉及\"仓库库存快照\"（全类型：可用/冻结/质检）？\n90: │   └── 用 dm.dm_wm_all_type_stock_t（81列）\n91: │   └── 简版用 dm.dm_dp_api_warehouse_stock（9列，FineReport API）\n92: ├── 涉及\"CXC日报\"/\"仓储协作\"/\"出入库趋势\"？\n93: │   └── 用 dm.dm_rpt_wm_cxc_day_sum（172万行，按天）\n94: ├── 涉及\"库存月报统计\"/\"按库龄段+品类汇总\"？\n95: │   └── 用 dm.dm_otd_wm_stock_stat_month_t（105万行）\n96: ├── 涉及\"出入库明细\"/\"产品出入库\"？\n97: │   ├── 通用 → dm.dm_product_inout_stock_t（99万行）\n98: │   ├── 湖南 → dm.dm_product_inout_stock_hunan_t（56万行）\n99: │   └── 湖南含金额 → dm.dm_original_product_inout_stock_hunan_t（147万行，带成本中心/金额）\n100: ├── 涉及\"安全库存\"/\"可用库存健康度\"？\n101: │   └── 用 dm.dm_safestock_all_stock（高度汇总）\n102: ├── 涉及\"缺货/超期\"？\n103: │   └── 用 dm.dm_dp_api_stockout_oudue\n104: ├── 涉及\"低周转出库\"/\"残次品出库\"？\n105: │   ├── 低周转 → dm.dm_wm_low_turnover_stockout_detail_t\n106: │   └── 残次品 → dm.dm_wm_defective_product_stockout_t\n107: ├── 涉及“库存周转率”？\n108: │   └── 用 dm.dm_otd_wm_stock_turnover_m（40行，预计算）\n109: ├── 涉及“跌价准备”/“库龄分段金额”/“库存金额（管理口径，默认）”？\n110: │   └── 用 dm.dm_fin_stock_detail_accage_t_2023（jchj_amt / wbzq_*_fall_amt / zsjkcje）\n111: ├── 涉及“阿米巴口径库存/跌价”（与 Mix 阿米巴对齐）？\n112: │   └── 同内部表 `*_aging` 字段族（stock_amt / jchj_aging / wbzq_*_fall_aging）\n113: ├── 涉及“线组分摊减值/分摊资金成本”（CHDJ）？\n114: │   └── 用 dm.dm_ambv2_chdj_grp_t（inventory_value=管理减值的线组分摊，非库存价值；金额合计用 conv 列）\n115: ├── 涉及“库存资金成本”（批次级）？\n116: │   └── 用 dm.dm_fin_stock_capital_cost_t（可为负、滚动窗口近2年）\n117: ├── 用户明确要求“上市口径”（特殊要求，回答必须声明口径）？\n118: │   └── 用 dm.dm_fin_stock_d_accage_list_c_t_2023（非默认，勿主动路由）\n119: └── 不确定？\n120:     └── 默认用 dm.dm_fin_stock_detail_accage_t_2023（最全，但查询必须带 calmonth 过滤）\n121: ```\n122: \n123: ---\n124: \n125: ## 三、核心表速查\n126: \n127: ### 3.1 dm_fin_stock_detail_accage_t_2023 — 库存账龄明细（第一优先）\n128: \n129: | 属性 | 值 |\n130: |------|-----|\n131: | Schema | dm |\n132: | 粒度 | 物料+工厂+库存地点+批次+会计期间 |\n133: | 列数 | 183 |\n134: | 行数 | 1.44亿 |\n135: | 时间范围 | 202012 ~ 202608 |\n136: | 时间字段 | `calmonth` (YYYYMM, NOT NULL) |\n137: | 数量字段 | `quantity` |\n138: | 金额字段 | `zsjkcje`（实际库存金额-管理），`stock_amt`（阿米巴结算价）；跌价 `jchj_amt`/`jchj_aging` |\n139: | 库龄字段 | `wbzq_6_amt`~`wbzq_24_amt`（金额），`wbzq_6_qty`~`wbzq_24_qty`（数量），`wbzq_6_area`~`wbzq_24_area`（面积） |\n140: | 关键维度 | plant, stor_loc, stockcat, stocktype, batch, material, matl_grp_1~5, zprodh1~5, wbs_elemt, vendor |\n141: | ⚠️ 陷阱 | calmonth 格式 YYYYMM（如 '202606'）；`___t` 后缀=描述；库龄多套口径并存（标准/爱米巴/自然日历/协议单价） |\n142: \n143: ### 3.2 dm_wm_all_type_stock_t — 全类型库存\n144: \n145: | 属性 | 值 |\n146: |------|-----|\n147: | Schema | dm |\n148: | 粒度 | 物料+工厂+库存地点的库存快照 |\n149: | 列数 | 81 |\n150: | 行数 | 14.4万 |\n151: | 时间字段 | `dw_last_update_date`（快照时间） |\n152: | 数量字段 | total_inventory_quantity, available_inventory_quantity, qc_inventory_quantity, frozen_inventory_quantity 等 14 个 |\n153: | 面积字段 | total_inventory_area, available_inventory_area 等 7 个 |\n154: | ⚠️ 陷阱 | 是快照表，不是实时数据；必须带工厂/渠道过滤 |\n155: \n156: ### 3.3 dm_rpt_wm_cxc_day_sum — CXC 日报\n157: \n158: | 属性 | 值 |\n159: |------|-----|\n160: | Schema | dm |\n161: | 粒度 | 日期+区域+品类+规格+产品渠道 |\n162: | 列数 | 15 |\n163: | 行数 | 172万 |\n164: | 时间范围 | 2022-07-31 ~ 2026-06-06 |\n165: | 时间字段 | `stat_date` (YYYYMMDD) |\n166: | 核心字段 | stock_area_month_start/end, stock_area_year_start, sales_stock_out_area_year/month/day, stock_in_area_year/month/day |\n167: | ⚠️ 陷阱 | 单位是面积（平米），不是数量；有 `_0630` 和 `_tmp` 变体表，用主表 |\n168: \n169: ### 3.4 dm_b1_transit_inventory_t — 在途库存\n170: \n171: | 属性 | 值 |\n172: |------|-----|\n173: | Schema | dm |\n174: | 粒度 | 客户+物料+品类+月份 |\n175: | 列数 | 11 |\n176: | 行数 | 1958万 |\n177: | 时间范围 | 2018-01 ~ 2030-12（含预测） |\n178: | 时间字段 | `doc_month` (YYYY-MM) |\n179: | ⚠️ 陷阱 | 含未来预测数据；汇总表无采购订单明细 |\n180: \n181: ### 3.5 其他表速查\n182: \n183: | 表名 | 行数 | 关键时间字段 | 主要用途 |\n184: |------|------|-------------|----------|\n185: | dm_product_inout_stock_t | 99万 | start_month (YYYY-MM) | 产品出入库汇总 |\n186: | dm_otd_wm_stock_stat_month_t | 105万 | month_date | 库存月报+库龄分段 |\n187: | dm_dp_api_warehouse_stock | 1.7万 | dw_last_update_date | 仓库库存快照 API |\n188: | dm_dp_api_stockout_oudue | 0.5万 | stat_month_ym | 缺货超期 |\n189: | dm_wm_low_turnover_stockout_detail_t | 36万 | voucher_post_date | 低周转出库明细 |\n190: | dm_wm_defective_product_stockout_t | 94万 | voucher_post_date | 残次品出库 |\n191: | dm_otd_wm_stock_turnover_m | 40 | stat_month | 库存周转率（预计算） |\n192: | dm_rpt_stock_age_month_ct | 57 | calmonth (YYYYMM) | 库龄月报汇总 |\n193: \n194: ---\n195: \n196: ## 四、日期格式总览（关键！）\n197: \n198: | 表 | 时间字段 | 格式 | 示例 |\n199: |---|---------|------|------|\n200: | dm_fin_stock_detail_accage_t_2023 | `calmonth` | YYYYMM | `'202606'` |\n201: | dm_fin_stock_detail_accage_t | `calmonth` | YYYYMM | `'202606'` |\n202: | dm_rpt_wm_cxc_day_sum | `stat_date` | YYYYMMDD | `'20260606'` |\n203: | dm_b1_transit_inventory_t | `doc_month` | YYYY-MM | `'2026-06'` |\n204: | dm_product_inout_stock_t | `start_month` | YYYY-MM | `'2026-06'` |\n205: | dm_otd_wm_stock_stat_month_t | `month_date` | 需确认 | 不同数据源可能不同 |\n206: | dm_otd_wm_stock_turnover_m | `stat_month` | text | |\n207: | 低周转/残次品表 | `voucher_post_date` | timestamp | `'2026-06-01'` |\n208: | dm_fin_stock_capital_cost_t | `month` | YYYYMM | `'202608'` |\n209: | dm_ambv2_chdj_grp_t | `stat_month` | YYYY-MM | `'2026-08'` |\n210: \n211: ⚠️ **最大陷阱**：同一个库不同表的时间字段格式不一致！YYYYMM vs YYYY-MM vs YYYYMMDD vs timestamp。\n212: \n213: ---\n214: \n215: ## 五、标准指标公式\n216: \n217: ### 库存类\n218: \n219: | 指标 | 公式 | 适用表 |\n220: |------|------|--------|\n221: | 库存总量 | `SUM(quantity)` | dm_fin_stock_detail_accage_t_2023 |\n222: | 库存资金占压 | `SUM(zsjkcje)` | dm_fin_stock_detail_accage_t_2023 |\n223: | 库存面积（全类型） | `SUM(total_inventory_area)` | dm_wm_all_type_stock_t |\n224: | 可用库存占比 | `SUM(available_inventory_quantity) / SUM(total_inventory_quantity) * 100` | dm_wm_all_type_stock_t |\n225: \n226: ### 库龄类\n227: \n228: | 指标 | 公式 | 适用表 |\n229: |------|------|--------|\n230: | 库龄0-6月金额 | `SUM(wbzq_6_amt)` | dm_fin_stock_detail_accage_t_2023 |\n231: | 库龄6-12月金额 | `SUM(wbzq_6_12_amt)` | dm_fin_stock_detail_accage_t_2023 |\n232: | 库龄12-24月金额 | `SUM(wbzq_12_24_amt)` | dm_fin_stock_detail_accage_t_2023 |\n233: | 库龄24月+金额 | `SUM(wbzq_24_amt)` | dm_fin_stock_detail_accage_t_2023 |\n234: | 长龄库存占比（>12月） | `SUM(wbzq_12_24_amt + wbzq_24_amt) / SUM(zsjkcje) * 100` | dm_fin_stock_detail_accage_t_2023 |\n235: \n236: ### 出入库/周转类\n237: \n238: | 指标 | 公式 | 适用表 |\n239: |------|------|--------|\n240: | 月度出库面积 | `SUM(sales_stock_out_area_month)` | dm_rpt_wm_cxc_day_sum |\n241: | 月度入库面积 | `SUM(stock_in_area_month)` | dm_rpt_wm_cxc_day_sum |\n242: | 月均库存 | `(stock_area_month_start + stock_area_month_end) / 2` | dm_rpt_wm_cxc_day_sum |\n243: | 月度库存周转率 | `sales_stock_out_area_month / ((stock_area_month_start + stock_area_month_end) / 2)` | dm_rpt_wm_cxc_day_sum |\n244: | 库存周转次数 | `turnover_times`（预计算） | dm_otd_wm_stock_turnover_m |\n245: | 在途库存金额 | `SUM(deliver_amount)` | dm_b1_transit_inventory_t |\n246: \n247: ---\n248: \n249: ## 六、标准过滤条件\n250: \n251: ```sql\n252: -- dm_fin_stock_detail_accage_t_2023：必须带 calmonth 过滤避免全表扫描\n253: WHERE calmonth = '202606'\n254: \n255: -- dm_b1_transit_inventory_t：排除未来预测数据\n256: WHERE doc_month <= '2026-06' AND doc_month >= '2018-01'\n257: \n258: -- dm_rpt_wm_cxc_day_sum：stat_date 格式为 YYYYMMDD\n259: WHERE stat_date = '20260606'\n260: \n261: -- 低周转/残次品表：用 timestamp 过滤\n262: WHERE voucher_post_date >= '2026-01-01'\n263: \n264: -- 产品出入库表：start_month 格式 YYYY-MM\n265: WHERE start_month = '2026-06'\n266: \n267: -- dm_product_inout_stock_t 规格字段带下划线\n268: SELECT dimension_ FROM dm.dm_product_inout_stock_t\n269: ```\n270: \n271: ---\n272: \n273: ## 七、已知陷阱总览\n274: \n275: 1. **日期格式不一致**（见第四节）：同一概念在不同表中格式不同，绝对不能混用\n276: 2. **物料字段名不一致**：`material`（SAP风格，`___t`后缀）vs `material_num`（新风格，`_name`后缀）。查询时注意表用的是哪套\n277: 3. **`___t` 后缀**：三个下划线 + t，SAP 风格文本字段。如 `plant` → `plant___t`，`zprodh1` → `zprodh1___t`\n278: 4. **规格字段**：`dm_product_inout_stock_t` 中是 `dimension_`（单下划线后缀），其他表是 `dimension`\n279: 5. **库龄多套口径**：管理(wbzq/ybzq+fall_amt)、阿米巴(*_aging)、协议单价(xydj/xyzjdj)、自然日历(zrzlcp_)。用户未指定时默认管理口径；SKU 效益域配 Mix 用阿米巴口径\n280: 6. **在途库存含预测**：`dm_b1_transit_inventory_t` 有 2030 年数据，必须过滤 doc_month\n281: 7. **`dm.dm_fin_stock_detail_accage_t` 是旧表/子集**（91列，不含面积/数量细分字段），查询用 `_2023` 后缀完整版\n282: 8. **CXC 日报变体**：`_0630`（6/30快照）、`_tmp`（临时表），查询用主表 `dm_rpt_wm_cxc_day_sum`\n283: 9. **安全库存表行数极少**：是高度汇总的报表，不是明细数据\n284: 10. **湖南基地独立表**：出入库有专门湖南表，查询时注意基地分表规则\n285: 11. **`jc` 字段族=减值**（管理口径 0/10/40/70%），不是\"检出金额\"；`jchj_amt`=减值合计（管理）\n286: 12. **`wbzq`/`ybzq`=无/有保质期**（按 bz_flag 分流），不是未/已包装；有保质期减值仅 7C/73/7220+特定库位工厂计提，其余恒 0\n287: 13. **CHDJ `inventory_value` 实为管理口径减值**（非库存价值）：与库存金额是不同概念，与上市口径跌价是不同体系，禁止跨表加减\n288: 14. **资金成本表 TRUNCATE 滚动窗口只留近 2 年**：更早月份查不到是窗口限制非数据丢失\n289: 15. **资金成本可为负**（平均余额<202012基线，去库存常态）；**CHDJ `capital_cost` 原始列在分摊行结构中重复携带全额（SUM 放大反号）——CHDJ 维度金额 SUM `capital_cost_conv`，准确金额用源表**\n290: 16. **资金成本 LAG 分区含 material_name**：物料改名断链→期初变 0→当月成本突降\n291: 17. **CHDJ 范围限卫浴/瓷砖/国际/丽适**（非全集团）；其 zdpsyb 码=node2 去 H 前缀，11000011/11000012 为卫浴旧组织\n292: 18. **库龄明细表 plant 7C 用 zpcrk_fc 分桶**（其余工厂用批次日期 zmmm_o017_zbatch_date）\n293: \n294: ---\n295: \n296: ## 八、存货跌价与减值 · 资金成本（完整语义）\n297: \n298: ### 8.1 跌价/减值体系对照（禁止混用，2026-08-20/24 合并裁定）\n299: \n300: | 体系 | 字段族 | 计提比例 | 桶边界 | 载体表 | 路由 |\n301: |---|---|---|---|---|---|\n302: | **管理口径跌价（默认）** | `jchj_amt`（合计，预计算）+ 分段 `wbzq_6_fall_amt`/`wbzq_6_12_fall_amt`/`wbzq_12_24_fall_amt`/`wbzq_24_fall_amt`/`ybzq_bzdq_3_fall_amt`/`ybzq_bzdq_fall_amt` | 0/10/40/70% + 保质期 70/100% | 6/12/24月 + 保质期到期 | 内部表 `dm_fin_stock_detail_accage_t_2023`（calmonth=YYYYMM） | \"跌价/减值/库龄\"（默认） |\n303: | **阿米巴口径跌价** | `jchj_aging` + 分段 `*_fall_aging`；金额基数 `stock_amt` | 同上比例 | 6/12/24月（阿米巴结算价桶） | 同上（`*_aging` 族） | 与 Mix/销售侧对齐、SKU 效益域 |\n304: | **CHDJ 线组分摊** | `inventory_value`（=管理减值合计的线组分摊，**非库存价值**）/ `inventory_value_amb`（阿米巴结算价减值分摊） | 承袭上述比例 | 同上 + 预算比例分摊 | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） | \"线组/渠道分摊\"；范围限卫浴/瓷砖/国际/丽适 |\n305: | **上市口径（非默认）** | `aging_sum_fall_amt` + 年段分段 | 0/20/30/50/50% | 1/2/3/4年（天级90天桶） | `dm_fin_stock_d_accage_list_c_t_2023` | **仅用户明确要求且声明口径时使用**（业务裁定 2026-08-24） |\n306: \n307: ### 8.2 库存资金成本\n308: \n309: | 概念 | 权威字段 | 所在表 |\n310: |---|---|---|\n311: | 库存资金成本（批次级，主口径） | `capital_cost` | `dm_fin_stock_capital_cost_t`（month=YYYYMM） |\n312: | 累计资金成本（分年不跨年） | `capital_cost_sum` | 同上 |\n313: | 分摊资金成本（按预算比例到线组） | `capital_cost_conv`/`capital_cost_sum_conv` | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） |\n314: \n315: 公式（ETL 实证）：`((期初+期末)/2 − 202012余额) × 4%/12`；期初=LAG(期末)；**可为负**（低于基线）；TRUNCATE 滚动窗口仅近 2 年；**CHDJ 原始 capital_cost 列禁止 SUM 当金额（分摊行重复携带全额），用 conv 列或源表**。\n316: \n317: ### 8.3 金额口径锚点（2026-07/08 实测，内部口径）\n318: \n319: | 金额 | 表/字段 | 概念 |\n320: |---|---|---|\n321: | 14.71亿（202607） | 内部表 `zsjkcje` / 资金成本表 `closing_balance` 14.3亿（202608） | **库存金额（管理口径）** |\n322: | 17.52亿 | 内部表 `stock_amt` | 库存金额（阿米巴结算价） |\n323: | 2.877亿 | 内部表 `jchj_amt` | **管理口径跌价/减值** |\n324: | 3.301亿 | 内部表 `jchj_aging` | 阿米巴口径减值 |\n325: | 6.35亿 | CHDJ `inventory_value` | 管理减值的**线组分摊**（卫浴/瓷砖/国际/丽适范围，非全集团） |\n326: \n327: **决策**：问库存金额/跌价→内部表（默认管理族）；与 Mix/销售侧对齐→`*_aging` 族；问线组分摊→CHDJ；问资金成本→默认 `dm_fin_stock_capital_cost_t`。任何两口径金额不可加减。上市口径表 `dm_fin_stock_d_accage_list_c_t_2023` 非默认——仅特殊要求使用且回答必须声明口径。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)、[stock-accage.md](stock-accage.md)。\n328: \n329: ---\n330: \n331: ## 九、关联维度表\n332: \n333: | 维度 | 表 | 关联键 |\n334: |------|-----|--------|\n335: | 成本中心属性 | dwifin.dwi_cost_center_main_t | cost_center_code / cost_center |\n336: | 公司信息 | dwrdim.dwr_dim_company_d | comp_code / company_code |\n337: \n338: 注：库存明细表中已有物料描述（`material___t`/`material_name`），无需单独关联物料主数据。\n\n(End of file - total 338 lines)\n</content>"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "8f0ce02b-4084-46f6-82fc-e152310a9210"
+   },
+   "meta": {
+    "path": "D:\\dataprojai-2harness\\skills\\inventory-knowledge\\references\\metrics.md",
+    "offset": 1,
+    "lines": [
+     {
+      "number": 1,
+      "text": "---"
+     },
+     {
+      "number": 2,
+      "text": "name: inventory-metrics"
+     },
+     {
+      "number": 3,
+      "text": "description: 库存仓储域语义层 — 编译后的指标定义、概念映射、维度值。Agent 必须优先查阅此文件再决定用哪张表。"
+     },
+     {
+      "number": 4,
+      "text": "---"
+     },
+     {
+      "number": 5,
+      "text": ""
+     },
+     {
+      "number": 6,
+      "text": "# 库存仓储域 — 语义层 (Semantic Layer)"
+     },
+     {
+      "number": 7,
+      "text": ""
+     },
+     {
+      "number": 8,
+      "text": "## 使用规则（强制）"
+     },
+     {
+      "number": 9,
+      "text": ""
+     },
+     {
+      "number": 10,
+      "text": "1. 收到任何库存相关问题，**必须先读本文件**，再做后续判断"
+     },
+     {
+      "number": 11,
+      "text": "2. 本文件定义的概念→字段映射是权威的，不可自行猜测"
+     },
+     {
+      "number": 12,
+      "text": "3. 每张表的选择必须经过本文件的决策树"
+     },
+     {
+      "number": 13,
+      "text": ""
+     },
+     {
+      "number": 14,
+      "text": "---"
+     },
+     {
+      "number": 15,
+      "text": ""
+     },
+     {
+      "number": 16,
+      "text": "## 一、核心概念 → DWS 字段映射"
+     },
+     {
+      "number": 17,
+      "text": ""
+     },
+     {
+      "number": 18,
+      "text": "### 1.1 \"库存\"到底指什么？"
+     },
+     {
+      "number": 19,
+      "text": ""
+     },
+     {
+      "number": 20,
+      "text": "| 业务口径 | DWS 字段 | 所属表 | 说明 |"
+     },
+     {
+      "number": 21,
+      "text": "|----------|----------|--------|------|"
+     },
+     {
+      "number": 22,
+      "text": "| 库存数量（最常用） | `quantity` | dm_fin_stock_detail_accage_t_2023 | 物料库存数量 |"
+     },
+     {
+      "number": 23,
+      "text": "| 库存金额（管理口径，默认） | `zsjkcje` | dm_fin_stock_detail_accage_t_2023 | 实际库存金额，库存域默认字段 |"
+     },
+     {
+      "number": 24,
+      "text": "| 库存金额（阿米巴结算价） | `stock_amt` | dm_fin_stock_detail_accage_t_2023 | 与 Mix 阿米巴口径对齐时使用 |"
+     },
+     {
+      "number": 25,
+      "text": "| 库存面积 | 各个 `*_area` 字段 | 多张表 | CXC 日报、出入库、全类型库存都有面积字段 |"
+     },
+     {
+      "number": 26,
+      "text": "| 可用库存数量 | `available_inventory_quantity` | dm_wm_all_type_stock_t | 可用库存 |"
+     },
+     {
+      "number": 27,
+      "text": "| 总库存数量 | `total_inventory_quantity` / `all_stock_quantity` | dm_wm_all_type_stock_t | 总库存 |"
+     },
+     {
+      "number": 28,
+      "text": "| 在途数量 | `deliver_qty` | dm_b1_transit_inventory_t | 供应商已发货未入库 |"
+     },
+     {
+      "number": 29,
+      "text": "| 库龄分段金额 | `wbzq_6_amt` / `wbzq_6_12_amt` / `wbzq_12_24_amt` / `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | 无保质期分段（管理口径；有保质期走 ybzq 到期口径） |"
+     },
+     {
+      "number": 30,
+      "text": "| 入库面积 | `stock_in_area_month` / `stock_in_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径入库 |"
+     },
+     {
+      "number": 31,
+      "text": "| 出库面积（销售） | `sales_stock_out_area_month` / `sales_stock_out_area_day` | dm_rpt_wm_cxc_day_sum | CXC 口径销售出库 |"
+     },
+     {
+      "number": 32,
+      "text": ""
+     },
+     {
+      "number": 33,
+      "text": "**歧义陷阱**：用户说\"库存\"时，默认指 `dm_fin_stock_detail_accage_t_2023` 的 `quantity` 和 `zsjkcje`。如果加了限定词（\"可用\"/\"在途\"/\"按面积\"），切换到对应表。"
+     },
+     {
+      "number": 34,
+      "text": ""
+     },
+     {
+      "number": 35,
+      "text": "### 1.2 库龄/库存类型枚举值"
+     },
+     {
+      "number": 36,
+      "text": ""
+     },
+     {
+      "number": 37,
+      "text": "| 概念 | 字段 | 所属表 | 典型值 |"
+     },
+     {
+      "number": 38,
+      "text": "|------|------|--------|--------|"
+     },
+     {
+      "number": 39,
+      "text": "| 库龄分段（宽表） | `stock_age_seg` | dm_otd_wm_stock_stat_month_t | 0-3月/3-6月/6-12月/12-24月/24月+ |"
+     },
+     {
+      "number": 40,
+      "text": "| 库存类型 | `stock_type` | dm_otd_wm_stock_stat_month_t | 可用库存/冻结库存/质检库存/在途库存 |"
+     },
+     {
+      "number": 41,
+      "text": "| 库龄分段（明细） | `wbzq_6_amt` ~ `wbzq_24_amt` | dm_fin_stock_detail_accage_t_2023 | **wbzq=无保质期**（按批次日期 6/12/24月分桶）；有保质期产品走 ybzq_bzdq_amt（到期）/ybzq_bzdq_3_amt（3月内） |"
+     },
+     {
+      "number": 42,
+      "text": "| 跌价/减值 | `jchj_amt`（管理，预计算）/`jchj_aging`（阿米巴）+ 分段 `wbzq_*_fall_amt`/`*_fall_aging` | dm_fin_stock_detail_accage_t_2023 | 计提 0/10/40/70%+保质期 70/100%，详见 stock-fall-list.md / stock-accage.md |"
+     },
+     {
+      "number": 43,
+      "text": "| 保质期标识 | `bz_flag` | dm_fin_stock_detail_accage_t_2023 | Y=有保质期，N=无保质期（非包装标志） |"
+     },
+     {
+      "number": 44,
+      "text": ""
+     },
+     {
+      "number": 45,
+      "text": "### 1.3 组织维度"
+     },
+     {
+      "number": 46,
+      "text": ""
+     },
+     {
+      "number": 47,
+      "text": "| 业务概念 | 字段 | 所属表 | 备注 |"
+     },
+     {
+      "number": 48,
+      "text": "|----------|------|--------|------|"
+     },
+     {
+      "number": 49,
+      "text": "| 工厂编码 | `plant` | dm_fin_stock_detail_accage_t_2023 | SAP 风格命名 |"
+     },
+     {
+      "number": 50,
+      "text": "| 工厂名称 | `plant___t` | dm_fin_stock_detail_accage_t_2023 | `___t` 后缀=文本描述 |"
+     },
+     {
+      "number": 51,
+      "text": "| 工厂编码（宽表风格） | `factory_werks_code` | dm_product_inout_stock_t 等 | 另一种命名风格 |"
+     },
+     {
+      "number": 52,
+      "text": "| 库存地点 | `stor_loc` / `stor_loc___t` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 53,
+      "text": "| 库存地点（其他表） | `inv_location` | dm_wm_all_type_stock_t 等 | 另一种命名风格 |"
+     },
+     {
+      "number": 54,
+      "text": "| 库存类别 | `stockcat` / `stockcat___t` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 55,
+      "text": "| 库存类型 | `stocktype` / `stocktype___t` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 56,
+      "text": "| 公司 | `comp_code` / `comp_code___t` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 57,
+      "text": "| 销售中心 | `sales_center_code` / `sales_center` | dm_dp_api_warehouse_stock | |"
+     },
+     {
+      "number": 58,
+      "text": "| 销售区域 | `sales_region_code` / `sales_region` | dm_dp_api_stockout_oudue | |"
+     },
+     {
+      "number": 59,
+      "text": "| 产区 | `product_area_code` / `product_area_name` | dm_otd_wm_stock_stat_month_t | |"
+     },
+     {
+      "number": 60,
+      "text": ""
+     },
+     {
+      "number": 61,
+      "text": "### 1.4 物料/产品维度"
+     },
+     {
+      "number": 62,
+      "text": ""
+     },
+     {
+      "number": 63,
+      "text": "| 业务概念 | 字段 | 所属表 | 备注 |"
+     },
+     {
+      "number": 64,
+      "text": "|----------|------|--------|------|"
+     },
+     {
+      "number": 65,
+      "text": "| 物料号 | `material` (旧) / `material_num` (新) | 多张表 | 两张表体系用不同字段名 |"
+     },
+     {
+      "number": 66,
+      "text": "| 物料描述 | `material___t` / `material_name` | 多张表 | `___t` 后缀 v.s 直接 `_name` 后缀 |"
+     },
+     {
+      "number": 67,
+      "text": "| 物料组层级1-5 | `matl_grp_1` ~ `matl_grp_5` | dm_fin_stock_detail_accage_t_2023 | `___t` 后缀为描述 |"
+     },
+     {
+      "number": 68,
+      "text": "| 产品层次1-5 | `zprodh1` ~ `zprodh5` | dm_fin_stock_detail_accage_t_2023 | SAP 风格，与 matl_grp 两套体系并存 |"
+     },
+     {
+      "number": 69,
+      "text": "| 外部物料组 | `extmatlgrp` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 70,
+      "text": "| 物料类型 | `matl_type` | dm_fin_stock_detail_accage_t_2023 | |"
+     },
+     {
+      "number": 71,
+      "text": "| 品类 | `cat` | dm_otd_wm_stock_stat_month_t, dm_rpt_wm_cxc_day_sum | |"
+     },
+     {
+      "number": 72,
+      "text": "| 产品渠道 | `prod_channel` / `product_channel_name` | CXC/统计/全类型表 | |"
+     },
+     {
+      "number": 73,
+      "text": "| 品牌 | `product_brand_name` / `brand_name` | 出入库/全类型表 | |"
+     },
+     {
+      "number": 74,
+      "text": "| 规格 | `dimension` / `dimension_` | 多张表 | `dm_product_inout_stock_t` 有下划线后缀 |"
+     },
+     {
+      "number": 75,
+      "text": ""
+     },
+     {
+      "number": 76,
+      "text": "---"
+     },
+     {
+      "number": 77,
+      "text": ""
+     },
+     {
+      "number": 78,
+      "text": "## 二、表选择决策树"
+     },
+     {
+      "number": 79,
+      "text": ""
+     },
+     {
+      "number": 80,
+      "text": "```"
+     },
+     {
+      "number": 81,
+      "text": "用户问题"
+     },
+     {
+      "number": 82,
+      "text": "├── 需要物料级库存明细（含批次/工厂/库存地点）？"
+     },
+     {
+      "number": 83,
+      "text": "│   └── 用 dm.dm_fin_stock_detail_accage_t_2023（183列，1.44亿行，最全）"
+     },
+     {
+      "number": 84,
+      "text": "├── 需要库龄分析/资金占压？"
+     },
+     {
+      "number": 85,
+      "text": "│   ├── 明细级 → dm.dm_fin_stock_detail_accage_t_2023"
+     },
+     {
+      "number": 86,
+      "text": "│   └── 月汇总级 → dm.dm_rpt_stock_age_month_ct（57行）"
+     },
+     {
+      "number": 87,
+      "text": "├── 涉及\"在途库存\"？"
+     },
+     {
+      "number": 88,
+      "text": "│   └── 用 dm.dm_b1_transit_inventory_t（1958万行，含预测）"
+     },
+     {
+      "number": 89,
+      "text": "├── 涉及\"仓库库存快照\"（全类型：可用/冻结/质检）？"
+     },
+     {
+      "number": 90,
+      "text": "│   └── 用 dm.dm_wm_all_type_stock_t（81列）"
+     },
+     {
+      "number": 91,
+      "text": "│   └── 简版用 dm.dm_dp_api_warehouse_stock（9列，FineReport API）"
+     },
+     {
+      "number": 92,
+      "text": "├── 涉及\"CXC日报\"/\"仓储协作\"/\"出入库趋势\"？"
+     },
+     {
+      "number": 93,
+      "text": "│   └── 用 dm.dm_rpt_wm_cxc_day_sum（172万行，按天）"
+     },
+     {
+      "number": 94,
+      "text": "├── 涉及\"库存月报统计\"/\"按库龄段+品类汇总\"？"
+     },
+     {
+      "number": 95,
+      "text": "│   └── 用 dm.dm_otd_wm_stock_stat_month_t（105万行）"
+     },
+     {
+      "number": 96,
+      "text": "├── 涉及\"出入库明细\"/\"产品出入库\"？"
+     },
+     {
+      "number": 97,
+      "text": "│   ├── 通用 → dm.dm_product_inout_stock_t（99万行）"
+     },
+     {
+      "number": 98,
+      "text": "│   ├── 湖南 → dm.dm_product_inout_stock_hunan_t（56万行）"
+     },
+     {
+      "number": 99,
+      "text": "│   └── 湖南含金额 → dm.dm_original_product_inout_stock_hunan_t（147万行，带成本中心/金额）"
+     },
+     {
+      "number": 100,
+      "text": "├── 涉及\"安全库存\"/\"可用库存健康度\"？"
+     },
+     {
+      "number": 101,
+      "text": "│   └── 用 dm.dm_safestock_all_stock（高度汇总）"
+     },
+     {
+      "number": 102,
+      "text": "├── 涉及\"缺货/超期\"？"
+     },
+     {
+      "number": 103,
+      "text": "│   └── 用 dm.dm_dp_api_stockout_oudue"
+     },
+     {
+      "number": 104,
+      "text": "├── 涉及\"低周转出库\"/\"残次品出库\"？"
+     },
+     {
+      "number": 105,
+      "text": "│   ├── 低周转 → dm.dm_wm_low_turnover_stockout_detail_t"
+     },
+     {
+      "number": 106,
+      "text": "│   └── 残次品 → dm.dm_wm_defective_product_stockout_t"
+     },
+     {
+      "number": 107,
+      "text": "├── 涉及“库存周转率”？"
+     },
+     {
+      "number": 108,
+      "text": "│   └── 用 dm.dm_otd_wm_stock_turnover_m（40行，预计算）"
+     },
+     {
+      "number": 109,
+      "text": "├── 涉及“跌价准备”/“库龄分段金额”/“库存金额（管理口径，默认）”？"
+     },
+     {
+      "number": 110,
+      "text": "│   └── 用 dm.dm_fin_stock_detail_accage_t_2023（jchj_amt / wbzq_*_fall_amt / zsjkcje）"
+     },
+     {
+      "number": 111,
+      "text": "├── 涉及“阿米巴口径库存/跌价”（与 Mix 阿米巴对齐）？"
+     },
+     {
+      "number": 112,
+      "text": "│   └── 同内部表 `*_aging` 字段族（stock_amt / jchj_aging / wbzq_*_fall_aging）"
+     },
+     {
+      "number": 113,
+      "text": "├── 涉及“线组分摊减值/分摊资金成本”（CHDJ）？"
+     },
+     {
+      "number": 114,
+      "text": "│   └── 用 dm.dm_ambv2_chdj_grp_t（inventory_value=管理减值的线组分摊，非库存价值；金额合计用 conv 列）"
+     },
+     {
+      "number": 115,
+      "text": "├── 涉及“库存资金成本”（批次级）？"
+     },
+     {
+      "number": 116,
+      "text": "│   └── 用 dm.dm_fin_stock_capital_cost_t（可为负、滚动窗口近2年）"
+     },
+     {
+      "number": 117,
+      "text": "├── 用户明确要求“上市口径”（特殊要求，回答必须声明口径）？"
+     },
+     {
+      "number": 118,
+      "text": "│   └── 用 dm.dm_fin_stock_d_accage_list_c_t_2023（非默认，勿主动路由）"
+     },
+     {
+      "number": 119,
+      "text": "└── 不确定？"
+     },
+     {
+      "number": 120,
+      "text": "    └── 默认用 dm.dm_fin_stock_detail_accage_t_2023（最全，但查询必须带 calmonth 过滤）"
+     },
+     {
+      "number": 121,
+      "text": "```"
+     },
+     {
+      "number": 122,
+      "text": ""
+     },
+     {
+      "number": 123,
+      "text": "---"
+     },
+     {
+      "number": 124,
+      "text": ""
+     },
+     {
+      "number": 125,
+      "text": "## 三、核心表速查"
+     },
+     {
+      "number": 126,
+      "text": ""
+     },
+     {
+      "number": 127,
+      "text": "### 3.1 dm_fin_stock_detail_accage_t_2023 — 库存账龄明细（第一优先）"
+     },
+     {
+      "number": 128,
+      "text": ""
+     },
+     {
+      "number": 129,
+      "text": "| 属性 | 值 |"
+     },
+     {
+      "number": 130,
+      "text": "|------|-----|"
+     },
+     {
+      "number": 131,
+      "text": "| Schema | dm |"
+     },
+     {
+      "number": 132,
+      "text": "| 粒度 | 物料+工厂+库存地点+批次+会计期间 |"
+     },
+     {
+      "number": 133,
+      "text": "| 列数 | 183 |"
+     },
+     {
+      "number": 134,
+      "text": "| 行数 | 1.44亿 |"
+     },
+     {
+      "number": 135,
+      "text": "| 时间范围 | 202012 ~ 202608 |"
+     },
+     {
+      "number": 136,
+      "text": "| 时间字段 | `calmonth` (YYYYMM, NOT NULL) |"
+     },
+     {
+      "number": 137,
+      "text": "| 数量字段 | `quantity` |"
+     },
+     {
+      "number": 138,
+      "text": "| 金额字段 | `zsjkcje`（实际库存金额-管理），`stock_amt`（阿米巴结算价）；跌价 `jchj_amt`/`jchj_aging` |"
+     },
+     {
+      "number": 139,
+      "text": "| 库龄字段 | `wbzq_6_amt`~`wbzq_24_amt`（金额），`wbzq_6_qty`~`wbzq_24_qty`（数量），`wbzq_6_area`~`wbzq_24_area`（面积） |"
+     },
+     {
+      "number": 140,
+      "text": "| 关键维度 | plant, stor_loc, stockcat, stocktype, batch, material, matl_grp_1~5, zprodh1~5, wbs_elemt, vendor |"
+     },
+     {
+      "number": 141,
+      "text": "| ⚠️ 陷阱 | calmonth 格式 YYYYMM（如 '202606'）；`___t` 后缀=描述；库龄多套口径并存（标准/爱米巴/自然日历/协议单价） |"
+     },
+     {
+      "number": 142,
+      "text": ""
+     },
+     {
+      "number": 143,
+      "text": "### 3.2 dm_wm_all_type_stock_t — 全类型库存"
+     },
+     {
+      "number": 144,
+      "text": ""
+     },
+     {
+      "number": 145,
+      "text": "| 属性 | 值 |"
+     },
+     {
+      "number": 146,
+      "text": "|------|-----|"
+     },
+     {
+      "number": 147,
+      "text": "| Schema | dm |"
+     },
+     {
+      "number": 148,
+      "text": "| 粒度 | 物料+工厂+库存地点的库存快照 |"
+     },
+     {
+      "number": 149,
+      "text": "| 列数 | 81 |"
+     },
+     {
+      "number": 150,
+      "text": "| 行数 | 14.4万 |"
+     },
+     {
+      "number": 151,
+      "text": "| 时间字段 | `dw_last_update_date`（快照时间） |"
+     },
+     {
+      "number": 152,
+      "text": "| 数量字段 | total_inventory_quantity, available_inventory_quantity, qc_inventory_quantity, frozen_inventory_quantity 等 14 个 |"
+     },
+     {
+      "number": 153,
+      "text": "| 面积字段 | total_inventory_area, available_inventory_area 等 7 个 |"
+     },
+     {
+      "number": 154,
+      "text": "| ⚠️ 陷阱 | 是快照表，不是实时数据；必须带工厂/渠道过滤 |"
+     },
+     {
+      "number": 155,
+      "text": ""
+     },
+     {
+      "number": 156,
+      "text": "### 3.3 dm_rpt_wm_cxc_day_sum — CXC 日报"
+     },
+     {
+      "number": 157,
+      "text": ""
+     },
+     {
+      "number": 158,
+      "text": "| 属性 | 值 |"
+     },
+     {
+      "number": 159,
+      "text": "|------|-----|"
+     },
+     {
+      "number": 160,
+      "text": "| Schema | dm |"
+     },
+     {
+      "number": 161,
+      "text": "| 粒度 | 日期+区域+品类+规格+产品渠道 |"
+     },
+     {
+      "number": 162,
+      "text": "| 列数 | 15 |"
+     },
+     {
+      "number": 163,
+      "text": "| 行数 | 172万 |"
+     },
+     {
+      "number": 164,
+      "text": "| 时间范围 | 2022-07-31 ~ 2026-06-06 |"
+     },
+     {
+      "number": 165,
+      "text": "| 时间字段 | `stat_date` (YYYYMMDD) |"
+     },
+     {
+      "number": 166,
+      "text": "| 核心字段 | stock_area_month_start/end, stock_area_year_start, sales_stock_out_area_year/month/day, stock_in_area_year/month/day |"
+     },
+     {
+      "number": 167,
+      "text": "| ⚠️ 陷阱 | 单位是面积（平米），不是数量；有 `_0630` 和 `_tmp` 变体表，用主表 |"
+     },
+     {
+      "number": 168,
+      "text": ""
+     },
+     {
+      "number": 169,
+      "text": "### 3.4 dm_b1_transit_inventory_t — 在途库存"
+     },
+     {
+      "number": 170,
+      "text": ""
+     },
+     {
+      "number": 171,
+      "text": "| 属性 | 值 |"
+     },
+     {
+      "number": 172,
+      "text": "|------|-----|"
+     },
+     {
+      "number": 173,
+      "text": "| Schema | dm |"
+     },
+     {
+      "number": 174,
+      "text": "| 粒度 | 客户+物料+品类+月份 |"
+     },
+     {
+      "number": 175,
+      "text": "| 列数 | 11 |"
+     },
+     {
+      "number": 176,
+      "text": "| 行数 | 1958万 |"
+     },
+     {
+      "number": 177,
+      "text": "| 时间范围 | 2018-01 ~ 2030-12（含预测） |"
+     },
+     {
+      "number": 178,
+      "text": "| 时间字段 | `doc_month` (YYYY-MM) |"
+     },
+     {
+      "number": 179,
+      "text": "| ⚠️ 陷阱 | 含未来预测数据；汇总表无采购订单明细 |"
+     },
+     {
+      "number": 180,
+      "text": ""
+     },
+     {
+      "number": 181,
+      "text": "### 3.5 其他表速查"
+     },
+     {
+      "number": 182,
+      "text": ""
+     },
+     {
+      "number": 183,
+      "text": "| 表名 | 行数 | 关键时间字段 | 主要用途 |"
+     },
+     {
+      "number": 184,
+      "text": "|------|------|-------------|----------|"
+     },
+     {
+      "number": 185,
+      "text": "| dm_product_inout_stock_t | 99万 | start_month (YYYY-MM) | 产品出入库汇总 |"
+     },
+     {
+      "number": 186,
+      "text": "| dm_otd_wm_stock_stat_month_t | 105万 | month_date | 库存月报+库龄分段 |"
+     },
+     {
+      "number": 187,
+      "text": "| dm_dp_api_warehouse_stock | 1.7万 | dw_last_update_date | 仓库库存快照 API |"
+     },
+     {
+      "number": 188,
+      "text": "| dm_dp_api_stockout_oudue | 0.5万 | stat_month_ym | 缺货超期 |"
+     },
+     {
+      "number": 189,
+      "text": "| dm_wm_low_turnover_stockout_detail_t | 36万 | voucher_post_date | 低周转出库明细 |"
+     },
+     {
+      "number": 190,
+      "text": "| dm_wm_defective_product_stockout_t | 94万 | voucher_post_date | 残次品出库 |"
+     },
+     {
+      "number": 191,
+      "text": "| dm_otd_wm_stock_turnover_m | 40 | stat_month | 库存周转率（预计算） |"
+     },
+     {
+      "number": 192,
+      "text": "| dm_rpt_stock_age_month_ct | 57 | calmonth (YYYYMM) | 库龄月报汇总 |"
+     },
+     {
+      "number": 193,
+      "text": ""
+     },
+     {
+      "number": 194,
+      "text": "---"
+     },
+     {
+      "number": 195,
+      "text": ""
+     },
+     {
+      "number": 196,
+      "text": "## 四、日期格式总览（关键！）"
+     },
+     {
+      "number": 197,
+      "text": ""
+     },
+     {
+      "number": 198,
+      "text": "| 表 | 时间字段 | 格式 | 示例 |"
+     },
+     {
+      "number": 199,
+      "text": "|---|---------|------|------|"
+     },
+     {
+      "number": 200,
+      "text": "| dm_fin_stock_detail_accage_t_2023 | `calmonth` | YYYYMM | `'202606'` |"
+     },
+     {
+      "number": 201,
+      "text": "| dm_fin_stock_detail_accage_t | `calmonth` | YYYYMM | `'202606'` |"
+     },
+     {
+      "number": 202,
+      "text": "| dm_rpt_wm_cxc_day_sum | `stat_date` | YYYYMMDD | `'20260606'` |"
+     },
+     {
+      "number": 203,
+      "text": "| dm_b1_transit_inventory_t | `doc_month` | YYYY-MM | `'2026-06'` |"
+     },
+     {
+      "number": 204,
+      "text": "| dm_product_inout_stock_t | `start_month` | YYYY-MM | `'2026-06'` |"
+     },
+     {
+      "number": 205,
+      "text": "| dm_otd_wm_stock_stat_month_t | `month_date` | 需确认 | 不同数据源可能不同 |"
+     },
+     {
+      "number": 206,
+      "text": "| dm_otd_wm_stock_turnover_m | `stat_month` | text | |"
+     },
+     {
+      "number": 207,
+      "text": "| 低周转/残次品表 | `voucher_post_date` | timestamp | `'2026-06-01'` |"
+     },
+     {
+      "number": 208,
+      "text": "| dm_fin_stock_capital_cost_t | `month` | YYYYMM | `'202608'` |"
+     },
+     {
+      "number": 209,
+      "text": "| dm_ambv2_chdj_grp_t | `stat_month` | YYYY-MM | `'2026-08'` |"
+     },
+     {
+      "number": 210,
+      "text": ""
+     },
+     {
+      "number": 211,
+      "text": "⚠️ **最大陷阱**：同一个库不同表的时间字段格式不一致！YYYYMM vs YYYY-MM vs YYYYMMDD vs timestamp。"
+     },
+     {
+      "number": 212,
+      "text": ""
+     },
+     {
+      "number": 213,
+      "text": "---"
+     },
+     {
+      "number": 214,
+      "text": ""
+     },
+     {
+      "number": 215,
+      "text": "## 五、标准指标公式"
+     },
+     {
+      "number": 216,
+      "text": ""
+     },
+     {
+      "number": 217,
+      "text": "### 库存类"
+     },
+     {
+      "number": 218,
+      "text": ""
+     },
+     {
+      "number": 219,
+      "text": "| 指标 | 公式 | 适用表 |"
+     },
+     {
+      "number": 220,
+      "text": "|------|------|--------|"
+     },
+     {
+      "number": 221,
+      "text": "| 库存总量 | `SUM(quantity)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 222,
+      "text": "| 库存资金占压 | `SUM(zsjkcje)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 223,
+      "text": "| 库存面积（全类型） | `SUM(total_inventory_area)` | dm_wm_all_type_stock_t |"
+     },
+     {
+      "number": 224,
+      "text": "| 可用库存占比 | `SUM(available_inventory_quantity) / SUM(total_inventory_quantity) * 100` | dm_wm_all_type_stock_t |"
+     },
+     {
+      "number": 225,
+      "text": ""
+     },
+     {
+      "number": 226,
+      "text": "### 库龄类"
+     },
+     {
+      "number": 227,
+      "text": ""
+     },
+     {
+      "number": 228,
+      "text": "| 指标 | 公式 | 适用表 |"
+     },
+     {
+      "number": 229,
+      "text": "|------|------|--------|"
+     },
+     {
+      "number": 230,
+      "text": "| 库龄0-6月金额 | `SUM(wbzq_6_amt)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 231,
+      "text": "| 库龄6-12月金额 | `SUM(wbzq_6_12_amt)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 232,
+      "text": "| 库龄12-24月金额 | `SUM(wbzq_12_24_amt)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 233,
+      "text": "| 库龄24月+金额 | `SUM(wbzq_24_amt)` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 234,
+      "text": "| 长龄库存占比（>12月） | `SUM(wbzq_12_24_amt + wbzq_24_amt) / SUM(zsjkcje) * 100` | dm_fin_stock_detail_accage_t_2023 |"
+     },
+     {
+      "number": 235,
+      "text": ""
+     },
+     {
+      "number": 236,
+      "text": "### 出入库/周转类"
+     },
+     {
+      "number": 237,
+      "text": ""
+     },
+     {
+      "number": 238,
+      "text": "| 指标 | 公式 | 适用表 |"
+     },
+     {
+      "number": 239,
+      "text": "|------|------|--------|"
+     },
+     {
+      "number": 240,
+      "text": "| 月度出库面积 | `SUM(sales_stock_out_area_month)` | dm_rpt_wm_cxc_day_sum |"
+     },
+     {
+      "number": 241,
+      "text": "| 月度入库面积 | `SUM(stock_in_area_month)` | dm_rpt_wm_cxc_day_sum |"
+     },
+     {
+      "number": 242,
+      "text": "| 月均库存 | `(stock_area_month_start + stock_area_month_end) / 2` | dm_rpt_wm_cxc_day_sum |"
+     },
+     {
+      "number": 243,
+      "text": "| 月度库存周转率 | `sales_stock_out_area_month / ((stock_area_month_start + stock_area_month_end) / 2)` | dm_rpt_wm_cxc_day_sum |"
+     },
+     {
+      "number": 244,
+      "text": "| 库存周转次数 | `turnover_times`（预计算） | dm_otd_wm_stock_turnover_m |"
+     },
+     {
+      "number": 245,
+      "text": "| 在途库存金额 | `SUM(deliver_amount)` | dm_b1_transit_inventory_t |"
+     },
+     {
+      "number": 246,
+      "text": ""
+     },
+     {
+      "number": 247,
+      "text": "---"
+     },
+     {
+      "number": 248,
+      "text": ""
+     },
+     {
+      "number": 249,
+      "text": "## 六、标准过滤条件"
+     },
+     {
+      "number": 250,
+      "text": ""
+     },
+     {
+      "number": 251,
+      "text": "```sql"
+     },
+     {
+      "number": 252,
+      "text": "-- dm_fin_stock_detail_accage_t_2023：必须带 calmonth 过滤避免全表扫描"
+     },
+     {
+      "number": 253,
+      "text": "WHERE calmonth = '202606'"
+     },
+     {
+      "number": 254,
+      "text": ""
+     },
+     {
+      "number": 255,
+      "text": "-- dm_b1_transit_inventory_t：排除未来预测数据"
+     },
+     {
+      "number": 256,
+      "text": "WHERE doc_month <= '2026-06' AND doc_month >= '2018-01'"
+     },
+     {
+      "number": 257,
+      "text": ""
+     },
+     {
+      "number": 258,
+      "text": "-- dm_rpt_wm_cxc_day_sum：stat_date 格式为 YYYYMMDD"
+     },
+     {
+      "number": 259,
+      "text": "WHERE stat_date = '20260606'"
+     },
+     {
+      "number": 260,
+      "text": ""
+     },
+     {
+      "number": 261,
+      "text": "-- 低周转/残次品表：用 timestamp 过滤"
+     },
+     {
+      "number": 262,
+      "text": "WHERE voucher_post_date >= '2026-01-01'"
+     },
+     {
+      "number": 263,
+      "text": ""
+     },
+     {
+      "number": 264,
+      "text": "-- 产品出入库表：start_month 格式 YYYY-MM"
+     },
+     {
+      "number": 265,
+      "text": "WHERE start_month = '2026-06'"
+     },
+     {
+      "number": 266,
+      "text": ""
+     },
+     {
+      "number": 267,
+      "text": "-- dm_product_inout_stock_t 规格字段带下划线"
+     },
+     {
+      "number": 268,
+      "text": "SELECT dimension_ FROM dm.dm_product_inout_stock_t"
+     },
+     {
+      "number": 269,
+      "text": "```"
+     },
+     {
+      "number": 270,
+      "text": ""
+     },
+     {
+      "number": 271,
+      "text": "---"
+     },
+     {
+      "number": 272,
+      "text": ""
+     },
+     {
+      "number": 273,
+      "text": "## 七、已知陷阱总览"
+     },
+     {
+      "number": 274,
+      "text": ""
+     },
+     {
+      "number": 275,
+      "text": "1. **日期格式不一致**（见第四节）：同一概念在不同表中格式不同，绝对不能混用"
+     },
+     {
+      "number": 276,
+      "text": "2. **物料字段名不一致**：`material`（SAP风格，`___t`后缀）vs `material_num`（新风格，`_name`后缀）。查询时注意表用的是哪套"
+     },
+     {
+      "number": 277,
+      "text": "3. **`___t` 后缀**：三个下划线 + t，SAP 风格文本字段。如 `plant` → `plant___t`，`zprodh1` → `zprodh1___t`"
+     },
+     {
+      "number": 278,
+      "text": "4. **规格字段**：`dm_product_inout_stock_t` 中是 `dimension_`（单下划线后缀），其他表是 `dimension`"
+     },
+     {
+      "number": 279,
+      "text": "5. **库龄多套口径**：管理(wbzq/ybzq+fall_amt)、阿米巴(*_aging)、协议单价(xydj/xyzjdj)、自然日历(zrzlcp_)。用户未指定时默认管理口径；SKU 效益域配 Mix 用阿米巴口径"
+     },
+     {
+      "number": 280,
+      "text": "6. **在途库存含预测**：`dm_b1_transit_inventory_t` 有 2030 年数据，必须过滤 doc_month"
+     },
+     {
+      "number": 281,
+      "text": "7. **`dm.dm_fin_stock_detail_accage_t` 是旧表/子集**（91列，不含面积/数量细分字段），查询用 `_2023` 后缀完整版"
+     },
+     {
+      "number": 282,
+      "text": "8. **CXC 日报变体**：`_0630`（6/30快照）、`_tmp`（临时表），查询用主表 `dm_rpt_wm_cxc_day_sum`"
+     },
+     {
+      "number": 283,
+      "text": "9. **安全库存表行数极少**：是高度汇总的报表，不是明细数据"
+     },
+     {
+      "number": 284,
+      "text": "10. **湖南基地独立表**：出入库有专门湖南表，查询时注意基地分表规则"
+     },
+     {
+      "number": 285,
+      "text": "11. **`jc` 字段族=减值**（管理口径 0/10/40/70%），不是\"检出金额\"；`jchj_amt`=减值合计（管理）"
+     },
+     {
+      "number": 286,
+      "text": "12. **`wbzq`/`ybzq`=无/有保质期**（按 bz_flag 分流），不是未/已包装；有保质期减值仅 7C/73/7220+特定库位工厂计提，其余恒 0"
+     },
+     {
+      "number": 287,
+      "text": "13. **CHDJ `inventory_value` 实为管理口径减值**（非库存价值）：与库存金额是不同概念，与上市口径跌价是不同体系，禁止跨表加减"
+     },
+     {
+      "number": 288,
+      "text": "14. **资金成本表 TRUNCATE 滚动窗口只留近 2 年**：更早月份查不到是窗口限制非数据丢失"
+     },
+     {
+      "number": 289,
+      "text": "15. **资金成本可为负**（平均余额<202012基线，去库存常态）；**CHDJ `capital_cost` 原始列在分摊行结构中重复携带全额（SUM 放大反号）——CHDJ 维度金额 SUM `capital_cost_conv`，准确金额用源表**"
+     },
+     {
+      "number": 290,
+      "text": "16. **资金成本 LAG 分区含 material_name**：物料改名断链→期初变 0→当月成本突降"
+     },
+     {
+      "number": 291,
+      "text": "17. **CHDJ 范围限卫浴/瓷砖/国际/丽适**（非全集团）；其 zdpsyb 码=node2 去 H 前缀，11000011/11000012 为卫浴旧组织"
+     },
+     {
+      "number": 292,
+      "text": "18. **库龄明细表 plant 7C 用 zpcrk_fc 分桶**（其余工厂用批次日期 zmmm_o017_zbatch_date）"
+     },
+     {
+      "number": 293,
+      "text": ""
+     },
+     {
+      "number": 294,
+      "text": "---"
+     },
+     {
+      "number": 295,
+      "text": ""
+     },
+     {
+      "number": 296,
+      "text": "## 八、存货跌价与减值 · 资金成本（完整语义）"
+     },
+     {
+      "number": 297,
+      "text": ""
+     },
+     {
+      "number": 298,
+      "text": "### 8.1 跌价/减值体系对照（禁止混用，2026-08-20/24 合并裁定）"
+     },
+     {
+      "number": 299,
+      "text": ""
+     },
+     {
+      "number": 300,
+      "text": "| 体系 | 字段族 | 计提比例 | 桶边界 | 载体表 | 路由 |"
+     },
+     {
+      "number": 301,
+      "text": "|---|---|---|---|---|---|"
+     },
+     {
+      "number": 302,
+      "text": "| **管理口径跌价（默认）** | `jchj_amt`（合计，预计算）+ 分段 `wbzq_6_fall_amt`/`wbzq_6_12_fall_amt`/`wbzq_12_24_fall_amt`/`wbzq_24_fall_amt`/`ybzq_bzdq_3_fall_amt`/`ybzq_bzdq_fall_amt` | 0/10/40/70% + 保质期 70/100% | 6/12/24月 + 保质期到期 | 内部表 `dm_fin_stock_detail_accage_t_2023`（calmonth=YYYYMM） | \"跌价/减值/库龄\"（默认） |"
+     },
+     {
+      "number": 303,
+      "text": "| **阿米巴口径跌价** | `jchj_aging` + 分段 `*_fall_aging`；金额基数 `stock_amt` | 同上比例 | 6/12/24月（阿米巴结算价桶） | 同上（`*_aging` 族） | 与 Mix/销售侧对齐、SKU 效益域 |"
+     },
+     {
+      "number": 304,
+      "text": "| **CHDJ 线组分摊** | `inventory_value`（=管理减值合计的线组分摊，**非库存价值**）/ `inventory_value_amb`（阿米巴结算价减值分摊） | 承袭上述比例 | 同上 + 预算比例分摊 | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） | \"线组/渠道分摊\"；范围限卫浴/瓷砖/国际/丽适 |"
+     },
+     {
+      "number": 305,
+      "text": "| **上市口径（非默认）** | `aging_sum_fall_amt` + 年段分段 | 0/20/30/50/50% | 1/2/3/4年（天级90天桶） | `dm_fin_stock_d_accage_list_c_t_2023` | **仅用户明确要求且声明口径时使用**（业务裁定 2026-08-24） |"
+     },
+     {
+      "number": 306,
+      "text": ""
+     },
+     {
+      "number": 307,
+      "text": "### 8.2 库存资金成本"
+     },
+     {
+      "number": 308,
+      "text": ""
+     },
+     {
+      "number": 309,
+      "text": "| 概念 | 权威字段 | 所在表 |"
+     },
+     {
+      "number": 310,
+      "text": "|---|---|---|"
+     },
+     {
+      "number": 311,
+      "text": "| 库存资金成本（批次级，主口径） | `capital_cost` | `dm_fin_stock_capital_cost_t`（month=YYYYMM） |"
+     },
+     {
+      "number": 312,
+      "text": "| 累计资金成本（分年不跨年） | `capital_cost_sum` | 同上 |"
+     },
+     {
+      "number": 313,
+      "text": "| 分摊资金成本（按预算比例到线组） | `capital_cost_conv`/`capital_cost_sum_conv` | `dm_ambv2_chdj_grp_t`（stat_month=YYYY-MM） |"
+     },
+     {
+      "number": 314,
+      "text": ""
+     },
+     {
+      "number": 315,
+      "text": "公式（ETL 实证）：`((期初+期末)/2 − 202012余额) × 4%/12`；期初=LAG(期末)；**可为负**（低于基线）；TRUNCATE 滚动窗口仅近 2 年；**CHDJ 原始 capital_cost 列禁止 SUM 当金额（分摊行重复携带全额），用 conv 列或源表**。"
+     },
+     {
+      "number": 316,
+      "text": ""
+     },
+     {
+      "number": 317,
+      "text": "### 8.3 金额口径锚点（2026-07/08 实测，内部口径）"
+     },
+     {
+      "number": 318,
+      "text": ""
+     },
+     {
+      "number": 319,
+      "text": "| 金额 | 表/字段 | 概念 |"
+     },
+     {
+      "number": 320,
+      "text": "|---|---|---|"
+     },
+     {
+      "number": 321,
+      "text": "| 14.71亿（202607） | 内部表 `zsjkcje` / 资金成本表 `closing_balance` 14.3亿（202608） | **库存金额（管理口径）** |"
+     },
+     {
+      "number": 322,
+      "text": "| 17.52亿 | 内部表 `stock_amt` | 库存金额（阿米巴结算价） |"
+     },
+     {
+      "number": 323,
+      "text": "| 2.877亿 | 内部表 `jchj_amt` | **管理口径跌价/减值** |"
+     },
+     {
+      "number": 324,
+      "text": "| 3.301亿 | 内部表 `jchj_aging` | 阿米巴口径减值 |"
+     },
+     {
+      "number": 325,
+      "text": "| 6.35亿 | CHDJ `inventory_value` | 管理减值的**线组分摊**（卫浴/瓷砖/国际/丽适范围，非全集团） |"
+     },
+     {
+      "number": 326,
+      "text": ""
+     },
+     {
+      "number": 327,
+      "text": "**决策**：问库存金额/跌价→内部表（默认管理族）；与 Mix/销售侧对齐→`*_aging` 族；问线组分摊→CHDJ；问资金成本→默认 `dm_fin_stock_capital_cost_t`。任何两口径金额不可加减。上市口径表 `dm_fin_stock_d_accage_list_c_t_2023` 非默认——仅特殊要求使用且回答必须声明口径。详见 [stock-fall-list.md](stock-fall-list.md)、[chdj-capital-cost.md](chdj-capital-cost.md)、[capital-cost-table.md](capital-cost-table.md)、[stock-accage.md](stock-accage.md)。"
+     },
+     {
+      "number": 328,
+      "text": ""
+     },
+     {
+      "number": 329,
+      "text": "---"
+     },
+     {
+      "number": 330,
+      "text": ""
+     },
+     {
+      "number": 331,
+      "text": "## 九、关联维度表"
+     },
+     {
+      "number": 332,
+      "text": ""
+     },
+     {
+      "number": 333,
+      "text": "| 维度 | 表 | 关联键 |"
+     },
+     {
+      "number": 334,
+      "text": "|------|-----|--------|"
+     },
+     {
+      "number": 335,
+      "text": "| 成本中心属性 | dwifin.dwi_cost_center_main_t | cost_center_code / cost_center |"
+     },
+     {
+      "number": 336,
+      "text": "| 公司信息 | dwrdim.dwr_dim_company_d | comp_code / company_code |"
+     },
+     {
+      "number": 337,
+      "text": ""
+     },
+     {
+      "number": 338,
+      "text": "注：库存明细表中已有物料描述（`material___t`/`material_name`），无需单独关联物料主数据。"
+     }
+    ],
+    "totalLines": 338,
+    "lang": "md"
+   }
+  },
+  "sourceEventSeqs": [
+   539
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "step/end",
+  "seq": 543,
+  "time": 1788921454532,
+  "data": {
+   "turn": 1,
+   "step": 2
+  }
+ },
+ {
+  "type": "step/start",
+  "seq": 1169,
+  "time": 1788921461578,
+  "data": {
+   "turn": 1,
+   "step": 5
+  }
+ },
+ {
+  "type": "assistant/message",
+  "seq": 1653,
+  "time": 1788921466224,
+  "data": {
+   "turn": 1,
+   "step": 5,
+   "message": {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "The org-hierarchy doc is not in this environment. That's fine — the inventory table has `zdpsyb`/`zdpsyb___t` directly, which serves the \"事业部\" dimension.\n\nNow l …[TRUNC]"
+     },
+     {
+      "type": "text",
+      "text": "语义层已加载。表 `dm.dm_fin_stock_detail_accage_t_2023` 含事业部字段 `zdpsyb`/`zdpsyb___t`，跌价合计管理口径为 `jchj_amt`。Q3 2024 = calmonth 202407~202409。先验证表结构并探测该期间数据分布。"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_00_bvpF7QI97XlKhNrCEKle5112",
+      "name": "mcp__dws__describe_table",
+      "arguments": "{\"table_name\": \"dm.dm_fin_stock_detail_accage_t_2023\"}"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_01_fbdvQNkFqnjYxpCFhrFT3238",
+      "name": "mcp__dws__run_query",
+      "arguments": "{\"sql\": \"SELECT calmonth,\\n       COUNT(*) AS row_cnt,\\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,\\n       ROUND(SUM(COALESCE(zsjkcje,0))) AS stock_amt\\nFROM dm.dm_fin_stock_detail_accage_t_2023\\nWHERE calmonth BETWEEN '202407' AND '202409'\\nGROUP BY calmonth\\nORDER BY calmonth\", \"description\": \"探测2024Q3月度跌价金额总量\"}"
+     }
+    ],
+    "source": {
+     "kind": "model",
+     "provider": "deepseek-official",
+     "model": "deepseek-v4-flash"
+    },
+    "id": "89f72a77-9d72-4255-8b20-309e6d130c0e"
+   },
+   "usage": {
+    "inputTokens": 72,
+    "outputTokens": 546,
+    "totalTokens": 30698,
+    "cacheReadTokens": 30080,
+    "reasoningTokens": 252
+   }
+  },
+  "sourceEventSeqs": [
+   [
+    1170,
+    1652
+   ]
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 1654,
+  "time": 1788921466226,
+  "data": {
+   "turn": 1,
+   "step": 5,
+   "callId": "call_00_bvpF7QI97XlKhNrCEKle5112",
+   "name": "mcp__dws__describe_table",
+   "arguments": "{\"table_name\": \"dm.dm_fin_stock_detail_accage_t_2023\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 1655,
+  "time": 1788921466580,
+  "data": {
+   "turn": 1,
+   "step": 5,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_00_bvpF7QI97XlKhNrCEKle5112"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_00_bvpF7QI97XlKhNrCEKle5112",
+      "content": [
+       {
+        "type": "text",
+        "text": "{\"status\": \"ok\", \"table\": \"dm.dm_fin_stock_detail_accage_t_2023\", \"columns\": [{\"column_name\": \"batch\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"批次\"}, {\"column_name\": \"calmonth\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"NO\", \"column_default\": null, \"column_comment\": \"日历年/月\"}, {\"column_name\": \"calmonth2\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"日历月\"}, {\"column_name\": \"calyear\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"日历年\"}, {\"column_name\": \"comp_code\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"公司代码\"}, {\"column_name\": \"comp_code___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"公司代码_描述\"}, {\"column_name\": \"doc_currcy\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"凭证货币\"}, {\"column_name\": \"doc_currcy___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"凭证货币_描述\"}, {\"column_name\": \"extmatlgrp\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"外部物料组\"}, {\"column_name\": \"extmatlgrp___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"外部物料组_描述\"}, {\"column_name\": \"industry\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"行业\"}, {\"column_name\": \"industry___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"行业_描述\"}, {\"column_name\": \"material\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料编码\"}, {\"column_name\": \"material___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料编码_描述\"}, {\"column_name\": \"matl_group\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组\"}, {\"column_name\": \"matl_group___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组_描述\"}, {\"column_name\": \"matl_type\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料类型\"}, {\"column_name\": \"matl_type___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料类型_描述\"}, {\"column_name\": \"plant\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"工厂\"}, {\"column_name\": \"plant___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"工厂_描述\"}, {\"column_name\": \"reqtsn\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"请求事务序号\"}, {\"column_name\": \"stockcat\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存类别\"}, {\"column_name\": \"stockcat___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存类别_描述\"}, {\"column_name\": \"stocktype\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存类型\"}, {\"column_name\": \"stocktype___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存类型_描述\"}, {\"column_name\": \"stor_loc\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存地点\"}, {\"column_name\": \"stor_loc___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存地点_描述\"}, {\"column_name\": \"unit\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"计量单位\"}, {\"column_name\": \"unit___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"计量单位_描述\"}, {\"column_name\": \"val_class\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"评估类\"}, {\"column_name\": \"val_class___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"评估类_描述\"}, {\"column_name\": \"wbs_elemt\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"WBS 元素\"}, {\"column_name\": \"wbs_elemt___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"WBS 元素_描述\"}, {\"column_name\": \"wbs_elm_ex\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"0WBS_ELM_EX\"}, {\"column_name\": \"zmmm_o017_zbatch_date\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"入库日期\"}, {\"column_name\": \"zbatchmd\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料批次主数据\"}, {\"column_name\": \"zdpsyb\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"事业部\"}, {\"column_name\": \"zdpsyb___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"事业部_描述\"}, {\"column_name\": \"zdpzgsdq\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"子公司大区\"}, {\"column_name\": \"zdpzgsdq___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"子公司大区_描述\"}, {\"column_name\": \"zisqc\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"是否清仓\"}, {\"column_name\": \"ziswx\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"是否外协\"}, {\"column_name\": \"zmatltype\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料类别\"}, {\"column_name\": \"zmatltype___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料类别_描述\"}, {\"column_name\": \"zprodh3\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次3\"}, {\"column_name\": \"zprodh3___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次3_描述\"}, {\"column_name\": \"zww010\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产区\"}, {\"column_name\": \"zww010___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产区_描述\"}, {\"column_name\": \"zyl01\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品渠道\"}, {\"column_name\": \"zyl01___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品渠道_描述\"}, {\"column_name\": \"zyl06\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品等级\"}, {\"column_name\": \"zyl06___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品等级_描述\"}, {\"column_name\": \"quantity\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"数量\"}, {\"column_name\": \"zsjkcje\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"实际库存金额\"}, {\"column_name\": \"bz_flag\", \"data_type\": \"character varying\", \"character_maximum_length\": 2, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"保质期标识，Y：有保质期 N：无保质期\"}, {\"column_name\": \"ybzq_bzdq_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品，保质期到期\"}, {\"column_name\": \"ybzq_bzdq_3_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品,距离保质期到期3个月以内\"}, {\"column_name\": \"wbzq_6_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6个月以内\"}, {\"column_name\": \"wbzq_6_12_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6-12月\"}, {\"column_name\": \"wbzq_12_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，1-2年\"}, {\"column_name\": \"wbzq_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，2年以上\"}, {\"column_name\": \"ybzq_jc_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期减值\"}, {\"column_name\": \"wbzq_jc_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期减值\"}, {\"column_name\": \"dw_last_update_date\", \"data_type\": \"timestamp without time zone\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"数据同步时间\"}, {\"column_name\": \"zprodh1\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次1\"}, {\"column_name\": \"zprodh1___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次1_描述\"}, {\"column_name\": \"zprodh2\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次2\"}, {\"column_name\": \"zprodh2___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次2_描述\"}, {\"column_name\": \"zprodh4\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次4\"}, {\"column_name\": \"zprodh4___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次4_描述\"}, {\"column_name\": \"zprodh5\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次5\"}, {\"column_name\": \"zprodh5___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品层次5_描述\"}, {\"column_name\": \"matl_grp_1\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组1\"}, {\"column_name\": \"matl_grp_1___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组1_描述\"}, {\"column_name\": \"matl_grp_2\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组2\"}, {\"column_name\": \"matl_grp_2___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组2_描述\"}, {\"column_name\": \"matl_grp_3\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组3\"}, {\"column_name\": \"matl_grp_3___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组3_描述\"}, {\"column_name\": \"matl_grp_4\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组4\"}, {\"column_name\": \"matl_grp_4___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组4_描述\"}, {\"column_name\": \"matl_grp_5\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组5\"}, {\"column_name\": \"matl_grp_5___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"物料组5_描述\"}, {\"column_name\": \"vendor\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"供应商\"}, {\"column_name\": \"vendor___t\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"供应商_描述\"}, {\"column_name\": \"z_vfdat\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"货架寿命到期日\"}, {\"column_name\": \"val_type\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"评估类型\"}, {\"column_name\": \"zmmm_o017_zzqj\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"周期价\"}, {\"column_name\": \"ybzq_bzdq_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品数量，保质期到期\"}, {\"column_name\": \"ybzq_bzdq_3_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品数量,距离保质期到期3个月以内\"}, {\"column_name\": \"wbzq_6_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，6个月以内\"}, {\"column_name\": \"wbzq_6_12_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，6-12月\"}, {\"column_name\": \"wbzq_12_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，1-2年\"}, {\"column_name\": \"wbzq_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，2年以上\"}, {\"column_name\": \"batch_rk_date\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"批次入库日期（阿米巴调整)\"}, {\"column_name\": \"base\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"基地\"}, {\"column_name\": \"storage_classify\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库位分类\"}, {\"column_name\": \"classify_name\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"分类\"}, {\"column_name\": \"category_name\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"品类\"}, {\"column_name\": \"clear_inv_flag\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"清库存标识\"}, {\"column_name\": \"foreign_own\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"外协自产\"}, {\"column_name\": \"product_base\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"生产基地\"}, {\"column_name\": \"next_mon_date\", \"data_type\": \"timestamp without time zone\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月日期\"}, {\"column_name\": \"time_diff\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"时间差\"}, {\"column_name\": \"xydj_7_12_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月跌价金额-7-12个月\"}, {\"column_name\": \"xydi_12_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月跌价金额-1-2年\"}, {\"column_name\": \"xydj_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月跌价金额-2年以上\"}, {\"column_name\": \"xydjhj_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月跌价金额合计\"}, {\"column_name\": \"xyzjdj_7_12_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月增加跌价金额-7-12个月\"}, {\"column_name\": \"xyzjdj_12_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月增加跌价金额-1-2年\"}, {\"column_name\": \"xyzjdj_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月增加跌价金额-2年以上\"}, {\"column_name\": \"xyzjdjhj_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"下月增加跌价金额合计\"}, {\"column_name\": \"ybzq_bzdq_3_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品,距离保质期到期3个月以内跌价 70% \"}, {\"column_name\": \"ybzq_bzdq_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品，保质期到期跌价 100%\"}, {\"column_name\": \"wbzq_6_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6个月以内跌价 0%\"}, {\"column_name\": \"wbzq_6_12_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6-12月跌价 10%\"}, {\"column_name\": \"wbzq_12_24_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，1-2年跌价 40%\"}, {\"column_name\": \"wbzq_24_fall_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，2年以上跌价 70%\"}, {\"column_name\": \"jchj_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"减值合计（管理）\"}, {\"column_name\": \"stock_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"库存金额（阿米巴结算价）\"}, {\"column_name\": \"ybzq_bzdq_3_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品,距离保质期到期3个月以内账龄（阿米巴结算价）\"}, {\"column_name\": \"ybzq_bzdq_3_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品,距离保质期到期3个月以内跌价（阿米巴结算价）70%\"}, {\"column_name\": \"ybzq_bzdq_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品，保质期到期账龄（阿米巴结算价）\"}, {\"column_name\": \"ybzq_bzdq_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品，保质期到期跌价（阿米巴结算价）100%\"}, {\"column_name\": \"wbzq_6_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6个月以内账龄（阿米巴结算价）\"}, {\"column_name\": \"wbzq_6_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6个月以内跌价（阿米巴结算价）0%\"}, {\"column_name\": \"wbzq_6_12_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6-12月账龄（阿米巴结算价）\"}, {\"column_name\": \"wbzq_6_12_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，6-12月跌价（阿米巴结算价）10%\"}, {\"column_name\": \"wbzq_12_24_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，1-2年账龄（阿米巴结算价）\"}, {\"column_name\": \"wbzq_12_24_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，1-2年跌价（阿米巴结算价） 40%\"}, {\"column_name\": \"wbzq_24_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，2年以上账龄（阿米巴结算价）\"}, {\"column_name\": \"wbzq_24_fall_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品，2年以上跌价（阿米巴结算价）70%\"}, {\"column_name\": \"ybzq_jc_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期减值（阿米巴结算价）小计\"}, {\"column_name\": \"wbzq_jc_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期减值（阿米巴结算价）小计\"}, {\"column_name\": \"jchj_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"减值合计（阿米巴结算价）\"}, {\"column_name\": \"prod_property\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品所有权\"}, {\"column_name\": \"prod_property_name\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"产品所有权描述\"}, {\"column_name\": \"doc_number\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"销售凭证\"}, {\"column_name\": \"s_ord_item\", \"data_type\": \"character varying\", \"character_maximum_length\": 500, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"销售凭证项目\"}, {\"column_name\": \"ybzq_bzdq_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品面积,保质期到期\"}, {\"column_name\": \"ybzq_bzdq_3_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品面积,距离保质期到期3个月以内\"}, {\"column_name\": \"wbzq_6_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积,6个月以内\"}, {\"column_name\": \"wbzq_6_12_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积,6-12月\"}, {\"column_name\": \"wbzq_12_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积,1-2年\"}, {\"column_name\": \"wbzq_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积,2年以上\"}, {\"column_name\": \"busi_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"体积\"}, {\"column_name\": \"volume_unit_name\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"体积单位\"}, {\"column_name\": \"clearance_reason_code\", \"data_type\": \"character varying\", \"character_maximum_length\": 200, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"清仓原因编码\"}, {\"column_name\": \"clearance_reason\", \"data_type\": \"character varying\", \"character_maximum_length\": 400, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"清仓原因文本\"}, {\"column_name\": \"promote_reason_code\", \"data_type\": \"character varying\", \"character_maximum_length\": 100, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"促销原因编码\"}, {\"column_name\": \"promote_reason\", \"data_type\": \"character varying\", \"character_maximum_length\": 400, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"促销原因文本\"}, {\"column_name\": \"amb_wbzq_6_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，6个月以内（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_6_12_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，6-12月（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_12_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，1-2年（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品数量，2年以上（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_6_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积，6个月以内（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_6_12_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积，6-12月（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_12_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积，1-2年（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"amb_wbzq_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品面积，2年以上（瓷砖销售单元阿米巴）\"}, {\"column_name\": \"wbzq_6_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品体积，6个月以内\"}, {\"column_name\": \"wbzq_6_12_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品体积，6-12月\"}, {\"column_name\": \"wbzq_12_24_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品体积，1-2年\"}, {\"column_name\": \"wbzq_24_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"无保质期产品体积，2年以上\"}, {\"column_name\": \"ybzq_bzdq_3_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品体积，距离保质期到期3个月以内\"}, {\"column_name\": \"ybzq_bzdq_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品体积，保质期到期\"}, {\"column_name\": \"ybzq_bzdq_d3_volume\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品体积,距离保质期到期大于3个月\"}, {\"column_name\": \"ybzq_bzdq_d3_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品面积,距离保质期到期大于3个月\"}, {\"column_name\": \"ybzq_bzdq_d3_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品数量,距离保质期到期大于3个月\"}, {\"column_name\": \"ybzq_bzdq_d3_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品金额,距离保质期到期大于3个月\"}, {\"column_name\": \"ybzq_bzdq_d3_aging\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"有保质期产品金额,距离保质期到期大于3个月（阿米巴结算价）\"}, {\"column_name\": \"zkcmj\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"面积\"}, {\"column_name\": \"zrzlcp_6_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_6_12_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_12_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_24_amt\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_6_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_6_12_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_12_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_24_qty\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_6_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_6_12_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_12_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"zrzlcp_24_area\", \"data_type\": \"numeric\", \"character_maximum_length\": null, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": null}, {\"column_name\": \"supplier_or_creditor_num\", \"data_type\": \"character varying\", \"character_maximum_length\": 256, \"is_nullable\": \"YES\", \"column_default\": null, \"column_comment\": \"外协供应商编码\"}], \"count\": 183}"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "51c6a635-1120-4b1a-9e73-0fda5b262fed"
+   }
+  },
+  "sourceEventSeqs": [
+   1654
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 1656,
+  "time": 1788921466581,
+  "data": {
+   "turn": 1,
+   "step": 5,
+   "callId": "call_01_fbdvQNkFqnjYxpCFhrFT3238",
+   "name": "mcp__dws__run_query",
+   "arguments": "{\"sql\": \"SELECT calmonth,\\n       COUNT(*) AS row_cnt,\\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total,\\n       ROUND(SUM(COALESCE(zsjkcje,0))) AS stock_amt\\nFROM dm.dm_fin_stock_detail_accage_t_2023\\nWHERE calmonth BETWEEN '202407' AND '202409'\\nGROUP BY calmonth\\nORDER BY calmonth\", \"description\": \"探测2024Q3月度跌价金额总量\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 1657,
+  "time": 1788921471380,
+  "data": {
+   "turn": 1,
+   "step": 5,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_01_fbdvQNkFqnjYxpCFhrFT3238"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_01_fbdvQNkFqnjYxpCFhrFT3238",
+      "content": [
+       {
+        "type": "text",
+        "text": "{\"status\": \"ok\", \"row_count\": 3, \"truncated\": false, \"result_ref\": \"r-20260909103751-34092-1\", \"result_path\": \"D:\\\\dataprojai-2harness\\\\m0\\\\results\\\\r-20260909103751-34092-1.json\", \"schema\": [\"calmonth\", \"row_cnt\", \"fall_total\", \"stock_amt\"], \"data\": [{\"calmonth\": \"202407\", \"row_cnt\": 4131568, \"fall_total\": \"310330987\", \"stock_amt\": \"1714645009\"}, {\"calmonth\": \"202408\", \"row_cnt\": 4221515, \"fall_total\": \"312124171\", \"stock_amt\": \"1804544556\"}, {\"calmonth\": \"202409\", \"row_cnt\": 4313087, \"fall_total\": \"315342129\", \"stock_amt\": \"1838484867\"}]}"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "d228bd2c-d87a-4d00-a720-c0ba83dac51e"
+   }
+  },
+  "sourceEventSeqs": [
+   1656
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "step/end",
+  "seq": 1658,
+  "time": 1788921471380,
+  "data": {
+   "turn": 1,
+   "step": 5
+  }
+ },
+ {
+  "type": "assistant/message",
+  "seq": 2161,
+  "time": 1788921476357,
+  "data": {
+   "turn": 1,
+   "step": 6,
+   "message": {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "2024 Q3 data exists: ~310-315M 跌价 total per month (management口径 jchj_amt). Now let's break down by 事业部 (zdpsyb / zdpsyb___t).\n\nQuery: by calmonth and zdpsyb cod …[TRUNC]"
+     },
+     {
+      "type": "text",
+      "text": "2024年Q3数据齐全（月度跌价合计约3.1亿）。现在按事业部维度下钻，做Q3按月+合计的结构化查询。"
+     },
+     {
+      "type": "tool-call",
+      "id": "call_00_Dj68fyluKyrGUsmdM4ua4123",
+      "name": "mcp__dws__run_query",
+      "arguments": "{\"sql\": \"SELECT zdpsyb AS dept_code,\\n       MAX(zdpsyb___t) AS dept_name,\\n       ROUND(SUM(CASE WHEN calmonth='202407' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202407,\\n       ROUND(SUM(CASE WHEN calmonth='202408' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202408,\\n       ROUND(SUM(CASE WHEN calmonth='202409' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202409,\\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_q3_total,\\n       ROUND(SUM(COALESCE(zsjkcje,0))) AS stock_q3_total\\nFROM dm.dm_fin_stock_detail_accage_t_2023\\nWHERE calmonth BETWEEN '202407' AND '202409'\\nGROUP BY zdpsyb\\nORDER BY fall_q3_total DESC\", \"description\": \"2024Q3各事业部跌价准备金额按月及合计\"}"
+     }
+    ],
+    "source": {
+     "kind": "model",
+     "provider": "deepseek-official",
+     "model": "deepseek-v4-flash"
+    },
+    "id": "fcf05959-7c4e-42b2-95e6-190eb3bcb29c"
+   },
+   "usage": {
+    "inputTokens": 10564,
+    "outputTokens": 540,
+    "totalTokens": 41696,
+    "cacheReadTokens": 30592,
+    "reasoningTokens": 208
+   }
+  },
+  "sourceEventSeqs": [
+   [
+    1660,
+    2160
+   ]
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "tool/call",
+  "seq": 2162,
+  "time": 1788921476358,
+  "data": {
+   "turn": 1,
+   "step": 6,
+   "callId": "call_00_Dj68fyluKyrGUsmdM4ua4123",
+   "name": "mcp__dws__run_query",
+   "arguments": "{\"sql\": \"SELECT zdpsyb AS dept_code,\\n       MAX(zdpsyb___t) AS dept_name,\\n       ROUND(SUM(CASE WHEN calmonth='202407' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202407,\\n       ROUND(SUM(CASE WHEN calmonth='202408' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202408,\\n       ROUND(SUM(CASE WHEN calmonth='202409' THEN COALESCE(jchj_amt,0) ELSE 0 END)) AS fall_202409,\\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_q3_total,\\n       ROUND(SUM(COALESCE(zsjkcje,0))) AS stock_q3_total\\nFROM dm.dm_fin_stock_detail_accage_t_2023\\nWHERE calmonth BETWEEN '202407' AND '202409'\\nGROUP BY zdpsyb\\nORDER BY fall_q3_total DESC\", \"description\": \"2024Q3各事业部跌价准备金额按月及合计\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 2163,
+  "time": 1788921481019,
+  "data": {
+   "turn": 1,
+   "step": 6,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_00_Dj68fyluKyrGUsmdM4ua4123"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_00_Dj68fyluKyrGUsmdM4ua4123",
+      "content": [
+       {
+        "type": "text",
+        "text": "{\"status\": \"ok\", \"row_count\": 6, \"truncated\": false, \"result_ref\": \"r-20260909103801-34092-2\", \"result_path\": \"D:\\\\dataprojai-2harness\\\\m0\\\\results\\\\r-20260909103801-34092-2.json\", \"schema\": [\"dept_code\", \"dept_name\", \"fall_202407\", \"fall_202408\", \"fall_202409\", \"fall_q3_total\", \"stock_q3_total\"], \"data\": [{\"dept_code\": \"11000001\", \"dept_name\": \"瓷砖事业部\", \"fall_202407\": \"252306512\", \"fall_202408\": \"252611204\", \"fall_202409\": \"257195992\", \"fall_q3_total\": \"762113708\", \"stock_q3_total\": \"4519488928\"}, {\"dept_code\": \"11000002\", \"dept_name\": \"卫浴事业部\", \"fall_202407\": \"36262947\", \"fall_202408\": \"35780765\", \"fall_202409\": \"36114869\", \"fall_q3_total\": \"108158581\", \"stock_q3_total\": \"590525388\"}, {\"dept_code\": \"11000010\", \"dept_name\": \"生态新材事业部\", \"fall_202407\": \"8237120\", \"fall_202408\": \"8693861\", \"fall_202409\": \"9309292\", \"fall_q3_total\": \"26240274\", \"stock_q3_total\": \"82674199\"}, {\"dept_code\": \"11240102\", \"dept_name\": \"国际营销中心\", \"fall_202407\": \"8238081\", \"fall_202408\": \"9769663\", \"fall_202409\": \"7520114\", \"fall_q3_total\": \"25527857\", \"stock_q3_total\": \"114572512\"}, {\"dept_code\": \"11000011\", \"dept_name\": \"卫浴事业部-非全资\", \"fall_202407\": \"4744525\", \"fall_202408\": \"4713825\", \"fall_202409\": \"4687459\", \"fall_q3_total\": \"14145810\", \"stock_q3_total\": \"34683301\"}, {\"dept_code\": \"11000012\", \"dept_name\": \"卫浴事业部\", \"fall_202407\": \"541801\", \"fall_202408\": \"554853\", \"fall_202409\": \"514404\", \"fall_q3_total\": \"1611058\", \"stock_q3_total\": \"15730104\"}]}"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "61d02b79-287e-4117-b0f5-c32760d839e1"
+   }
+  },
+  "sourceEventSeqs": [
+   2162
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "step/end",
+  "seq": 2164,
+  "time": 1788921481019,
+  "data": {
+   "turn": 1,
+   "step": 6
+  }
+ },
+ {
+  "type": "step/start",
+  "seq": 2165,
+  "time": 1788921481030,
+  "data": {
+   "turn": 1,
+   "step": 7
+  }
+ },
+ {
+  "type": "step/start",
+  "seq": 3525,
+  "time": 1788921494608,
+  "data": {
+   "turn": 1,
+   "step": 8
+  }
+ },
+ {
+  "type": "assistant/message",
+  "seq": 8555,
+  "time": 1788921530717,
+  "data": {
+   "turn": 1,
+   "step": 8,
+   "message": {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Now compile the results.\n\nSummary of analyses:\n\n**Q3 2024 (202407~202409) 各事业部库存跌价准备 (管理口径 jchj_amt)**:\n\n| 事业部 | 7月末 | 8月末 | 9月末(季末) | Q3合计 | 库存金额(Q3合计) |\n|---| …[TRUNC]"
+     },
+     {
+      "type": "text",
+      "text": "已取得全部所需数据并通过交叉验证（分段跌价之和 = jchj_amt，误差仅舍入级别；月度合计与事业部合计完全对平）。以下为完整分析。\n\n# 2024年Q3各事业部库存跌价准备金额分析\n\n## 一、核心结果（管理口径 `jchj_amt`，单位：元）\n\n| 事业部编码 | 事业部 | 2024-07末 | 2024-0 …[TRUNC]"
+     }
+    ],
+    "source": {
+     "kind": "model",
+     "provider": "deepseek-official",
+     "model": "deepseek-v4-flash"
+    },
+    "id": "abbcf252-a9c5-4fac-88c4-2927d1aa0147"
+   },
+   "usage": {
+    "inputTokens": 836,
+    "outputTokens": 5026,
+    "totalTokens": 49510,
+    "cacheReadTokens": 43648,
+    "reasoningTokens": 3066
+   }
+  },
+  "sourceEventSeqs": [
+   [
+    3526,
+    8554
+   ]
+  ],
+  "surfaceOp": "append"
+ },
+ {
+  "type": "step/end",
+  "seq": 8556,
+  "time": 1788921530723,
+  "data": {
+   "turn": 1,
+   "step": 8
+  }
+ },
+ {
+  "type": "turn/end",
+  "seq": 8557,
+  "time": 1788921530724,
+  "data": {
+   "turn": 1,
+   "reason": {
+    "kind": "completed"
+   }
+  }
+ },
+ {
+  "type": "turn/start",
+  "seq": 8559,
+  "time": 1788921531305,
+  "data": {
+   "turn": 2
+  }
+ },
+ {
+  "type": "tool/call",
+  "seq": 15439,
+  "time": 1788921590521,
+  "data": {
+   "turn": 2,
+   "step": 3,
+   "callId": "call_00_ET_NNzYkpN3zahTSUj0WlMU7886",
+   "name": "exec_script",
+   "arguments": "{\"script\": \"yoy_calc.py\"}"
+  }
+ },
+ {
+  "type": "tool/result",
+  "seq": 15440,
+  "time": 1788921595343,
+  "data": {
+   "turn": 2,
+   "step": 3,
+   "message": {
+    "source": {
+     "kind": "tool",
+     "callId": "call_00_ET_NNzYkpN3zahTSUj0WlMU7886"
+    },
+    "content": [
+     {
+      "type": "tool-result",
+      "toolCallId": "call_00_ET_NNzYkpN3zahTSUj0WlMU7886",
+      "content": [
+       {
+        "type": "text",
+        "text": "[sandbox: exit code 0]\nstdout:\n== 各事业部 9月末(季末)同比 ==\n事业部                   2023-09末      2024-09末           增减额      同比    23末计提率    24末计提率\n瓷砖事业部              233,798,765   257,195,992   +23,397,227  +10.0%     17.5%     16.5%\n卫浴事业部               43,935,569    36,114,869    -7,820,700  -17.8%     20.9%     18.5%\n生态新材事业部              5,072,225     9,309,292    +4,237,067  +83.5%     17.5%     34.4%\n卫浴事业部-非全资            2,804,678     4,687,459    +1,882,781  +67.1%     39.8%     39.8%\n卫浴旧组织码                 649,511       514,404      -135,107  -20.8%     12.6%      9.7%\n集团合计               286,260,748   307,822,016   +21,561,268   +7.5%\n\n== Q3三个月末合计同比 ==\n事业部                   2023Q3合计      2024Q3合计           增减额      同比\n瓷砖事业部              732,583,868   762,113,708   +29,529,840   +4.0%\n卫浴事业部              132,321,831   108,158,581   -24,163,250  -18.3%\n家居事业部(仅23Q3)       115,579,997             0  -115,579,997   新增/消失\n生态新材事业部             12,774,661    26,240,273   +13,465,612 +105.4%\n卫浴事业部-非全资            8,397,471    14,145,809    +5,748,338  +68.5%\n卫浴旧组织码               1,995,413     1,611,058      -384,355  -19.3%\n国际营销中心(仅24Q3)                0    25,527,858   +25,527,858   新增/消失\n集团合计               888,073,244   912,269,429   +24,196,185   +2.7%\n\n== 集团月度同比 ==\n202307/202407: 2023=  342,583,926  2024=  310,330,987  同比=-9.4%\n202308/202408: 2023=  335,514,018  2024=  312,124,171  同比=-7.0%\n202309/202409: 2023=  325,555,297  2024=  315,342,129  同比=-3.1%\n\n== 卫浴口径合计(11000002+11000011+11000012) ==\n2023-07末=48,186,173  2024-07末=41,549,273  -13.8%\n2023-09末=47,389,758  2024-09末=41,316,732  -12.8%\n"
+       }
+      ],
+      "isError": false
+     }
+    ],
+    "role": "user",
+    "id": "4ea5d947-955d-496b-8a5d-0d46ce40be54"
+   }
+  },
+  "sourceEventSeqs": [
+   15439
+  ],
+  "surfaceOp": "append"
+ }
+]
