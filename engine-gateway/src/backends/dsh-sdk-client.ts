@@ -144,12 +144,19 @@ export class DshSdkClient {
     const rl = createInterface({ input: child.stdout! });
     rl.on("line", (line: string) => this.handleLine(line));
 
-    const result = await this.withTimeout(
-      this.send("initialize", { cwd: this.opts.cwd, ...initParams }),
-      this.initTimeoutMs,
-      () => new SdkPromptError("TIMEOUT", `initialize no response in ${this.initTimeoutMs}ms`, this.stderrTail()),
-    );
-    return result as { serverInfo: { name: string; version: string } };
+    // initialize 失败/超时 → 必须杀掉已 spawn 的子进程（env 携密钥的 dsh 不得
+    // 成为孤儿泄漏），再向上抛错。
+    try {
+      const result = await this.withTimeout(
+        this.send("initialize", { cwd: this.opts.cwd, ...initParams }),
+        this.initTimeoutMs,
+        () => new SdkPromptError("TIMEOUT", `initialize no response in ${this.initTimeoutMs}ms`, this.stderrTail()),
+      );
+      return result as { serverInfo: { name: string; version: string } };
+    } catch (e) {
+      this.killTree();
+      throw e;
+    }
   }
 
   get hasExited(): boolean {
@@ -240,13 +247,15 @@ export class DshSdkClient {
     }
   }
 
-  /** 消毒：已知密钥值 → ***；KEY=value / KEY: value 形态兜底。 */
+  /** 消毒：已知密钥值 → ***；KEY=value / KEY: value 形态兜底（键名含
+   *  PASSWORD/TOKEN/SECRET/KEY 即遮蔽——与 dsh 自身 env 洗净机制同款宽度，
+   *  findings §3.1；网关全环境透传时 AUTH_TOKEN 等未预知键的崩溃 dump 不外泄）。 */
   private sanitize(text: string): string {
     let out = text;
     for (const v of this.secretValues) {
       if (v) out = out.split(v).join("***");
     }
-    out = out.replace(/(DWS_PASSWORD|DWS_RUN_PASSWORD|DEEPSEEK_API_KEY)(\s*[=:]\s*)\S+/gi, "$1$2***");
+    out = out.replace(/(\w*(?:PASSWORD|TOKEN|SECRET|KEY)\w*)(\s*[=:]\s*)\S+/gi, "$1$2***");
     return out;
   }
 

@@ -1,9 +1,13 @@
 // M1-T5：DshBackend —— spec §5 BackendProvider 的 dsh 实现（SDK 驱动组装层）。
 //
 // 三条 S3 spike 设计约束（findings dsh-api.md §5.5，非可选）：
-//   1. SDK sessionId 每次 spawn 唯一：`gw-<sessionId>-a<attempt+代数>`。跨 spawn
-//      复用同 id 被服务端确定性拒绝（id collision，两次复验）——进程死亡/超时后
-//      重建 = 新 SDK sessionId；逻辑会话身份在网关侧（SQLite session_id），不在 dsh 侧。
+//   1. SDK sessionId 每次 spawn 唯一：`gw-<sessionId>-a<attempt+代数>-<6位随机hex>`。
+//      跨 spawn 复用同 id 被服务端确定性拒绝（id collision，两次复验；已完成的
+//      持久化日志同样撞——S3 进程 C 证据）。唯一性必须**跨实例**成立：a<attempt>
+//      段只保证单实例内不重（同逻辑会话的第二个任务以同 attempt 起跑就会撞已
+//      持久化日志），故每次 spawn 追加实例无关随机段（randomBytes(3).hex）；
+//      a<attempt> 保留为可读段便于日志排查。逻辑会话身份在网关侧（SQLite
+//      session_id），不在 dsh 侧。
 //   2. cancel/超时 = killTree（协议面仅 initialize/session/prompt/shutdown 三方法，
 //      无 cancel；AbortSignal 只放弃客户端等待不终止服务端）。
 //   3. spawn env 全量注入（REQUIRED_ENV_KEYS）：少一个 M0_* 变量 → m0-exec-script
@@ -18,6 +22,7 @@
 // result_ref 清单由 T7 TaskRunner 生成；spike 裁定"全量注入必需"，dsh 侧零自恢复）。
 
 import { mkdirSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import type { DbAccount } from "../config/db-accounts.ts";
@@ -139,6 +144,8 @@ export class DshBackend implements BackendProvider {
 /** 单逻辑会话的引擎侧句柄：持有一个 dsh 子进程，死亡/超时后按代数 respawn。 */
 class DshEngineSession implements EngineSession {
   private generation: number;
+  /** 本次 spawn 的实例无关随机段（S3 约束 1：跨实例唯一性；每次 spawn 重掷）。 */
+  private spawnNonce: string;
   private client: DshSdkClient | null = null;
   private clientStarted = false;
   private cancelled = false;
@@ -164,11 +171,12 @@ class DshEngineSession implements EngineSession {
     this.killTreeFn = killTreeFn;
     this.initParams = initParams;
     this.generation = opts.attempt ?? 1;
+    this.spawnNonce = randomBytes(3).toString("hex");
   }
 
-  /** 当前 spawn 的 SDK 会话 id（每次 spawn 唯一——S3 spike 约束 1）。 */
+  /** 当前 spawn 的 SDK 会话 id（每次 spawn 唯一且跨实例唯一——S3 spike 约束 1）。 */
   get sdkSessionId(): string {
-    return `gw-${this.opts.sessionId}-a${this.generation}`;
+    return `gw-${this.opts.sessionId}-a${this.generation}-${this.spawnNonce}`;
   }
 
   async *ask(question: string, askOpts?: AskOpts): AsyncGenerator<NormEvent> {
@@ -221,8 +229,9 @@ class DshEngineSession implements EngineSession {
   /** 取活客户端；死亡/未启动则 respawn（新代数 = 新 SDK sessionId）。 */
   private async ensureClient(): Promise<DshSdkClient> {
     if (this.client && this.clientStarted && !this.client.hasExited) return this.client;
-    // 旧客户端已死（超时击杀/意外退出）：换代重启
+    // 旧客户端已死（超时击杀/意外退出）：换代重启；随机段重掷（跨实例唯一）
     if (this.client) this.generation++;
+    this.spawnNonce = randomBytes(3).toString("hex");
     const client = new DshSdkClient({
       cwd: join(this.opts.workroot, this.opts.sessionId, "workdir"),
       env: this.env,

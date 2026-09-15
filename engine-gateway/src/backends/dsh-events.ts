@@ -17,6 +17,8 @@
 //             后续 exec_script(read/grep) 不再逐个改 stage，保持阶段稳定）
 //   其余 tool/call                           → analyzing 附原文（工具名，SSE 前端可见进展）
 //   turn/start                              → analyzing（新一轮开始）
+//   repairing 阶段判定属编排层（归一化器无 attempt 上下文），T7 经 task-store 的
+//   stage 事件产出（attempt>0 重试起跑时）——本模块不产 repairing。
 //   step/start / step/end / user/message / 头部事件（session/permission/sandbox/approval）
 //                                          → 不产出（噪音；stage 由 tool/call 驱动）
 //

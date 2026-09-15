@@ -207,6 +207,43 @@ test("超时：回放无 turn/end → killTree 被调 + prompt 以 TIMEOUT 拒�
   assert.ok(client.hasExited);
 });
 
+// ── 3b. initialize 失败杀孤儿（I-2：env 带密钥的 dsh 进程不得泄漏）──────────────
+test("initialize 超时：start 拒绝 + killTree 被调（不留孤儿 dsh）", async () => {
+  const child = makeFakeChild();
+  let killCalled = 0;
+  const client = new DshSdkClient({
+    cwd: "D:\\x\\workdir",
+    env: { ...BASE_ENV },
+    spawnFn: () => child as unknown as ChildProcess,
+    killTreeFn: () => { killCalled++; child.emit("exit", 1); },
+    initTimeoutMs: 60,
+  });
+  // 不应答 initialize → 超时
+  await assert.rejects(client.start({ provider: "x", model: "y" }), (e: unknown) => {
+    assert.ok(e instanceof SdkPromptError);
+    assert.equal((e as SdkPromptError).code, "TIMEOUT");
+    return true;
+  });
+  assert.equal(killCalled, 1, "initialize 超时必须 killTree");
+});
+
+test("initialize 错误应答：start 拒绝 + killTree 被调", async () => {
+  const child = makeFakeChild();
+  let killCalled = 0;
+  const client = new DshSdkClient({
+    cwd: "D:\\x\\workdir",
+    env: { ...BASE_ENV },
+    spawnFn: () => child as unknown as ChildProcess,
+    killTreeFn: () => { killCalled++; child.emit("exit", 1); },
+    initTimeoutMs: 2000,
+  });
+  const startP = client.start({ provider: "x", model: "y" });
+  const f = childWrites(child)[0];
+  line(child, { jsonrpc: "2.0", id: f.id, error: { code: -32603, message: "cannot create effect on inactive context" } });
+  await assert.rejects(startP, /-32603|inactive context/);
+  assert.equal(killCalled, 1, "initialize 错误应答必须 killTree");
+});
+
 // ── 4. 进程死亡：emit exit → pending reject（ENGINE_ERROR）────────────────────────
 test("进程死亡：prompt 在途时 exit → prompt 以 ENGINE_ERROR 拒绝", async () => {
   const child = makeFakeChild();
@@ -260,12 +297,14 @@ test("stderr 消毒：DWS_PASSWORD/DEEPSEEK_API_KEY 值在环形缓冲与输出�
   assert.ok(!tail.includes("secret123"), "DWS_PASSWORD 值不得出现在 stderrTail");
   assert.ok(!tail.includes("sk-test-key"), "DEEPSEEK_API_KEY 值不得出现在 stderrTail");
   assert.ok(tail.includes("***"));
-  // KEY=value 形态兜底（值未知时也遮蔽）
-  child.stderr.write("DWS_RUN_PASSWORD=other-secret-99\n");
+  // KEY=value 形态兜底（值未知时也遮蔽）；词表放宽：未预知键（AUTH_TOKEN 等）同样遮蔽
+  child.stderr.write("DWS_RUN_PASSWORD=other-secret-99\nAUTH_TOKEN=xyz-token-88\n");
   await new Promise((r) => setImmediate(r));
   const tail2 = client.stderrTail();
   assert.ok(!tail2.includes("other-secret-99"));
   assert.ok(tail2.includes("DWS_RUN_PASSWORD=***"));
+  assert.ok(!tail2.includes("xyz-token-88"), "AUTH_TOKEN 值不得出现在 stderrTail");
+  assert.ok(tail2.includes("AUTH_TOKEN=***"));
 
   // 环形缓冲：只保尾 4KB
   child.stderr.write("x".repeat(10_000));
@@ -341,31 +380,33 @@ test("createSession：建目录 + env 全量注入（REQUIRED_ENV_KEYS）+ DWS �
     assert.equal(opts.env.M0_SANDBOX_RUNNER, "D:\\x\\run_in_sandbox.sh");
     assert.equal(opts.cwd, join(root, "sess-001", "workdir"));
 
-    // initialize + prompt 帧应答（historyPrefix 拼接 + SDK sessionId 唯一形态）
+    // initialize + prompt 帧应答（historyPrefix 拼接 + SDK sessionId 跨实例唯一形态）
     const w0 = childWrites(children[0]).find((f) => f.method === "initialize");
     line(children[0], { jsonrpc: "2.0", id: w0.id, result: { serverInfo: { name: "deepseek-harness-sdk-runtime", version: "0.0.1" } } });
     await waitFor(() => childWrites(children[0]).some((f) => f.method === "session/prompt"), 3000, "prompt 帧");
     const wPrompt = childWrites(children[0]).find((f) => f.method === "session/prompt");
-    assert.equal(wPrompt.params.sessionId, "gw-sess-001-a3"); // attempt=3 首代
+    // 形态断言：gw-sess-001-a3-<6位随机hex>（随机段=实例无关唯一性，I-1）
+    assert.ok(/^gw-sess-001-a3-[0-9a-f]{6}$/.test(wPrompt.params.sessionId), `sessionId 形态: ${wPrompt.params.sessionId}`);
+    const sid1: string = wPrompt.params.sessionId;
     assert.ok(wPrompt.params.contentBlocks[0].text.startsWith("历史：PX-77"));
     assert.ok(wPrompt.params.contentBlocks[0].text.endsWith("分析Q3库存"));
     line(children[0], { jsonrpc: "2.0", id: wPrompt.id, result: { messageId: "m1" } });
-    notifyEvent(children[0], "gw-sess-001-a3", { type: "turn/end", seq: 2, data: { turn: 1, reason: { kind: "completed" } } });
+    notifyEvent(children[0], sid1, { type: "turn/end", seq: 2, data: { turn: 1, reason: { kind: "completed" } } });
     await askDone;
     assert.equal(collected.length, 0); // 该问无中间事件 → 空流自然终止
 
-    // 第二问同客户端（同 SDK sessionId）
+    // 第二问同客户端（同 spawn → 同 SDK sessionId）
     const got: any[] = [];
     const it2 = session.ask("第二问");
     const done2 = (async () => { for await (const ev of it2) got.push(ev); })();
     await waitFor(() => childWrites(children[0]).filter((f) => f.method === "session/prompt").length >= 2, 3000, "第二问 prompt 帧");
     const w2 = childWrites(children[0]).filter((f) => f.method === "session/prompt").pop();
-    assert.equal(w2.params.sessionId, "gw-sess-001-a3");
+    assert.equal(w2.params.sessionId, sid1);
     line(children[0], { jsonrpc: "2.0", id: w2.id, result: { messageId: "m2" } });
-    notifyEvent(children[0], "gw-sess-001-a3", {
+    notifyEvent(children[0], sid1, {
       type: "assistant/message", seq: 3, data: { turn: 2, message: { role: "assistant", content: [{ type: "text", text: "答" }] } },
     });
-    notifyEvent(children[0], "gw-sess-001-a3", { type: "turn/end", seq: 4, data: { turn: 2, reason: { kind: "completed" } } });
+    notifyEvent(children[0], sid1, { type: "turn/end", seq: 4, data: { turn: 2, reason: { kind: "completed" } } });
     await done2;
     assert.deepEqual(got.map((e) => e.type), ["answer"]);
     assert.equal(got[0].markdown, "答");
@@ -410,7 +451,9 @@ test("createSession：进程死亡后下一问 respawn 新 SDK sessionId（S3 �
     line(children[1], { jsonrpc: "2.0", id: w2.id, result: { serverInfo: { name: "s", version: "0" } } });
     await waitFor(() => childWrites(children[1]).some((f) => f.method === "session/prompt"), 3000, "prompt 帧(2)");
     const p2 = childWrites(children[1]).find((f) => f.method === "session/prompt");
-    assert.equal(p2.params.sessionId, "gw-sess-001-a4", "respawn 后 SDK sessionId 必须换代");
+    // respawn：代数+1 且随机段重掷（形态断言 + 与首代不同——跨 spawn 不复用）
+    assert.ok(/^gw-sess-001-a4-[0-9a-f]{6}$/.test(p2.params.sessionId), `respawn sessionId 形态: ${p2.params.sessionId}`);
+    assert.notEqual(p2.params.sessionId, p1.params.sessionId, "respawn 后 SDK sessionId 必须换代");
     line(children[1], { jsonrpc: "2.0", id: p2.id, result: { messageId: "m2" } });
     notifyEvent(children[1], p2.params.sessionId, { type: "turn/end", seq: 1, data: { turn: 1, reason: { kind: "completed" } } });
     await done2;
