@@ -12,9 +12,11 @@
 //   - 发布顺序 = recordPublication → report 事件 → done 事件 → finalize(succeeded)
 //     （A.3 结果层恰好一次；done 必须先于 finalize 落库——finalize 清 lease_owner 后
 //     appendEvent 的围栏检查必拒，终态事件不存在"后补"通道）
-//   - 失败三分类（A.4）：CONFIG 零重试（行6）/ 引擎自报 error 事件（流异常终止）不占
-//     attempt / 基础设施故障（thrown TIMEOUT|ENGINE_ERROR）在 deadline+maxAttempts
-//     预算内 releaseForRetry 续跑（行1：同 session、注入 result_ref、不重查数）
+//   - 失败统一分类（A.4，T7 裁决）：ask() 抛出与流内终止 error 事件**同路**按 code 归口
+//     （真实 backend 的 ask() 从不抛——spawn/prompt 失败一律转流内 error 事件收流，
+//     两类表面不同路则生产续跑臂失效）——TIMEOUT/ENGINE_ERROR（基础设施故障）在
+//     deadline+maxAttempts 预算内 releaseForRetry 续跑（行1：同 session、注入
+//     result_ref、不重查数）；CONFIG 零重试（行6）；REPORT_CHECK 等本地判定码终态失败
 //
 // T5 审查移交项落点：
 //   - 归一化 report 事件 = "报告构建完成"信号，不入库（spec report 事件发布后才发）
@@ -60,11 +62,10 @@ export interface TaskRunnerConfig {
 /** 内置外链 CDN 探测：src/href 引用 http(s) 资源即命中（本地 ./echarts.min.js 不命中）。 */
 const DEFAULT_CDN_RE = /(?:src|href)\s*=\s*["']https?:\/\//i;
 
-/** ask() 抛出错误与引擎自报 error 事件的统一载体。thrown=是否 ask() 抛出（决定可否续跑）。 */
+/** 失败统一载体：ask() 抛出与流内终止 error 事件同源同路（分类只看 code——T7 裁决）。 */
 interface Failure {
   code: string;
   message: string;
-  thrown: boolean;
 }
 
 /** ask() 抛错的 code 判定：SdkPromptError 带 code；createSession 的 [CONFIG] 前缀 Error 识别为 CONFIG。 */
@@ -206,7 +207,7 @@ export class TaskRunner {
                 lostLease = true; // A.1 L1：围栏拒 → 杀自身进程树 + 静默退出
                 break;
               }
-              if (ev.type === "error") failure = { code: ev.code, message: ev.message, thrown: false };
+              if (ev.type === "error") failure = { code: ev.code, message: ev.message };
             }
             // cancel 检查点（事件边界）：backend cancel 不产 error，编排器靠标志落地。
             if (this.store.getTask(runId)?.cancel_requested === 1) {
@@ -215,8 +216,9 @@ export class TaskRunner {
             }
           }
         } catch (err) {
-          // ask() 抛 SdkPromptError：基础设施故障（TIMEOUT/ENGINE_ERROR）或 CONFIG。
-          failure = { code: thrownCode(err), message: err instanceof Error ? err.message : String(err), thrown: true };
+          // ask() 抛出（真实 dsh backend 不走此路——失败一律转流内 error 事件；此分支
+          // 覆盖 mock/未来引擎实现）：与流内 error 事件同进统一分类器。
+          failure = { code: thrownCode(err), message: err instanceof Error ? err.message : String(err) };
         }
 
         if (lostLease) {
@@ -233,41 +235,43 @@ export class TaskRunner {
           return;
         }
 
-        // 4. 失败路径分类（A.4）。
+        // 4. 失败路径分类（A.4）——统一分类器：来源（ask 抛出 / 流内 error 事件收流）
+        //    不参与判定，只看 code：
+        //    TIMEOUT/ENGINE_ERROR → 基础设施故障 → 续跑臂（行1）；
+        //    CONFIG → 快败零重试（行6，对应 backend :193 spawn/initialize 失败）；
+        //    REPORT_CHECK 等本地判定码 → 终态失败（重试无意义）。
         if (failure) {
-          if (failure.code === "CONFIG" || !failure.thrown) {
-            // 行6：凭据/配置零重试；引擎自报 error 事件（流异常终止，非 ask 抛出）
-            // 不占 attempt、不续跑——终态 code 沿用事件 code（凭据失败的事件 code
-            // 即 CONFIG，与行6归口一致）。
-            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
-            this.store.finalize(lease, "failed", failure.code, failure.message);
-            return;
+          if (failure.code === "TIMEOUT" || failure.code === "ENGINE_ERROR") {
+            // 行1：基础设施故障——deadline/attempt 预算内续跑（带历史注入，不重查数）。
+            const t = this.store.getTask(runId)!;
+            if (t.deadline != null && t.deadline < Date.now()) {
+              // 超预算：TIMEOUT 触发的标 TIMEOUT（任务文本），其余归 UNRECOVERABLE（同 reaper）。
+              const code = failure.code === "TIMEOUT" ? "TIMEOUT" : "UNRECOVERABLE";
+              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+              this.store.finalize(lease, "failed", code, `deadline 已过: ${failure.message}`);
+              return;
+            }
+            if (lease.attempt >= this.maxAttempts) {
+              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+              this.store.finalize(lease, "failed", "UNRECOVERABLE", `attempt 达上限 ${this.maxAttempts}: ${failure.message}`);
+              return;
+            }
+            // 重试前最后看一眼取消标志（失败窗口期到的取消不丢）。
+            if (t.cancel_requested === 1) {
+              await session.cancel();
+              this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1);
+              this.store.finalize(lease, "cancelled");
+              return;
+            }
+            // 主动让出租约（status 保持 running）→ 循环顶 claimLease 才能以 attempt+1 接管。
+            const rel = this.store.releaseForRetry(lease);
+            if (rel.fenced) return; // 已被接管——静默退出
+            continue;
           }
-          // 行1：基础设施故障（thrown TIMEOUT/ENGINE_ERROR）——deadline/attempt 预算内续跑。
-          const t = this.store.getTask(runId)!;
-          if (t.deadline != null && t.deadline < Date.now()) {
-            // 超预算：TIMEOUT 触发的标 TIMEOUT（任务文本），其余归 UNRECOVERABLE（同 reaper）。
-            const code = failure.code === "TIMEOUT" ? "TIMEOUT" : "UNRECOVERABLE";
-            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
-            this.store.finalize(lease, "failed", code, `deadline 已过: ${failure.message}`);
-            return;
-          }
-          if (lease.attempt >= this.maxAttempts) {
-            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
-            this.store.finalize(lease, "failed", "UNRECOVERABLE", `attempt 达上限 ${this.maxAttempts}: ${failure.message}`);
-            return;
-          }
-          // 重试前最后看一眼取消标志（失败窗口期到的取消不丢）。
-          if (t.cancel_requested === 1) {
-            await session.cancel();
-            this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1);
-            this.store.finalize(lease, "cancelled");
-            return;
-          }
-          // 主动让出租约（status 保持 running）→ 循环顶 claimLease 才能以 attempt+1 接管。
-          const rel = this.store.releaseForRetry(lease);
-          if (rel.fenced) return; // 已被接管——静默退出
-          continue;
+          // CONFIG（行6）与其余本地判定码：终态失败零重试。
+          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+          this.store.finalize(lease, "failed", failure.code, failure.message);
+          return;
         }
 
         // 5. 成功路径：报告发布。

@@ -436,3 +436,46 @@ test("心跳：事件间空隙 interval 续租，lease_expires_at 被推后且�
   assert.equal(store.getTask(runId)!.status, "succeeded");
   assert.ok(expiryAfterGap > expiryAtAskStart, `心跳推后租约: ${expiryAtAskStart} -> ${expiryAfterGap}`);
 });
+
+// ── 14. 统一失败分类器（T7 裁决）：流内 error 事件与 ask() 抛出同路进 A.4 续跑臂 ───
+// 真实 DshBackend.ask() 从不抛（dsh-backend.ts :193/:217——spawn/prompt 失败一律转
+// 流内 error 事件收流）；与用例3（抛出表面）对偶：同一矩阵行、两种失败表面。
+test("流内 ENGINE_ERROR 收流（真实 backend 表面）：attempt=2 续跑注入历史 + done recovered=true", async () => {
+  const runId = newTask();
+  const backend = makeBackend([
+    { events: [evSql("r-ref-3"), { type: "error", code: "ENGINE_ERROR", message: "turn/end reason: error" }] as NormEvent[] },
+    { events: [evAnswer] },
+  ]);
+  await makeRunner(backend).runOnce(runId);
+
+  const task = store.getTask(runId)!;
+  assert.equal(task.status, "succeeded");
+  assert.equal(task.attempt, 2); // 流内 ENGINE_ERROR 同进续跑臂
+  assert.equal(backend.asks.length, 2);
+  const prefix = backend.asks[1]!.historyPrefix!;
+  assert.ok(prefix.includes("r-ref-3"), "续跑注入本任务已产 result_ref 清单");
+  assert.ok(prefix.includes("不要重新查询"));
+  const done = eventPayloads(runId, "done")[0];
+  assert.equal(done.status, "succeeded");
+  assert.equal(done.recovered, true);
+  // attempt1 的流内 error 事件本身已入库（spec 词表：error 事件原样入库）
+  const errs = eventPayloads(runId, "error");
+  assert.equal(errs.length, 1);
+  assert.equal(errs[0].code, "ENGINE_ERROR");
+});
+
+test("流内 CONFIG 收流（backend :193 spawn 失败表面）：零重试快败，attempt 停在 1", async () => {
+  const runId = newTask();
+  const backend = makeBackend([
+    { events: [{ type: "error", code: "CONFIG", message: "dsh spawn/initialize failed" }] as NormEvent[] },
+  ]);
+  await makeRunner(backend, { maxAttempts: 3 }).runOnce(runId);
+
+  const task = store.getTask(runId)!;
+  assert.equal(task.status, "failed");
+  assert.equal(task.error_code, "CONFIG");
+  assert.equal(task.attempt, 1); // 行6：凭据/配置零 attempt 消耗
+  assert.equal(backend.asks.length, 1);
+  const done = eventPayloads(runId, "done")[0];
+  assert.equal(done.status, "failed");
+});
