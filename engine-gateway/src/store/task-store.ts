@@ -277,6 +277,30 @@ export class TaskStore {
     })();
   }
 
+  /** A.4 行4 恢复入口查询：run_id 是否已发布（只读，无需围栏——恢复路径的判定事实源）。 */
+  getPublication(runId: string): { report_path: string; published_at: number } | undefined {
+    return this.db
+      .prepare("SELECT report_path, published_at FROM publications WHERE run_id = ?")
+      .get(runId) as { report_path: string; published_at: number } | undefined;
+  }
+
+  /**
+   * 重试释放（A.4 行1 的接续臂，T7 编排器专用）：可续跑的基础设施故障后，本执行者
+   * 主动让出租约（status 保持 running、清 lease 字段）——紧随其后的 claimLease 才能以
+   * attempt+1 接管（同 worker 或接管者均可；释放与重 claim 的窗口内被抢走属 A.1 允许
+   * 的正确形态）。围栏条件写：失权返回 fenced，调用方不得再续跑。
+   */
+  releaseForRetry(lease: Lease): FencedResult {
+    const ts = this.now();
+    const r = this.db
+      .prepare(
+        `UPDATE tasks SET lease_owner=NULL, lease_expires_at=NULL, updated_at=?
+         WHERE ${FENCE} AND status='running'`,
+      )
+      .run(ts, lease.run_id, lease.attempt, lease.lease_owner);
+    return { fenced: r.changes === 0 };
+  }
+
   // ---------- A.3 取消标志 / A.4 Reaper ----------
 
   /** 无围栏（A.3：无执行权者只置标志，不直接写终态）。终态任务上无效。 */

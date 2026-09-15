@@ -2,7 +2,7 @@
   "name": "engine-gateway",
   "type": "module",
   "scripts": {
-    "test": "node --test src/config/*.test.ts src/store/*.test.ts src/backends/*.test.ts"
+    "test": "node --test src/config/*.test.ts src/store/*.test.ts src/backends/*.test.ts src/orchestrator/*.test.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3"
