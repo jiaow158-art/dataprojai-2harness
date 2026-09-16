@@ -47,6 +47,9 @@ export interface SessionOpts {
   db: DbAccount;
   /** 初始 attempt（恢复入口 T7 传入；此后 respawn 自增代数）。 */
   attempt?: number;
+  /** 任务 id（T9 L-1 接线：注入 SANDBOX_RUN_ID 使沙箱容器名 <run_id>-a<attempt>-<pid>，
+   *  接管者按 run_id+旧 attempt 清理不误杀新 attempt——附录 A.1）。缺省回退 sessionId。 */
+  runId?: string;
 }
 
 export interface AskOpts {
@@ -119,6 +122,8 @@ export class DshBackend implements BackendProvider {
       M0_ASSETS_DIR: opts.assetsDir,
       M0_PROJECT_SKILL_DIR: opts.skillsDir,
       RESULT_DIR: resultsDir,
+      SANDBOX_RUN_ID: opts.runId ?? opts.sessionId,
+      SANDBOX_ATTEMPT: String(opts.attempt ?? 1),
       DWS_USER: opts.db.user,
       DWS_PASSWORD: dwsPassword,
       DEEPSEEK_API_KEY: deepseekKey,

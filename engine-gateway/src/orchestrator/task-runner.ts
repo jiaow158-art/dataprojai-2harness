@@ -169,6 +169,7 @@ export class TaskRunner {
           session = await this.backend.createSession({
             sessionId: task.session_id,
             attempt: lease.attempt,
+            runId: runId,
             workroot: this.config.paths.workroot,
             resultsRoot: this.config.paths.resultsRoot,
             assetsDir: this.config.paths.assetsDir,
