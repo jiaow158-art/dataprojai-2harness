@@ -154,15 +154,19 @@ export class TaskRunner {
 
         const task = this.store.getTask(runId)!;
 
-        // attempt>1：repairing 阶段事件（T5 移交：由本层产）+ A.2 S2 历史注入前缀。
+        // repairing 阶段事件（T5 移交：由本层产）仅 attempt>1；**历史注入前缀对每次
+        // 执行都构造**（spec D14：任务出队执行时装载该对话最新已提交的历史）——每个
+        // 任务都是新 spawn 的 dsh 会话（进程零记忆，S3 实测），同会话正常续问
+        // （attempt=1）与恢复续跑（attempt>1）同样需要前缀；无历史时 buildHistoryPrefix
+        // 返回 undefined（会话首问裸 prompt，不浪费 token）。
         // 在 spawn 之前做——若此刻已被接管（围栏拒），不浪费一次引擎 spawn。
         let historyPrefix: string | undefined;
         if (lease.attempt > 1) {
           this.store.updateStage(lease, "repairing");
           const w = this.store.appendEvent(lease, "stage", { stage: "repairing", attempt: lease.attempt });
           if (w.fenced) return; // A.1：失权者静默退出（session 尚未 spawn）
-          historyPrefix = this.buildHistoryPrefix(task.session_id, runId, this.resultsDirOf(task.session_id));
         }
+        historyPrefix = this.buildHistoryPrefix(task.session_id, runId, this.resultsDirOf(task.session_id));
 
         // 3. 驱动执行。createSession 抛错（env 缺失等 [CONFIG]）→ 按其 code 终态。
         try {
@@ -237,11 +241,22 @@ export class TaskRunner {
         }
 
         // 4. 失败路径分类（A.4）——统一分类器：来源（ask 抛出 / 流内 error 事件收流）
-        //    不参与判定，只看 code：
+        //    不参与判定，只看 code（计费类错误嗅探例外，见下）：
         //    TIMEOUT/ENGINE_ERROR → 基础设施故障 → 续跑臂（行1）；
         //    CONFIG → 快败零重试（行6，对应 backend :193 spawn/initialize 失败）；
         //    REPORT_CHECK 等本地判定码 → 终态失败（重试无意义）。
         if (failure) {
+          // soak 发现1：计费类错误（402 QUOTA / Insufficient Balance）经 turn/end error
+          // reason 统一映射为 ENGINE_ERROR，重试毫无意义（烧满 3 attempt ×15 任务=45 次
+          // 无效 turn）——按行6 语义归 CONFIG 快败零重试。
+          if (
+            failure.code === "ENGINE_ERROR" &&
+            /Insufficient\s+Balance|("code"\s*:\s*"QUOTA")|status"?\s*[:=]\s*402/i.test(failure.message)
+          ) {
+            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+            this.store.finalize(lease, "failed", "CONFIG", `计费/配额错误（快败不重试）: ${failure.message}`);
+            return;
+          }
           if (failure.code === "TIMEOUT" || failure.code === "ENGINE_ERROR") {
             // 行1：基础设施故障——deadline/attempt 预算内续跑（带历史注入，不重查数）。
             const t = this.store.getTask(runId)!;
@@ -336,8 +351,8 @@ export class TaskRunner {
    * 另附本任务已产生的 result_ref 清单（sessionHistory 从 events 表 sql 事件提取，
    * 跨 attempt 累积）+ 指示语——这些结果已落盘，直接读文件续算，不要重新查询。
    */
-  private buildHistoryPrefix(sessionId: string, runId: string, resultsDir: string): string {
-    const lines: string[] = ["【会话历史注入（任务续算恢复，事实源=网关事件表）】"];
+  private buildHistoryPrefix(sessionId: string, runId: string, resultsDir: string): string | undefined {
+    const lines: string[] = ["【会话历史注入（事实源=网关事件表）】"];
     const hist = this.store.sessionHistory(sessionId);
     const current = hist.find((h) => h.run_id === runId);
     let n = 0;
@@ -357,6 +372,8 @@ export class TaskRunner {
       }
     }
     const refs = current?.result_refs ?? [];
+    // 无可注入内容（会话首问且本任务无既往结果）→ undefined，裸 prompt。
+    if (n === 0 && refs.length === 0) return undefined;
     if (refs.length) lines.push(`本任务此前已产生的查询结果文件：${refs.join(", ")}`);
     lines.push(`以上查询结果已保存在 ${resultsDir}，请直接读取文件续算，不要重新查询。`);
     return lines.join("\n");

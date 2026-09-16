@@ -507,3 +507,42 @@ test("historyPrefix 状态过滤：queued/running 在途任务跳过，不渲染
   assert.ok(!prefix.includes("排队中的问题"), "queued 在途任务跳过——不误渲染为失败（Minor-1）");
   assert.ok(!prefix.includes("失败，结果不可信"), "无误标的失败渲染");
 });
+
+// ── soak 发现2修复：同会话正常续问（attempt=1）也注入历史（spec D14）──────────────
+test("D14 续问注入：同会话任务2 首跑（attempt=1）注入前人历史；会话首问仍裸 prompt", async () => {
+  // 任务1：独立会话首问 → 无前缀
+  const firstId = newTask("s-cont", "第一问");
+  const b1 = makeBackend([{ events: [evAnswer] }]);
+  await makeRunner(b1).runOnce(firstId);
+  assert.equal(b1.asks[0]!.historyPrefix, undefined, "会话首问无历史 → 裸 prompt");
+
+  // 任务2：同会话续问，attempt=1（正常路径非恢复）→ 必须注入任务1历史
+  const secondId = newTask("s-cont", "增加去年同期对比");
+  const b2 = makeBackend([{ events: [evAnswer] }]);
+  await makeRunner(b2).runOnce(secondId);
+  assert.equal(store.getTask(secondId)!.attempt, 1, "正常续问不占 attempt");
+  const prefix = b2.asks[0]!.historyPrefix!;
+  assert.ok(prefix.includes("第一问"), "续问前缀含任务1问题");
+  assert.ok(prefix.includes("结论"), "续问前缀含任务1回答摘要");
+  assert.ok(!prefix.includes("repairing"), "attempt=1 不产 repairing 阶段");
+  const stages = eventPayloads(secondId, "stage").map((p: any) => p.stage);
+  assert.ok(!stages.includes("repairing"), "repairing 事件仍仅限 attempt>1");
+});
+
+// ── soak 发现1修复：计费类错误（402 QUOTA）快败零重试（行6 语义）──────────────────
+test("QUOTA 快败：流内 error 含 Insufficient Balance → failed/CONFIG 零重试", async () => {
+  const runId = newTask();
+  const quotaEv: NormEvent = {
+    type: "error", code: "ENGINE_ERROR",
+    message: 'turn/end reason: {"kind":"error","error":{"message":"Insufficient Balance","code":"QUOTA","status":402}}',
+  };
+  const backend = makeBackend([{ events: [quotaEv] }]);
+  await makeRunner(backend).runOnce(runId);
+
+  const task = store.getTask(runId)!;
+  assert.equal(task.status, "failed");
+  assert.equal(task.error_code, "CONFIG", "计费错误归 CONFIG（非 UNRECOVERABLE）");
+  assert.equal(task.attempt, 1, "零重试——不烧第二次引擎 turn");
+  assert.equal(backend.asks.length, 1);
+  assert.ok(task.error_message!.includes("计费/配额错误"), "错误消息明确计费语义");
+});
