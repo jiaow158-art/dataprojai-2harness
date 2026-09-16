@@ -544,7 +544,12 @@ try {
     }
     for (const ref of produced) if (!onDisk.has(ref)) refFail.push(`sess${sessIdx} 缺文件 ${ref}`);
     for (const f of onDisk) if (!produced.has(f)) refFail.push(`sess${sessIdx} 外来文件 ${f}`);
-    if (produced.size === 0) refFail.push(`sess${sessIdx} 无 sql 产出`);
+    // 修（2026-09-16 正式跑复盘）："无 sql 产出"对被取消会话过严——b2/s1 注入 2s 即终态，
+    // 模型尚未跑任何查询，零产出是正确行为。隔离性的实质断言是上两行（ref↔文件双向映射），
+    // 会话级"必有一产出"删除；独立核对已证 155/155 ref→文件全映射零跨会话。
+    if (produced.size === 0 && sessTasks.some((t) => t.finalStatus !== "cancelled")) {
+      refFail.push(`sess${sessIdx} 无 sql 产出且存在非取消任务`);
+    }
   }
   check("A4c", `结果目录隔离：sql result_ref 文件全部落在所属 session 的 results 目录，无跨会话文件（${bySession.size} 个 session）`,
     refFail.length === 0, refFail.length ? refFail.slice(0, 6).join("; ") : `${bySession.size} 个 session 全隔离（简单 6 + 报告 3 + 多轮 3）`);
