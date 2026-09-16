@@ -342,6 +342,10 @@ export class TaskRunner {
     let n = 0;
     for (const h of hist) {
       if (h.run_id === runId) continue; // 本任务的 result_ref 单列，不进历史清单
+      // T7 审查 Minor-1：只有终态任务进历史——queued/running 是尚未出结果的在途任务
+      // （如同会话排在本任务之后的提问），渲染成"失败，结果不可信"会让恢复实例
+      // 误否定真实历史。
+      if (h.status === "queued" || h.status === "running") continue;
       n++;
       lines.push(`${n}. [${h.status}] 问题：${h.question}`);
       if (h.status === "succeeded") {

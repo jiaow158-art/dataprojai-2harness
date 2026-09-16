@@ -479,3 +479,31 @@ test("流内 CONFIG 收流（backend :193 spawn 失败表面）：零重试快�
   const done = eventPayloads(runId, "done")[0];
   assert.equal(done.status, "failed");
 });
+
+// ── T7 审查 Minor-1：historyPrefix 状态过滤——仅终态任务进历史，在途任务不误标失败 ──
+test("historyPrefix 状态过滤：queued/running 在途任务跳过，不渲染为失败", async () => {
+  // 同会话四任务：cancelled → succeeded → queued（在途）→ 本任务（续跑恢复）
+  const cId = newTask("s-hist", "被取消的问题");
+  store.finalize(store.claimLease(cId, "w0", 90_000, 3600)!, "cancelled");
+  const okId = newTask("s-hist", "已成功的问题");
+  const okLease = store.claimLease(okId, "w0", 90_000, 3600)!;
+  store.appendEvent(okLease, "sql", { sql: "SELECT 1", rows: 1, truncated: false, result_ref: "r-hist-1", elapsed_ms: 1 });
+  store.appendEvent(okLease, "answer", { markdown: "结论 A" });
+  store.finalize(okLease, "succeeded");
+  newTask("s-hist", "排队中的问题"); // queued 在途——不得进历史
+  const retryId = newTask("s-hist", "待续跑的问题");
+  const l = store.claimLease(retryId, "w0", 90_000, 3600)!;
+  store.releaseForRetry(l); // running + 无租约：模拟基础设施故障后的续跑窗口（attempt 已 =1）
+
+  const backend = makeBackend([{ events: [evAnswer] }]);
+  await makeRunner(backend).runOnce(retryId); // 续跑 claim → attempt=2 → 注入 historyPrefix
+
+  assert.equal(store.getTask(retryId)!.attempt, 2);
+  const prefix = backend.asks[0]!.historyPrefix!;
+  assert.ok(prefix.includes("[cancelled] 问题：被取消的问题"), "终态取消任务进历史");
+  assert.ok(prefix.includes("已取消，结果不可信"));
+  assert.ok(prefix.includes("[succeeded] 问题：已成功的问题"), "终态成功任务进历史");
+  assert.ok(prefix.includes("r-hist-1"), "成功任务的 result_ref 进历史");
+  assert.ok(!prefix.includes("排队中的问题"), "queued 在途任务跳过——不误渲染为失败（Minor-1）");
+  assert.ok(!prefix.includes("失败，结果不可信"), "无误标的失败渲染");
+});
