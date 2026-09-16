@@ -155,6 +155,30 @@ export class TaskStore {
   // ---------- A.1 核心：租约与围栏写 ----------
 
   /**
+   * A.1 boot 自愈（T8 WorkerPool.start 首步调用）：单服务部署不变量下，进程启动时
+   * 不可能有合法租约持有者——上一次进程死亡残留的 running 任务全部回队（status→queued、
+   * 清租约与 stage；attempt 不动，下次 claim 时 +1 走恢复路径）。
+   * 必须回队而非仅清租约：listRunnable 只放行 queued，而 reaper 的围栏 UPDATE 绑定
+   * lease_owner，对 NULL 属主行永不匹配——"清租约但保持 running"的任务会永久卡死，
+   * 既不可被 claim 也不可被收尸（M1 计划 T7 的"boot 自愈后 queued→恢复路径"语义）。
+   * 超预算的回队任务由 reaper 的 queued-zombie 分支终态（A.4 接管臂拒绝 claim）。
+   * 返回回队任务数（0 = 干净启动）。
+   */
+  healOrphans(): number {
+    return this.db
+      .prepare(
+        `UPDATE tasks SET status='queued', lease_owner=NULL, lease_expires_at=NULL, stage=NULL
+         WHERE status='running'`,
+      )
+      .run().changes;
+  }
+
+  /** 全局 queued 水位（T8：MAX_QUEUE 队列上限判定 + /api/health 队列深度）。 */
+  countQueued(): number {
+    return this.db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE status='queued'").get().n as number;
+  }
+
+  /**
    * 原子获权（A.1 L1）：单条条件 UPDATE——status='queued'，或 status='running' 但租约
    * 已过期/无主（接管与 boot 自愈路径），且租约空闲、未过 deadline（A.4 接管臂：超预算
    * 任务不可被接管续跑，只能走 reaper 的 deadline 分支终态 failed）才放行。
