@@ -29,6 +29,9 @@
 // turn/end reason 映射：kind=completed → 无事件（ask() 流终止）；其余 kind（error/
 // max-tokens/…）→ error {code:"ENGINE_ERROR", message: reason 原文}。错误细分（TIMEOUT/
 // CONFIG/…）由编排层按上下文判定，归一化只做忠实转译。
+//
+// usage 侧通道（M2-T0，done.tokens 前置）：assistant/message 的 data.usage 逐条累积，
+// usage() 取值——**不产规范事件**（事件词表六类冻结不动，本文件头契约）。
 
 /** dsh session.event 通知的原生事件信封（dsh-sdk-protocol SessionEvent；宽松索引访问）。 */
 export interface RawSdkEvent {
@@ -55,6 +58,13 @@ export type NormStage =
   | "repairing"
   | "publishing";
 
+/** usage 累积总量（done.tokens 载体，M2-T0）。字段名对齐 spec done 词表的 tokens 形状。 */
+export interface UsageTotal {
+  input: number;
+  output: number;
+  cache_read: number;
+}
+
 const RUN_QUERY_TOOL = "mcp__dws__run_query";
 const EXEC_SCRIPT_TOOL = "exec_script";
 
@@ -74,6 +84,28 @@ interface RunQueryCall {
  */
 export class EventNormalizer {
   private runQueryCalls = new Map<string, RunQueryCall>();
+  // usage 累积（assistant/message 逐条；M2-T0）。归一化器每次 ask() 新建 → 天然按轮归零。
+  private usageIn = 0;
+  private usageOut = 0;
+  private usageCacheRead = 0;
+  private usageEvents = 0;
+
+  /**
+   * 本轮累积的 usage；一条含 usage 的 assistant/message 都没见过 → null（引擎不可用/
+   * 零事件兜底，编排层据此保持 done.tokens=null）。
+   *
+   * 累积规则（fixture 实测，T16 真实会话 dsh-fixture.json）：每条 assistant/message 的
+   * `data.usage` 均有值——含带 tool-call 的中间消息与终文，形状
+   * {inputTokens, outputTokens, totalTokens, cacheReadTokens, reasoningTokens}。
+   * 每条消息是一次独立模型调用（服务端按次计费，inputTokens 每次重计全部上下文），
+   * 逐条累加即计费口径。totalTokens = inputTokens + outputTokens + cacheReadTokens
+   * （inputTokens 不含 cache 命中；reasoningTokens 已含在 outputTokens 内，fixture 五条
+   * 全部精确满足该等式），故 input/output/cache_read 三字段直接求和不重不漏。
+   */
+  usage(): UsageTotal | null {
+    if (this.usageEvents === 0) return null;
+    return { input: this.usageIn, output: this.usageOut, cache_read: this.usageCacheRead };
+  }
 
   /** 喂入一个原始事件，返回 0..n 个规范事件。 */
   push(ev: RawSdkEvent): NormEvent[] {
@@ -139,6 +171,14 @@ export class EventNormalizer {
       }
 
       case "assistant/message": {
+        // usage 侧通道（M2-T0）：只累积，不产规范事件（词表六类冻结）。
+        const u = data?.usage;
+        if (u && typeof u === "object") {
+          if (typeof u.inputTokens === "number") this.usageIn += u.inputTokens;
+          if (typeof u.outputTokens === "number") this.usageOut += u.outputTokens;
+          if (typeof u.cacheReadTokens === "number") this.usageCacheRead += u.cacheReadTokens;
+          this.usageEvents++;
+        }
         const content = data?.message?.content ?? [];
         const hasText = content.some((b: any) => b?.type === "text");
         const hasToolCall = content.some((b: any) => b?.type === "tool-call");

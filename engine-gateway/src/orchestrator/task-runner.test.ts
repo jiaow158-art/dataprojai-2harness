@@ -546,3 +546,60 @@ test("QUOTA 快败：流内 error 含 Insufficient Balance → failed/CONFIG 零
   assert.equal(backend.asks.length, 1);
   assert.ok(task.error_message!.includes("计费/配额错误"), "错误消息明确计费语义");
 });
+
+// ── M2-T0：done.tokens 接线——session.lastUsage 跨 attempt 累计入 done ───────────
+// UsageSession mock 镜像真实 DshEngineSession 形态：usage 快照在事件/抛错前落定
+// （真实实现快照在收流 finally），失败路径同样有值。既有用例的 MockSession（旧 mock，
+// 无 lastUsage 方法）零改动——其 done.tokens 必须保持 null（下一用例覆盖）。
+interface UsageStep {
+  events?: NormEvent[];
+  throw?: Error;
+  usage?: { input: number; output: number; cache_read: number };
+}
+
+function makeUsageBackend(script: UsageStep[]): BackendProvider {
+  let stepIdx = 0;
+  return {
+    id: "mock-usage",
+    async createSession(opts: SessionOpts): Promise<EngineSession> {
+      mkdirSync(join(opts.workroot, opts.sessionId, "workdir"), { recursive: true });
+      mkdirSync(join(opts.resultsRoot, opts.sessionId, "results"), { recursive: true });
+      let snapshot: { input: number; output: number; cache_read: number } | null = null;
+      return {
+        async *ask(): AsyncGenerator<NormEvent> {
+          const cur = script[stepIdx++] ?? {};
+          snapshot = cur.usage ?? null;
+          for (const ev of cur.events ?? []) yield ev;
+          if (cur.throw) throw cur.throw;
+        },
+        lastUsage: () => snapshot,
+        async cancel(): Promise<void> {},
+      } as unknown as EngineSession;
+    },
+  };
+}
+
+test("done.tokens：带 lastUsage 的 session 跨 attempt 累计（失败 attempt 的 usage 也算）", async () => {
+  const runId = newTask();
+  const backend = makeUsageBackend([
+    { events: [evSql("r-tok-1")], throw: new SdkPromptError("ENGINE_ERROR", "died"), usage: { input: 100, output: 10, cache_read: 50 } },
+    { events: [evAnswer], usage: { input: 200, output: 30, cache_read: 70 } },
+  ]);
+  await makeRunner(backend).runOnce(runId);
+
+  const task = store.getTask(runId)!;
+  assert.equal(task.status, "succeeded");
+  assert.equal(task.attempt, 2);
+  const done = eventPayloads(runId, "done")[0];
+  assert.deepEqual(done.tokens, { input: 300, output: 40, cache_read: 120 });
+});
+
+test("done.tokens：旧 mock（无 lastUsage 方法）→ tokens 保持 null 不炸（typeof 守卫兜底）", async () => {
+  const runId = newTask();
+  const backend = makeBackend([{ events: [evAnswer] }]); // MockSession 无 lastUsage 方法
+  await makeRunner(backend).runOnce(runId);
+
+  assert.equal(store.getTask(runId)!.status, "succeeded");
+  const done = eventPayloads(runId, "done")[0];
+  assert.equal(done.tokens, null);
+});

@@ -27,7 +27,7 @@ import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import type { DbAccount } from "../config/db-accounts.ts";
 import { DshSdkClient, REQUIRED_ENV_KEYS, type TurnEnd } from "./dsh-sdk-client.ts";
-import { EventNormalizer, type NormEvent, type RawSdkEvent } from "./dsh-events.ts";
+import { EventNormalizer, type NormEvent, type RawSdkEvent, type UsageTotal } from "./dsh-events.ts";
 import type { ChildProcess } from "node:child_process";
 
 /** spec §5 稳定契约：换引擎 = 新实现 + 改一行注册，Web/API 零改动。 */
@@ -62,6 +62,12 @@ export interface AskOpts {
 export interface EngineSession {
   ask(question: string, opts?: AskOpts): AsyncIterable<NormEvent>;
   cancel(): Promise<void>;
+  /**
+   * 最近一次 ask 的 usage 快照（M2-T0 done.tokens 数据源；每次 ask 归零重计，
+   * respawn 后同样归零重计）。可选成员：旧实现/mock 可不提供——调用方以
+   * `typeof session.lastUsage === "function"` 守卫。null = 本 ask 无 usage 数据。
+   */
+  lastUsage?(): UsageTotal | null;
 }
 
 /** DshBackend 可注入依赖（单测替身；默认真实 spawn/killTree/console.warn）。 */
@@ -156,6 +162,8 @@ class DshEngineSession implements EngineSession {
   private cancelled = false;
   /** 当前 ask() 的原始事件汇入点（串行单 ask；respawn 换代不影响汇入）。 */
   private sink: ((ev: RawSdkEvent, sessionId: string) => void) | null = null;
+  /** 最近一次 ask 的 usage 快照（M2-T0；归一化器随 ask 新建 → 每 ask 归零重计）。 */
+  private usageSnapshot: UsageTotal | null = null;
 
   private opts: SessionOpts;
   private env: Record<string, string | undefined>;
@@ -195,6 +203,7 @@ class DshEngineSession implements EngineSession {
     try {
       client = await this.ensureClient();
     } catch (e) {
+      this.usageSnapshot = null; // 本 ask 引擎未跑起来：无 usage（归零语义）
       yield { type: "error", code: "CONFIG", message: `dsh spawn/initialize failed: ${String(e)}` };
       return;
     }
@@ -213,6 +222,9 @@ class DshEngineSession implements EngineSession {
       for await (const ev of queue.drain()) yield ev;
     } finally {
       this.sink = null;
+      // 快照放 finally：编排层 cancel/围栏 break 提前收流时，已见 usage 同样保留
+      // （done.tokens 成功/失败路径都算——T7 累计口径）。
+      this.usageSnapshot = normalizer.usage();
     }
 
     if (outcome?.err) {
@@ -229,6 +241,11 @@ class DshEngineSession implements EngineSession {
   async cancel(): Promise<void> {
     this.cancelled = true;
     if (this.client) await this.client.kill();
+  }
+
+  /** M2-T0：最近一次 ask 的 usage 快照（编排层 TaskRunner 累计进 done.tokens）。 */
+  lastUsage(): UsageTotal | null {
+    return this.usageSnapshot;
   }
 
   /** 取活客户端；死亡/未启动则 respawn（新代数 = 新 SDK sessionId）。 */

@@ -29,7 +29,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSyn
 import { dirname, join } from "node:path";
 import { resolveDbAccount } from "../config/db-accounts.ts";
 import type { BackendProvider, EngineSession } from "../backends/dsh-backend.ts";
-import type { NormEvent } from "../backends/dsh-events.ts";
+import type { NormEvent, UsageTotal } from "../backends/dsh-events.ts";
 import type { Lease, TaskStore } from "../store/task-store.ts";
 
 export interface TaskRunnerPaths {
@@ -128,6 +128,9 @@ export class TaskRunner {
    */
   async runOnce(runId: string): Promise<void> {
     const startedAt = Date.now();
+    // M2-T0：done.tokens——跨 ask/attempt 的 usage 累计（每次 ask 结束累计
+    // session.lastUsage()）；null = 引擎未提供任何 usage（mock/旧实现兜底，词表允许 null）。
+    let tokens: UsageTotal | null = null;
     while (true) {
       // 1. claimLease 获权（attempt+1、deadline 首次固化）。失败=别人在跑/已终态/超预算。
       const lease = this.store.claimLease(runId, this.config.workerId, this.ttl, this.config.taskBudgetS);
@@ -147,7 +150,7 @@ export class TaskRunner {
         // 2. 恢复入口——A.4 行4：publications 已写而 status 未翻（发布后崩溃）→
         //    直接补终态，不重跑。对每次获权都查（防线不依赖前次 claim 的存在）。
         if (this.store.getPublication(runId)) {
-          this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "succeeded");
           return;
         }
@@ -184,7 +187,7 @@ export class TaskRunner {
         } catch (err) {
           const code = thrownCode(err);
           const message = `createSession failed: ${err instanceof Error ? err.message : String(err)}`;
-          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "failed", code === "CONFIG" ? "CONFIG" : "ENGINE_ERROR", message);
           return;
         }
@@ -226,6 +229,19 @@ export class TaskRunner {
           failure = { code: thrownCode(err), message: err instanceof Error ? err.message : String(err) };
         }
 
+        // M2-T0：本 ask 结束（成功/失败/取消路径都算）累计本轮 usage。旧 mock/未来
+        // 引擎实现无 lastUsage 方法 → typeof 守卫跳过（tokens 保持 null 兜底）；
+        // 本 ask 无 usage 数据（返回 null）同样跳过。
+        if (typeof session.lastUsage === "function") {
+          const u = session.lastUsage();
+          if (u) {
+            tokens = tokens ?? { input: 0, output: 0, cache_read: 0 };
+            tokens.input += u.input;
+            tokens.output += u.output;
+            tokens.cache_read += u.cache_read;
+          }
+        }
+
         if (lostLease) {
           await session.cancel();
           return; // 别人已接管——不 finalize（行3：旧执行者 kill 自身退出）
@@ -235,7 +251,7 @@ export class TaskRunner {
         if (this.store.getTask(runId)?.cancel_requested === 1) cancelled = true;
         if (cancelled) {
           await session.cancel();
-          this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "cancelled");
           return;
         }
@@ -253,7 +269,7 @@ export class TaskRunner {
             failure.code === "ENGINE_ERROR" &&
             /Insufficient\s+Balance|("code"\s*:\s*"QUOTA")|status"?\s*[:=]\s*402/i.test(failure.message)
           ) {
-            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+            this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
             this.store.finalize(lease, "failed", "CONFIG", `计费/配额错误（快败不重试）: ${failure.message}`);
             return;
           }
@@ -263,19 +279,19 @@ export class TaskRunner {
             if (t.deadline != null && t.deadline < Date.now()) {
               // 超预算：TIMEOUT 触发的标 TIMEOUT（任务文本），其余归 UNRECOVERABLE（同 reaper）。
               const code = failure.code === "TIMEOUT" ? "TIMEOUT" : "UNRECOVERABLE";
-              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
               this.store.finalize(lease, "failed", code, `deadline 已过: ${failure.message}`);
               return;
             }
             if (lease.attempt >= this.maxAttempts) {
-              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+              this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
               this.store.finalize(lease, "failed", "UNRECOVERABLE", `attempt 达上限 ${this.maxAttempts}: ${failure.message}`);
               return;
             }
             // 重试前最后看一眼取消标志（失败窗口期到的取消不丢）。
             if (t.cancel_requested === 1) {
               await session.cancel();
-              this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1);
+              this.emitDone(lease, runId, "cancelled", startedAt, lease.attempt > 1, tokens);
               this.store.finalize(lease, "cancelled");
               return;
             }
@@ -285,7 +301,7 @@ export class TaskRunner {
             continue;
           }
           // CONFIG（行6）与其余本地判定码：终态失败零重试。
-          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "failed", failure.code, failure.message);
           return;
         }
@@ -294,7 +310,7 @@ export class TaskRunner {
         const artifact = this.locateArtifact(this.workdirOf(task.session_id), reportSignal);
         if (!artifact) {
           // 无 HTML 产物且无 pendingError → 纯问答任务，跳过发布。
-          this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "succeeded");
           return;
         }
@@ -302,7 +318,7 @@ export class TaskRunner {
         // 发布检查（M1 简化：失败不 Self-Heal，走失败终态，消息含检查详情）。
         const check = this.checkReport(artifact);
         if (!check.ok) {
-          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1);
+          this.emitDone(lease, runId, "failed", startedAt, lease.attempt > 1, tokens);
           this.store.finalize(lease, "failed", "REPORT_CHECK", `报告发布检查失败: ${check.detail}`);
           return;
         }
@@ -322,7 +338,7 @@ export class TaskRunner {
         this.store.recordPublication(runId, dest);
         const wr = this.store.appendEvent(lease, "report", { path: dest });
         if (wr.fenced) return; // publications 已写：接管者走行4恢复补终态——恰好一次发布成立
-        this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1);
+        this.emitDone(lease, runId, "succeeded", startedAt, lease.attempt > 1, tokens);
         this.store.finalize(lease, "succeeded");
         return;
       } finally {
@@ -333,14 +349,15 @@ export class TaskRunner {
     }
   }
 
-  /** done 事件（词表六类之一）：必须先于 finalize 落库（见文件头发布顺序注）。 */
-  private emitDone(lease: Lease, runId: string, status: "succeeded" | "failed" | "cancelled", startedAt: number, recovered: boolean): void {
+  /** done 事件（词表六类之一）：必须先于 finalize 落库（见文件头发布顺序注）。
+   *  tokens = 本次 runOnce 的跨 attempt usage 累计（无 ask 的早退路径为 null）。 */
+  private emitDone(lease: Lease, runId: string, status: "succeeded" | "failed" | "cancelled", startedAt: number, recovered: boolean, tokens: UsageTotal | null): void {
     this.store.appendEvent(lease, "done", {
       run_id: runId,
       status,
       engine: "dsh",
       elapsed_ms: Date.now() - startedAt,
-      tokens: null,
+      tokens,
       recovered,
     });
   }

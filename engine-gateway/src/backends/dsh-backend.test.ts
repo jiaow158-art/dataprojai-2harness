@@ -462,6 +462,60 @@ test("createSession：进程死亡后下一问 respawn 新 SDK sessionId（S3 �
   }
 });
 
+// ── 7. lastUsage（M2-T0）：fixture 回放 usage 累积 + respawn 归零重计 ─────────────
+test("lastUsage：fixture 全量回放 → usage 与日志累积一致；respawn 后归零重计；未 ask 为 null", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-t5d-"));
+  try {
+    const children: FakeChild[] = [];
+    const backend = new DshBackend({
+      spawnFn: () => { const ch = makeFakeChild(); children.push(ch); return ch as unknown as ChildProcess; },
+      killTreeFn: () => {},
+    });
+    const session = await backend.createSession(makeSessionOpts(root, root));
+    assert.equal(session.lastUsage!(), null, "未 ask 前快照为 null");
+
+    // 第一问：全量回放 fixture（5 条 assistant/message 均带 data.usage）
+    const it1 = session.ask("分析Q3库存");
+    const done1 = (async () => { for await (const _ of it1) { /* drain */ } })();
+    await waitFor(() => children.length >= 1 && childWrites(children[0]).some((f) => f.method === "initialize"), 3000, "initialize 帧");
+    const w1 = childWrites(children[0]).find((f) => f.method === "initialize")!;
+    line(children[0], { jsonrpc: "2.0", id: w1.id, result: { serverInfo: { name: "s", version: "0" } } });
+    await waitFor(() => childWrites(children[0]).some((f) => f.method === "session/prompt"), 3000, "prompt 帧");
+    const p1 = childWrites(children[0]).find((f) => f.method === "session/prompt")!;
+    line(children[0], { jsonrpc: "2.0", id: p1.id, result: { messageId: "m1" } });
+    for (const ev of fixture) notifyEvent(children[0], p1.params.sessionId, ev);
+    await done1;
+
+    // fixture 实测（T16 会话日志 5 条 usage 逐条累加）：
+    //   input 8108+6979+72+10564+836 = 26559；output 197+409+546+540+5026 = 6718；
+    //   cache_read 0+8192+30080+30592+43648 = 112512
+    const u1 = session.lastUsage()!;
+    assert.ok(u1.input > 0 && u1.output > 0);
+    assert.deepEqual(u1, { input: 26559, output: 6718, cache_read: 112512 });
+
+    // 第二问前子进程死亡 → respawn（新代数）：归零重计，只含本轮一条 usage 的量
+    children[0].emit("exit", 1);
+    const it2 = session.ask("q2");
+    const done2 = (async () => { for await (const _ of it2) { /* drain */ } })();
+    await waitFor(() => children.length === 2, 3000, "respawn 新子进程");
+    await waitFor(() => childWrites(children[1]).some((f) => f.method === "initialize"), 3000, "initialize 帧(2)");
+    const w2 = childWrites(children[1]).find((f) => f.method === "initialize")!;
+    line(children[1], { jsonrpc: "2.0", id: w2.id, result: { serverInfo: { name: "s", version: "0" } } });
+    await waitFor(() => childWrites(children[1]).some((f) => f.method === "session/prompt"), 3000, "prompt 帧(2)");
+    const p2 = childWrites(children[1]).find((f) => f.method === "session/prompt")!;
+    line(children[1], { jsonrpc: "2.0", id: p2.id, result: { messageId: "m2" } });
+    notifyEvent(children[1], p2.params.sessionId, {
+      type: "assistant/message", seq: 1,
+      data: { turn: 1, message: { role: "assistant", content: [{ type: "text", text: "答2" }] }, usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120, cacheReadTokens: 0, reasoningTokens: 5 } },
+    });
+    notifyEvent(children[1], p2.params.sessionId, { type: "turn/end", seq: 2, data: { turn: 1, reason: { kind: "completed" } } });
+    await done2;
+    assert.deepEqual(session.lastUsage(), { input: 100, output: 20, cache_read: 0 }, "respawn 后归零重计");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("createSession：缺 DWS_RUN_PASSWORD → CONFIG 快败（不 spawn）", async () => {
   delete process.env.DWS_RUN_PASSWORD;
   const backend = new DshBackend({ spawnFn: () => { throw new Error("must not spawn"); } });
