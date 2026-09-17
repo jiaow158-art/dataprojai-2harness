@@ -20,8 +20,9 @@
 
 真值：期望 SQL 用 psycopg2 重导 DWS（statement_timeout 60s，fetchmany 上限 2001）；
 dataset.data 与 fresh 不一致 → judge 判 DATA_DRIFT（漂移注记，非引擎失败）。
-agent 行数据从最终 sql 事件 result_ref 落盘文件读回（GW_RESULTS_ROOT/<sessionId>/results/
-<ref>.json）做全对照；文件缺失 → 降级行数对照并注记（T1 移交项 1/3）。
+agent 行数据从**每个** sql 事件的 result_ref 落盘文件读回（GW_RESULTS_ROOT/<sessionId>/results/
+<ref>.json，round1 修正：不只最后一个——judge 多事件最佳匹配需要全部事件行数据）；文件缺失 →
+降级行数对照并注记（T1 移交项 1/3）。
 number 抽查按度量列（键列=非数值列优先，fresh_compare 显式传 key_cols，T1 移交项 2）。
 """
 from __future__ import annotations
@@ -744,7 +745,11 @@ def latest_round_summary() -> str | None:
 
 def judge_one(q: dict, state: dict, agent_rows: list | None,
               fresh_rows: list | None, fresh_err: str | None) -> dict:
-    """组装 judge 输入并判分；附驱动器侧补充（T1 移交项 2：显式 key_cols 全对照 + 度量列抽查）。"""
+    """组装 judge 输入并判分；附驱动器侧补充（T1 移交项 2 + round1 缺陷1 联动）：
+
+    - runner 已把每个 sql 事件的 result_ref 行数据读回挂 data → judge 做多事件最佳匹配
+    - 驱动器侧独立复核：任一事件 fresh_compare（显式 key_cols）通过 + 度量列抽查
+    """
     expected = {"row_count": q.get("row_count"), "sql": q.get("sql") or "", "data": q.get("data")}
     if q.get("expected_refusal"):
         expected["expected_refusal"] = True
@@ -760,8 +765,15 @@ def judge_one(q: dict, state: dict, agent_rows: list | None,
     if isinstance(truth, list) and truth:
         key_cols = pick_key_cols(truth)
         verdict["checks"]["key_cols"] = key_cols
-        if agent_rows is not None:
-            verdict["checks"]["full_compare_key_cols"] = fresh_compare(agent_rows, truth, key_cols=key_cols)
+        events = agent.get("sql_events") or []
+        hit = next((i for i, e in enumerate(events)
+                    if isinstance(e.get("data"), list)
+                    and fresh_compare(e["data"], truth, key_cols=key_cols, extra_cols_ok=True)), None)
+        ok = hit is not None or (agent_rows is not None and fresh_compare(
+            agent_rows, truth, key_cols=key_cols, extra_cols_ok=True))
+        verdict["checks"]["full_compare_key_cols"] = ok
+        if hit is not None:
+            verdict["checks"]["full_compare_event"] = hit
         mc = measure_spot_check(truth, state["answer"], key_cols)
         if mc is not None:
             verdict["checks"]["measure_in_answer"] = mc["found"]
@@ -796,18 +808,26 @@ def run_scenario(q: dict, idx: int, run_ts: str, client: GatewayClient,
             # 流关闭/断路而无 done（reaper 终态或中断）：任务 API 兜底
             task = client.get_task(run_id)
             state["done_status"] = task.get("status")
-        # T1 移交项 1：agent 行数据从最终 sql 事件 result_ref 落盘文件读回（judge 全对照面）
-        if state["sql_events"]:
-            last = state["sql_events"][-1]
-            ref = last.get("result_ref")
-            if ref:
-                agent_rows, err = read_result_ref_data(results_root, detail["session_id"], ref)
-                if err:
-                    ref_note = f"{err}——降级行数对照"
-                elif agent_rows is not None:
-                    last["data"] = agent_rows
+        # T1 移交项 1 + round1 缺陷1 联动：每个 sql 事件的 result_ref 落盘文件都读回
+        # （不只最后一个——judge 多事件最佳匹配需要全部事件的行数据）
+        refs_read, refs_missing = 0, 0
+        for ev in state["sql_events"]:
+            ref = ev.get("result_ref")
+            if not ref:
+                continue
+            data, err = read_result_ref_data(results_root, detail["session_id"], ref)
+            if isinstance(data, list):
+                ev["data"] = data
+                agent_rows = data  # 兼容旧字段：最后一个成功读回的事件行数据
+                refs_read += 1
             else:
-                ref_note = "最终 sql 事件无 result_ref——降级行数对照"
+                refs_missing += 1
+        if state["sql_events"] and refs_read == 0:
+            ref_note = ("result_ref 文件全部缺失"
+                        f"（{refs_missing} 个）——降级行数对照" if refs_missing
+                        else "全部 sql 事件无 result_ref——降级行数对照")
+        elif refs_missing:
+            ref_note = f"{refs_missing} 个 result_ref 文件缺失，其余 {refs_read} 个已读回"
         else:
             ref_note = None
         # 真值重导（拒答场景跳过——judge 红队分支不用真值）
@@ -827,6 +847,15 @@ def run_scenario(q: dict, idx: int, run_ts: str, client: GatewayClient,
         detail["driver_error"] = "interrupted"
         verdict = {"verdict": "SKIP", "failure_class": None,
                    "notes": ["运行中断（Ctrl-C），本场景未完成判分"], "checks": {}}
+    # 明细的行数口径：优先取 judge 命中事件（多事件最佳匹配），无命中时取最后读回的事件
+    m = (verdict.get("checks") or {}).get("matched_event")
+    if isinstance(m, int) and m < len(state.get("sql_events") or []) \
+            and isinstance(state["sql_events"][m].get("data"), list):
+        agent_rows_count = len(state["sql_events"][m]["data"])
+    elif agent_rows is not None:
+        agent_rows_count = len(agent_rows)
+    else:
+        agent_rows_count = None
     detail.update({
         "verdict": verdict["verdict"],
         "failure_class": verdict.get("failure_class"),
@@ -839,7 +868,7 @@ def run_scenario(q: dict, idx: int, run_ts: str, client: GatewayClient,
         "sql_events": [{k: e.get(k) for k in ("sql", "rows", "truncated", "result_ref")}
                        for e in state.get("sql_events") or []],
         "answer_head": (state.get("answer") or "")[:800],
-        "agent_rows_count": len(agent_rows) if agent_rows is not None else None,
+        "agent_rows_count": agent_rows_count,
         "fresh_err": fresh_err,
         "fresh_rows_count": len(fresh_rows) if fresh_rows is not None else None,
         "cached": False,

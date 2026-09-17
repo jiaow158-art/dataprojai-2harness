@@ -199,3 +199,43 @@ def test_render_report_cost_table_when_tokens_present():
     assert abs(cost - 0.00605) < 1e-9
     md = R.render_report("r", summary, ds, cost={"cny": cost, "prices": {"input": 2.0}}, gateway_desc="x")
     assert "成本" in md and "tokens" in md
+
+
+# ---- 8. round1 缺陷1 联动：多事件读回与 any-event 复核 ----
+def test_judge_one_multievent_full_compare():
+    """judge_one：任一事件 fresh_compare（显式 key_cols）通过 → full_compare_key_cols=True 且记命中序号。"""
+    truth = [{"month": "2026-01", "amt": 1.0}, {"month": "2026-02", "amt": 2.0}]
+    q = {"row_count": 2, "sql": "SELECT month, amt FROM t", "data": truth}
+    state = {"sql_events": [
+        {"sql": "SELECT month, amt FROM t", "rows": 2, "truncated": False, "data": list(truth)},
+        {"sql": "SELECT SUM(amt) AS a FROM t", "rows": 1, "truncated": False, "data": [{"a": 3.0}]},
+    ], "answer": "2026-01 amt 1.0", "done_status": "succeeded", "elapsed_ms": 100}
+    v = R.judge_one(q, state, agent_rows=list(truth), fresh_rows=list(truth), fresh_err=None)
+    assert v["verdict"] == "PASS"
+    assert v["checks"]["full_compare_key_cols"] is True
+    assert v["checks"]["full_compare_event"] == 0
+    assert v["checks"]["matched_event"] == 0
+
+
+def test_judge_one_multievent_none_match_reports_false():
+    truth = [{"month": "2026-01", "amt": 1.0}]
+    q = {"row_count": 1, "sql": "SELECT month, amt FROM t", "data": truth}
+    state = {"sql_events": [
+        {"sql": "SELECT month, amt FROM t", "rows": 1, "truncated": False, "data": [{"month": "2026-01", "amt": 9.0}]},
+        {"sql": "SELECT SUM(amt) AS a FROM t", "rows": 1, "truncated": False, "data": [{"a": 9.0}]},
+    ], "answer": "", "done_status": "succeeded", "elapsed_ms": 100}
+    v = R.judge_one(q, state, agent_rows=None, fresh_rows=list(truth), fresh_err=None)
+    assert v["checks"]["full_compare_key_cols"] is False
+
+
+def test_read_result_ref_roundtrip_and_missing(tmp_path):
+    import json as _json
+    d = tmp_path / "sess-1" / "results"
+    d.mkdir(parents=True)
+    (d / "r-1.json").write_text(_json.dumps({"result_ref": "r-1", "data": [{"a": 1}]}), encoding="utf-8")
+    data, err = R.read_result_ref_data(str(tmp_path), "sess-1", "r-1")
+    assert data == [{"a": 1}] and err is None
+    data2, err2 = R.read_result_ref_data(str(tmp_path), "sess-1", "r-missing")
+    assert data2 is None and "缺失" in err2
+    data3, err3 = R.read_result_ref_data(None, "sess-1", "r-1")
+    assert data3 is None and err3  # 无 results_root（直连未配 GW_RESULTS_ROOT）→ 降级说明
