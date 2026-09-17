@@ -1,0 +1,4 @@
+# eval 运行产物不进 git（.gitignore 本身提交）
+cache/
+round-*/
+gw-*/
