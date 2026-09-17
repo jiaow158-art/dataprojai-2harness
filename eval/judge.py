@@ -514,5 +514,3 @@ def judge_scenario(*, expected: dict, agent: dict,
 
     # 11 number 抽查：answer 含真值首行关键数值（注记，不 FAIL）
     return spotcheck_then("PASS")
-
-    return result("PASS", None)
