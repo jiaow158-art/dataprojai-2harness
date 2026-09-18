@@ -51,6 +51,8 @@ const TEMPLATE_DIR = path.join(__dirname, "profile-template");
 
 // ── 固定事实（M0 实测定型；换机器时改这里）────────────────────────────────
 const PLUGIN_DIR = path.resolve(__dirname, "..", "..", "m0", "dsh-plugin", "exec-script");
+// E-5 修复：读域围栏插件（tools/execute 瀑布拦 read/read_image/glob/grep）
+const FENCE_PLUGIN_DIR = path.resolve(__dirname, "..", "..", "m0", "dsh-plugin", "fs-read-fence");
 const MCP_PYTHON = "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe";
 const MCP_SCRIPT = path.resolve(__dirname, "..", "..", "dws_mcp_server.py");
 const HEADLESS_RESULT_DIR = path.resolve(__dirname, "..", "..", "m0", "results");
@@ -90,6 +92,7 @@ const packageJson = render("package.json.tmpl", {
   APP_BUNDLE: profile.appBundle,
   // Windows link: 用正斜杠（pnpm/yaml 均接受，且避免 YAML 反斜杠转义问题）。
   PLUGIN_DIR: PLUGIN_DIR.replaceAll("\\", "/"),
+  FENCE_PLUGIN_DIR: FENCE_PLUGIN_DIR.replaceAll("\\", "/"),
 });
 
 const patchYml = render("cordis.patch.yml.tmpl", {
@@ -134,25 +137,31 @@ if (allSame && !force) {
 }
 
 // ── node_modules link（T13 实测方式：dsh plugin add，转包 pnpm）────────────
-const linkTarget = path.join(profileDir, "node_modules", "m0-exec-script-plugin");
-const linkOk = existsSync(linkTarget);
-if (!linkOk || force) {
-  console.log(`[${profileName}] ${linkOk ? "force" : "link 缺失"} → dsh plugin add（bundle 注册 + pnpm link）`);
-  const r = spawnSync("dsh.cmd", ["plugin", "--profile", profileName, "add", PLUGIN_DIR], {
-    stdio: "inherit", shell: true, cwd: process.env.USERPROFILE || process.env.HOME,
-  });
-  if (r.status !== 0) {
-    console.error(`[${profileName}] dsh plugin add 失败（exit ${r.status}）`);
-    process.exit(1);
+const PLUGINS = [
+  { name: "m0-exec-script-plugin", dir: PLUGIN_DIR },
+  { name: "m0-fs-read-fence-plugin", dir: FENCE_PLUGIN_DIR },
+];
+for (const p of PLUGINS) {
+  const linkTarget = path.join(profileDir, "node_modules", p.name);
+  const linkOk = existsSync(linkTarget);
+  if (!linkOk || force) {
+    console.log(`[${profileName}] ${p.name} ${linkOk ? "force" : "link 缺失"} → dsh plugin add（bundle 注册 + pnpm link）`);
+    const r = spawnSync("dsh.cmd", ["plugin", "--profile", profileName, "add", p.dir], {
+      stdio: "inherit", shell: true, cwd: process.env.USERPROFILE || process.env.HOME,
+    });
+    if (r.status !== 0) {
+      console.error(`[${profileName}] dsh plugin add ${p.name} 失败（exit ${r.status}）`);
+      process.exit(1);
+    }
+  } else {
+    console.log(`[${profileName}] ${p.name} link 已存在，跳过 plugin add`);
   }
-} else {
-  console.log(`[${profileName}] node_modules link 已存在，跳过 plugin add`);
 }
 
 // ── 自检（dump-config 级；会话级断言属 Task 9 E2E）────────────────────────
 // dump-config 已实测为只读自检（不重写 package.json），安全用于 CI。
 const REQUIRED_DISABLED = ["tool-pwsh", "tool-web", "tool-workflow", "workflow-worker-thread", "tool-ralph"];
-const REQUIRED_PRESENT = ["m0-exec-script", "mcp-dws"];
+const REQUIRED_PRESENT = ["m0-exec-script", "mcp-dws", "m0-fs-read-fence"];
 
 function selfCheck() {
   const r = spawnSync("dsh.cmd", ["--profile", profileName, "--dump-config"], {
@@ -205,7 +214,7 @@ function selfCheck() {
     } catch {}
     return false;
   }
-  console.log(`[${profileName}] SELF-CHECK PASS: 五工具 disabled+patched by / m0-exec-script / mcp-dws（dump-config 级）`);
+  console.log(`[${profileName}] SELF-CHECK PASS: 五工具 disabled+patched by / m0-exec-script / mcp-dws / m0-fs-read-fence（dump-config 级）`);
   return true;
 }
 

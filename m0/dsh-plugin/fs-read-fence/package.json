@@ -1,0 +1,14 @@
+{
+  "name": "m0-fs-read-fence-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.2"
+  }
+}

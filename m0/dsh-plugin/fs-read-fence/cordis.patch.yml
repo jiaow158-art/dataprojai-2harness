@@ -1,0 +1,11 @@
+# E-5 修复：读域围栏（tools/execute 瀑布拦截 read/read_image/glob/grep）。
+# 写侧围栏仍由 fs-sandbox workspace-write 负责（分层不重叠，见插件头注）。
+# roots 经 !!js process.env 注入（与 DWS_PASSWORD 同红线手法，值不落文件）；
+# 四个 M0_* env 由网关 DshBackend.createSession 全量注入（REQUIRED_ENV_KEYS）。
+- insert:
+    - id: m0-fs-read-fence
+      name: 'm0-fs-read-fence-plugin/fs-read-fence.ts'
+      config:
+        roots: !!js >-
+          [process.env.M0_SANDBOX_WORKDIR, process.env.M0_RESULTS_DIR,
+           process.env.M0_PROJECT_SKILL_DIR, process.env.M0_ASSETS_DIR].filter(Boolean)
