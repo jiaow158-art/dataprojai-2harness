@@ -29,7 +29,7 @@
 | 17 | 69 | inventory / inventory_impairment_calibers | 109e0b3d45ce → 39d59fa3cb27 | 为什么内部管理减值、阿米巴减值和CHDJ线组分摊的数对不上？各是多少？ | 2026年7月内部管理减值、阿米巴减值和CHDJ线组分摊的数为什么对不上？各是多少？ | SQL `calmonth='202607' / stat_month='2026-07'`，问题无时间锚点（同漂移类） |
 | 18 | 70 | inventory / inventory_aging_fall_link | ab755e9b1561 → f4bef513335e | 各事业部2年以上长库龄段的跌价敞口有多大？ | 2026年7月各事业部2年以上长库龄段的跌价敞口有多大？ | SQL `calmonth='202607'`，问题无时间锚点（同漂移类） |
 
-实现方式：文本级精确替换（每条原问题串全文件唯一，替换前断言 count==1），未触碰文件其余字节；改后 parse 前后对照断言**仅 question 字段变化**、CRLF/尾换行/无 BOM 保持；`git diff` = 17 insertions / 17 deletions，全部为 question 行。
+实现方式：文本级精确替换（每条原问题串全文件唯一，替换前断言 count==1），未触碰文件其余字节；改后 parse 前后对照断言**仅 question 字段变化**、CRLF/尾换行/无 BOM 保持；`git diff` = 18 insertions / 18 deletions，全部为 question 行。
 
 ## 二、核对后保持原样的条目（开放但不可改 / 已一致）
 
