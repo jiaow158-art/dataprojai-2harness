@@ -243,4 +243,4 @@ LIMIT 200;
 3. **mengef（已出库）排除602/653移动类型**（退货/冲销），实际出库量可能偏小
 4. **预估单价为NULL时**说明 material_area=0（非面积计价的物料，如卫浴）
 5. **zh_channel_code2 的 GD04（特惠品）在有些数据中可能映射不完整**
-6. **组织筛选需JOIN dm_rpt_sales_group_t**，sales_order_det_t 自身没有 node_desc 字段
+6. **组织筛选需JOIN dm_rpt_sale_grp_t**，sales_order_det_t 自身没有 node_desc 字段

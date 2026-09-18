@@ -69,7 +69,7 @@ WHERE stat_month = '2026-06'
 -- 二级渠道: channel_type = '整合渠道2'
 
 -- 组织筛选（订单表无node_desc，需JOIN）
-JOIN dm.dm_rpt_sales_group_t s ON det.vkgrp = s.sale_grp
+JOIN dm.dm_rpt_sale_grp_t s ON det.vkgrp = s.sale_grp
   AND s.lev2_name = '瓷砖事业部'
 
 -- 排除备份表（_wjh_, _bak, _20240329后缀）
@@ -82,7 +82,7 @@ JOIN dm.dm_rpt_sales_group_t s ON det.vkgrp = s.sale_grp
 - [ ] 时间过滤：大表（det/not_user）是否带了时间范围？
 - [ ] 时间格式：audat 是 YYYYMMDD 字符串？creation_time 是 timestamp？
 - [ ] 渠道编码：用 zh_channel_code1/2 还是 vtweg？
-- [ ] 组织筛选：JOIN dm_rpt_sales_group_t 关联键 sale_grp = vkgrp？
+- [ ] 组织筛选：JOIN dm_rpt_sale_grp_t 关联键 sale_grp = vkgrp？
 - [ ] 未交付表：是否加了 del_flag = 'N'？
 - [ ] 产区表：是否意识到仅限瓷砖？
 - [ ] 耗时字段：是否将字符串转为数值再计算？

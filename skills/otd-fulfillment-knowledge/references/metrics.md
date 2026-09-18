@@ -156,30 +156,31 @@ dm_otd_sales_order_det_t (订单底表)
 ### 维度关联
 - 客户名称：`kunnr` → `dwrdim.dwr_dim_cust_general_d.cust_num` (end_date='4712-12-31')
 - 物料维度：`matnr` → `dwimd.dwi_md_data_material_general_t.material_num`
-- 销售组织：`vkgrp` → `dm.dm_rpt_sales_group_t` (通过 node 层级)
+- 销售组织：`vkgrp` → `dm.dm_rpt_sale_grp_t` (通过 node 层级；关联键 `sale_grp = vkgrp`，组织名取 `lev2_name` 等 lev 列)
 - WBS信息：`ps_psp_pnr` → `dm.dm_otd_wbs_plan_order_det_t.pspnr`
 - 渠道名称：`zh_channel_code1/2` → `upload.upload_business_analysis_channel_t.channel_code`
 
 ## 七、已知陷阱
 
-1. **大表性能**: `sales_order_det_t` (899万) 和 `so_order_not_user_t` (794万) 必须带时间范围过滤，禁止全表扫描
-2. **时间格式不一致**:
+1. **两张同名销售组织维表勿混**（2026-09-18 DWS 实测）：本域用 `dm.dm_rpt_sale_grp_t`（关联键 `sale_grp` = det.`vkgrp`，lev2_name 等取组织名）；`dm.dm_rpt_sales_group_t` 是另一张 10 级树表（sales-performance 域用，关联键 `node_name10`），**没有 `sale_grp` 列**，本域 JOIN 它必错
+2. **大表性能**: `sales_order_det_t` (899万) 和 `so_order_not_user_t` (794万) 必须带时间范围过滤，禁止全表扫描
+3. **时间格式不一致**:
    - `sales_order_det_t.erdat/audat` 是 YYYYMMDD 字符串（如 '20260531'）
    - `so_order_not_user_t.creation_time` 是 timestamp 类型
    - `area_delivery_detail_m.stat_month` 是 YYYY-MM 字符串（如 '2026-05'）
-3. **产区交付表仅瓷砖**: `area_delivery_detail_m` ETL硬编码 `lev2_name='瓷砖事业部'`，不能查卫浴
-4. **未交付表排除零售**: `no_deliver_order_dtl` ETL硬编码 `ORDER_TYPE != '零售销售订单'`，零售未交付不在此表
-5. **确认数量 vs 交货数量**: `wqrsl`（未确认数量）= kwmeng - max(vmeng, menge)，不是简单的减法
-6. **已出库数量有两套口径**:
+4. **产区交付表仅瓷砖**: `area_delivery_detail_m` ETL硬编码 `lev2_name='瓷砖事业部'`，不能查卫浴
+5. **未交付表排除零售**: `no_deliver_order_dtl` ETL硬编码 `ORDER_TYPE != '零售销售订单'`，零售未交付不在此表
+6. **确认数量 vs 交货数量**: `wqrsl`（未确认数量）= kwmeng - max(vmeng, menge)，不是简单的减法
+7. **已出库数量有两套口径**:
    - `sales_order_det_t.mengef`（SAP货物移动，排除602/653移动类型）
    - `area_delivery_detail_m.sales_stock_out_qty`（WM库存移动，仅601/602/643/644/653/654 + record_type='MDOC'）
-7. **渠道编码需JOIN维表取中文名**，ETL中 channel_code1 名称来自 `SDI_BUSINESS_ANALYSIS_CHANNEL_1037`，GaussDB中对应 `upload.upload_business_analysis_channel_t`
-8. **订单类型过滤**: `sales_order_det_t` ETL限定 `auart IN ('ZA01','ZA02','ZA03','ZA06','ZA09','ZP01')`
-9. **so_order_not_user_t.is_sealing（是否封仓）字段恒为NULL** — ETL中第88行指定 `null as is_sealing`
-10. **so_order_not_user_t.holding_warning（留货预警）字段恒为NULL** — ETL第77行
-11. **no_deliver_order_dtl 是Hive外表同步** — ETL包含 `CREATE TABLE IF NOT EXISTS` DDL，可能与GaussDB实际结构有差异
-12. **预估返点金额**: `zfdje` 是预估金额，含条件逻辑（KURRF8~KURRF11四个条件类型求和）
-13. **单价计算因年份而异**: 2024年 ×(1-0.04), 2025年 ×(1-0.05), 其他年 ×(1+zsyjf_percent)
-14. **签收数据覆盖率仅 4.5%，不可用作履约完成率**: 全表 794 万行中 receiving_status='已签收' 仅 35 万行（4.5%），95.1% 为'待签收'。TMS 签收数据集成不完整，大部分订单永远不会流转到已签收状态。评估履约完成度请使用 **outbound_status（出库率）** 或 **shipping_status（发运率 39.9%）** 替代。
+8. **渠道编码需JOIN维表取中文名**，ETL中 channel_code1 名称来自 `SDI_BUSINESS_ANALYSIS_CHANNEL_1037`，GaussDB中对应 `upload.upload_business_analysis_channel_t`
+9. **订单类型过滤**: `sales_order_det_t` ETL限定 `auart IN ('ZA01','ZA02','ZA03','ZA06','ZA09','ZP01')`
+10. **so_order_not_user_t.is_sealing（是否封仓）字段恒为NULL** — ETL中第88行指定 `null as is_sealing`
+11. **so_order_not_user_t.holding_warning（留货预警）字段恒为NULL** — ETL第77行
+12. **no_deliver_order_dtl 是Hive外表同步** — ETL包含 `CREATE TABLE IF NOT EXISTS` DDL，可能与GaussDB实际结构有差异
+13. **预估返点金额**: `zfdje` 是预估金额，含条件逻辑（KURRF8~KURRF11四个条件类型求和）
+14. **单价计算因年份而异**: 2024年 ×(1-0.04), 2025年 ×(1-0.05), 其他年 ×(1+zsyjf_percent)
+15. **签收数据覆盖率仅 4.5%，不可用作履约完成率**: 全表 794 万行中 receiving_status='已签收' 仅 35 万行（4.5%），95.1% 为'待签收'。TMS 签收数据集成不完整，大部分订单永远不会流转到已签收状态。评估履约完成度请使用 **outbound_status（出库率）** 或 **shipping_status（发运率 39.9%）** 替代。
 15. **两表 JOIN 匹配率约 99%**: `so_order_not_user_t` LEFT JOIN `sales_order_det_t` 时有约 1% 行无法匹配（sap_number/sap_item_num 在 sales_order_det_t 中不存在对应 vbeln/posnr）。使用 INNER JOIN 会静默丢弃这些行。
 16. **状态字段不严格级联**: ETL 不保证 OTD 状态顺序。已验证出现 `shipping_status='已发运' AND outbound_status IS NULL`（448/69733 ≈ 0.6%）和 `holding_status IS NULL`（388/69733 ≈ 0.6%）。分析时需考虑状态 NULL 和跳跃的情况。
