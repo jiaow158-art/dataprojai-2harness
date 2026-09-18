@@ -208,3 +208,28 @@ AND month <= '2026-06'  -- 当前月
 | 公司信息 | dwrdim.dwr_dim_company_d | comp_code / company_code |
 
 注：`dwi_cost_center_main_t` 无描述字段，需要描述直接用费用表自带的 `cost_center_desc`/`cost_center_describe`。
+
+---
+
+## 九、pattern → 首选表与字段路由（对齐 eval_dataset 录制口径）
+
+> 本节把 10 类费用问题 pattern 固化为"首选表 + 金额字段"的路由规则。依据 = `eval_dataset.json` fin-cost 10 场景的期望 SQL（录制口径，即判定标准）+ 2026-09-17 实测证据（round-sample2）。
+> 当 DM 宽表与 dwrfin 明细表业务上都讲得通时，**以 eval_dataset 录制口径为准**，不要自行改换口径——不换表、不换金额字段、不加录制 SQL 之外的过滤条件。
+
+| pattern（问题形态） | 首选表 | 金额字段 / 关键列 | 路由规则与理由 |
+|---------------------|--------|-------------------|----------------|
+| trend_monthly（各月费用总额趋势） | dwrfin.dwr_fin_cost_d_compre_subj_t | `SUM(local_currency_amt)`，`WHERE year='YYYY' GROUP BY year, month` | 费用总额趋势 = 记账本位币原值口径；实测（E4）改用 dm.amount 被判口径错，以录制口径为准 |
+| summary_year（各年费用总额汇总） | dwrfin.dwr_fin_cost_d_compre_subj_t | `SUM(local_currency_amt)`，`WHERE year>='YYYY' GROUP BY year` | 与 trend_monthly 同口径家族：费用总额默认 dwrfin 记账口径 |
+| topn_costcenter（成本中心费用TopN） | dwrfin.dwr_fin_cost_d_compre_subj_t | `SUM(local_currency_amt)` BY `cost_center_code`，year + month 双条件 | 录制口径；注意 cost_center_code 大量 NULL（见七.6） |
+| account_topn（费用科目TopN） | dwrfin.dwr_fin_cost_d_compre_subj_t | `SUM(local_currency_amt)` BY `general_ledger_account` | 录制口径 = 明细表记账原值；dm.acc_acount 也可答但口径不同 |
+| breakdown_category（按功能范围拆分/排名） | dm.dm_fact_finance_cost_f | `SUM(amount)` BY `config_name` 单列，`LIMIT 10` | 录制口径 = 报表口径 + config_name 单列分组；**勿**加 functional_scope 双列分组、**勿**加 `functional_scope IS NOT NULL`（实测导致 9 行变 8 行，E4） |
+| topn_mfg_cost（制造费用按成本中心TopN） | dm.dm_fact_finance_cost_f | `SUM(amount)`，`functional_scope='4105'` 且 `acc_acount NOT IN ('0041011040','0041011030','0061507000')` | 录制口径；过度科目排除必须显式写（见六），dm 表才有该排除逻辑 |
+| budget_vs_actual（预算 vs 实际） | dm.dm_fact_finance_cost_f | `SUM(amount)` vs `SUM(budget_cost)`，偏差 = amount − budget_cost | 预算字段仅 dm 表有（见三决策树） |
+| yoy_comparison（费用同比） | dm.dm_fact_finance_cost_f | `SUM(amount)` vs `SUM(ly_amount)` | ly_ 同比字段仅 dm 表有 |
+| ratio_analysis（期间费用占比） | dm.dm_fact_finance_cost_f | `SUM(period_expense) / SUM(amount) * 100` BY `config_name` | period_expense 仅 dm 表有；录制窗口是区间（如 2026-01~05）不是全年，按问题给定窗口取数 |
+| profit_region（销售区域毛利排名） | dwrfin.dwrfin_cost_sales_gross_profit_d | `SUM(gross_profit)`；毛利率 = `SUM(gross_profit)/NULLIF(SUM(notax_sales_net_amt),0)*100`，`months='YYYYMM'` 无横杠 | 毛利数据只有毛利表有；时间格式陷阱见七.1 |
+
+**已知口径分歧点（两表差异写明，不替业务拍板新口径）**
+
+- **费用总额：dm.amount vs dwrfin.local_currency_amt。** 实测 2026-05（round-sample2）：dm.amount 合计 4.25 亿 vs dwrfin.local_currency_amt 口径 2.59 亿——差异真实存在。两口径都有业务理由（dm = 报表整合口径，月+成本中心+科目+销售组粒度、含调整；dwrfin = 凭证行项目记账本位币原值）。**路由以 eval_dataset 录制口径为准**：费用总额/趋势/年度汇总/成本中心与科目 TopN → dwrfin.local_currency_amt；功能范围拆分/制造费用/预算/同比/占比 → dm.amount 或对应专用字段。
+- 同类辨析先例（手动实测 E1，库存域）：capital_cost 表 closing_balance（11.86 亿）vs 明细表 zsjkcje（12.43 亿）——同月不同表数值不同属常态。遇到两表对不上时：两个都算、在答案里声明所用口径、按本节路由选定，不要私下换表凑数。

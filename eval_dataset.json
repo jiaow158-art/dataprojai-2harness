@@ -353,7 +353,7 @@
     {
       "domain": "fin-cost",
       "pattern": "ratio_analysis",
-      "question": "2026年各功能范围期间费用占比",
+      "question": "2026年1-5月各功能范围期间费用占比",
       "sql": "SELECT month, config_name,\n           SUM(amount) as total,\n           SUM(period_expense) as period_expense,\n           ROUND(SUM(period_expense) / NULLIF(SUM(amount),0) * 100, 2) as expense_ratio\n    FROM dm.dm_fact_finance_cost_f\n    WHERE month >= '2026-01' AND month <= '2026-05'\n    GROUP BY month, config_name ORDER BY month, config_name LIMIT 20",
       "row_count": 20,
       "elapsed_ms": 5184,
@@ -685,7 +685,7 @@
     {
       "domain": "inventory",
       "pattern": "aging_structure",
-      "question": "最近三个月库存库龄结构及长库龄占比",
+      "question": "2026年4-6月库存库龄结构及长库龄占比",
       "sql": "SELECT calmonth,\n           SUM(quantity) as total_qty,\n           SUM(zsjkcje) as total_amount,\n           SUM(wbzq_6_amt) as wbzq_0_6m,\n           SUM(wbzq_6_12_amt) as wbzq_6_12m,\n           SUM(wbzq_12_24_amt) as wbzq_12_24m,\n           SUM(wbzq_24_amt) as wbzq_24m_plus,\n           ROUND(SUM(wbzq_12_24_amt + wbzq_24_amt) / NULLIF(SUM(zsjkcje),0) * 100, 2) as long_aged_pct\n    FROM dm.dm_fin_stock_detail_accage_t_2023\n    WHERE calmonth IN ('202604','202605','202606')\n    GROUP BY calmonth ORDER BY calmonth",
       "row_count": 3,
       "elapsed_ms": 1397,
@@ -1383,7 +1383,7 @@
     },
     {
       "pattern": "topn_customer",
-      "question": "最新应收余额Top10客户",
+      "question": "2026年6月7日应收余额Top10客户",
       "sql": "SELECT cust_code, cust_name,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(n_overdue_receivables) as n_overdue\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'\n  AND (special_general_ledger IS NULL OR special_general_ledger = '')\nGROUP BY cust_code, cust_name\nORDER BY balance DESC\nLIMIT 10",
       "row_count": 10,
       "elapsed_ms": 105,
@@ -1464,7 +1464,7 @@
     },
     {
       "pattern": "aging_structure",
-      "question": "最近三个月应收账龄结构及逾期占比",
+      "question": "2026年5-6月应收账龄结构及逾期占比",
       "sql": "SELECT query_date,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(overdue_receivables) as overdue_total,\n       SUM(n_overdue_receivables) as n_overdue_total,\n       ROUND(SUM(overdue_receivables) / NULLIF(SUM(local_currency_balance_sum),0) * 100, 2) as overdue_pct\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date IN ('2026-05-02','2026-05-31','2026-06-02','2026-06-07')\nGROUP BY query_date\nORDER BY query_date",
       "row_count": 4,
       "elapsed_ms": 122,
@@ -1503,7 +1503,7 @@
     },
     {
       "pattern": "aging_bucket_detail",
-      "question": "最新账龄分段汇总（2023新版）",
+      "question": "2026年6月7日账龄分段汇总（2023新版）",
       "sql": "SELECT\n  SUM(overdue_receivables_1_90_day_2023_after) as d_0_90,\n  SUM(overdue_receivables_91_275_day_2023_after) as d_91_275,\n  SUM(overdue_receivables_276_730_day_2023_after) as d_276_730,\n  SUM(overdue_receivables_731_1460_day_2023_after) as d_731_1460,\n  SUM(overdue_receivables_1461_day_2023_after) as d_1461_plus\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'",
       "row_count": 1,
       "elapsed_ms": 52,
@@ -1521,7 +1521,7 @@
     },
     {
       "pattern": "overdue_customer",
-      "question": "最新逾期客户Top10",
+      "question": "2026年6月逾期客户Top10",
       "sql": "SELECT c_name, sales_grp___t,\n       ysye as balance, yqe as overdue,\n       ROUND(yqe / NULLIF(ysye, 0) * 100, 2) as overdue_pct\nFROM dm.dm_ar_overdue_receivables_t\nWHERE ed_mon = '202606'\n  AND yqe > 0\n  AND (is_ignore IS NULL OR is_ignore = 0)\nORDER BY yqe DESC\nLIMIT 10",
       "row_count": 0,
       "elapsed_ms": 58,
@@ -1637,7 +1637,7 @@
     },
     {
       "pattern": "devalue_by_class",
-      "question": "最新坏账减值按客户分类汇总",
+      "question": "2026年6月7日坏账减值按客户分类汇总",
       "sql": "SELECT cust_class_name,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(overdue_1_90_amt + overdue_91_275_amt + overdue_276_730_amt\n           + overdue_731_1460_amt + overdue_1461_amt) as total_devalue\nFROM dwrfin.dwr_ar_credit_devalue_f\nWHERE query_date = '2026-06-07'\nGROUP BY cust_class_name\nORDER BY balance DESC\nLIMIT 10",
       "row_count": 2,
       "elapsed_ms": 138,
@@ -1773,7 +1773,7 @@
     },
     {
       "pattern": "analysis_wbs",
-      "question": "最新综合分析按WBS汇总",
+      "question": "2026年6月综合分析按WBS汇总",
       "sql": "SELECT wbs_level1_desc,\n       SUM(receivables_am) as receivables,\n       SUM(overdue_receivables) as overdue,\n       SUM(all_collection_amt) as collection,\n       ROUND(AVG(collection_rate), 2) as avg_coll_rate\nFROM dm.dm_ar_analysis_rpt_f\nWHERE calmonth = '2026-06'\nGROUP BY wbs_level1_desc\nORDER BY receivables DESC\nLIMIT 10",
       "row_count": 10,
       "elapsed_ms": 1146,
@@ -1936,7 +1936,7 @@
     {
       "domain": "sales-performance",
       "pattern": "org_monthly_achievement",
-      "question": "今年卫浴事业部业绩情况",
+      "question": "2026年1-6月卫浴事业部业绩情况",
       "sql": "SELECT calmonth,\n       SUM(ambperformance) as total_achievement,\n       SUM(notax_sales_net_amt) as notax_amt,\n       SUM(zxsmj) as sales_area\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE calmonth >= '2026-01' AND calmonth <= '2026-06'\n  AND node_desc2 = '卫浴事业部'\n  AND data_source IN ('S', 'T', 'D', '')\nGROUP BY calmonth\nORDER BY calmonth",
       "row_count": 6,
       "elapsed_ms": 8057,
@@ -2746,7 +2746,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_trend_mom",
-      "question": "物料FG802702_A近半年销售额环比变化如何？",
+      "question": "物料FG802702_A 2026年2-7月销售额环比变化如何？",
       "sql": "SELECT calmonth, ROUND(SUM(ambperformance)) AS amt, ROUND(SUM(zxsmj)) AS area,\n       ROUND(100.0 * (SUM(ambperformance) - LAG(SUM(ambperformance)) OVER (ORDER BY calmonth))\n             / NULLIF(LAG(SUM(ambperformance)) OVER (ORDER BY calmonth), 0), 1) AS mom_pct\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE material_num = 'FG802702_A' AND calmonth BETWEEN '2026-02' AND '2026-07'\n  AND data_source IN ('S','T','D','')\nGROUP BY calmonth ORDER BY calmonth;",
       "row_count": 6,
       "elapsed_ms": 5547,
@@ -2775,7 +2775,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_margin_quadrant",
-      "question": "近3个月SKU毛利率与销售增长率四象限数据（销售额TOP30）",
+      "question": "2026年5-7月SKU毛利率与销售增长率四象限数据（销售额TOP30）",
       "sql": "WITH cur AS (\n  SELECT material_num, SUM(ambperformance) AS amt, SUM(gross_profit_after_sharing) AS gp\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-05' AND '2026-07' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n), prev AS (\n  SELECT material_num, SUM(ambperformance) AS amt\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-02' AND '2026-04' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n)\nSELECT c.material_num, ROUND(c.amt) AS amt,\n       ROUND(100.0*c.gp/NULLIF(c.amt,0),1) AS gp_rate,\n       ROUND(100.0*(c.amt-p.amt)/NULLIF(p.amt,0),1) AS growth_pct\nFROM cur c JOIN prev p USING (material_num)\nORDER BY c.amt DESC LIMIT 30;",
       "row_count": 30,
       "elapsed_ms": 5312,
@@ -2804,7 +2804,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_turnover_dos",
-      "question": "7月末库存可售天数最长的50个SKU是哪些？",
+      "question": "2026年7月末库存可售天数最长的50个SKU是哪些？",
       "sql": "WITH stock AS (\n  SELECT material, SUM(stock_amt) AS stock_amt\n  FROM dm.dm_fin_stock_detail_accage_t_2023\n  WHERE calmonth = '202607' GROUP BY material\n), cost AS (\n  SELECT material_num, AVG(m_cost) AS avg_m_cost, AVG(m_amt) AS avg_m_amt FROM (\n    SELECT material_num, calmonth, SUM(act_cost_sum_amt) AS m_cost, SUM(ambperformance) AS m_amt\n    FROM dm.dm_fin_operations_mix_sum_t\n    WHERE calmonth BETWEEN '2026-02' AND '2026-07' AND data_source IN ('S','T','D','')\n    GROUP BY material_num, calmonth) t\n  GROUP BY material_num\n)\nSELECT s.material, ROUND(s.stock_amt) AS stock_amt,\n       ROUND(s.stock_amt / NULLIF(c.avg_m_cost/30.0,0), 0) AS dos_days,\n       ROUND(s.stock_amt / NULLIF(c.avg_m_amt,0), 2) AS stock_sales_ratio\nFROM stock s JOIN cost c ON s.material = c.material_num\nORDER BY dos_days DESC NULLS LAST LIMIT 50;",
       "row_count": 50,
       "elapsed_ms": 590,
@@ -2873,7 +2873,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_channel_pivot",
-      "question": "物料FG802702_A在各整合渠道的销售额与毛利率？",
+      "question": "物料FG802702_A 2026年1-7月各整合渠道的销售额与毛利率？",
       "sql": "SELECT integrate_channel__t AS channel,\n       ROUND(SUM(ambperformance)) AS amt,\n       ROUND(SUM(gross_profit_after_sharing)) AS gp,\n       ROUND(100.0*SUM(gross_profit_after_sharing)/NULLIF(SUM(ambperformance),0),1) AS gp_rate\nFROM dm.dm_fin_operations_mix_sum_t\nWHERE material_num = 'FG802702_A' AND calmonth BETWEEN '2026-01' AND '2026-07'\n  AND data_source IN ('S','T','D','')\nGROUP BY integrate_channel__t ORDER BY amt DESC;",
       "row_count": 4,
       "elapsed_ms": 5372,
@@ -2902,7 +2902,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_fall_top10",
-      "question": "7月末存货跌价TOP10的SKU？",
+      "question": "2026年7月末存货跌价TOP10的SKU？",
       "sql": "SELECT material, MAX(material___t) AS material_name,\n       ROUND(SUM(jchj_aging)) AS fall_amt,\n       ROUND(SUM(stock_amt)) AS stock_amt,\n       ROUND(SUM(wbzq_6_12_fall_aging)) AS fall_6_12m,\n       ROUND(SUM(wbzq_12_24_fall_aging)) AS fall_12_24m,\n       ROUND(SUM(wbzq_24_fall_aging)) AS fall_24m\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth = '202607'\nGROUP BY material ORDER BY fall_amt DESC LIMIT 10;",
       "row_count": 10,
       "elapsed_ms": 858,
@@ -2940,7 +2940,7 @@
     {
       "domain": "sku-profitability",
       "pattern": "sku_score_top20",
-      "question": "SKU综合效益评分TOP20及处置建议？",
+      "question": "截至2026年7月SKU综合效益评分TOP20及处置建议？",
       "sql": "WITH cur AS (\n  SELECT material_num, SUM(ambperformance) AS amt, SUM(gross_profit_after_sharing) AS gp\n  FROM dm.dm_fin_operations_mix_sum_t\n  WHERE calmonth BETWEEN '2026-05' AND '2026-07' AND data_source IN ('S','T','D','')\n  GROUP BY material_num\n), act AS (\n  SELECT material_num, COUNT(DISTINCT start_month) AS active_months\n  FROM dm.dm_product_inout_stock_t\n  WHERE start_month BETWEEN '2026-01' AND '2026-07'\n    AND (out_stock_qty > 0 OR out_stock_area > 0)\n  GROUP BY material_num\n), stk AS (\n  SELECT material, SUM(stock_amt) AS stock_amt, SUM(jchj_aging) AS fall_amt\n  FROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth='202607' GROUP BY material\n), base AS (\n  SELECT c.material_num, c.amt, c.gp, COALESCE(a.active_months,0) AS active_months,\n         COALESCE(s.stock_amt,0) AS stock_amt, COALESCE(s.fall_amt,0) AS fall_amt\n  FROM cur c\n  LEFT JOIN act a ON c.material_num=a.material_num\n  LEFT JOIN stk s ON c.material_num=s.material\n  WHERE c.amt > 0\n), scored AS (\n  SELECT *,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY amt),1) AS s_sales,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY gp),1) AS s_gp,\n    ROUND(100*active_months/7.0,1) AS s_active,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt DESC),1) AS s_stock_inv,\n    ROUND(100*PERCENT_RANK() OVER (ORDER BY stock_amt/NULLIF(amt,0) DESC),1) AS s_turnover\n  FROM base\n), final AS (\n  SELECT *, ROUND(s_sales*0.25+s_gp*0.30+s_active*0.20+s_stock_inv*0.15+s_turnover*0.10,1) AS score\n  FROM scored\n)\nSELECT material_num, ROUND(amt) AS amt, ROUND(fall_amt) AS fall_amt, stock_amt, score,\n       CASE WHEN score>=80 THEN '加大投入' WHEN score>=60 THEN '保留优化'\n            WHEN score>=40 THEN '调价降本' ELSE '降库存' END AS action\nFROM final ORDER BY score DESC LIMIT 20;",
       "row_count": 20,
       "elapsed_ms": 1668,
@@ -2996,7 +2996,7 @@
     {
       "domain": "inventory",
       "pattern": "inventory_fall_trend",
-      "question": "今年以来存货跌价（减值）每月总额走势？",
+      "question": "2026年1-7月存货跌价（减值）每月总额走势？",
       "sql": "SELECT calmonth, ROUND(SUM(COALESCE(jchj_amt,0))) AS fall_total\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth BETWEEN '202601' AND '202607'\nGROUP BY calmonth ORDER BY calmonth;",
       "row_count": 7,
       "elapsed_ms": 5038,
@@ -3029,7 +3029,7 @@
     {
       "domain": "inventory",
       "pattern": "inventory_impairment_calibers",
-      "question": "为什么内部管理减值、阿米巴减值和CHDJ线组分摊的数对不上？各是多少？",
+      "question": "2026年7月内部管理减值、阿米巴减值和CHDJ线组分摊的数为什么对不上？各是多少？",
       "sql": "SELECT '内部管理减值' AS metric, ROUND(SUM(COALESCE(jchj_amt,0))) AS amt\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\nUNION ALL\nSELECT '内部阿米巴减值', ROUND(SUM(COALESCE(jchj_aging,0)))\nFROM dm.dm_fin_stock_detail_accage_t_2023 WHERE calmonth = '202607'\nUNION ALL\nSELECT 'CHDJ线组分摊(部分事业部)', ROUND(SUM(inventory_value))\nFROM dm.dm_ambv2_chdj_grp_t WHERE stat_month = '2026-07';",
       "row_count": 3,
       "elapsed_ms": 391,
@@ -3043,7 +3043,7 @@
     {
       "domain": "inventory",
       "pattern": "inventory_aging_fall_link",
-      "question": "各事业部2年以上长库龄段的跌价敞口有多大？",
+      "question": "2026年7月各事业部2年以上长库龄段的跌价敞口有多大？",
       "sql": "SELECT zdpsyb___t,\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))) AS long_fall,\n       ROUND(SUM(COALESCE(jchj_amt,0))) AS total_fall,\n       ROUND(SUM(COALESCE(wbzq_24_fall_amt,0))\n             /NULLIF(SUM(COALESCE(jchj_amt,0)),0)*100,1) AS long_ratio_pct\nFROM dm.dm_fin_stock_detail_accage_t_2023\nWHERE calmonth = '202607'\nGROUP BY zdpsyb___t ORDER BY long_fall DESC;",
       "row_count": 5,
       "elapsed_ms": 538,
