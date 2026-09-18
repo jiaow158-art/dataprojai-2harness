@@ -8,10 +8,11 @@
       "inventory",
       "ar",
       "sales-performance",
-      "sku-profitability"
+      "sku-profitability",
+      "otd-fulfillment"
     ],
     "description": "Offline evaluation dataset for Skills accuracy tracking",
-    "total": 71,
+    "total": 85,
     "passed": 30,
     "failed": 0,
     "runner": "run_eval.py"
@@ -3115,6 +3116,741 @@
       "data": [],
       "checksum": "refusal-expected",
       "expected_refusal": true
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "channel_qty_summary",
+      "question": "2026年5月各整合渠道（一级）的订单数量、确认数量与已出库数量汇总",
+      "sql": "SELECT zh_channel_code1, zh_channel_name1,\n       ROUND(SUM(kwmeng)) AS order_qty,\n       ROUND(SUM(vmeng)) AS confirm_qty,\n       ROUND(SUM(mengef)) AS outbound_qty\n    FROM dm.dm_otd_sales_order_det_t\n    WHERE audat BETWEEN '20260501' AND '20260531'\n    GROUP BY zh_channel_code1, zh_channel_name1 ORDER BY zh_channel_code1",
+      "row_count": 3,
+      "elapsed_ms": 210,
+      "data": [
+        {
+          "zh_channel_code1": "GD01",
+          "zh_channel_name1": "零售渠道",
+          "order_qty": "11875679",
+          "confirm_qty": "11538776",
+          "outbound_qty": "8676719"
+        },
+        {
+          "zh_channel_code1": "GD02",
+          "zh_channel_name1": "整装头部",
+          "order_qty": "4875064",
+          "confirm_qty": "4797160",
+          "outbound_qty": "4310644"
+        },
+        {
+          "zh_channel_code1": "GD03",
+          "zh_channel_name1": "工程渠道",
+          "order_qty": "18477786",
+          "confirm_qty": "17883283",
+          "outbound_qty": "16202263"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "unconfirmed_topn",
+      "question": "2026年5月未确认数量最多的前10个订单行明细",
+      "sql": "SELECT vbeln, posnr, matnr, material_name, kwmeng, vmeng, wqrsl\n    FROM dm.dm_otd_sales_order_det_t\n    WHERE audat BETWEEN '20260501' AND '20260531' AND wqrsl > 0\n    ORDER BY wqrsl DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 183,
+      "data": [
+        {
+          "vbeln": "1114610336",
+          "posnr": "000010",
+          "matnr": "SG63D00041_A",
+          "material_name": "600*300(淮安市闽龙商贸有)",
+          "kwmeng": 149500.0,
+          "vmeng": 0.0,
+          "wqrsl": 149500.0
+        },
+        {
+          "vbeln": "1114610204",
+          "posnr": "000010",
+          "matnr": "YG602091_A",
+          "material_name": "600X600聚晶",
+          "kwmeng": 42412.0,
+          "vmeng": 0.0,
+          "wqrsl": 42412.0
+        },
+        {
+          "vbeln": "1114615830",
+          "posnr": "000010",
+          "matnr": "YF96D00089_A",
+          "material_name": "900*150仿古砖(企商组)",
+          "kwmeng": 25000.0,
+          "vmeng": 0.0,
+          "wqrsl": 25000.0
+        },
+        {
+          "vbeln": "1114615831",
+          "posnr": "000020",
+          "matnr": "YF96D00089_A",
+          "material_name": "900*150仿古砖(企商组)",
+          "kwmeng": 20000.0,
+          "vmeng": 0.0,
+          "wqrsl": 20000.0
+        },
+        {
+          "vbeln": "1114599043",
+          "posnr": "000010",
+          "matnr": "YF40D00014_A",
+          "material_name": "400*400(武汉樟品建材有限)",
+          "kwmeng": 19240.0,
+          "vmeng": 0.0,
+          "wqrsl": 19240.0
+        },
+        {
+          "vbeln": "1114615831",
+          "posnr": "000010",
+          "matnr": "YF96D00089_A",
+          "material_name": "900*150仿古砖(企商组)",
+          "kwmeng": 18000.0,
+          "vmeng": 0.0,
+          "wqrsl": 18000.0
+        },
+        {
+          "vbeln": "1114580815",
+          "posnr": "000010",
+          "matnr": "YF60D05239_A",
+          "material_name": "600*600(安阳攀晨工程实业)",
+          "kwmeng": 16256.0,
+          "vmeng": 0.0,
+          "wqrsl": 16256.0
+        },
+        {
+          "vbeln": "1114590149",
+          "posnr": "000010",
+          "matnr": "FG80D03763_A",
+          "material_name": "800*800(杭州东箭完整家居)",
+          "kwmeng": 15625.0,
+          "vmeng": 0.0,
+          "wqrsl": 15625.0
+        },
+        {
+          "vbeln": "1114614271",
+          "posnr": "000010",
+          "matnr": "YF30D00097_A",
+          "material_name": "300*300(淮安市闽龙商贸有)",
+          "kwmeng": 14700.0,
+          "vmeng": 0.0,
+          "wqrsl": 14700.0
+        },
+        {
+          "vbeln": "1114630574",
+          "posnr": "000010",
+          "matnr": "ZSF849332D_A",
+          "material_name": "800X400中板-梦之家",
+          "kwmeng": 12500.0,
+          "vmeng": 0.0,
+          "wqrsl": 12500.0
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "fulfillment_status_dist",
+      "question": "2026年5月创建的订单行履约各环节（留货/出库/发运）状态分布",
+      "sql": "SELECT COUNT(*) AS total_lines,\n       SUM(CASE WHEN holding_status = '待留货' THEN 1 ELSE 0 END) AS pending_hold,\n       SUM(CASE WHEN holding_status = '已留货' THEN 1 ELSE 0 END) AS held,\n       SUM(CASE WHEN outbound_status = '待出库' THEN 1 ELSE 0 END) AS pending_outbound,\n       SUM(CASE WHEN outbound_status = '已出库' THEN 1 ELSE 0 END) AS outbounded,\n       SUM(CASE WHEN shipping_status = '已发运' THEN 1 ELSE 0 END) AS shipped\n    FROM dm.dm_otd_so_order_not_user_t\n    WHERE creation_time >= '2026-05-01' AND creation_time < '2026-06-01'",
+      "row_count": 1,
+      "elapsed_ms": 66,
+      "data": [
+        {
+          "total_lines": 77370,
+          "pending_hold": 972,
+          "held": 75933,
+          "pending_outbound": 682,
+          "outbounded": 65940,
+          "shipped": 66314
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "outbound_rate_daily",
+      "question": "2026年5月按下单日期的订单出库率与发运率走势",
+      "sql": "SELECT DATE(creation_time) AS order_date, COUNT(*) AS total,\n       ROUND(SUM(CASE WHEN outbound_status = '已出库' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS outbound_rate,\n       ROUND(SUM(CASE WHEN shipping_status = '已发运' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS shipping_rate\n    FROM dm.dm_otd_so_order_not_user_t\n    WHERE creation_time >= '2026-05-01' AND creation_time < '2026-06-01'\n    GROUP BY DATE(creation_time) ORDER BY order_date",
+      "row_count": 31,
+      "elapsed_ms": 111,
+      "data": [
+        {
+          "order_date": "2026-05-01",
+          "total": 1270,
+          "outbound_rate": "84.3",
+          "shipping_rate": "84.3"
+        },
+        {
+          "order_date": "2026-05-02",
+          "total": 1512,
+          "outbound_rate": "89.9",
+          "shipping_rate": "89.9"
+        },
+        {
+          "order_date": "2026-05-03",
+          "total": 1559,
+          "outbound_rate": "85.4",
+          "shipping_rate": "85.4"
+        },
+        {
+          "order_date": "2026-05-04",
+          "total": 1876,
+          "outbound_rate": "84.4",
+          "shipping_rate": "84.4"
+        },
+        {
+          "order_date": "2026-05-05",
+          "total": 2268,
+          "outbound_rate": "84.0",
+          "shipping_rate": "84.0"
+        },
+        {
+          "order_date": "2026-05-06",
+          "total": 2878,
+          "outbound_rate": "84.6",
+          "shipping_rate": "85.1"
+        },
+        {
+          "order_date": "2026-05-07",
+          "total": 3145,
+          "outbound_rate": "86.6",
+          "shipping_rate": "87.1"
+        },
+        {
+          "order_date": "2026-05-08",
+          "total": 2618,
+          "outbound_rate": "85.5",
+          "shipping_rate": "86.0"
+        },
+        {
+          "order_date": "2026-05-09",
+          "total": 2500,
+          "outbound_rate": "86.4",
+          "shipping_rate": "86.7"
+        },
+        {
+          "order_date": "2026-05-10",
+          "total": 1547,
+          "outbound_rate": "86.2",
+          "shipping_rate": "86.4"
+        },
+        {
+          "order_date": "2026-05-11",
+          "total": 3443,
+          "outbound_rate": "85.7",
+          "shipping_rate": "85.8"
+        },
+        {
+          "order_date": "2026-05-12",
+          "total": 2893,
+          "outbound_rate": "83.8",
+          "shipping_rate": "84.5"
+        },
+        {
+          "order_date": "2026-05-13",
+          "total": 3091,
+          "outbound_rate": "85.3",
+          "shipping_rate": "85.5"
+        },
+        {
+          "order_date": "2026-05-14",
+          "total": 2893,
+          "outbound_rate": "87.3",
+          "shipping_rate": "88.1"
+        },
+        {
+          "order_date": "2026-05-15",
+          "total": 2633,
+          "outbound_rate": "84.0",
+          "shipping_rate": "85.9"
+        },
+        {
+          "order_date": "2026-05-16",
+          "total": 2174,
+          "outbound_rate": "84.9",
+          "shipping_rate": "85.6"
+        },
+        {
+          "order_date": "2026-05-17",
+          "total": 1371,
+          "outbound_rate": "89.4",
+          "shipping_rate": "89.4"
+        },
+        {
+          "order_date": "2026-05-18",
+          "total": 3285,
+          "outbound_rate": "83.8",
+          "shipping_rate": "83.9"
+        },
+        {
+          "order_date": "2026-05-19",
+          "total": 2613,
+          "outbound_rate": "86.5",
+          "shipping_rate": "86.5"
+        },
+        {
+          "order_date": "2026-05-20",
+          "total": 2684,
+          "outbound_rate": "83.7",
+          "shipping_rate": "84.6"
+        },
+        {
+          "order_date": "2026-05-21",
+          "total": 2430,
+          "outbound_rate": "87.9",
+          "shipping_rate": "89.1"
+        },
+        {
+          "order_date": "2026-05-22",
+          "total": 2832,
+          "outbound_rate": "81.9",
+          "shipping_rate": "83.2"
+        },
+        {
+          "order_date": "2026-05-23",
+          "total": 2381,
+          "outbound_rate": "82.3",
+          "shipping_rate": "83.4"
+        },
+        {
+          "order_date": "2026-05-24",
+          "total": 1473,
+          "outbound_rate": "88.6",
+          "shipping_rate": "88.6"
+        },
+        {
+          "order_date": "2026-05-25",
+          "total": 3392,
+          "outbound_rate": "85.7",
+          "shipping_rate": "86.7"
+        },
+        {
+          "order_date": "2026-05-26",
+          "total": 3229,
+          "outbound_rate": "83.3",
+          "shipping_rate": "84.2"
+        },
+        {
+          "order_date": "2026-05-27",
+          "total": 2781,
+          "outbound_rate": "85.4",
+          "shipping_rate": "85.8"
+        },
+        {
+          "order_date": "2026-05-28",
+          "total": 2918,
+          "outbound_rate": "84.5",
+          "shipping_rate": "84.7"
+        },
+        {
+          "order_date": "2026-05-29",
+          "total": 2977,
+          "outbound_rate": "85.2",
+          "shipping_rate": "85.3"
+        },
+        {
+          "order_date": "2026-05-30",
+          "total": 2388,
+          "outbound_rate": "86.5",
+          "shipping_rate": "86.5"
+        },
+        {
+          "order_date": "2026-05-31",
+          "total": 2316,
+          "outbound_rate": "84.6",
+          "shipping_rate": "84.6"
+        }
+      ],
+      "checksum": "rows=31"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "channel_outbound_rate_join",
+      "question": "2026年5月各整合渠道（一级）订单的出库率对比",
+      "sql": "SELECT det.zh_channel_code1, det.zh_channel_name1,\n       COUNT(*) AS order_lines,\n       SUM(CASE WHEN track.outbound_status = '已出库' THEN 1 ELSE 0 END) AS outbounded,\n       ROUND(SUM(CASE WHEN track.outbound_status = '已出库' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS outbound_rate\n    FROM dm.dm_otd_sales_order_det_t det\n    JOIN dm.dm_otd_so_order_not_user_t track\n      ON det.vbeln = track.sap_number AND det.posnr = track.sap_item_num\n    WHERE det.audat BETWEEN '20260501' AND '20260531'\n    GROUP BY det.zh_channel_code1, det.zh_channel_name1 ORDER BY det.zh_channel_code1",
+      "row_count": 3,
+      "elapsed_ms": 861,
+      "data": [
+        {
+          "zh_channel_code1": "GD01",
+          "zh_channel_name1": "零售渠道",
+          "order_lines": 51842,
+          "outbounded": 44522,
+          "outbound_rate": "85.9"
+        },
+        {
+          "zh_channel_code1": "GD02",
+          "zh_channel_name1": "整装头部",
+          "order_lines": 14412,
+          "outbounded": 13175,
+          "outbound_rate": "91.4"
+        },
+        {
+          "zh_channel_code1": "GD03",
+          "zh_channel_name1": "工程渠道",
+          "order_lines": 11554,
+          "outbounded": 8508,
+          "outbound_rate": "73.6"
+        }
+      ],
+      "checksum": "rows=3"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "bu_outbound_rate_org",
+      "question": "2026年5月瓷砖事业部订单行的出库率",
+      "sql": "SELECT COUNT(*) AS order_lines,\n       SUM(CASE WHEN track.outbound_status = '已出库' THEN 1 ELSE 0 END) AS outbounded,\n       ROUND(SUM(CASE WHEN track.outbound_status = '已出库' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 1) AS outbound_rate\n    FROM dm.dm_otd_sales_order_det_t det\n    JOIN dm.dm_otd_so_order_not_user_t track\n      ON det.vbeln = track.sap_number AND det.posnr = track.sap_item_num\n    JOIN dm.dm_rpt_sale_grp_t s ON det.vkgrp = s.sale_grp\n    WHERE det.audat BETWEEN '20260501' AND '20260531'\n      AND s.lev2_name = '瓷砖事业部'",
+      "row_count": 1,
+      "elapsed_ms": 1799,
+      "data": [
+        {
+          "order_lines": 76868,
+          "outbounded": 65515,
+          "outbound_rate": "85.2"
+        }
+      ],
+      "checksum": "rows=1"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "no_deliver_overdue_top10",
+      "question": "截至2026年9月18日已过客户交期仍未交付的订单，按未交付面积排前10",
+      "sql": "SELECT order_num, material_num, prod_category, cust_name,\n       ROUND(nodeliver_qty_aps, 1) AS nodeliver_qty,\n       ROUND(nodeliver_area_aps, 1) AS nodeliver_area,\n       order_time, expect_date\n    FROM dm.dm_otd_no_deliver_order_dtl\n    WHERE del_flag = 'N' AND expect_date < '2026-09-18'\n    ORDER BY nodeliver_area_aps DESC LIMIT 10",
+      "row_count": 10,
+      "elapsed_ms": 28,
+      "data": [
+        {
+          "order_num": "1114664009",
+          "material_num": "ZFG272500T_A",
+          "prod_category": "晶理石",
+          "cust_name": "成武继升建材",
+          "nodeliver_qty": "13987.0",
+          "nodeliver_area": "10070.6",
+          "order_time": "2026-08-17 09:23:30",
+          "expect_date": "2026-09-10 00:00:00"
+        },
+        {
+          "order_num": null,
+          "material_num": "YV19D00038_A",
+          "prod_category": "岩板",
+          "cust_name": "唐山万科新城房地产开发有限公司",
+          "nodeliver_qty": "4428.0",
+          "nodeliver_area": "7173.4",
+          "order_time": "2026-08-10 08:25:45",
+          "expect_date": "2026-09-17 00:00:00"
+        },
+        {
+          "order_num": "1114754780",
+          "material_num": "JLN63630_A",
+          "prod_category": "瓷片",
+          "cust_name": "济南辰泰商贸",
+          "nodeliver_qty": "37180.0",
+          "nodeliver_area": "6692.4",
+          "order_time": "2026-09-05 09:09:56",
+          "expect_date": "2026-09-10 00:00:00"
+        },
+        {
+          "order_num": "1114676982",
+          "material_num": "YF60D05331_A",
+          "prod_category": "仿古砖",
+          "cust_name": "瑞利 沈阳 陶瓷",
+          "nodeliver_qty": "17564.0",
+          "nodeliver_area": "6323.0",
+          "order_time": "2026-07-25 09:05:52",
+          "expect_date": "2026-09-02 00:00:00"
+        },
+        {
+          "order_num": "1114791051",
+          "material_num": "ZFG803073T_A",
+          "prod_category": "晶理石",
+          "cust_name": "湖南泽谨商贸",
+          "nodeliver_qty": "9165.0",
+          "nodeliver_area": "5865.6",
+          "order_time": "2026-08-26 09:58:21",
+          "expect_date": "2026-09-10 00:00:00"
+        },
+        {
+          "order_num": "1114791051",
+          "material_num": "ZFG802405T_A",
+          "prod_category": "晶理石",
+          "cust_name": "湖南泽谨商贸",
+          "nodeliver_qty": "7108.0",
+          "nodeliver_area": "4549.1",
+          "order_time": "2026-08-26 09:58:16",
+          "expect_date": "2026-09-10 00:00:00"
+        },
+        {
+          "order_num": "1114823727",
+          "material_num": "ZFG271700D_A",
+          "prod_category": "晶理石",
+          "cust_name": "潮德润家居科技",
+          "nodeliver_qty": "5995.0",
+          "nodeliver_area": "4316.4",
+          "order_time": "2026-09-12 10:05:33",
+          "expect_date": "2026-09-08 00:00:00"
+        },
+        {
+          "order_num": "1114809402",
+          "material_num": "YF63D00096_A",
+          "prod_category": "仿古砖",
+          "cust_name": "天津颐安家居 瓷砖在用 ",
+          "nodeliver_qty": "22568.0",
+          "nodeliver_area": "4035.2",
+          "order_time": "2026-08-13 09:59:59",
+          "expect_date": "2026-09-17 00:00:00"
+        },
+        {
+          "order_num": "1114788811",
+          "material_num": "ZFG802405T_A",
+          "prod_category": "晶理石",
+          "cust_name": "成武继升建材",
+          "nodeliver_qty": "6000.0",
+          "nodeliver_area": "3840.0",
+          "order_time": "2026-08-25 17:23:00",
+          "expect_date": "2026-09-17 00:00:00"
+        },
+        {
+          "order_num": null,
+          "material_num": "FG271831_A",
+          "prod_category": "晶理石",
+          "cust_name": "成都能安置业有限公司",
+          "nodeliver_qty": "5000.0",
+          "nodeliver_area": "3600.0",
+          "order_time": "2026-07-07 15:59:42",
+          "expect_date": "2026-09-15 00:00:00"
+        }
+      ],
+      "checksum": "rows=10"
+    },
+    {
+      "domain": "otd-fulfillment",
+      "pattern": "area_delivery_trend",
+      "question": "2026年上半年各产区瓷砖出库数量与面积月度走势",
+      "sql": "SELECT stat_month, belong_area_name,\n       ROUND(SUM(ABS(sales_stock_out_qty))) AS abs_qty,\n       ROUND(SUM(ABS(sales_stock_out_area))) AS abs_area\n    FROM dm.dm_otd_area_delivery_detail_m\n    WHERE stat_month BETWEEN '2026-01' AND '2026-06'\n    GROUP BY stat_month, belong_area_name ORDER BY stat_month, abs_area DESC",
+      "row_count": 36,
+      "elapsed_ms": 437,
+      "data": [
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "广东基地",
+          "abs_qty": "5369331",
+          "abs_area": "2740046"
+        },
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "江西基地",
+          "abs_qty": "3729356",
+          "abs_area": "1756831"
+        },
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "2284077",
+          "abs_area": "829683"
+        },
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "西南基地",
+          "abs_qty": "1370509",
+          "abs_area": "768900"
+        },
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "山西基地",
+          "abs_qty": "232186",
+          "abs_area": "121679"
+        },
+        {
+          "stat_month": "2026-01",
+          "belong_area_name": "山东基地",
+          "abs_qty": "401992",
+          "abs_area": "100012"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "广东基地",
+          "abs_qty": "852722",
+          "abs_area": "420392"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "江西基地",
+          "abs_qty": "589847",
+          "abs_area": "316916"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "403173",
+          "abs_area": "153041"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "西南基地",
+          "abs_qty": "255236",
+          "abs_area": "147916"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "山西基地",
+          "abs_qty": "68766",
+          "abs_area": "36908"
+        },
+        {
+          "stat_month": "2026-02",
+          "belong_area_name": "山东基地",
+          "abs_qty": "26612",
+          "abs_area": "9251"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "广东基地",
+          "abs_qty": "8404747",
+          "abs_area": "5079058"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "江西基地",
+          "abs_qty": "4696131",
+          "abs_area": "2600045"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "西南基地",
+          "abs_qty": "2870665",
+          "abs_area": "1646915"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "3172158",
+          "abs_area": "1215403"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "山西基地",
+          "abs_qty": "940805",
+          "abs_area": "470191"
+        },
+        {
+          "stat_month": "2026-03",
+          "belong_area_name": "山东基地",
+          "abs_qty": "426341",
+          "abs_area": "104653"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "广东基地",
+          "abs_qty": "8688524",
+          "abs_area": "5218255"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "江西基地",
+          "abs_qty": "7735100",
+          "abs_area": "3428179"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "西南基地",
+          "abs_qty": "3279159",
+          "abs_area": "1757756"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "4215219",
+          "abs_area": "1528812"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "山西基地",
+          "abs_qty": "1092734",
+          "abs_area": "563503"
+        },
+        {
+          "stat_month": "2026-04",
+          "belong_area_name": "山东基地",
+          "abs_qty": "246703",
+          "abs_area": "75999"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "广东基地",
+          "abs_qty": "9655649",
+          "abs_area": "5972588"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "江西基地",
+          "abs_qty": "8712952",
+          "abs_area": "3812455"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "西南基地",
+          "abs_qty": "3100127",
+          "abs_area": "1782443"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "4689741",
+          "abs_area": "1730788"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "山西基地",
+          "abs_qty": "908328",
+          "abs_area": "442760"
+        },
+        {
+          "stat_month": "2026-05",
+          "belong_area_name": "山东基地",
+          "abs_qty": "289952",
+          "abs_area": "128457"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "广东基地",
+          "abs_qty": "12097893",
+          "abs_area": "7312397"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "江西基地",
+          "abs_qty": "9322953",
+          "abs_area": "4279332"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "湖南基地",
+          "abs_qty": "4909091",
+          "abs_area": "1873240"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "西南基地",
+          "abs_qty": "3043532",
+          "abs_area": "1761469"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "山西基地",
+          "abs_qty": "865899",
+          "abs_area": "483522"
+        },
+        {
+          "stat_month": "2026-06",
+          "belong_area_name": "山东基地",
+          "abs_qty": "394102",
+          "abs_area": "147494"
+        }
+      ],
+      "checksum": "rows=36"
     }
   ]
 }
