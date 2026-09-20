@@ -2,193 +2,85 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目定位 — 东鹏集团问数系统
+## 项目定位 — 东鹏问数系统 · AI 数据层（dsh 引擎）
 
-这是东鹏陶瓷集团内部**自助问数系统**的两个核心仓库之一：
+企业自助问数系统：业务用户经 Web 提问，agent 查 GaussDB(DWS) 数仓、分析、出报告。本仓已完成 **DeepSeek Harness（dsh）引擎迁移**（M0-M2 全 GO，M3 前置清零）——**Claude Code 在本仓只做开发工具，不是运行时**。
 
-| 仓库 | 定位 |
+| 仓库 | 角色 |
 |---|---|
-| **`/home/dp-user/dataprojv2`**（本仓库） | **AI 数据层** — Skills 知识库 + MCP 数据库连接 + Eval 验证 |
-| **`/opt/claudecodeui`** | **Web 界面层** — React 前端 + Express 后端，用户登录、提问、查历史 |
+| **`D:\dataprojai-2harness`**（本仓） | 引擎网关 + Skills 知识库 + 评测体系 |
+| **`D:\dataplat-ui`** | 自建 Web UI（登录/对话 SSE/报告；claudecodeui 已弃用） |
 
-**这个系统只做一件事：企业用户通过 Web 聊天界面，用自然语言查询 GaussDB 数据仓库，获取分析结果。**
+全程决策与证据链在 `docs/superpowers/{specs,plans,reports}/`——动架构前先读对应文档。设计依据 Anthropic 4-layer Agentic Analytics Stack（Skills/参考面/语义层/评测）。
 
-不是通用 AI 工具，不是开发者平台，不暴露 Git、终端、文件树、插件等任何开发功能。
-
-## Framework reference
-
-数据层的设计依据 **Anthropic 4-layer Agentic Analytics Stack**：
-**https://claude.com/blog/how-anthropic-enables-self-service-data-analytics-with-claude**
-
-## Data warehouse
-
-**GaussDB** (PostgreSQL-compatible) at `121.37.200.214:8000`, database `DP_DWS`, user `aiuser`.
-
-## Architecture — Anthropic 4-layer stack
+## 架构（大图）
 
 ```
-dataproj/
-├── huaweiclaude/              # Layer 1: Data Foundations (raw DWS schema exports)
-├── sources-of-truth/          # Layer 2: Sources of Truth (cross-domain reference surfaces)
-│   └── business-context/      #   Cross-domain master data (org, material, company, WBS)
-├── skills/                    # Layer 3: Skills (per-domain paired knowledge + analyst)
-│   ├── fin-cost-knowledge/    #   Knowledge skill (routing + references/)
-│   │   └── references/       #     metrics.md, data-lineage.md, table refs
-│   ├── fin-cost-analyst/      #   Analyst skill (6-step workflow + adversarial review)
-│   ├── inventory-knowledge/
-│   │   └── references/
-│   ├── inventory-analyst/
-│   ├── ar-knowledge/
-│   │   └── references/
-│   ├── ar-analyst/
-│   ├── sales-performance-knowledge/
-│   ├── sales-performance-analyst/
-│   ├── otd-fulfillment-knowledge/
-│   ├── otd-fulfillment-analyst/
-│   ├── sku-profitability-knowledge/
-│   ├── sku-profitability-analyst/
-│   └── report-generator/       #   Cross-domain: Analyst → interactive dark-theme HTML report
-│       └── templates/          #     report-shell.html, echarts.min.js
-├── eval_dataset.json          # Layer 4: Validation (66 scenarios, 6 domains)
-├── run_eval.py                #   Automated eval runner
-└── CLAUDE.md                  #   This file
+浏览器(dataplat-ui) → UI BFF → engine-gateway → dsh SDK 子进程 → DeepSeek API
+                                        │
+                                        ├→ Docker 沙箱执行脚本（--network none 等 5 要素）
+                                        └→ DWS MCP 子进程（只读 SELECT，双通道落盘）
 ```
 
-### Layer 1 — Data Foundations
-- DWS database (SAP → DWI → DWR → DM layers), `dm` and `dwrfin` schemas are primary
-- `huaweiclaude/` contains raw schema exports for reference
+**engine-gateway/**（Node 24 + TS strip 模式 + better-sqlite3 WAL）
+- `src/store/task-store.ts` 围栏条件写（run_id+attempt+lease_owner，rowcount=0→静默杀自身进程树）；`src/backends/dsh-backend.ts` 每次 spawn 的 SDK sessionId 必须全局唯一 `gw-<sid>-a<attempt>-<nonce>`（同 id 跨进程必撞）；`src/orchestrator/task-runner.ts` D14 历史注入（每次执行都注入，非仅 attempt>1）、失败分类（TIMEOUT/ENGINE_ERROR 重试，CONFIG/QUOTA 快败，REPORT_CHECK 终态）
+- BackendProvider 接口可插拔换引擎；Web/API 契约冻结在 `docs/superpowers/reports/2026-09-16-m2-integration-check.md`（改契约须代码+文档双改）
+- e2e 五发故障注入 `test/e2e.live.test.ts`：**必须串行跑**（收尾清理器全机扫杀 dsh 进程），且 Docker Desktop 必须在跑
 
-### Layer 2 — Sources of Truth
-Four reference surfaces, in descending order of trust. The top three are **per-domain** (inside each `skills/{domain}-knowledge/references/`); only Business Context is **cross-domain**:
+**dsh 插件**（`m0/dsh-plugin/`，经 `engine-gateway/scripts/setup-dsh-profile.mjs` 装入 ~/.dsh/profiles——脚本+模板是 profile 唯一权威，含 dump-config 自检）
+- `exec-script/`：模型执行代码唯一通道（Docker 沙箱）
+- `fs-read-fence/`：tools/execute 瀑布拦 read/read_image/glob/grep 路径域（工作区/结果/技能/资产/临时）；写侧归 fs-sandbox，分层不重叠
+- 工具白名单 26 项（pwsh/web×2/workflow/ralph 已禁）；改沙箱/插件必须复跑 `m0/tests/sandbox_redteam.sh`
 
-1. **Semantic Layer** — Per-domain `metrics.md` (concept→field mapping, decision trees, known traps). Agents MUST read this first.
-2. **Lineage** — Per-domain `data-lineage.md` (SAP source → DWI → DWR → DM flow)
-3. **Query Corpus** — Historical SQL distilled into per-domain table reference docs (e.g. `finance-cost-fact.md`, `stock-accage.md`)
-4. **Business Context** — Cross-domain master data in `sources-of-truth/business-context/`:
-   - `org-hierarchy.md` — 10-level sales org hierarchy (2427 rows, 15 node2 units)
-   - `customer-master.md` — 客户主数据 (3 tables: API 1.5K / sales area 650K / general 206K rows)
-   - `material-master.md` — 物料主数据 (360万 rows, SCD Type 2, 25.7万 unique materials)
-   - `company-plant.md` — 公司 & 工厂 (199 companies, 131 plants)
-   - `wbs-master.md` — WBS 元素 (129万 rows, 16 project types, 4-level hierarchy)
+**skills/**：6 域配对 `{domain}-knowledge`（路由+references）+ `{domain}-analyst`（6 步工作流+对抗审查，+6% 准确率不可跳）+ `report-generator`。各域 `metrics.md` 的 **"pattern → 首选表与字段路由"节是口径判定标准**（以 eval_dataset 录制口径为准，不替业务拍板）——修口径问题先看这节。
 
-### Layer 3 — Skills
-- Paired per domain: `{domain}-knowledge` (routing + references) + `{domain}-analyst` (6-step workflow)
-- Cross-domain tool: `report-generator` (converts Analyst Markdown output → interactive dark-theme HTML report with ECharts)
-- Without Skills: accuracy drops to ~21%. With Skills: >95%.
-- Analyst adversarial review step is +6% accuracy — never skip it.
+**评测体系**
+- `eval_dataset.json`：85 场景（6 域 79 + 红队 6）= 业务正确性标准；**数据集是标准**——改问题/SQL/data 都要逐条记变更清单（先例：`eval_results/round-manual/T6-changes.md`、`dataset-repair-20260920.md`），文本级替换保字节形态（CRLF/无 BOM）
+- `eval/judge.py` 纯函数判分（97 pytest）：多事件最佳匹配 / 拒答词表 / 采样录制前缀感知 / 列改名数值多重集兜底 / CTE 表名过滤——实弹校准出来的语义，改前先读测试
+- `run_agent_eval.py` live 驱动器（`EVAL_LIVE=1` 门禁防误烧 API；`--idx` 精确选场；`--fresh` 自动给 submission_id 加盐——网关幂等键不变会原样返回旧任务）；`eval/rejudge_round.py` 判分器校准后零成本复判录播
 
-**Report generation**: When user says "生成报告", "导出 HTML", "做个报告" after receiving Analyst results, **must read `skills/report-generator/SKILL.md`** and follow its 6-step workflow. The JSON format is strictly `sections[]` + `kpis[]` + `insight` + `provenance` — never use the old `charts[]`/`table`/`trace` format.
-
-### Layer 4 — Validation
-- `eval_dataset.json` (66 scenarios, 6 domains) + `run_eval.py` (automated)
-- Per-domain launch gate: no launch until evals clear ~90%
-
-## MCP server — DWS database access
-
-Configured in `.mcp.json` (project root). Format: `type: "stdio"` is a **required** field — servers without it are silently ignored.
-
-```json
-{
-  "mcpServers": {
-    "dws": {
-      "type": "stdio",
-      "command": "/usr/bin/python3",
-      "args": ["/home/dp-user/dataprojv2/dws_mcp_server.py"],
-      "env": {
-        "DWS_HOST": "121.37.200.214",
-        "DWS_PORT": "8000",
-        "DWS_DBNAME": "DP_DWS",
-        "DWS_USER": "aiuser",
-        "DWS_PASSWORD": "由环境变量 DWS_PASSWORD 提供，未在此处配置"
-      }
-    }
-  }
-}
-```
-
-MCP tools available: `run_query` (SELECT only, auto-LIMIT 200), `list_tables`, `describe_table`, `search_tables`.
-For write operations or complex multi-step queries, use Python + psycopg2 directly (see `run_eval.py` for connection pattern).
-
-## Python version
-
-```
-/usr/bin/python3
-```
-
-## Running eval tests
+## 常用命令
 
 ```bash
-# All domains (66 scenarios, 6 domains)
-python run_eval.py
+# 测试
+python -m pytest eval/ -q                    # 判分器/驱动器全量
+python -m pytest eval/test_judge.py -v      # 单文件
+cd engine-gateway && npm test               # 网关单测
 
-# Single domain
-python run_eval.py inventory
-python run_eval.py ar
-python run_eval.py fin-cost
+# 离线评测（期望 SQL 直连 DWS，不烧 API）
+python run_eval.py [domain|留空全量]
+
+# live 评测（需网关在跑 + GATEWAY_URL/AUTH_TOKEN/GW_RESULTS_ROOT env）
+EVAL_LIVE=1 GATEWAY_URL=http://127.0.0.1:58080 AUTH_TOKEN=... \
+  GW_RESULTS_ROOT=<网关结果根> python run_agent_eval.py --idx 0,1,4 --round-tag x
+
+# 网关（env 清单见 M1 报告部署节；DWS_RUN_PASSWORD 必须显式设）
+cd engine-gateway && node scripts/setup-dsh-profile.mjs --profile sdk   # 先装 profile（幂等）
+node src/server/index.ts
+
+# 手动问数（同会话追问；/new 重开）
+python engine-gateway/scripts/ask.py "2026年8月瓷砖事业部库存金额多少"
+
+# e2e（真 dsh/DeepSeek/DWS；串行！）
+cd engine-gateway && E2E_LIVE=1 E2E_SHOT=shot4 node --test test/e2e.live.test.ts
 ```
 
-## Covered domains (6 of 22)
+Python = `python`（3.12）；Node = v24（TS strip：**禁** parameter properties/enum/namespace）。Shell 是 Git Bash。
 
-| Domain | Knowledge Skill | Analyst Skill | Tables |
-|--------|----------------|---------------|--------|
-| fin-cost | `skills/fin-cost-knowledge/` | `skills/fin-cost-analyst/` | 72 |
-| inventory | `skills/inventory-knowledge/` | `skills/inventory-analyst/` | 73 |
-| ar | `skills/ar-knowledge/` | `skills/ar-analyst/` | 73 |
-| sales-performance | `skills/sales-performance-knowledge/` | `skills/sales-performance-analyst/` | 15 |
-| otd-fulfillment | `skills/otd-fulfillment-knowledge/` | `skills/otd-fulfillment-analyst/` | 4 |
-| sku-profitability | `skills/sku-profitability-knowledge/` | `skills/sku-profitability-analyst/` | 5 |
+## 红线（违反=返工）
 
-**Cross-domain tool:**
+- **密钥只走 env**（DWS_PASSWORD / DEEPSEEK_API_KEY / AUTH_TOKEN）：任何文件/日志/测试输出不得含值；曾有真实 key 误入文档被 GitHub 推送保护拦截后全历史清洗（`a0cde62`）——推送前 `git grep -E "sk-[A-Za-z0-9]{20,}|ghp_|github_pat_"` 自查
+- 网关 stderr 消毒（PASSWORD|TOKEN|SECRET|KEY 模式）不得回退
+- 后台代理并行作业时**提交必须路径限定**（`git commit -m msg -- <paths>`），防卷入他人暂存
+- workdir/results 目录必须在平台 Temp 树外（workspace-write 硬编码豁免 os.tmpdir()）
+- UI 侧身份只信 BFF 注入的 X-User；报告属主校验+路径遏制不可绕过
 
-| Tool | Skill | Trigger |
-|------|-------|---------|
-| report-generator | `skills/report-generator/` | User says "生成报告" / "导出HTML" after Analyst output |
+## 数仓关键事实
 
-## Domain boundary rule (NON-NEGOTIABLE)
-
-**Only answer queries within covered domains.** If a user asks about an uncovered domain (AP, GL, sales, procurement, HR, etc.), do NOT query DWS directly — guide them to build the domain Skill first. Without Skills, accuracy drops to ~21%.
-
-## Cross-domain shared resources
-
-| Resource | Location | Used by |
-|----------|----------|---------|
-| Org hierarchy (10-level) | `sources-of-truth/business-context/org-hierarchy.md` | All domains |
-| Material master (360万 rows) | `sources-of-truth/business-context/material-master.md` | All domains |
-| Company & plant (199/131) | `sources-of-truth/business-context/company-plant.md` | All domains |
-| WBS elements (129万 rows) | `sources-of-truth/business-context/wbs-master.md` | All domains |
-
-When a user asks about "瓷砖事业部", "财经平台", etc., consult org-hierarchy.md to resolve the correct `node_desc*` filter. All domain fact tables embed `node_desc1~9` fields — no JOIN needed for basic org filtering.
-
-## Skill file conventions
-
-- Every domain must have **paired** `{domain}-knowledge` + `{domain}-analyst` skills
-- `metrics.md` is the mandatory first-read semantic layer (concept→field mapping, table selection decision tree, date format overview, known traps)
-- `data-lineage.md` documents SAP source → DWI → DWR → DM flow
-- Table reference docs record column definitions, common query patterns, and **known traps** (the most important maintenance item)
-- Analyst SKILL.md includes adversarial review step — this is +6% accuracy
-- Knowledge SKILL.md must include a "跨域共享参考" section pointing to `sources-of-truth/`
-
-## Skill maintenance rule (from article)
-
-**~90% of data-model PRs should include a skill change.** When ETL/table schema changes, update the corresponding reference doc in the same PR. The code-review hook should flag model changes that don't touch a skill file.
-
-## Critical data warehouse facts
-
-- **Date format chaos**: Different tables use `YYYYMM`, `YYYY-MM`, `YYYYMMDD`, `YYYY-MM-DD`, and `timestamp` for the same concept. Always verify the format for each table.
-- **`___t` suffix**: SAP-style text description fields (e.g., `plant` → `plant___t`)
-- **Backup table variants**: `_wjh_*`, `_bak*`, `_tmp*`, `_01`, `_close`, `_2024*` suffixes = DO NOT USE
-- **Large tables** (>10M rows): Must always include time-range filters. `dm_fin_stock_detail_accage_t_2023` (144M rows), `dwr_ar_account_detail_f` (103M rows)
-- **Dual naming systems**: `cust_code` (DWR style) vs `debitor` (SAP style), `material` vs `material_num`, `plant` vs `factory_werks_code`
-
-## Key project files
-
-| File | Purpose |
-|------|---------|
-| `eval_dataset.json` | 66 offline eval scenarios (6 domains) with expected results |
-| `run_eval.py` | Automated eval runner |
-| `domain_categories.json` | Generated by `categorize_tables.py` — 22 domains with table counts (not committed) |
-| `skills/README.md` | Skill directory overview and maintenance rules |
-| `huaweiclaude/` | Raw DWS schema exports (DWI/DWR/DM/SDI) |
-| `sources-of-truth/business-context/` | Cross-domain master data (org, material, company, WBS) |
-| `.mcp.json` | MCP server config for DWS database access (project root) |
-| `dws_mcp_server.py` | MCP server implementation (stdio JSON-RPC, psycopg2) |
+- **日期格式混乱**：同概念各表用 YYYYMM / YYYY-MM / YYYYMMDD / YYYY-MM-DD / timestamp，逐表核
+- **`___t` 后缀** = SAP 风格文本描述字段；**双命名**：`cust_code`(DWR) vs `debitor`(SAP)、`material` vs `material_num`、`plant` vs `factory_werks_code`
+- **备份变体表**（`_bak/_tmp/_wjh/_01/_close/_2024*` 后缀）勿用；判分器见此形态直接判表选错
+- **大表**（>10M 行）必须带时间过滤：`dm_fin_stock_detail_accage_t_2023` 144M、`dwr_ar_account_detail_f` 103M、otd det 899M/track 794M
+- **同名组织维表**：`dm_rpt_sale_grp_t`（关联键 sale_grp=vkgrp，otd 用）≠ `dm_rpt_sales_group_t`（10 级树，node_name10，sales-performance 用；**实测其 org_code 100% 属瓷砖事业部**，非瓷砖 JOIN 必空）
+- 跨域主数据在 `sources-of-truth/business-context/`（组织/客户/物料/公司/WBS）
+- DWS：`121.37.200.214:8000` / `DP_DWS` / `aiuser`（已收紧只读：写授权全撤、全 schema CREATE=False）；密码 env DWS_PASSWORD
