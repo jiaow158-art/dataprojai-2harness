@@ -1,0 +1,182 @@
+{
+ "round": "golden10-hardened2",
+ "started_at": "2026-09-20T11:37:50+08:00",
+ "finished_at": "2026-09-20T11:40:16+08:00",
+ "interrupted": false,
+ "env": {
+  "code_sha": "92e3a2201c41e04f5e8f1ba2290d492972b985af",
+  "model": "deepseek-v4-flash",
+  "dataset_mtime": 1789874665.6116884,
+  "gateway": "直连 http://127.0.0.1:58080",
+  "task_budget_s": "1800"
+ },
+ "selection": {
+  "available_domains": [
+   "ar",
+   "fin-cost",
+   "inventory",
+   "otd-fulfillment",
+   "redteam",
+   "sales-performance",
+   "sku-profitability"
+  ]
+ },
+ "totals": {
+  "total": 5,
+  "PASS": 4,
+  "FAIL": 0,
+  "SKIP": 0,
+  "DATA_DRIFT": 1,
+  "pass_rate_all": 0.8,
+  "pass_rate_judged": 0.8
+ },
+ "by_domain": {
+  "inventory": {
+   "total": 2,
+   "PASS": 2,
+   "FAIL": 0,
+   "SKIP": 0,
+   "DATA_DRIFT": 0,
+   "pass_rate_all": 1.0,
+   "pass_rate_judged": 1.0
+  },
+  "sales-performance": {
+   "total": 1,
+   "PASS": 1,
+   "FAIL": 0,
+   "SKIP": 0,
+   "DATA_DRIFT": 0,
+   "pass_rate_all": 1.0,
+   "pass_rate_judged": 1.0
+  },
+  "otd-fulfillment": {
+   "total": 2,
+   "PASS": 1,
+   "FAIL": 0,
+   "SKIP": 0,
+   "DATA_DRIFT": 1,
+   "pass_rate_all": 0.5,
+   "pass_rate_judged": 0.5
+  }
+ },
+ "failure_classes": {},
+ "data_drift": [
+  "ff90bc18ec78"
+ ],
+ "tokens": {
+  "input": 177074,
+  "output": 29054,
+  "cache_read": 902144
+ },
+ "tokens_scenarios": 5,
+ "cost": {
+  "cny": 1.037652,
+  "prices": {
+   "input": 2.0,
+   "output": 8.0,
+   "cache_read": 0.5
+  }
+ },
+ "scenarios": [
+  {
+   "key": "c3543a382f5b",
+   "idx": 10,
+   "domain": "inventory",
+   "pattern": "topn_material",
+   "question": "2026年5月库存量Top10物料",
+   "verdict": "PASS",
+   "failure_class": null,
+   "wall_ms": 42640,
+   "engine_elapsed_ms": 31817,
+   "tokens": {
+    "input": 30593,
+    "output": 2881,
+    "cache_read": 64640
+   },
+   "cached": false,
+   "session_id": "eval-inventory-10-20260920113750",
+   "run_id": "run-4ffdbaeb-4ee4-4cda-86c1-0d7fc1408e94",
+   "driver_error": null
+  },
+  {
+   "key": "505573221378",
+   "idx": 11,
+   "domain": "inventory",
+   "pattern": "aging_structure",
+   "question": "2026年4-6月库存库龄结构及长库龄占比",
+   "verdict": "PASS",
+   "failure_class": null,
+   "wall_ms": 60203,
+   "engine_elapsed_ms": 55776,
+   "tokens": {
+    "input": 31459,
+    "output": 5161,
+    "cache_read": 184832
+   },
+   "cached": false,
+   "session_id": "eval-inventory-11-20260920113750",
+   "run_id": "run-3b5a01d1-137d-48a5-94cc-65f78c9ee273",
+   "driver_error": null
+  },
+  {
+   "key": "c2ac3d42f66a",
+   "idx": 30,
+   "domain": "sales-performance",
+   "pattern": "org_monthly_achievement",
+   "question": "2026年1-6月卫浴事业部业绩情况",
+   "verdict": "PASS",
+   "failure_class": null,
+   "wall_ms": 54672,
+   "engine_elapsed_ms": 53377,
+   "tokens": {
+    "input": 38241,
+    "output": 10458,
+    "cache_read": 222592
+   },
+   "cached": false,
+   "session_id": "eval-sales-performance-30-20260920113750",
+   "run_id": "run-2a13ff9d-e197-4cfb-845a-8f33735ed28a",
+   "driver_error": null
+  },
+  {
+   "key": "ff90bc18ec78",
+   "idx": 82,
+   "domain": "otd-fulfillment",
+   "pattern": "bu_outbound_rate_org",
+   "question": "2026年5月瓷砖事业部订单行的出库率",
+   "verdict": "DATA_DRIFT",
+   "failure_class": null,
+   "wall_ms": 22859,
+   "engine_elapsed_ms": 19267,
+   "tokens": {
+    "input": 24991,
+    "output": 2308,
+    "cache_read": 43648
+   },
+   "cached": false,
+   "session_id": "eval-otd-fulfillment-82-20260920113750",
+   "run_id": "run-ad1efc18-8a23-46ee-b1d7-3054159c7b5d",
+   "driver_error": null
+  },
+  {
+   "key": "647d69d5f2cd",
+   "idx": 84,
+   "domain": "otd-fulfillment",
+   "pattern": "area_delivery_trend",
+   "question": "2026年上半年各产区瓷砖出库数量与面积月度走势",
+   "verdict": "PASS",
+   "failure_class": null,
+   "wall_ms": 63094,
+   "engine_elapsed_ms": 60749,
+   "tokens": {
+    "input": 51790,
+    "output": 8246,
+    "cache_read": 386432
+   },
+   "cached": false,
+   "session_id": "eval-otd-fulfillment-84-20260920113750",
+   "run_id": "run-39be4371-b679-45e0-90ec-ba6a319295a6",
+   "driver_error": null
+  }
+ ]
+}
