@@ -21,8 +21,8 @@
     {
       "domain": "fin-cost",
       "pattern": "trend_monthly",
-      "question": "2026年各月费用总额趋势",
-      "sql": "SELECT year, month, SUM(local_currency_amt) as total_amount\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year = '2026'\n    GROUP BY year, month ORDER BY year, month",
+      "question": "2026年1-6月各月费用总额趋势",
+      "sql": "SELECT year, month, SUM(local_currency_amt) as total_amount\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year = '2026' AND month <= '2026-06'\n    GROUP BY year, month ORDER BY year, month",
       "row_count": 6,
       "elapsed_ms": 1651,
       "data": [
@@ -54,7 +54,7 @@
         {
           "year": "2026",
           "month": "2026-06",
-          "total_amount": -26142233.4017
+          "total_amount": 1337047071.2478
         }
       ],
       "checksum": "rows=6"
@@ -577,7 +577,7 @@
       "domain": "fin-cost",
       "pattern": "summary_year",
       "question": "2024-2026年各年费用总额汇总",
-      "sql": "SELECT year, SUM(local_currency_amt) as total,\n           COUNT(DISTINCT cost_center_code) as cc_cnt,\n           COUNT(DISTINCT general_ledger_account) as acct_cnt\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year >= '2024'\n    GROUP BY year ORDER BY year",
+      "sql": "SELECT year, SUM(local_currency_amt) as total,\n           COUNT(DISTINCT cost_center_code) as cc_cnt,\n           COUNT(DISTINCT general_ledger_account) as acct_cnt\n    FROM dwrfin.dwr_fin_cost_d_compre_subj_t\n    WHERE year BETWEEN '2024' AND '2026'\n    GROUP BY year ORDER BY year",
       "row_count": 3,
       "elapsed_ms": 4390,
       "data": [
@@ -595,9 +595,9 @@
         },
         {
           "year": "2026",
-          "total": -1063703726.3093,
-          "cc_cnt": 4104,
-          "acct_cnt": 497
+          "total": -1079403229.8902,
+          "cc_cnt": 4581,
+          "acct_cnt": 507
         }
       ],
       "checksum": "rows=3"
@@ -713,13 +713,13 @@
         },
         {
           "calmonth": "202606",
-          "total_qty": 94629891.686,
-          "total_amount": 1472667069.963894,
-          "wbzq_0_6m": 681716366.012862,
-          "wbzq_6_12m": 315214457.836577,
-          "wbzq_12_24m": 228238460.657812,
-          "wbzq_24m_plus": 247496605.541643,
-          "long_aged_pct": 32.3
+          "total_qty": 94126357.517,
+          "total_amount": 1411793189.667066,
+          "wbzq_0_6m": 667054549.512814,
+          "wbzq_6_12m": 277246149.721186,
+          "wbzq_12_24m": 225542606.437286,
+          "wbzq_24m_plus": 241948842.20078,
+          "long_aged_pct": 33.11
         }
       ],
       "checksum": "rows=3"
@@ -1384,80 +1384,80 @@
     },
     {
       "pattern": "topn_customer",
-      "question": "2026年6月7日应收余额Top10客户",
-      "sql": "SELECT cust_code, cust_name,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(n_overdue_receivables) as n_overdue\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'\n  AND (special_general_ledger IS NULL OR special_general_ledger = '')\nGROUP BY cust_code, cust_name\nORDER BY balance DESC\nLIMIT 10",
+      "question": "2026年6月30日应收余额Top10客户",
+      "sql": "SELECT cust_code, cust_name,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(n_overdue_receivables) as n_overdue\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-30'\n  AND (special_general_ledger IS NULL OR special_general_ledger = '')\nGROUP BY cust_code, cust_name\nORDER BY balance DESC\nLIMIT 10",
       "row_count": 10,
-      "elapsed_ms": 105,
+      "elapsed_ms": 187,
       "data": [
-        {
-          "cust_code": "0000007200",
-          "cust_name": "佛山市乐淘陶科技有限公司",
-          "balance": "261613498.62",
-          "overdue": "108877073.10",
-          "n_overdue": "152736425.52"
-        },
         {
           "cust_code": "0000008300",
           "cust_name": "上海东鹏陶瓷有限公司",
-          "balance": "187682343.09",
-          "overdue": "520875241.99",
-          "n_overdue": "-333192898.90"
-        },
-        {
-          "cust_code": "0000008A00",
-          "cust_name": "重庆石湾东鹏陶瓷有限公司",
-          "balance": "158595314.95",
-          "overdue": "41649226.64",
-          "n_overdue": "116946088.31"
+          "balance": "389449290.60",
+          "overdue": "1469574544.41",
+          "n_overdue": "-1080125253.81"
         },
         {
           "cust_code": "0000007900",
           "cust_name": "佛山市东鹏陶瓷有限公司",
-          "balance": "143146902.68",
-          "overdue": "420604422.68",
-          "n_overdue": "-277457520.00"
+          "balance": "377538216.39",
+          "overdue": "1277857532.19",
+          "n_overdue": "-900319315.80"
         },
         {
-          "cust_code": "0000008200",
-          "cust_name": "广州市东鹏陶瓷有限责任公司",
-          "balance": "93060625.22",
-          "overdue": "382233090.67",
-          "n_overdue": "-289172465.45"
+          "cust_code": "0000007200",
+          "cust_name": "佛山市乐淘陶科技有限公司",
+          "balance": "319410550.83",
+          "overdue": "28895089.83",
+          "n_overdue": "290515461.00"
         },
         {
-          "cust_code": "0000001300",
-          "cust_name": "清远纳福娜陶瓷有限公司",
-          "balance": "90905692.50",
-          "overdue": "90723874.81",
-          "n_overdue": "181817.69"
-        },
-        {
-          "cust_code": "0000008100",
-          "cust_name": "深圳东鹏陶瓷有限公司",
-          "balance": "89108263.43",
-          "overdue": "728898146.79",
-          "n_overdue": "-639789883.36"
+          "cust_code": "0000001000",
+          "cust_name": "广东东鹏控股股份有限公司",
+          "balance": "266553617.46",
+          "overdue": "17815891792.11",
+          "n_overdue": "-17549338174.65"
         },
         {
           "cust_code": "0000001800",
           "cust_name": "重庆市东鹏智能家居有限公司",
-          "balance": "69495670.12",
-          "overdue": "69495670.12",
-          "n_overdue": "0.00"
+          "balance": "237049906.11",
+          "overdue": "190541845.92",
+          "n_overdue": "46508060.19"
         },
         {
-          "cust_code": "0000007500",
-          "cust_name": "堆龙德庆和盈商贸有限公司",
-          "balance": "57854167.95",
-          "overdue": "19463363.39",
-          "n_overdue": "38390804.56"
+          "cust_code": "0000008100",
+          "cust_name": "深圳东鹏陶瓷有限公司",
+          "balance": "201641484.18",
+          "overdue": "2202171918.63",
+          "n_overdue": "-2000530434.45"
         },
         {
-          "cust_code": "0000001500",
-          "cust_name": "丰城市东鹏陶瓷有限公司",
-          "balance": "57435653.61",
-          "overdue": "56960011.94",
-          "n_overdue": "475641.67"
+          "cust_code": "0000008200",
+          "cust_name": "广州市东鹏陶瓷有限责任公司",
+          "balance": "159541121.46",
+          "overdue": "1156428024.18",
+          "n_overdue": "-996886902.72"
+        },
+        {
+          "cust_code": "0000008500",
+          "cust_name": "陕西东鹏建材有限公司",
+          "balance": "92202295.92",
+          "overdue": "807528256.32",
+          "n_overdue": "-715325960.40"
+        },
+        {
+          "cust_code": "0000316498",
+          "cust_name": "广州恒大材料设备",
+          "balance": "92008707.09",
+          "overdue": "96016554.66",
+          "n_overdue": "-4007847.57"
+        },
+        {
+          "cust_code": "0000008A00",
+          "cust_name": "重庆石湾东鹏陶瓷有限公司",
+          "balance": "86739055.68",
+          "overdue": "3735410.58",
+          "n_overdue": "83003645.10"
         }
       ],
       "checksum": "rows=10",
@@ -1466,7 +1466,7 @@
     {
       "pattern": "aging_structure",
       "question": "2026年5-6月应收账龄结构及逾期占比",
-      "sql": "SELECT query_date,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(overdue_receivables) as overdue_total,\n       SUM(n_overdue_receivables) as n_overdue_total,\n       ROUND(SUM(overdue_receivables) / NULLIF(SUM(local_currency_balance_sum),0) * 100, 2) as overdue_pct\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date IN ('2026-05-02','2026-05-31','2026-06-02','2026-06-07')\nGROUP BY query_date\nORDER BY query_date",
+      "sql": "SELECT query_date,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(overdue_receivables) as overdue_total,\n       SUM(n_overdue_receivables) as n_overdue_total,\n       ROUND(SUM(overdue_receivables) / NULLIF(SUM(local_currency_balance_sum),0) * 100, 2) as overdue_pct\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date IN ('2026-05-02','2026-05-31','2026-06-02','2026-06-30')\nGROUP BY query_date\nORDER BY query_date",
       "row_count": 4,
       "elapsed_ms": 122,
       "data": [
@@ -1492,11 +1492,11 @@
           "overdue_pct": "395.80"
         },
         {
-          "query_date": "2026-06-07",
-          "total_balance": "2632826417.45",
-          "overdue_total": "10237389413.41",
-          "n_overdue_total": "-7604562995.96",
-          "overdue_pct": "388.84"
+          "query_date": "2026-06-30",
+          "total_balance": "5611503241.25",
+          "overdue_total": "29681764776.57",
+          "n_overdue_total": "-24070261535.32",
+          "overdue_pct": "528.94"
         }
       ],
       "checksum": "rows=4",
@@ -1504,17 +1504,17 @@
     },
     {
       "pattern": "aging_bucket_detail",
-      "question": "2026年6月7日账龄分段汇总（2023新版）",
-      "sql": "SELECT\n  SUM(overdue_receivables_1_90_day_2023_after) as d_0_90,\n  SUM(overdue_receivables_91_275_day_2023_after) as d_91_275,\n  SUM(overdue_receivables_276_730_day_2023_after) as d_276_730,\n  SUM(overdue_receivables_731_1460_day_2023_after) as d_731_1460,\n  SUM(overdue_receivables_1461_day_2023_after) as d_1461_plus\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-07'",
+      "question": "2026年6月30日账龄分段汇总（2023新版）",
+      "sql": "SELECT\n  SUM(overdue_receivables_1_90_day_2023_after) as d_0_90,\n  SUM(overdue_receivables_91_275_day_2023_after) as d_91_275,\n  SUM(overdue_receivables_276_730_day_2023_after) as d_276_730,\n  SUM(overdue_receivables_731_1460_day_2023_after) as d_731_1460,\n  SUM(overdue_receivables_1461_day_2023_after) as d_1461_plus\nFROM dwrfin.dwr_ar_receivable_aging_2023_info_f\nWHERE query_date = '2026-06-30'",
       "row_count": 1,
-      "elapsed_ms": 52,
+      "elapsed_ms": 67,
       "data": [
         {
-          "d_0_90": "376912059.65",
-          "d_91_275": "48933638.05",
-          "d_276_730": "2523087.02",
-          "d_731_1460": "352440.33",
-          "d_1461_plus": "21478.97"
+          "d_0_90": "762605592.44",
+          "d_91_275": "1814657153.99",
+          "d_276_730": "2279107680.85",
+          "d_731_1460": "3345328122.84",
+          "d_1461_plus": "174316565.06"
         }
       ],
       "checksum": "rows=1",
@@ -1524,16 +1524,87 @@
       "pattern": "overdue_customer",
       "question": "2026年6月逾期客户Top10",
       "sql": "SELECT c_name, sales_grp___t,\n       ysye as balance, yqe as overdue,\n       ROUND(yqe / NULLIF(ysye, 0) * 100, 2) as overdue_pct\nFROM dm.dm_ar_overdue_receivables_t\nWHERE ed_mon = '202606'\n  AND yqe > 0\n  AND (is_ignore IS NULL OR is_ignore = 0)\nORDER BY yqe DESC\nLIMIT 10",
-      "row_count": 0,
+      "row_count": 10,
       "elapsed_ms": 58,
-      "data": [],
-      "checksum": "rows=0",
+      "data": [
+        {
+          "c_name": "As American Inc",
+          "sales_grp___t": "北美组",
+          "balance": "18446665.9800000000",
+          "overdue": "18446665.9800000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "润材电子商务有限公司",
+          "sales_grp___t": "战略工程南区",
+          "balance": "13874655.5200000000",
+          "overdue": "13830268.5900000000",
+          "overdue_pct": "99.68"
+        },
+        {
+          "c_name": "银丰科技(青岛)有限公司",
+          "sales_grp___t": "上海工程六线组",
+          "balance": "15078155.3200000000",
+          "overdue": "12629730.3500000000",
+          "overdue_pct": "83.76"
+        },
+        {
+          "c_name": "广西南宁问鼎建筑装饰材料有限公司",
+          "sales_grp___t": "广西大包专供",
+          "balance": "8486763.1900000000",
+          "overdue": "8486763.1900000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "重庆葛洲坝融创金裕置业有限公司",
+          "sales_grp___t": "战略工程北区",
+          "balance": "7825098.7100000000",
+          "overdue": "7825098.7100000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "江苏意久建材有限公司",
+          "sales_grp___t": "锡常扬组",
+          "balance": "7373096.8400000000",
+          "overdue": "7373096.8400000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "河北荣盛建筑材料有限公司",
+          "sales_grp___t": "粤西运营组",
+          "balance": "7304104.6300000000",
+          "overdue": "7304104.6300000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "杭州枫华科技有限公司",
+          "sales_grp___t": "上海工程二线组",
+          "balance": "6865051.7100000000",
+          "overdue": "6865051.7100000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "长沙浩博建材贸易有限公司",
+          "sales_grp___t": "湖南组",
+          "balance": "6202799.2000000000",
+          "overdue": "6202799.2000000000",
+          "overdue_pct": "100.00"
+        },
+        {
+          "c_name": "重庆庆科商贸有限公司",
+          "sales_grp___t": "重庆运营组",
+          "balance": "5904729.7900000000",
+          "overdue": "5904729.7900000000",
+          "overdue_pct": "100.00"
+        }
+      ],
+      "checksum": "rows=10",
       "domain": "ar"
     },
     {
       "pattern": "collection_monthly",
       "question": "2026年上半年回款月度趋势",
-      "sql": "SELECT year, month,\n       SUM(all_collection_amt) as total_collection,\n       SUM(collection_amt) as matched,\n       ROUND(SUM(collection_amt) / NULLIF(SUM(all_collection_amt), 0) * 100, 2) as match_rate\nFROM dwrfin.dwr_ar_collection_detail_f\nWHERE year = '2026'\nGROUP BY year, month\nORDER BY year, month",
+      "sql": "SELECT year, month,\n       SUM(all_collection_amt) as total_collection,\n       SUM(collection_amt) as matched,\n       ROUND(SUM(collection_amt) / NULLIF(SUM(all_collection_amt), 0) * 100, 2) as match_rate\nFROM dwrfin.dwr_ar_collection_detail_f\nWHERE year = '2026' AND month <= '2026-06'\nGROUP BY year, month\nORDER BY year, month",
       "row_count": 6,
       "elapsed_ms": 199,
       "data": [
@@ -1547,37 +1618,37 @@
         {
           "year": "2026",
           "month": "2026-02",
-          "total_collection": "112294086.6800000000",
+          "total_collection": "112573115.8100000000",
           "matched": "3992979.4200000000",
-          "match_rate": "3.56"
+          "match_rate": "3.55"
         },
         {
           "year": "2026",
           "month": "2026-03",
-          "total_collection": "536767693.6400000000",
+          "total_collection": "536388664.5100000000",
           "matched": "5452396.1400000000",
           "match_rate": "1.02"
         },
         {
           "year": "2026",
           "month": "2026-04",
-          "total_collection": "485237254.2900000000",
+          "total_collection": "485147395.4200000000",
           "matched": "3176489.4800000000",
           "match_rate": "0.65"
         },
         {
           "year": "2026",
           "month": "2026-05",
-          "total_collection": "537696621.9500000000",
+          "total_collection": "537690427.7500000000",
           "matched": "7782252.1100000000",
           "match_rate": "1.45"
         },
         {
           "year": "2026",
           "month": "2026-06",
-          "total_collection": "101411372.2000000000",
-          "matched": "979017.7600000000",
-          "match_rate": "0.97"
+          "total_collection": "628476059.9600000000",
+          "matched": "13598824.1100000000",
+          "match_rate": "2.16"
         }
       ],
       "checksum": "rows=6",
@@ -1585,8 +1656,8 @@
     },
     {
       "pattern": "balance_trend",
-      "question": "2026年应收余额月度趋势",
-      "sql": "SELECT year, month,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(current_local_currency_balance) as current_balance\nFROM dwrfin.dwr_ar_receivable_balance_f\nWHERE year = '2026'\nGROUP BY year, month\nORDER BY year, month",
+      "question": "2026年上半年应收余额月度趋势",
+      "sql": "SELECT year, month,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as total_balance,\n       SUM(current_local_currency_balance) as current_balance\nFROM dwrfin.dwr_ar_receivable_balance_f\nWHERE year = '2026' AND month <= '2026-06'\nGROUP BY year, month\nORDER BY year, month",
       "row_count": 6,
       "elapsed_ms": 841,
       "data": [
@@ -1628,9 +1699,9 @@
         {
           "year": "2026",
           "month": "2026-06",
-          "cust_cnt": "19898",
-          "total_balance": "9312825535.42",
-          "current_balance": "380266242.07"
+          "cust_cnt": "19958",
+          "total_balance": "4912309202.55",
+          "current_balance": "-4020250090.80"
         }
       ],
       "checksum": "rows=6",
@@ -1638,24 +1709,24 @@
     },
     {
       "pattern": "devalue_by_class",
-      "question": "2026年6月7日坏账减值按客户分类汇总",
-      "sql": "SELECT cust_class_name,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(overdue_1_90_amt + overdue_91_275_amt + overdue_276_730_amt\n           + overdue_731_1460_amt + overdue_1461_amt) as total_devalue\nFROM dwrfin.dwr_ar_credit_devalue_f\nWHERE query_date = '2026-06-07'\nGROUP BY cust_class_name\nORDER BY balance DESC\nLIMIT 10",
+      "question": "2026年6月30日坏账减值按客户分类汇总",
+      "sql": "SELECT cust_class_name,\n       COUNT(DISTINCT cust_code) as cust_cnt,\n       SUM(local_currency_balance_sum) as balance,\n       SUM(overdue_receivables) as overdue,\n       SUM(overdue_1_90_amt + overdue_91_275_amt + overdue_276_730_amt\n           + overdue_731_1460_amt + overdue_1461_amt) as total_devalue\nFROM dwrfin.dwr_ar_credit_devalue_f\nWHERE query_date = '2026-06-30'\nGROUP BY cust_class_name\nORDER BY balance DESC\nLIMIT 10",
       "row_count": 2,
-      "elapsed_ms": 138,
+      "elapsed_ms": 178,
       "data": [
         {
           "cust_class_name": null,
-          "cust_cnt": "19092",
-          "balance": "3547872831.06",
-          "overdue": "10878649816.87",
-          "total_devalue": "10094686272.38"
+          "cust_cnt": "19155",
+          "balance": "2742663830.81",
+          "overdue": "10533753822.68",
+          "total_devalue": "10214067343.64"
         },
         {
           "cust_class_name": "工程客户（无自动运费）",
           "cust_cnt": "236",
-          "balance": "51546932.64",
-          "overdue": "50924945.90",
-          "total_devalue": "10892005.88"
+          "balance": "51537268.15",
+          "overdue": "50924945.87",
+          "total_devalue": "10892005.85"
         }
       ],
       "checksum": "rows=2",
@@ -1974,9 +2045,9 @@
         },
         {
           "calmonth": "2026-06",
-          "total_achievement": "11712138.8230330000",
-          "notax_amt": "10242193.5964830000",
-          "sales_area": "4568.8026474200"
+          "total_achievement": "80836718.8014960000",
+          "notax_amt": "70365938.9046340000",
+          "sales_area": "21315.6113567200"
         }
       ],
       "checksum": "rows=6"
