@@ -1,5 +1,7 @@
 # dsh 引擎接入 · M3 内部白名单试点 — 实施计划
 
+> **收口记录（2026-09-20）**：T1-T4 全部完成验收（pm2 常驻部署/白名单账号/观测审计脚本/SOP）。**用户裁定 M3 快速通过直接进 M4**——T5 试点执行转为常态运行（真实任务持续积累，日报/审计随用随查），T6 试点报告并入 M4 首项。依据：平台全链路验收（真问题 36.1s/报告 105.2s/断电自愈）+ 用户亲手多账号测试"没啥问题"。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **T0 裁定（用户 2026-09-20 确认）**：部署=**方案 A**（本机 Windows 常驻，"我这边跑成功先"）；其余按建议默认（首批白名单 ≤5 人名单于 T2 建号时定、6 域全开、验收 2-4 周/≥50 任务/失败率<10% 且逐例可归因、余额阈值建脚本后再定）；服务器 Linux 移植与 M4 一起做。
