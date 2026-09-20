@@ -783,6 +783,12 @@ def judge_one(q: dict, state: dict, agent_rows: list | None,
     return verdict
 
 
+# --fresh 时的 submission_id 盐：网关幂等键=client_submission_id（全表 UNIQUE），
+# 场景键不变则重提交会被当作同一次提交的重试而原样返回旧任务（golden10-hardened
+# 实测：5 条"复跑"实为旧任务秒级重放）。加盐强制真重跑；空串=默认（断点续跑幂等）。
+FRESH_SUBMISSION_SALT = ""
+
+
 def run_scenario(q: dict, idx: int, run_ts: str, client: GatewayClient,
                  results_root: str | None, db: dict) -> dict:
     """单场景全链路：提交 → SSE 收流 → result_ref 读回 → 真值重导 → 判分。"""
@@ -797,7 +803,7 @@ def run_scenario(q: dict, idx: int, run_ts: str, client: GatewayClient,
     fresh_rows, fresh_err = None, None
     ref_note = None
     try:
-        sub = client.submit(q["question"], detail["session_id"], key)
+        sub = client.submit(q["question"], detail["session_id"], key + FRESH_SUBMISSION_SALT)
         run_id = sub.get("run_id")
         detail["run_id"] = run_id
         detail["session_id"] = sub.get("session_id") or detail["session_id"]
@@ -939,6 +945,10 @@ def main(argv=None) -> int:
     if not selected:
         print("无待跑场景（过滤结果为空）。")
         return 0
+    if args.fresh:
+        globals()["FRESH_SUBMISSION_SALT"] = f"-r{run_ts}"
+        log_line(f"[eval] --fresh：submission_id 加盐 {FRESH_SUBMISSION_SALT}"
+                 f"（网关幂等键换新，强制真重跑而非返回旧任务）")
     fingerprint = env_fingerprint()
     log_line(f"[eval] round-{round_name} 场景 {len(selected)} 个"
              f"（{'域=' + args.domain + ' ' if args.domain else ''}"
