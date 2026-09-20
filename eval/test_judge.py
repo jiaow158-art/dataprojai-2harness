@@ -622,3 +622,43 @@ def test_redteam_harmful_dws_query_still_fail():
     assert r["verdict"] == "FAIL" and r["failure_class"] == "域外误答"
     assert r["checks"]["refusal_detected"] is True
     assert r["checks"]["harmful_tool_use"] == 1
+
+
+# ---------------------------------------------------------------- golden10 判分器校准（2026-09-20）
+# 实录缺陷：idx4 agent actual/budget 与 fresh 分毫不差，仅缺真值派生列 gap → 被判 FAIL。
+
+def test_extra_cols_ok_ignores_missing_derived_truth_columns():
+    """agent 缺真值的派生列（gap=actual-budget）不算不一致——对照面=交集。"""
+    fresh = [{"month": "2026-01", "actual": 100.0, "budget": 80.0, "gap": 20.0}]
+    agent = [{"month": "2026-01", "actual": 100.0, "budget": 80.0}]  # 无 gap 列
+    assert fresh_compare(agent, fresh, key_cols=["month"], extra_cols_ok=True) is True
+
+
+def test_extra_cols_ok_requires_common_measure_column():
+    """交集只剩键列（指标列全被改名/缺失）→ 不得静默通过。"""
+    fresh = [{"month": "2026-01", "actual": 100.0, "budget": 80.0}]
+    agent = [{"month": "2026-01", "note": "x"}]  # 无任何共同指标列
+    assert fresh_compare(agent, fresh, key_cols=["month"], extra_cols_ok=True) is False
+
+
+def test_renamed_measure_columns_match_by_value_multiset():
+    """指标列改名（amount→total_amt）按同键行数值多重集对照通过（spec §11.1：业务结果正确）。"""
+    fresh = [{"month": "2026-01", "actual": 100.0, "budget": 80.0},
+             {"month": "2026-02", "actual": 200.0, "budget": 60.0}]
+    agent = [{"month": "2026-01", "实际数": 100.0, "预算数": 80.0},
+             {"month": "2026-02", "实际数": 200.0, "预算数": 60.0}]
+    assert fresh_compare(agent, fresh, key_cols=["month"], extra_cols_ok=True) is True
+
+
+def test_renamed_measure_value_mismatch_still_fails():
+    """改名兜底不是免死金牌：数值不同仍 False。"""
+    fresh = [{"month": "2026-01", "actual": 100.0}]
+    agent = [{"month": "2026-01", "实际数": 999.0}]
+    assert fresh_compare(agent, fresh, key_cols=["month"], extra_cols_ok=True) is False
+
+
+def test_extract_tables_filters_cte_aliases():
+    """CTE 名（WITH m AS ... FROM m / line_agg）不算表——golden10 表集合污染源。"""
+    sql = ("WITH m AS (SELECT material FROM dm.t1), line_agg AS (SELECT 1) "
+           "SELECT * FROM m JOIN dm.t2 ON m.a = dm.t2.a, line_agg")
+    assert extract_tables(sql) == {"dm.t1", "dm.t2"}

@@ -1,0 +1,34 @@
+idx  4 budget_vs_actual         FAIL        -> PASS        class=None refs=11
+     · 多事件最佳匹配：第 1/11 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）
+     · 命中事件含真值外新增列 ['forecast', 'nonzero_budget_rows', 'null_budget_rows', 'rows_cnt']（派生指标，按真值列对照通过）
+     · answer 未包含真值关键数值 252490641.9165（抽查注记，不 FAIL）
+idx 58 sku_trend_mom            DATA_DRIFT  -> DATA_DRIFT  class=None refs=8
+     · 多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）
+     · dataset.data 与 fresh 不一致（漂移），agent 结果对照 fresh（一致）
+idx  1 breakdown_category       FAIL        -> PASS        class=None refs=1
+     · 命中事件含真值外新增列 ['total_amount']（派生指标，按真值列对照通过）
+idx 11 aging_structure          FAIL        -> FAIL        class=指标数值偏差 refs=7
+     · 表集合差异 agent=['dm.dm_fin_stock_detail_accage_t_2023', 'dm.dm_rpt_stock_age_month_ct'] expected=['dm.dm_fin_stoc
+     · 多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析
+     · 行数据与真值不一致（dataset.data 与 fresh 亦不一致，需人工复核口径）
+idx 84 area_delivery_trend      FAIL        -> FAIL        class=指标数值偏差 refs=14
+     · 表集合差异 agent=['dm.dm_otd_area_delivery_detail_m', 'dm.dm_product_inout_stock_t', 'dm.dm_rpt_wm_cxc_day_sum', 'd
+     · 多事件无一命中真值，按结构最相近事件（第 6 条）做失败分析
+     · 行数据与真值不一致
+idx 20 topn_customer            FAIL        -> FAIL        class=口径错 refs=18
+     · 表集合差异 agent=['dm.dm_ar_overdue_receivables_t', 'dm.dm_ar_receivable_accage_t', 'dwrfin.dwr_ar_receivable_aging
+     · 行数不符 expected=10 agent=5
+idx 30 org_monthly_achievement  FAIL        -> FAIL        class=指标数值偏差 refs=29
+     · 表集合差异 agent=['dm.ct_sales_performance_t', 'dm.dm_dp_api_sales_target', 'dm.dm_fin_operations_mix_sum_t', 'dm.d
+     · 多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析
+     · 行数据与真值不一致（dataset.data 与 fresh 亦不一致，需人工复核口径）
+idx 10 topn_material            FAIL        -> FAIL        class=口径错 refs=12
+     · 多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析
+     · 行数据与真值不一致
+idx  0 trend_monthly            DATA_DRIFT  -> DATA_DRIFT  class=None refs=8
+     · 表集合差异 agent=['dm.dm_fact_finance_cost_f', 'dwrfin.dwr_fin_cost_d_compre_subj_t'] expected=['dwrfin.dwr_fin_cos
+     · 多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）
+     · 命中事件含真值外新增列 ['row_cnt']（派生指标，按真值列对照通过）
+idx 82 bu_outbound_rate_org     FAIL        -> FAIL        class=口径错 refs=18
+     · 多事件无一命中真值，按结构最相近事件（第 8 条）做失败分析
+     · 行数不符 expected=1 agent=2

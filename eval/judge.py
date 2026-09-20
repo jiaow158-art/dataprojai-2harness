@@ -56,15 +56,28 @@ _KEYCOL_NAME_RE = re.compile(
 
 
 # ---------------------------------------------------------------- SQL 表集合
+_CTE_DEF_RE = re.compile(r"(?is)\bwith\s+([a-z_][\w$]*)\s+as\s*\(|,\s*([a-z_][\w$]*)\s+as\s*\(")
+
+
 def extract_tables(sql: str) -> set[str]:
-    """提取 FROM/JOIN 后的表名（schema.table 或裸 table，去别名；子查询尽力）。"""
+    """提取 FROM/JOIN 后的表名（schema.table 或裸 table，去别名；子查询尽力）。
+
+    golden10 校准（2026-09-20）：CTE 名（`WITH m AS … FROM m`）不算表——
+    旧版把 CTE 别名当表集合成员，污染 superset 注记与表选错判定。
+    """
     tables: set[str] = set()
     if not sql:
         return tables
+    ctes: set[str] = set()
+    for m in _CTE_DEF_RE.finditer(sql):
+        ctes.add((m.group(1) or m.group(2)).lower())
     for m in _TABLE_RE.finditer(sql):
         tok = m.group(1).strip("\"'`[]").rstrip(")").rstrip(".")
         if _IDENT_RE.match(tok):
-            tables.add(tok.lower())
+            t = tok.lower()
+            if "." not in t and t in ctes:
+                continue
+            tables.add(t)
     return tables
 
 
@@ -122,22 +135,51 @@ def _row_key(row: dict, cols: list[str]):
     return tuple(str(row.get(c)) if row.get(c) is not None else None for c in cols)
 
 
+def _numlist_within(a: list[float], b: list[float], tol: float) -> bool:
+    if len(a) != len(b):
+        return False
+    return all(abs(x - y) <= tol * max(abs(x), abs(y), 1e-12) for x, y in zip(a, b))
+
+
+def _rows_match_truth(ar: dict, fr: dict, keyset: set[str], tol: float) -> bool:
+    """extra_cols_ok=True 的行匹配（golden10 校准 2026-09-20）：
+
+    1. **交集列对照**：agent 与真值同名列必须一致；agent 缺真值的派生列（如
+       gap=actual−budget）不算不一致——交集必须含至少一个非键指标列，否则
+       「无共同指标列」不得静默通过。
+    2. **改名兜底**：交集无指标列（agent 起了别名）→ 同键行的数值多重集对照
+       （spec §11.1：不要求 SQL/列名一致，要求业务结果正确）。
+    """
+    common = set(ar) & set(fr)
+    if common - keyset:
+        return all(_cells_equal(ar.get(c), fr.get(c), tol) for c in common)
+    av = sorted(v for k, v in ar.items() if k not in keyset for v in [_num(v)] if v is not None)
+    fv = sorted(v for k, v in fr.items() if k not in keyset for v in [_num(v)] if v is not None)
+    if not av and not fv:
+        return all(str(ar.get(c) or "").strip() == str(fr.get(c) or "").strip() for c in common)
+    return _numlist_within(av, fv, tol)
+
+
 def fresh_compare(agent_rows: list[dict] | None, fresh_rows: list[dict] | None,
                   num_tolerance_rel: float = 1e-3, key_cols: list[str] | None = None,
                   extra_cols_ok: bool = False) -> bool:
     """键列对齐的多重集对照：缺行/多行 False；数值列相对误差容差；非数值列精确。
 
-    extra_cols_ok=True（round1 修正，agent 对照真值专用）：agent 行含真值之外的新增列
-    （派生指标，如 exec_rate_pct）不算不一致——对照面收缩为真值列（agent 缺真值列仍不通过）。
+    extra_cols_ok=True（agent 对照真值专用，golden10 校准）：对照面 = 交集列 +
+    指标列改名时数值多重集兜底；agent 缺真值派生列不算不一致，但交集必须含
+    至少一个非键指标列（全改名走兜底，连兜底数值都对不上才 False）。
     漂移探测（fresh vs dataset.data）保持默认严格全列。
     """
+    if agent_rows is None and fresh_rows is None:
+        return True
     if agent_rows is None or fresh_rows is None:
-        return agent_rows is None and fresh_rows is None
+        return False
     if not agent_rows and not fresh_rows:
         return True
     if not agent_rows or not fresh_rows:
         return False
     cols = key_cols or _key_cols(fresh_rows)
+    keyset = set(cols)
     pool: dict[tuple, list[dict]] = {}
     for fr in fresh_rows:
         pool.setdefault(_row_key(fr, cols), []).append(fr)
@@ -146,8 +188,10 @@ def fresh_compare(agent_rows: list[dict] | None, fresh_rows: list[dict] | None,
         if not bucket:
             return False
         for i, fr in enumerate(bucket):
-            cmp_cols = set(fr) if extra_cols_ok else set(ar) | set(fr)
-            if all(_cells_equal(ar.get(c), fr.get(c), num_tolerance_rel) for c in cmp_cols):
+            ok = (_rows_match_truth(ar, fr, keyset, num_tolerance_rel) if extra_cols_ok
+                  else all(_cells_equal(ar.get(c), fr.get(c), num_tolerance_rel)
+                           for c in set(ar) | set(fr)))
+            if ok:
                 bucket.pop(i)
                 break
         else:

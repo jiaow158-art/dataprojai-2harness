@@ -1,0 +1,296 @@
+[
+ {
+  "idx": 4,
+  "domain": "fin-cost",
+  "pattern": "budget_vs_actual",
+  "old_verdict": "FAIL",
+  "new_verdict": "PASS",
+  "failure_class": null,
+  "refs_read": 11,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": false,
+   "data_compare": true,
+   "matched_event": 0,
+   "row_count": {
+    "expected": 5,
+    "agent": 5
+   },
+   "number_in_answer": false,
+   "key_cols": [
+    "month"
+   ],
+   "full_compare_key_cols": true,
+   "full_compare_event": 0,
+   "measure_in_answer": false
+  },
+  "notes": [
+   "多事件最佳匹配：第 1/11 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）",
+   "命中事件含真值外新增列 ['forecast', 'nonzero_budget_rows', 'null_budget_rows', 'rows_cnt']（派生指标，按真值列对照通过）",
+   "answer 未包含真值关键数值 252490641.9165（抽查注记，不 FAIL）"
+  ]
+ },
+ {
+  "idx": 58,
+  "domain": "sku-profitability",
+  "pattern": "sku_trend_mom",
+  "old_verdict": "DATA_DRIFT",
+  "new_verdict": "DATA_DRIFT",
+  "failure_class": null,
+  "refs_read": 8,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "data_compare": true,
+   "matched_event": 0,
+   "row_count": {
+    "expected": 6,
+    "agent": 6
+   },
+   "key_cols": [
+    "calmonth",
+    "mom_pct"
+   ],
+   "full_compare_key_cols": true,
+   "full_compare_event": 0,
+   "measure_in_answer": true
+  },
+  "notes": [
+   "多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）",
+   "dataset.data 与 fresh 不一致（漂移），agent 结果对照 fresh（一致）"
+  ]
+ },
+ {
+  "idx": 1,
+  "domain": "fin-cost",
+  "pattern": "breakdown_category",
+  "old_verdict": "FAIL",
+  "new_verdict": "PASS",
+  "failure_class": null,
+  "refs_read": 1,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": false,
+   "data_compare": true,
+   "matched_event": 0,
+   "row_count": {
+    "expected": 9,
+    "agent": 9
+   },
+   "number_in_answer": true,
+   "key_cols": [
+    "func_scope"
+   ],
+   "full_compare_key_cols": true,
+   "full_compare_event": 0,
+   "measure_in_answer": true
+  },
+  "notes": [
+   "命中事件含真值外新增列 ['total_amount']（派生指标，按真值列对照通过）"
+  ]
+ },
+ {
+  "idx": 11,
+  "domain": "inventory",
+  "pattern": "aging_structure",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "指标数值偏差",
+  "refs_read": 7,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "row_count": {
+    "expected": 3,
+    "agent": 3
+   },
+   "data_compare": false,
+   "key_cols": [
+    "calmonth",
+    "total_qty",
+    "total_amount"
+   ],
+   "full_compare_key_cols": false,
+   "measure_in_answer": true
+  },
+  "notes": [
+   "表集合差异 agent=['dm.dm_fin_stock_detail_accage_t_2023', 'dm.dm_rpt_stock_age_month_ct'] expected=['dm.dm_fin_stock_detail_accage_t_2023']（结果对照通过时不判表选错）",
+   "多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析",
+   "行数据与真值不一致（dataset.data 与 fresh 亦不一致，需人工复核口径）"
+  ]
+ },
+ {
+  "idx": 84,
+  "domain": "otd-fulfillment",
+  "pattern": "area_delivery_trend",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "指标数值偏差",
+  "refs_read": 14,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": false,
+   "row_count": {
+    "expected": 36,
+    "agent": 36
+   },
+   "data_compare": false,
+   "key_cols": [
+    "stat_month",
+    "belong_area_name"
+   ],
+   "full_compare_key_cols": false,
+   "measure_in_answer": false
+  },
+  "notes": [
+   "表集合差异 agent=['dm.dm_otd_area_delivery_detail_m', 'dm.dm_product_inout_stock_t', 'dm.dm_rpt_wm_cxc_day_sum', 'dm.dm_wm_prodstock_out_t'] expected=['dm.dm_otd_area_delivery_detail_m']（结果对照通过时不判表选错）",
+   "多事件无一命中真值，按结构最相近事件（第 6 条）做失败分析",
+   "行数据与真值不一致"
+  ]
+ },
+ {
+  "idx": 20,
+  "domain": "ar",
+  "pattern": "topn_customer",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "口径错",
+  "refs_read": 18,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "row_count": {
+    "expected": 10,
+    "agent": 5
+   }
+  },
+  "notes": [
+   "表集合差异 agent=['dm.dm_ar_overdue_receivables_t', 'dm.dm_ar_receivable_accage_t', 'dwrfin.dwr_ar_receivable_aging_2023_info_f'] expected=['dwrfin.dwr_ar_receivable_aging_2023_info_f']（结果对照通过时不判表选错）",
+   "行数不符 expected=10 agent=5"
+  ]
+ },
+ {
+  "idx": 30,
+  "domain": "sales-performance",
+  "pattern": "org_monthly_achievement",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "指标数值偏差",
+  "refs_read": 29,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "row_count": {
+    "expected": 6,
+    "agent": 6
+   },
+   "data_compare": false,
+   "key_cols": [
+    "calmonth"
+   ],
+   "full_compare_key_cols": false,
+   "measure_in_answer": false
+  },
+  "notes": [
+   "表集合差异 agent=['dm.ct_sales_performance_t', 'dm.dm_dp_api_sales_target', 'dm.dm_fin_operations_mix_sum_t', 'dm.dm_rpt_sales_group_t', 'information_schema.columns', 'pg_stat_user_tables'] expected=['dm.dm_fin_operations_mix_sum_t']（结果对照通过时不判表选错）",
+   "多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析",
+   "行数据与真值不一致（dataset.data 与 fresh 亦不一致，需人工复核口径）"
+  ]
+ },
+ {
+  "idx": 10,
+  "domain": "inventory",
+  "pattern": "topn_material",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "口径错",
+  "refs_read": 12,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": false,
+   "row_count": {
+    "expected": 10,
+    "agent": 10
+   },
+   "data_compare": false,
+   "key_cols": [
+    "material",
+    "material___t"
+   ],
+   "full_compare_key_cols": false,
+   "measure_in_answer": true
+  },
+  "notes": [
+   "多事件无一命中真值，按结构最相近事件（第 2 条）做失败分析",
+   "行数据与真值不一致"
+  ]
+ },
+ {
+  "idx": 0,
+  "domain": "fin-cost",
+  "pattern": "trend_monthly",
+  "old_verdict": "DATA_DRIFT",
+  "new_verdict": "DATA_DRIFT",
+  "failure_class": null,
+  "refs_read": 8,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "data_compare": true,
+   "matched_event": 0,
+   "row_count": {
+    "expected": 6,
+    "agent": 9
+   },
+   "key_cols": [
+    "month"
+   ],
+   "full_compare_key_cols": true,
+   "full_compare_event": 0,
+   "measure_in_answer": true
+  },
+  "notes": [
+   "表集合差异 agent=['dm.dm_fact_finance_cost_f', 'dwrfin.dwr_fin_cost_d_compre_subj_t'] expected=['dwrfin.dwr_fin_cost_d_compre_subj_t']（结果对照通过时不判表选错）",
+   "多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）",
+   "命中事件含真值外新增列 ['row_cnt']（派生指标，按真值列对照通过）",
+   "dataset.data 与 fresh 不一致（漂移），agent 结果对照 fresh（一致）"
+  ]
+ },
+ {
+  "idx": 82,
+  "domain": "otd-fulfillment",
+  "pattern": "bu_outbound_rate_org",
+  "old_verdict": "FAIL",
+  "new_verdict": "FAIL",
+  "failure_class": "口径错",
+  "refs_read": 18,
+  "fresh_err": null,
+  "checks": {
+   "table_set_ok": true,
+   "data_drift": true,
+   "row_count": {
+    "expected": 1,
+    "agent": 2
+   },
+   "key_cols": [
+    "order_lines",
+    "outbounded",
+    "outbound_rate"
+   ],
+   "full_compare_key_cols": false
+  },
+  "notes": [
+   "多事件无一命中真值，按结构最相近事件（第 8 条）做失败分析",
+   "行数不符 expected=1 agent=2"
+  ]
+ }
+]
