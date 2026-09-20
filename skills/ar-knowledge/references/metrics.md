@@ -365,3 +365,45 @@ GROUP BY calmonth
 3. 若用户坚持某个数字（如"我上次看到的是 33.63"），按用户给的数字反查其口径后沿用户口径走，不替业务裁决哪套"正确"。
 4. 科目白名单成员与 0011310200 的业务含义**待业务确认**；确认后更新本节。
 5. 关联跨域陷阱：多域共用的 `dm.dm_fin_operations_mix_sum_t` 存在 `calmonth='S'` 脏数据 38 行，处理方式见第七节第 15 条。
+
+---
+
+## 十、pattern → 首选表与字段路由（对齐 eval_dataset 录制口径）
+
+> 本节把 10 类应收问题 pattern 固化为"首选表 + 余额/账龄字段 + 快照日锚点"的路由规则。依据 = `eval_dataset.json` ar 10 场景的期望 SQL（录制口径，即判定标准）+ round-golden10 idx 20 失败录播归因 + 2026-09-20 直连 DWS 实测。
+> 当多张表业务上都讲得通时，**以 eval_dataset 录制口径为准**：不换表、不换余额字段、不换快照日锚点、不加录制 SQL 之外的过滤条件。
+> 与第九节的分工：九节裁决"集团应收余额/逾期率 KPI"的口径 A/B 二选一；本节裁决"问题形态 → 表/字段/锚点"路由。**九节口径 A 的科目白名单 + 正余额过滤是 KPI 专用，不得平移到本节的 TopN/结构类 pattern**（实测差异见 10.2/10.3）。
+
+### 10.1 pattern 路由表
+
+| pattern（问题形态） | 首选表 | 余额/账龄字段 | 快照日锚点 | 路由规则与理由 |
+|---------------------|--------|---------------|------------|----------------|
+| topn_customer（应收余额TopN客户） | dwrfin.dwr_ar_receivable_aging_2023_info_f | `SUM(local_currency_balance_sum)`，`SUM(overdue_receivables)`/`SUM(n_overdue_receivables)` 随行 | `query_date='YYYY-MM-DD'` 问题日期字面值 | 录制口径唯一业务过滤 = `special_general_ledger IS NULL OR ''`；`GROUP BY cust_code, cust_name` + `LIMIT 10`。教训与禁加过滤详见 10.2 |
+| aging_structure（账龄结构+逾期占比，多快照日） | dwrfin.dwr_ar_receivable_aging_2023_info_f | `SUM(local_currency_balance_sum)` / `SUM(overdue_receivables)` / `SUM(n_overdue_receivables)`；逾期占比 = overdue/balance*100 | `query_date IN (快照日列表)`，GROUP BY query_date | 录制口径**无** sgl 过滤；行数 = 命中的快照日数 |
+| aging_bucket_detail（账龄分段汇总，2023新版） | dwrfin.dwr_ar_receivable_aging_2023_info_f | 5 段 `SUM(overdue_receivables_{1_90,91_275,276_730,731_1460,1461}_day_2023_after)` | 单日 `query_date='YYYY-MM-DD'` | 单行汇总（1 行）；录制口径**无** sgl 过滤（与 topn_customer 不一致，照录不统一，不替业务拍板） |
+| overdue_customer（逾期客户TopN） | dm.dm_ar_overdue_receivables_t | `yqe`（逾期额）排序，`ysye`（余额）随行 | `ed_mon='YYYYMM'`（无横杠） | 过滤 `yqe>0` + `is_ignore IS NULL OR 0`（恒大/华夏幸福/泰禾被 ETL 硬编码 is_ignore=1，见 data-lineage 陷阱 28）；逾期监控专用月表，`c_name`/`sales_grp___t` 维度现成，`LIMIT 10` |
+| collection_monthly（回款月度趋势） | dwrfin.dwr_ar_collection_detail_f | `SUM(all_collection_amt)` 总额 + `SUM(collection_amt)` 已匹配 + 匹配率 | `year='YYYY'` GROUP BY year, month | 回款明细是回款口径唯一明细源；录制 SQL 无月上界（开放窗口遗留见 10.3） |
+| balance_trend（应收余额月度趋势） | dwrfin.dwr_ar_receivable_balance_f | `SUM(local_currency_balance_sum)` + `SUM(current_local_currency_balance)` + `COUNT(DISTINCT cust_code)` | `year='YYYY'` GROUP BY year, month（`month='YYYY-MM'` 带横杠） | 月粒度余额趋势只有 balance_f 有；aging 表是快照日粒度且日历不规则（10.3），不要拿它拼月度趋势 |
+| devalue_by_class（坏账减值按客户分类） | dwrfin.dwr_ar_credit_devalue_f | `SUM(overdue_1_90_amt + overdue_91_275_amt + overdue_276_730_amt + overdue_731_1460_amt + overdue_1461_amt)` 合计，balance/overdue 随行 | `query_date`，**该表仅月末有快照**（2026-05~06 实测只有 05-31/06-30） | 减值金额字段只有此表有；`GROUP BY cust_class_name`；行数 = 分类数 |
+| turnover_days（应收周转天数趋势） | dwrfin.dwr_ar_receivable_turnover_days_f | `zzts`（预计算） | `calmonth >= 'YYYYMM'`（**无横杠**，与 analysis_rpt 的 YYYY-MM 不同） | 484 行预计算小表；**数据仅到 2022-12 已停更**，窗口必须 ≤ 2022-12 |
+| analysis_wbs（综合分析按WBS汇总） | dm.dm_ar_analysis_rpt_f | `SUM(receivables_am)` / `SUM(overdue_receivables)` / `SUM(all_collection_amt)` / `AVG(collection_rate)` | `calmonth='YYYY-MM'`（**带横杠**） | 合同→回款全链路多维只有此表有；`GROUP BY wbs_level1_desc` 单列 + `LIMIT 10` |
+| collection_topn_customer（回款TopN客户） | dwrfin.dwr_ar_collection_detail_f | `SUM(all_collection_amt)` 排序 + `SUM(collection_amt)` + `SUM(non_confirm_amt)` | `year='YYYY' AND month='YYYY-MM'` 双条件（1287万行大表必带） | 录制口径按 all（含未匹配）排序——与 overdue-collection.md 陷阱 1"默认 collection_amt"冲突时以录制口径为准；`GROUP BY cust_code, cust_name` + `LIMIT 10` |
+
+### 10.2 topn_customer 教训（round-golden10 idx 20 失败实录，2026-09-20 归因）
+
+问题"2026年6月7日应收余额Top10客户"被判**口径错**（期望 10 行 / agent 记 5 行）。agent 的表和余额字段用对了（`dwr_ar_receivable_aging_2023_info_f` + `SUM(local_currency_balance_sum)`），栽在两个自作主张 + 一个行数语义：
+
+1. **私自换快照锚点**：探测发现 `2026-06-07` 无快照后，自行改用"最近快照 06-02"作主口径。录制口径锚点 = 问题日期**字面值** `query_date='2026-06-07'`。锚点缺失时应如实按问题日期查询（0 行就报 0 行，并说明现行快照日历见 10.3）——**换锚点 = 换口径**；只有用户明说"最新/最近快照"时才取 `MAX(query_date) WHERE query_date <= CURRENT_DATE`。
+2. **平移了第九节口径 A 的 KPI 过滤**：加了 6 科目白名单 + `local_currency_balance_sum > 0`。录制口径的唯一业务过滤是 `special_general_ledger IS NULL OR ''`。实测 2026-06-02（sgl 过滤下）：全科目合计 **50.49 亿** vs 白名单+正余额 **21.80 亿**，Top5 榜单完全不同（录制口径：乐淘陶 5.08 / 上海东鹏 3.69 / 重庆石湾 2.97 亿…；白名单口径：恒大 0.64 / 荣盛 0.63 亿…）。
+3. **行数语义**：Top10 = `LIMIT 10`，每行一个客户（`GROUP BY cust_code, cust_name`）→ 恒为 10 行；不是"过滤后剩余行数"，也不随科目/正余额口径变化（客户数 ≥10 时）。rejudge 记的"agent=5 行"是判定器在真值为空时回退取了**最后一条 sql 事件**（一条 `LIMIT 5` 的特别总账探测查询）的行数——agent 主结果其实是错误口径下的 10 行。
+
+**本 pattern 禁加过滤清单**：科目白名单（`general_ledger_account IN (...)`）、`local_currency_balance_sum > 0`、`is_overdue_cust` 过滤、`GROUP BY cust_code` 单列（录制为 cust_code+cust_name 双列）。可加的唯一业务过滤：`special_general_ledger IS NULL OR ''`。也不要换表——`dm_ar_receivable_accage_t`（zysye 月度快照）/`dm_ar_overdue_receivables_t`（ysye 月度）只可用于探测核对，不作本 pattern 答案源。
+
+### 10.3 快照日历与已知分歧点（2026-09-20 直连实测）
+
+- **aging_2023_info_f 快照日历**：现行 = 每月 02 日 + 月末（2025-09 至 2026-09 连续 13 个月规律一致，实测 27 个快照日）；另有**未来快照**（2026-12-31，17.4 万行）和当日在途半量快照（2026-09-19，8.8 万行）。问"最新"必须 `WHERE query_date <= CURRENT_DATE` 再取 MAX，直接 MAX 会拿到未来快照。
+- **该表全表 INSERT OVERWRITE 无分区**（data-lineage ETL 注意事项 14）：历史快照日会被重跑抹掉——录制时存在的 2026-06-07 快照现已不存在（期望 SQL fresh 重跑 = 0 行）。**idx 20/21/22/26 四个场景锚定 06-07，属数据侧漂移**，需数据集侧重录裁定（知识库不替数据集拍板，遗留）。
+- **credit_devalue_f 仅月末快照**（2026-05~06 实测只有 05-31/06-30），与 aging 表日历不同——同一天的减值数与账龄数可能对不齐，属表间快照策略差异，不要互相"纠错"。
+- **overdue 表当月在途**：当前月 `yqe` 全 0（月结后回填；实测 202609 3.66 万行 yqe>0 为 0 行，202606 已有 3443 行 yqe>0）。idx 23 录制 row_count=0 即录制时 202606 尚在月结前——现 fresh=10 行，同为数据漂移（遗留）。
+- **TopN 榜单口径 vs 九节口径 A**：两套都讲得通（榜单/结构 = 账龄表 sgl 过滤、全科目；KPI = 白名单 + 正余额，对齐历史正式报告）。路由：TopN/结构/分段 pattern 按本节录制口径；集团余额/逾期率 KPI 按九节口径 A/B 并声明口径。两套数字不可混用、不可互相"纠错"（同九.5）。
+- **开放窗口遗留**（T6 已记，同 fin-cost idx 0/24 处理）：collection_monthly / balance_trend 录制 SQL 仅 `year='2026'` 无月上界，录制后新增长月份会导致行数漂移（实测 balance_f 2026 现已 9 个月 vs 录制 6 个月）——根治需改录制 SQL，超出知识库边界，遗留 M3 前回归轮裁定。
