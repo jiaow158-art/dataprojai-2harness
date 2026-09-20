@@ -2,9 +2,8 @@ idx  4 budget_vs_actual         FAIL        -> PASS        class=None refs=11
      · 多事件最佳匹配：第 1/11 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）
      · 命中事件含真值外新增列 ['forecast', 'nonzero_budget_rows', 'null_budget_rows', 'rows_cnt']（派生指标，按真值列对照通过）
      · answer 未包含真值关键数值 252490641.9165（抽查注记，不 FAIL）
-idx 58 sku_trend_mom            DATA_DRIFT  -> DATA_DRIFT  class=None refs=8
+idx 58 sku_trend_mom            DATA_DRIFT  -> PASS        class=None refs=8
      · 多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）
-     · dataset.data 与 fresh 不一致（漂移），agent 结果对照 fresh（一致）
 idx  1 breakdown_category       FAIL        -> PASS        class=None refs=1
      · 命中事件含真值外新增列 ['total_amount']（派生指标，按真值列对照通过）
 idx 11 aging_structure          FAIL        -> FAIL        class=指标数值偏差 refs=7

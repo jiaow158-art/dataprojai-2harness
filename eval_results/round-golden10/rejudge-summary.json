@@ -36,19 +36,20 @@
   "domain": "sku-profitability",
   "pattern": "sku_trend_mom",
   "old_verdict": "DATA_DRIFT",
-  "new_verdict": "DATA_DRIFT",
+  "new_verdict": "PASS",
   "failure_class": null,
   "refs_read": 8,
   "fresh_err": null,
   "checks": {
    "table_set_ok": true,
-   "data_drift": true,
+   "data_drift": false,
    "data_compare": true,
    "matched_event": 0,
    "row_count": {
     "expected": 6,
     "agent": 6
    },
+   "number_in_answer": true,
    "key_cols": [
     "calmonth",
     "mom_pct"
@@ -58,8 +59,7 @@
    "measure_in_answer": true
   },
   "notes": [
-   "多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）",
-   "dataset.data 与 fresh 不一致（漂移），agent 结果对照 fresh（一致）"
+   "多事件最佳匹配：第 1/8 条 sql 事件行数据与真值一致（其余为下钻/合计/元数据查询）"
   ]
  },
  {

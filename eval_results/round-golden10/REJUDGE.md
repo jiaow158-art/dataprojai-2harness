@@ -9,20 +9,22 @@
 
 ## 修正后记分板
 
+> **2026-09-20 二次更新**：判分器再修一处（采样录制感知——sku/sales-performance 域 data 只录前 N 行样本，严格全量对照必报假漂移；idx58 因此翻 PASS）。同日五域知识库路由加固完成（inventory/ar/sales-performance/sku/otd 各域 metrics.md 新增路由节，六域现已全覆盖）。
+
 | idx | 域/场景 | 首判 | 复判 | 归因 |
 |---|---|---|---|---|
 | 4 | fin-cost 预算vs实际 | FAIL | **PASS** | 判分器旧病（数值分毫不差） |
 | 1 | fin-cost 功能范围拆分 | FAIL | **PASS** | **T6 路由修复见效**（E4 伤疤愈合：1 条 SQL 直取正确表口径） |
-| 0 | fin-cost 各月费用趋势 | DRIFT | DRIFT | **引擎无责**：agent 与 fresh 一致；drift=E-6 已知（录制 6 月→今 9 月，SQL 无上界） |
-| 58 | sku 环比 | DRIFT | DRIFT | **引擎无责**：agent 与 fresh 一致；数据修订型漂移 |
-| 10 | inventory Top10 物料 | FAIL | FAIL | 真差距：排序口径（与 09-18 复测一致，持续性） |
-| 11 | inventory 库龄结构 | FAIL | FAIL | 真差距 + 数据漂移混合（fresh≠dataset 亦注记） |
-| 20 | ar 应收Top10客户 | FAIL | FAIL | 真差距：行数 10 vs 5 |
-| 30 | sales-performance 业绩 | FAIL | FAIL | 真差距 + 数据漂移混合 |
-| 82 | otd 出库率 | FAIL | FAIL | 真差距：行数 1 vs 2（口径拆分差） |
-| 84 | otd 产区走势 | FAIL | FAIL | 真差距：多表交叉验证口径 |
+| 58 | sku 环比 | DRIFT | **PASS** | 判分器采样录制假漂移（数值逐月一致） |
+| 0 | fin-cost 各月费用趋势 | DRIFT | DRIFT | **引擎无责**：agent 与 fresh 一致；drift=E-6 已知（SQL 无上界） |
+| 10 | inventory Top10 物料 | FAIL | FAIL | 真差距（排序口径）→ 路由规则已入律 |
+| 11 | inventory 库龄结构 | FAIL | FAIL | 口径 + 数据重述混合（202606 录制后重述 -6,087 万）→ 规则已入律，数据侧需重录 |
+| 20 | ar 应收Top10客户 | FAIL | FAIL | agent 口径错已入律；但**场景锚定的 06-07 快照已被上游重跑抹掉**（真值恒空）——需数据集重录 |
+| 30 | sales-performance 业绩 | FAIL | FAIL | agent 交叉验证偏差已入律；6 月录制值系部分月入库（11.7M→80.8M）——数据侧需重录 |
+| 82 | otd 出库率 | FAIL | FAIL | agent UNION 口径对比行 → 规则已入律 |
+| 84 | otd 产区走势 | FAIL | FAIL | agent 净额 vs 录制 ABS + 多表重算 → 规则已入律 |
 
-**引擎无责 4/10（2 PASS + 2 DRIFT-but-matched）；真业务差距 6/10。**
+**引擎无责 4/10（3 PASS + 1 DRIFT-matched）；真差距 6/10，其知识库规则全部入律，待复跑验证；其中 3 条（idx 11/20/30）叠加数据集侧过期/消失锚点，复跑前建议先做零成本数据集修复。**
 
 ## 结论
 
