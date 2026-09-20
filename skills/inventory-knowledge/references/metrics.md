@@ -336,3 +336,47 @@ SELECT dimension_ FROM dm.dm_product_inout_stock_t
 | 公司信息 | dwrdim.dwr_dim_company_d | comp_code / company_code |
 
 注：库存明细表中已有物料描述（`material___t`/`material_name`），无需单独关联物料主数据。
+
+---
+
+## 十、pattern → 首选表与字段路由（对齐 eval_dataset 录制口径）
+
+> 本节把 15 类库存问题 pattern 固化为"首选表 + 字段/聚合口径"的路由规则。依据 = `eval_dataset.json` inventory 15 场景的期望 SQL（录制口径，即判定标准）+ 2026-09-20 DWS 直连实测（round-golden10 idx 10/11 失败复盘）。
+> 当两表业务上都讲得通时，**以 eval_dataset 录制口径为准**，不替业务拍板新口径——不换表、不换金额字段、不加录制 SQL 之外的过滤/分组条件。判定器按真值列名与行数据对照：真值外新增列可容忍（按真值列对照），**真值键列缺名/改名会导致键列对照失败**。
+
+| pattern（问题形态） | 首选表 | 关键字段 / 聚合口径 | 路由规则与理由 |
+|---------------------|--------|---------------------|----------------|
+| topn_material（库存量Top10物料） | dm.dm_fin_stock_detail_accage_t_2023 | `SUM(quantity)` 排序 DESC；`GROUP BY material, material___t` 双列（`material___t` 裸列输出）；伴随 COUNT(DISTINCT plant)、SUM(zsjkcje) | "库存量"=数量口径，排序键是 SUM(quantity)，不是金额/面积；zsjkcje=0 行**不排除**（录制无此谓词）；详见 10.1 |
+| aging_structure（库龄结构+长库龄占比） | dm.dm_fin_stock_detail_accage_t_2023 | 逐月 `GROUP BY calmonth`；四桶 `SUM(wbzq_6_amt)`/`SUM(wbzq_6_12_amt)`/`SUM(wbzq_12_24_amt)`/`SUM(wbzq_24_amt)`；占比 = SUM(wbzq_12_24_amt+wbzq_24_amt)/SUM(zsjkcje)*100 | 占比分母是 zsjkcje 总额**非桶和**；快照月选择与近月漂移判读见 10.2 |
+| factory_comparison（各工厂库存金额Top10） | dm.dm_fin_stock_detail_accage_t_2023 | `SUM(zsjkcje)` 排序 DESC；GROUP BY plant___t；伴随 COUNT(DISTINCT material)、SUM(quantity) | "金额Top"排序键是 zsjkcje（与 topn_material 的数量键相反）；金额默认管理口径 zsjkcje |
+| long_aged_detail（长库龄24月+物料Top10） | dm.dm_fin_stock_detail_accage_t_2023 | **行级不聚合**：`WHERE wbzq_24_amt > 0 ORDER BY wbzq_24_amt DESC`；SELECT material, material___t, plant___t, quantity, zsjkcje, wbzq_24_amt | "长库龄段Top"是批次级行排序——同一物料可多行入榜（不同工厂/批次）；排序键=行级 wbzq_24_amt，不要 SUM |
+| cxc_daily（某周协销日报） | dm.dm_rpt_wm_cxc_day_sum | stat_date BETWEEN 'YYYYMMDD'；stock_area_month_start/end + sales_stock_out_area_day + stock_in_area_day | 单位是面积（平米）非数量；stat_date YYYYMMDD 无横杠；用主表，勿用 `_0630`/`_tmp` 变体 |
+| transit_category（在途库存按品类汇总） | dm.dm_b1_transit_inventory_t | `SUM(deliver_qty)`/`SUM(deliver_amount)` BY doc_month, category_name，ORDER BY 金额 DESC | doc_month YYYY-MM 带横杠；单月等值过滤天然避开未来预测；NULL 品类行与 NULL 聚合行**不剔除**（录制真值实测含 NULL 品类行约 315 万件、"整装"NULL 聚合行） |
+| trend_monthly（库存总金额与库龄趋势） | dm.dm_fin_stock_detail_accage_t_2023 | `SUM(zsjkcje)` + SUM(wbzq_6_amt) + SUM(wbzq_24_amt) BY calmonth，BETWEEN 窗口 | 录制口径只带首末两桶（0-6 与 24+）代表库龄两端，勿自行扩成全桶列——列形状按真值 |
+| product_hierarchy（按产品层次汇总前两级） | dm.dm_fin_stock_detail_accage_t_2023 | GROUP BY zprodh1___t, zprodh2___t + `zprodh1___t IS NOT NULL`；ORDER BY SUM(zsjkcje) DESC LIMIT 10 | 层次维度用 zprodh 族（非 matl_grp 族）；`IS NOT NULL` 过滤是本场景录制口径**自带**——加不加过滤以录制 SQL 为准，勿把 fin-cost E4 的"勿加过滤"教训反向套用 |
+| warehouse_type（仓库库存类型×财务类别汇总） | dm.dm_dp_api_warehouse_stock | COUNT(DISTINCT material_num) + SUM(stock_area) BY warehouse_type, fin_cate，ORDER BY 面积 DESC | 快照表无时间维度（问题不带时间=全量）；物料列名是 material_num（非 material） |
+| defective_factory（残次品出库量Top10工厂） | dm.dm_wm_defective_product_stockout_t | COUNT(DISTINCT material_num) + SUM(quantity) BY factory_werks_name，ORDER BY 数量 DESC | 全量表无时间过滤（录制口径）；工厂列名 factory_werks_name（新命名风格） |
+| inventory_fall_top10（存货跌价最高Top10物料） | dm.dm_fin_stock_detail_accage_t_2023 | `ROUND(SUM(COALESCE(jchj_amt,0)))` 排序 DESC；GROUP BY material，`MAX(material___t) AS material_name` | 减值默认管理口径 jchj_amt（预计算，直接 SUM）；本场景录制口径就是 MAX 改名——列形状随各自录制 SQL（与 topn_material 的裸列不同） |
+| inventory_fall_trend（跌价每月总额走势） | dm.dm_fin_stock_detail_accage_t_2023 | `ROUND(SUM(COALESCE(jchj_amt,0)))` BY calmonth，BETWEEN 窗口 | 逐月一行；勿换 jchj_aging（阿米巴口径）——两口径 202607 相差 4,240 万（2.877 亿 vs 3.301 亿） |
+| inventory_capital_cost_by_dept（各事业部资金成本） | dm.dm_fin_stock_capital_cost_t | `SUM(closing_balance)` + `SUM(capital_cost)` BY business_department_desc + `LENGTH(TRIM(business_department_desc))>0`，ORDER BY 余额 DESC | 资金成本主口径在本表（非 CHDJ 的 conv 列）；capital_cost 可为负（见七.15）；month=YYYYMM 无横杠；空事业部描述过滤是录制口径自带 |
+| inventory_impairment_calibers（管理/阿米巴/CHDJ 三口径对账） | 明细表 + dm.dm_ambv2_chdj_grp_t（UNION ALL 三段） | 管理减值 SUM(jchj_amt)、阿米巴 SUM(jchj_aging)（calmonth=YYYYMM）；CHDJ SUM(inventory_value)（stat_month=YYYY-MM） | 对账类=三段并列各报各数、声明口径，禁止跨口径加减（见八.1）；两表时间格式不同（YYYYMM vs YYYY-MM） |
+| inventory_aging_fall_link（事业部2年+跌价敞口） | dm.dm_fin_stock_detail_accage_t_2023 | SUM(COALESCE(wbzq_24_fall_amt,0)) / SUM(COALESCE(jchj_amt,0))*100 BY zdpsyb___t，ORDER BY 敞口 DESC | 事业部维度用表自带 zdpsyb___t（无需 JOIN 组织表）；占比分母=jchj_amt 总减值 |
+
+### 10.1 金点子教训一：topn_material（round-golden10 idx 10，FAIL/口径错，09-18 与 09-20 两轮同伤）
+
+- **排序口径**：`ORDER BY SUM(quantity) DESC`。"库存量 TopN" 的排序键是**数量**，不是金额（zsjkcje）、不是面积（zkcmj）——失败会话中 agent 同时产出过按金额排序、按面积排序的 TopN 变体 SQL，均非录制口径。
+- **zsjkcje=0/NULL 处理：不排除、不过滤**。录制 SQL 唯一谓词是 `calmonth`。实测（2026-09-20，calmonth='202605'）：Top10 每个物料内部都含 zsjkcje=0 的行（#1 物料 LN63111_A 达 1,611 行），这是月末快照的正常构成；zsjkcje 无 NULL 行。整物料级"数量大但金额合计=0"的料最大仅 272 件（YF24D00008_B），距 Top10 门槛（540,398 件）差三个数量级——**若答案表出现"金额=0 的物料排进库存量 Top10"，说明排序/分组口径已经错了**，应回查排序键，而不是怀疑数据或加过滤凑数。
+- **分组与列形状**：`GROUP BY material, material___t` 且 `material___t` 作为裸列输出。失败会话 agent 用了 `GROUP BY material` + `MAX(material___t) AS material_name`，真值键列 material___t 缺名导致判定器键列对照失败。当前数据两种分组结果逐行相同（202605 实测无一物料多描述，0 行分叉），但仍以录制双列口径为准——物料与描述若多对一（改名/清仓改描述）两口径将分叉。
+
+### 10.2 金点子教训二：aging_structure（round-golden10 idx 11，FAIL/数值偏差+数据漂移混合）
+
+- **快照月选择**：库龄结构按**每月各自的月末快照**取数（`WHERE calmonth IN ('202604','202605','202606') GROUP BY calmonth`），每月一行（3 个月=3 行）。不要把窗口混成单行"Q2 合计"作主答案（可作附注），也不要按"最近三个月"动态推算月份——月份以问题给定的显式窗口为准。
+- **占比分母**：长库龄占比 = `SUM(wbzq_12_24_amt + wbzq_24_amt) / SUM(zsjkcje) * 100`。分母是 **zsjkcje 总额**，不是 wbzq 四桶之和——桶和不等于总额（202604 实测：四桶和比 zsjkcje 少约 1,180 元，因有保质期 ybzq 金额独立成桶且桶间有尾差）。分子固定为 >12 月两桶（12-24 + 24+）。
+- **COALESCE 包装无数值差**：`SUM(COALESCE(wbzq_12_24_amt,0)+COALESCE(wbzq_24_amt,0))` 与裸 `SUM(wbzq_12_24_amt + wbzq_24_amt)` 实测逐分相同（2026-06 三个关键列 NULL 计数=0）——失败轮的数值偏差**不是** COALESCE 引起的。
+- **近月快照重述（漂移判读）**：202606 快照录制值 14.727 亿/长库龄 32.30%，2026-09-20 实测 14.118 亿/33.11%（差 -6,087 万/-4.1%，total_qty 94,629,892→94,126,358）。当 agent 与 fresh 一致而双双≠录制真值、且仅近月不一致（202604/202605 与录制值分毫不差）时，判**数据修订（DATA_DRIFT）**而非口径错：答案声明取数时点，不要为凑录制数改口径。
+
+### 10.3 已知口径分歧点（两口径数值写明，路由以 eval_dataset 录制口径为准）
+
+- **库龄月报汇总表 vs 明细表**：`dm_rpt_stock_age_month_ct`（57 行汇总表）202604 zsjkcje 12.334 亿 vs 明细表 SUM(zsjkcje) 14.668 亿（差 -2.334 亿/-15.9%，2026-09-20 实测）。agent 曾用它交叉验证（round-golden10 idx 11 表集合差异被注记）——**路由以明细表录制口径为准**，汇总表只作旁证且差值需在答案声明。
+- **资金成本表期末余额 vs 明细表库存金额**：`dm_fin_stock_capital_cost_t.closing_balance` 202608 合计 14.121 亿 vs 明细表 zsjkcje 14.739 亿——差值全部由 ETL 源过滤 `(stockcat IS NULL OR stockcat<>'K')` 解释（实测：明细表排 K 后 14.12137608 亿 = closing_balance 合计 14.12137608 亿，分毫不差；fin-cost 域援引的 E1 先例 11.86 亿 vs 12.43 亿同机制）。问库存金额→明细表 zsjkcje；问资金成本→资金成本表（idx 68 录制口径）。
+- **管理 vs 阿米巴 vs CHDJ**（八.3 锚点重申）：zsjkcje 14.7 亿 vs stock_amt 17.5 亿；jchj_amt 2.877 亿 vs jchj_aging 3.301 亿（202607）；CHDJ inventory_value 6.35 亿是线组分摊非库存价值。对账类（idx 69）三段并列各报各数，禁止跨口径加减。
