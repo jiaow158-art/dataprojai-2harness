@@ -662,3 +662,41 @@ def test_extract_tables_filters_cte_aliases():
     sql = ("WITH m AS (SELECT material FROM dm.t1), line_agg AS (SELECT 1) "
            "SELECT * FROM m JOIN dm.t2 ON m.a = dm.t2.a, line_agg")
     assert extract_tables(sql) == {"dm.t1", "dm.t2"}
+
+
+def _drift_probe(exp_data, fresh, exp_rows):
+    """走到判定第 10 步的最小场景：agent 单事件与 fresh 全等（命中），漂移旗标决定 PASS/DATA_DRIFT。"""
+    return judge_scenario(
+        expected={"row_count": exp_rows, "sql": "SELECT month, amt FROM t", "data": exp_data},
+        agent={"sql_events": [{"sql": "SELECT month, amt FROM t", "rows": len(fresh),
+                               "data": [dict(r) for r in fresh]}],
+               "answer": "", "done_status": "succeeded", "elapsed_ms": 1000},
+        fresh_rows=fresh, fresh_err=None,
+    )
+
+
+def test_sampled_recording_prefix_not_drift():
+    """采样录制（row_count>len(data)，sku/sales-performance 惯例）：data 是 fresh 的前缀样本 → 非漂移。"""
+    exp_data = [{"month": "2026-02", "amt": 121100.0}, {"month": "2026-03", "amt": 4632468.0}]
+    fresh = exp_data + [{"month": "2026-04", "amt": 4408290.0}, {"month": "2026-05", "amt": 4944535.0}]
+    r = _drift_probe(exp_data, fresh, 6)
+    assert r["checks"]["data_drift"] is False
+    assert r["verdict"] == "PASS"
+
+
+def test_sampled_recording_value_change_still_drift():
+    """采样行的值本身变了 → 仍是漂移（前缀感知不是免检）。"""
+    exp_data = [{"month": "2026-02", "amt": 121100.0}]
+    fresh = [{"month": "2026-02", "amt": 999999.0}, {"month": "2026-03", "amt": 1.0}]
+    r = _drift_probe(exp_data, fresh, 6)
+    assert r["checks"]["data_drift"] is True
+    assert r["verdict"] == "DATA_DRIFT"
+
+
+def test_full_recording_drift_semantics_unchanged():
+    """全量录制（row_count==len(data)）行为不变：真漂移仍报。"""
+    exp_data = [{"month": "2026-01", "amt": 100.0}, {"month": "2026-02", "amt": 200.0}]
+    fresh = [{"month": "2026-01", "amt": 100.0}, {"month": "2026-02", "amt": 250.0}]
+    r = _drift_probe(exp_data, fresh, 2)
+    assert r["checks"]["data_drift"] is True
+    assert r["verdict"] == "DATA_DRIFT"

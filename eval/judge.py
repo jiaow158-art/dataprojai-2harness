@@ -160,6 +160,20 @@ def _rows_match_truth(ar: dict, fr: dict, keyset: set[str], tol: float) -> bool:
     return _numlist_within(av, fv, tol)
 
 
+def _sample_rows_hold(sample: list[dict], fresh: list[dict], tol: float = 1e-3) -> bool:
+    """采样录制子集对照：每条样本行在 fresh 中存在键匹配且交集列一致的行。"""
+    cols = _key_cols(fresh)
+    keyset = set(cols)
+    pool: dict[tuple, list[dict]] = {}
+    for fr in fresh:
+        pool.setdefault(_row_key(fr, cols), []).append(fr)
+    for sr in sample:
+        bucket = pool.get(_row_key(sr, cols))
+        if not bucket or not any(_rows_match_truth(sr, fr, keyset, tol) for fr in bucket):
+            return False
+    return True
+
+
 def fresh_compare(agent_rows: list[dict] | None, fresh_rows: list[dict] | None,
                   num_tolerance_rel: float = 1e-3, key_cols: list[str] | None = None,
                   extra_cols_ok: bool = False) -> bool:
@@ -477,7 +491,14 @@ def judge_scenario(*, expected: dict, agent: dict,
     # 无一命中 → 取与真值键列结构最相近事件（列名重合 → 行数接近 → 序号小）做失败分析。
     drift = False
     if fresh_rows is not None and exp_data is not None:
-        drift = not fresh_compare(fresh_rows, exp_data)
+        # 采样录制感知（golden10 复盘 2026-09-20）：部分域（sku/sales-performance 惯例）
+        # data 只录前 N 行样本（row_count > len(data)）——严格全量对照必报假漂移。
+        # 收缩为"样本行仍逐行成立"（子集对照）；样本行的值变了照样报漂移。
+        if (isinstance(exp_data, list) and exp_data
+                and isinstance(exp_rows, int) and len(exp_data) < exp_rows):
+            drift = not _sample_rows_hold(exp_data, fresh_rows)
+        else:
+            drift = not fresh_compare(fresh_rows, exp_data)
         checks["data_drift"] = drift
     truth = fresh_rows if fresh_rows is not None else exp_data
     truth_cols: set | None = None
