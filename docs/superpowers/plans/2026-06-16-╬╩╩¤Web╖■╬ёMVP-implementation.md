@@ -119,7 +119,7 @@ __pycache__/
 ```bash
 cd D:/dataproj
 cp .env.example .env
-# 然后在 .env 里填入真实的 DEEPSEEK_API_KEY=REDACTED-DEEPSEEK-KEY
+# 然后在 .env 里填入真实的 DEEPSEEK_API_KEY=<你的key，勿写进任何文件>
 ```
 
 **验证**：`ls webapp/*/` 显示所有 `__init__.py` 存在；`pip install -r requirements.txt` 无错。
