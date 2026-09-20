@@ -40,3 +40,10 @@ domain_categories.json
 *_tmp*
 *_test_t*
 *_2024*
+
+# 会话/记忆状态（本地工具态，不入库）
+engine-gateway/scripts/.ask-session.json
+.claude/agent-memory/
+
+# 执行产物目录（可重生成）
+/m0/results/
