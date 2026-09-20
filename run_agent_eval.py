@@ -883,6 +883,7 @@ def parse_args(argv=None):
     ap.add_argument("domain", nargs="?", default=None, help="域过滤（如 inventory/ar/fin-cost）")
     ap.add_argument("--limit", type=int, default=None, help="最多跑 N 个场景（过滤后截断）")
     ap.add_argument("--only-failed", action="store_true", help="读上一轮 summary 复跑非 PASS（绕缓存）")
+    ap.add_argument("--idx", default=None, help="精确按数据集下标选场景（逗号分隔，如 0,1,4,10——金点子抽样轮用）")
     ap.add_argument("--fresh", action="store_true", help="无视缓存全重跑")
     ap.add_argument("--round-tag", default=None, help="结果目录名 round-<tag>（缺省 round-<ts>）")
     return ap.parse_args(argv)
@@ -897,6 +898,12 @@ def select_questions(args) -> tuple[list[tuple[int, dict]], dict]:
         raise SystemExit(f"未知域 {args.domain!r}；可选: {', '.join(domains)}")
     selected = [(i, q) for i, q in enumerate(questions)
                 if not args.domain or q["domain"] == args.domain]
+    if args.idx:
+        idxs = {int(x) for x in args.idx.split(",") if x.strip()}
+        bad = idxs - {i for i, _ in selected}
+        if bad:
+            raise SystemExit(f"--idx 越界: {sorted(bad)}（数据集共 {len(questions)} 条）")
+        selected = [(i, q) for i, q in selected if i in idxs]
     meta = {"available_domains": domains}
     if args.only_failed:
         src = latest_round_summary()
