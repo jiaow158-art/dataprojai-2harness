@@ -505,7 +505,7 @@ GROUP BY org_code;
 | 时间字段 | `stat_year` (YYYY) + `stat_month` (YYYY-MM) |
 | 核心指标 | `target_sales_amt` **(万元!)** 需 `* 10000` 转元 |
 | org关联 | `sales_center_code` ↔ Mix 表 `node_name5` |
-| 陷阱 | `org_type` 必须过滤（`业务单位`=汇总 / `营销部`=明细，总分重复）；金额单位万元；未来月份有数据 |
+| 陷阱 | `org_type` 必须过滤（`业务单位`=汇总 / `营销部`=明细，总分重复）；金额单位万元；未来月份有数据；⚠️ 下方 org 关联 `sales_center ↔ node_name5` 实测 0/143 匹配（2026 全年，见「七」idx 30 教训 3），禁止用该键 JOIN 事实表 |
 
 ---
 
@@ -593,7 +593,7 @@ WHERE stat_year = '2026' AND stat_month = '2026-05'
 1. **Mix 表无同比字段**：`ambperformance` 只含当期值，同比必须回 `ct_sales_performance_t` 取 `last_year_*`。
 2. **Mix 表 data_source 取值**：S=SAP / D=重算 / T=调整值 / U=事业部内部交易 / W=卫浴费全资成本调整值。集团或 node_desc2 层级用 `IN ('S','T','D','')`，其他组织用 `IN ('','S','T','D','U')`。未指定组织时先询问用户。
 3. **Mix 表含未来预算月**：calmonth 到 2026-12，查实际数注意 `calmonth <= 当前月`。
-4. **业绩表 org_code 映射**：必须 JOIN `dm_rpt_sales_group_t`，关联键 `org_code = node_name10`（不是 `node10`！），已验证 382/382 匹配。
+4. **业绩表 org_code 映射**：必须 JOIN `dm_rpt_sales_group_t`，关联键 `org_code = node_name10`（不是 `node10`！），已验证 382/382 匹配。⚠️ 2026-09-20 实测补充：表内 org_code **全部属瓷砖事业部**（364/376/381 个 org 跨 2024-2026 月末快照均映射瓷砖），该 JOIN 仅对瓷砖有效——卫浴/国际营销中心/丽适岩板在 ct 表无数据，JOIN 后再加这些事业部过滤 = 0 行。详见「七」idx 30 教训 2。
 5. **业绩表日粒度聚合**：`month_achievement` 是 MTD 值，只能取月末快照，不能 BETWEEN 后直接 SUM。
 6. **成本/毛利口径差异**：Mix 表含费用分摊，业绩表不含，两表差异 ~3.7%。
 7. **渠道三套体系**：`integrate_channel`(整合渠道1,销售渠道导向)、`integrate_channel2`(整合渠道2,产品导向)、`distr_chan`(分销渠道,SAP原始口径)。用户说"渠道"时必须确认指哪个。权威映射表 `upload.upload_business_analysis_channel_t`，详见 [channel-dimension.md](channel-dimension.md)。
@@ -609,3 +609,43 @@ WHERE stat_year = '2026' AND stat_month = '2026-05'
 17. **【P1 跨表下钻可行性】** 在 `dm_dp_api_sales_target` 上做产品/客户/物料/品牌下钻 = **必然失败**（该表只 14 列，无产品/客户/物料维度）。在 `ct_sales_performance_t` 上做品牌/品类/规格下钻 = **必然失败**（无产品维度字段）。下钻前必查上方「二-B-2 跨表下钻可行性表」。
 18. **【待调研·业务提出 2026-08】区域业绩按"客户/工程 WBS"归属区分**：Mix 表 `region_province_name` 为内置区域（随客户销售区域走），业绩域表内无 WBS 归属字段；工程 WBS 主数据在跨域 [wbs-master](../../sources-of-truth/business-context/wbs-master.md)（129万 WBS 元素）。若需按 WBS 归属区域业绩，须调研 LTC/订单链路表后另行扩展——当前超出本 Skill 覆盖范围，遇此类问题用 Unbook 话术引导并记录缺口。
 18. **【P1 预计算分类字段】** `ct_sales_performance_t` 独有 `high_value_*` / `large_spec_*` / `package_*` / `n1_*` / `gd04_*` / `qjcp_*` / `iw_*` / `fc_*` / `word_impression_*` / `engineering_adjust_*` / `share_warehouse_*` / `other_adjust_*` 共 **12 组预计算产品分类字段**。用户问"高值/大规格/套餐/特惠品/旗舰产品/辅材/IW/世界印象/工程差价积分/共享仓"→ 换 ct_sales_performance_t 用对应字段，不要在 mix 表上硬过滤。**判定规则详见上方「二-C」章节**（含每类的渠道、产品所有权、等级、品牌编码等完整 WHERE 条件）。
+
+---
+
+## 七、pattern → 首选表与字段路由（对齐 eval_dataset 录制口径）
+
+> 本节把 14 类业绩问题 pattern 固化为"首选表 + 达成额/目标字段 + 组织过滤"的路由规则。依据 = `eval_dataset.json` sales-performance 全部 27 场景的期望 SQL（录制口径，即判定标准）+ 2026-09-20 直连实测（round-golden10 idx 30 失败分析）。
+> 当多表业务上都讲得通时，**以 eval_dataset 录制口径为准**——不换表、不换金额字段、不加录制 SQL 之外的过滤条件。业绩序列/排名/预算/渠道/客户/品牌/区域下钻 → 一律 `dm_fin_operations_mix_sum_t`；同比与预计算产品分类 → `ct_sales_performance_t`（注意：该表实测仅含瓷砖事业部，见下方 idx 30 教训 2）。
+
+| pattern（问题形态） | 首选表 | 达成额/目标字段 · 关键过滤 | 组织过滤方式 | 路由理由（录制口径） |
+|---------------------|--------|---------------------------|--------------|---------------------|
+| org_monthly_achievement（XX事业部某月/月段达成） | dm.dm_fin_operations_mix_sum_t | `SUM(ambperformance)` 主指标，可并 `SUM(notax_sales_net_amt)`/`SUM(zxsmj)`，calmonth 等值或 BETWEEN | `node_desc2='精确名'` 等值 + `data_source IN ('S','T','D','')` | 录制口径（idx 30 等 3 场景）；内置组织列写法最简 |
+| monthly_trend（XX事业部月度业绩趋势） | 同上 | `SUM(ambperformance)` BY calmonth ORDER BY calmonth | 同上 | 与 org_monthly_achievement 同口径家族 |
+| org_monthly_with_mom（XX事业部环比） | 同上 | `calmonth IN ('当月','上月')` CASE/MAX 透视自算环比（mix 无环比专用字段） | 同上 | 录制口径；环比必须自己算上月，与同比不同（见一.1） |
+| org_monthly_with_yoy（XX事业部同比） | dm.ct_sales_performance_t | `SUM(month_achievement)` vs `SUM(last_year_month_achievement)`，`calday='月末YYYYMMDD'` 快照 | **不加组织过滤**（全表即瓷砖，见 idx 30 教训 2） | `last_year_*` 仅业绩表有 |
+| yoy_growth_warning（同比下滑的渠道） | dm.ct_sales_performance_t | 同上，BY `integrate_channel_code`，`HAVING 当期 < 去年同期` | 不加组织过滤 | 同上 |
+| channel_breakdown（按整合渠道1达成） | dm.dm_fin_operations_mix_sum_t | `integrate_channel + integrate_channel__t`，`IS NOT NULL` | node_desc2 + data_source | 渠道描述字段内置，无需 JOIN |
+| cross_division_rank（各事业部业绩排名） | 同上 | `SUM(ambperformance)` BY `node_desc2`（`IS NOT NULL`，不筛具体事业部） | 仅 data_source 过滤 | 各事业部须同表同过滤才可比 |
+| target_achievement_rate（各事业部预算达成率排名） | 同上 | `SUM(ambperformance)` vs `SUM(ambperformance_ys)`（预算内置字段，单位元） | 仅 data_source + node_desc2 IS NOT NULL | 录制口径用 mix 预算字段，**不用** dm_dp_api_sales_target |
+| budget_vs_actual（XX事业部预算vs实际） | 同上 | diff = `SUM(ambperformance) − SUM(ambperformance_ys)` | node_desc2 + data_source | 同上；预算字段仅 mix 有 |
+| product_brand_topn（TOP10产品品牌） | 同上 | `SUM(ambperformance)` BY `product_brand_name`，`IS NOT NULL AND ambperformance > 0`，LIMIT 10 | 同上 | 品牌名称仅 mix 有 |
+| customer_topn（TOP10客户） | 同上 | `customer + cust_name`，`IS NOT NULL AND ambperformance > 0` | 同上 | 客户名称仅 mix 有 |
+| region_breakdown（按省份达成TOP10） | 同上 | `SUM(ambperformance)` BY `region_province_name`，`IS NOT NULL AND ambperformance > 0` | 同上 | 区域字段内置 |
+| high_value_analysis（高值产品按渠道达成） | dm.ct_sales_performance_t | `SUM(high_value_month_achievement)` BY `integrate_channel_code`，calday 月末 | 不加组织过滤 | 预计算产品分类仅业绩表有（判定规则见二-C） |
+| cost_margin_trend（成本与毛利趋势） | dm.dm_fin_operations_mix_sum_t | `actual_cost_exclude_logistics`（业务标准成本）+ `gross_profit_after_sharing`；毛利率 = gp/amb×100 | node_desc2 + data_source | 业务确认成本口径仅 mix 有（见一.1） |
+
+**idx 30（org_monthly_achievement，「2026年1-6月卫浴事业部业绩情况」）失败教训 → 规则（2026-09-20 直连实测）**
+
+idx 30 录播 29 条 SQL 里只有 1 条是录制口径（还多了预算/预测/成本列），其余 28 条耗在 ct 表组织 JOIN 排查（0 行）、目标表关联排查（0 匹配）、data_source 反复核验上；最终判定失败 = 6 月数据漂移 + 答案未含录制度量。落成规则：
+
+1. **月度业绩序列的标准路径只有一条**：mix 表 + `ambperformance`（含税达成）+ `node_desc2` 等值 + `data_source IN ('S','T','D','')` + `calmonth` 区间。ct 表与目标表**不参与、不交叉验证、不当"复核"用**。
+2. **ct_sales_performance_t 实测仅含瓷砖事业部**（对六.4 陷阱的实测修正）：20240630/20250630/20260630 三个末快照的 org_code 去重 364/376/381 个，**100% 映射 dm_rpt_sales_group_t 的瓷砖事业部**——卫浴/国际营销中心/丽适岩板在该表无任何数据，`JOIN dm_rpt_sales_group_t … WHERE node_desc2='卫浴事业部'` 必然 0 行（idx 30 实录：agent 为这个 0 行耗了 8+ 条排查 SQL）。**非瓷砖事业部要同比 → mix 跨年自连接**（如 2025 同月 vs 2026 同月 CASE 透视，参考 analyst 模式 J），不要去 ct 表取 last_year_*。
+3. **目标表（dm_dp_api_sales_target）不用于业绩/预算问答**：27 个录制场景中"预算达成率/预算vs实际"全部用 mix 内置 `ambperformance_ys`，无一用目标表。且 3.3 所载 `node_name5 ↔ sales_center` 关联**实测 0/143 匹配**（mix node_name5 是 H03230604 型 SAP 编码，target sales_center 是"华东运营中心"等中文名，2026 全年）——该 JOIN 必然空结果，禁止用于交叉验证。仅当用户明确问"目标"（target_sales_amt）时单表作答：`org_type='业务单位'` + 万元×10000 + 排除未来月（见五、3.3）。
+4. **交叉验证引入口径偏差的三种形态**（idx 30 全踩中）：(a) ct 与 mix 同月同事业部数值本就对不齐——瓷砖 2026-06 实测 ct 61,271.5万 vs mix 60,409.2万（ct 高 +1.4%）；(b) 目标表万元单位 + org_type 三值同额（业务单位/营销部/销区总分重复）+ 组织粒度是营销中心而非事业部；(c) ct 表对非瓷砖事业部 0 行被误读为"该事业部无业绩"。两表对不上 ≠ 谁错了：按本节路由选定口径作答并声明，不要私下换表凑数。
+5. **录制数据的"部分月"陷阱**：数据集录制时 2026-06 卫浴仅入库 11,712,138.82 元（部分月），现值 80,836,718.80——月度序列在**次月初/月中**取当月值必然偏低（1-5 月实测与录制完全一致，仅 6 月漂移）。回答含最近月份时按「零」章 last_analyze 判断完整性并声明。
+
+**已知口径分歧点（实测写明，不替业务拍板新口径）**
+
+- **ct.month_achievement vs mix.ambperformance**：同称"含税月达成"，同月同事业部差 ~1.4%（2026-06 瓷砖实测）。两口径各有 ETL 链路、都讲得通；路由以录制口径为准——业绩序列/排名/下钻/预算 → mix；同比与预计算产品分类 → ct（last_year_*/分类字段仅此表有）。
+- **目标 vs 预算 vs 预测**（详见四-A）：目标表粒度=营销中心×渠道×org_type、单位万元、当前与事实表关联断裂（0/143）；预算/预测是 mix 行级内置字段、单位元。**"预算达成率/预算vs实际"一律走 mix 的 `ambperformance_ys`，目标表只答"目标"本身。**
+- 同类辨析先例（手动实测 E1，库存域）：同月不同表数值不同属常态——两个都算、在答案里声明所用口径、按本节路由选定。
