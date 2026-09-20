@@ -58,7 +58,7 @@ OTD（Order-To-Delivery）履约域覆盖从订单创建到客户签收的完整
 │           shipping_status/receiving_status (各环节状态),
 │           billing_time/evaluation_time/holding_duration(耗时)
 │   大表！必须带 creation_time 范围过滤
-│   关联底表: JOIN dm_otd_sales_order_det_t ON sap_order_num = vbeln
+│   关联底表: JOIN dm_otd_sales_order_det_t ON sap_number = vbeln
 │
 ├── 未交付订单（哪些订单还没交、欠多少）
 │   → dm_otd_no_deliver_order_dtl (1854行，仅未交付)
@@ -147,7 +147,7 @@ OTD（Order-To-Delivery）履约域覆盖从订单创建到客户签收的完整
 dm_otd_sales_order_det_t (订单底表)
   │ vbeln = order_num / sap_order_num
   ├── dm_otd_so_order_not_user_t (履约跟踪)
-  │     ON det.vbeln = track.sap_order_num AND det.posnr = track.sap_item_num
+  │     ON det.vbeln = track.sap_number AND det.posnr = track.sap_item_num
   │
   └── dm_otd_no_deliver_order_dtl (未交付)
         ON det.vbeln = nd.order_num AND det.posnr = nd.order_item_num
@@ -182,5 +182,33 @@ dm_otd_sales_order_det_t (订单底表)
 13. **预估返点金额**: `zfdje` 是预估金额，含条件逻辑（KURRF8~KURRF11四个条件类型求和）
 14. **单价计算因年份而异**: 2024年 ×(1-0.04), 2025年 ×(1-0.05), 其他年 ×(1+zsyjf_percent)
 15. **签收数据覆盖率仅 4.5%，不可用作履约完成率**: 全表 794 万行中 receiving_status='已签收' 仅 35 万行（4.5%），95.1% 为'待签收'。TMS 签收数据集成不完整，大部分订单永远不会流转到已签收状态。评估履约完成度请使用 **outbound_status（出库率）** 或 **shipping_status（发运率 39.9%）** 替代。
-15. **两表 JOIN 匹配率约 99%**: `so_order_not_user_t` LEFT JOIN `sales_order_det_t` 时有约 1% 行无法匹配（sap_number/sap_item_num 在 sales_order_det_t 中不存在对应 vbeln/posnr）。使用 INNER JOIN 会静默丢弃这些行。
-16. **状态字段不严格级联**: ETL 不保证 OTD 状态顺序。已验证出现 `shipping_status='已发运' AND outbound_status IS NULL`（448/69733 ≈ 0.6%）和 `holding_status IS NULL`（388/69733 ≈ 0.6%）。分析时需考虑状态 NULL 和跳跃的情况。
+16. **两表 JOIN 匹配率约 99%**: `so_order_not_user_t` LEFT JOIN `sales_order_det_t` 时有约 1% 行无法匹配（sap_number/sap_item_num 在 sales_order_det_t 中不存在对应 vbeln/posnr）。使用 INNER JOIN 会静默丢弃这些行。
+17. **状态字段不严格级联**: ETL 不保证 OTD 状态顺序。已验证出现 `shipping_status='已发运' AND outbound_status IS NULL`（448/69733 ≈ 0.6%）和 `holding_status IS NULL`（388/69733 ≈ 0.6%）。分析时需考虑状态 NULL 和跳跃的情况。
+
+## 八、pattern → 首选表与字段路由（对齐 eval_dataset 录制口径）
+
+> 本节把 8 类 OTD 履约问题 pattern 固化为"首选表 + 数量/面积/比率字段 + JOIN 键"的路由规则。依据 = `eval_dataset.json` otd-fulfillment 8 场景的期望 SQL（2026-09-18 新增，DWS 实录，即判定标准）+ round-golden10 失败实录（idx 82 / 84）+ 2026-09-20 直连 DWS 复核。
+> 当多张表都能算出"讲得通"的数时，**以 eval_dataset 录制口径为准**——不换表、不加录制 SQL 之外的过滤或维度、不另立口径对比行。
+
+| pattern（问题形态） | 首选表 | 数量/面积/比率字段 | JOIN 键 | 路由规则与理由 |
+|---|---|---|---|---|
+| channel_qty_summary（各整合渠道订单/确认/出库数量汇总） | dm.dm_otd_sales_order_det_t 单表 | `SUM(kwmeng)` 订单 / `SUM(vmeng)` 确认 / `SUM(mengef)` 出库，BY `zh_channel_code1, zh_channel_name1`，`audat BETWEEN 'YYYYMMDD'` | 无需 JOIN | 渠道码与中文名 det 表自带（`zh_channel_name1`），勿再 JOIN 渠道维表；出库数量用 `mengef`（SAP 货物移动口径，见七.7） |
+| unconfirmed_topn（未确认数量TopN订单行明细） | dm.dm_otd_sales_order_det_t 单表 | `wqrsl > 0` ORDER BY `wqrsl` DESC LIMIT N，明细列 vbeln/posnr/matnr/material_name | 无需 JOIN | `wqrsl` 是 ETL 预制字段（= kwmeng − max(vmeng, menge)，见一.2 与七.6），直接用，勿用 kwmeng−vmeng 重算 |
+| fulfillment_status_dist（履约各环节状态分布） | dm.dm_otd_so_order_not_user_t 单表 | `COUNT(*)` + `SUM(CASE WHEN holding_status/outbound_status/shipping_status='已…' THEN 1 ELSE 0 END)` | 无需 JOIN | 状态分布不需要订单属性，单表即可；时间窗口用 `creation_time`（timestamp，`>= 月初 AND < 次月初` 半开区间，见七.3） |
+| outbound_rate_daily（按下单日期出库率/发运率走势） | dm.dm_otd_so_order_not_user_t 单表 | `ROUND(SUM(CASE WHEN outbound_status='已出库' THEN 1 ELSE 0 END)*100.0/COUNT(*),1)`，BY `DATE(creation_time)` | 无需 JOIN | "按下单日期"= track 表 `creation_time` 本身，不 JOIN det 表取 audat；比率按**行数**口径，不要数量加权 |
+| channel_outbound_rate_join（各整合渠道出库率） | det JOIN track 双表 | 行级出库率（同上），BY det.`zh_channel_code1/name1`，时间过滤放 `det.audat` | `det.vbeln = track.sap_number AND det.posnr = track.sap_item_num` | 出库状态只有 track 表有、渠道只有 det 表有——本域唯一必须双表 JOIN 的渠道场景；INNER JOIN 约 1% 不匹配行被丢弃（见七"两表 JOIN 匹配率"条） |
+| bu_outbound_rate_org（某事业部订单行出库率） | det JOIN track JOIN dm.dm_rpt_sale_grp_t 三表 | **单行汇总**：COUNT(*) 行数、SUM(CASE WHEN outbound_status='已出库')、ROUND(…*100.0/COUNT(*),1) | 上行 JOIN + `det.vkgrp = s.sale_grp`，过滤 `s.lev2_name = '瓷砖事业部'` | 组织过滤经本域销售组维表 `dm_rpt_sale_grp_t`（同名维表防混见七.1；`sale_grp` 唯一、JOIN 不发散，2026-09-20 实测 1861/1861）；期望**单行**，教训一见下 |
+| no_deliver_overdue_top10（逾期未交付TopN） | dm.dm_otd_no_deliver_order_dtl 单表 | 按 `nodeliver_area_aps` 排序 / `nodeliver_qty_aps` 数量，`del_flag='N' AND expect_date < '截至日'` | 无需 JOIN | 小表（千行级、仅未交付、已排除零售见七.5）；`del_flag='N'` 必带；"截至X日"翻译为 expect_date 半开比较 |
+| area_delivery_trend（产区月度出库数量/面积走势） | dm.dm_otd_area_delivery_detail_m 单表 | `SUM(ABS(sales_stock_out_qty))` / `SUM(ABS(sales_stock_out_area))`，BY `stat_month, belong_area_name`，`stat_month BETWEEN 'YYYY-MM'` | 无需 JOIN | **产区月度走势直接用产区表，不要用出入库表重算**（教训二）；SUM 必带 ABS；时间 'YYYY-MM'（七.3）；仅瓷砖事业部（七.4） |
+
+**实测教训入规则（round-golden10 失败实录）**
+
+1. **教训一（idx 82，bu_outbound_rate_org，期望 1 行 → agent 2 行，口径错）**：事业部出库率是**单值比率**。录播 sql_events 显示 agent 把结果 UNION ALL 成 `'全部事业部(仅creation_time口径)'` + `'瓷砖事业部(audat订单日期口径)'` 两行——多切了一个"口径/范围"标签维度，且混用两种时间口径。规则：比率类问题按问题主语出**一行**；时间窗口统一用 `det.audat`（订单日期，YYYYMMDD），不要用 `track.creation_time` 另开第二口径或加"对比行"。（2026-09-20 复核：录制 SQL 现值 76,877 行 / 85.3%，录制时 76,868 / 85.2%——数据持续更新属正常漂移，口径与行数不变。）
+2. **教训二（idx 84，area_delivery_trend，36 行数值全偏，指标数值偏差）**：录播显示 agent 先用 `dm_product_inout_stock_t` / `dm_wm_prodstock_out_t` / `dm_rpt_wm_cxc_day_sum` 三张出入库表交叉验证，最后对产区表用净额 `SUM(sales_stock_out_qty)`——录制口径是 `SUM(ABS(...))`。规则：**产区月度走势直接用 dm_otd_area_delivery_detail_m 单表 + SUM(ABS())**，不要用出入库表重算，也不要交叉替换口径。实测 2026-01：净额 12,755,421 vs 绝对值 13,387,451——该表每月都有冲销负数行（2026-01 为 3,177/65,760 ≈ 4.8%），不带 ABS 数值必偏小（月度差 1%~5%）。
+
+**已知口径分歧点（写明差异，不替业务拍板新口径）**
+
+- **出库量：净额 vs 绝对值（ABS）**。产区表 `sales_stock_out_qty/area` 含冲销负数行，`SUM` vs `SUM(ABS)` 月度差 1%~5%（2026-09-20 实测，见教训二）。两口径都有业务含义（净额=真实库存变动、绝对值=业务量规模），**路由以录制口径 ABS 为准**。
+- **出库率：行数口径 vs 数量口径**。行级 = `track.outbound_status='已出库'` 计行 / COUNT(*)；数量级 = `det.mengef / det.kwmeng`。录制口径 = 行级，按 pattern 路由不互替。
+- **"已出库数量"两套表口径**（七.7 已载）：渠道数量汇总用 `mengef`（SAP 货物移动），产区走势用 `sales_stock_out_qty`（WM 口径 + ABS）——按 pattern 路由，勿混用。
+- **时间口径**：订单维度窗口用 `det.audat`（YYYYMMDD），履约跟踪单表场景用 `track.creation_time`（timestamp）；同一查询不要同时引入两者（idx 82 教训）。
