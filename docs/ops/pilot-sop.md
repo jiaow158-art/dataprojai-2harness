@@ -23,6 +23,11 @@ node engine-gateway/scripts/audit.mjs --date 2026-09-20
 ```
 
 - 巡检项：pm2 两 app online（`pm2 status`）→ 日报无未归因失败 → DeepSeek 余额（平台页面；低于预算阈值充值）
+- **每周数据保留清理**（策略：审计链 180 天/报告+双通道 90 天/UI 会话 90 天/工作目录 14 天）：
+  ```bash
+  cd engine-gateway && node scripts/retention.mjs            # dry-run 先看清单
+  node scripts/retention.mjs --apply                          # 确认后执行（输出存档备查）
+  ```
 - 建号/改密：`cd D:\dataplat-ui\server && printf '密码\n密码\n' | DATA_DIR=./data-prod npm run admin:add <用户名>`，凭据记入 `D:\m0-sessions\prod\whitelist-credentials.txt` 并更新发放状态
 
 ## 异常处理
