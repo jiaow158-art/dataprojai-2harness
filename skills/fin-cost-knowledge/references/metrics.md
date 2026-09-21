@@ -233,3 +233,5 @@ AND month <= '2026-06'  -- 当前月
 
 - **费用总额：dm.amount vs dwrfin.local_currency_amt。** 实测 2026-05（round-sample2）：dm.amount 合计 4.25 亿 vs dwrfin.local_currency_amt 口径 2.59 亿——差异真实存在。两口径都有业务理由（dm = 报表整合口径，月+成本中心+科目+销售组粒度、含调整；dwrfin = 凭证行项目记账本位币原值）。**路由以 eval_dataset 录制口径为准**：费用总额/趋势/年度汇总/成本中心与科目 TopN → dwrfin.local_currency_amt；功能范围拆分/制造费用/预算/同比/占比 → dm.amount 或对应专用字段。
 - 同类辨析先例（手动实测 E1，库存域）：capital_cost 表 closing_balance（11.86 亿）vs 明细表 zsjkcje（12.43 亿）——同月不同表数值不同属常态。遇到两表对不上时：两个都算、在答案里声明所用口径、按本节路由选定，不要私下换表凑数。
+
+<!-- knowledge-gate E2E 验证注记 2026-09-21（HTML 注释，对渲染与模型读取均无语义影响） -->
