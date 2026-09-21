@@ -68,6 +68,11 @@ def main():
         domain = q["domain"]
         if domain_filter and domain != domain_filter:
             continue
+        # 红队场景（expected_refusal）无期望 SQL——拒答判定是 live judge 的职责，
+        # 离线 runner 跳过（M4-C2 知识发布门接入时实测：sql=null 会被当 query error 全挂）
+        if q.get("expected_refusal"):
+            print(f"[{i}] {q['pattern']}: SKIP (redteam，拒答判定走 live eval)")
+            continue
 
         total += 1
         print(f"[{total}] {q['pattern']}: {q['question']}", end=" ... ")

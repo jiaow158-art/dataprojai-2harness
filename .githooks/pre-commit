@@ -19,11 +19,12 @@ fi
 EVAL_CMD="${KNOWLEDGE_EVAL_CMD:-python run_eval.py}"
 echo "[knowledge-gate] 知识文件改动（$(echo "$changed" | wc -l) 个）→ 运行全量离线 eval…" >&2
 t0=$(date +%s%3N)
-out=$(eval "$EVAL_CMD" 2>&1); rc=$?
+# PYTHONIOENCODING=utf-8：Windows 控制台默认 GBK 会被 grep 判为二进制（"Binary file matches"）
+out=$(PYTHONIOENCODING=utf-8 eval "$EVAL_CMD" 2>&1); rc=$?
 elapsed=$(( $(date +%s%3N) - t0 ))
 
 if [ "$rc" -ne 0 ]; then
-  echo "$out" | grep -E "FAIL" | head -20 >&2
+  echo "$out" | grep -aE "FAIL" | head -20 >&2
   echo "" >&2
   echo "[knowledge-gate] ✗ 拒绝提交：离线回归未全过（如上清单）。修复知识或数据集后再提交；" >&2
   echo "                  紧急回滚逃生口：SKIP_KNOWLEDGE_GATE=1 git commit …（记入台账 skipped）" >&2
