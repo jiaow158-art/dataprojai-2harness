@@ -1,0 +1,17 @@
+#!/bin/sh
+# M4-C2 版本台账（post-commit）——知识文件提交成功后追加一行版本记录。
+# 与 pre-commit 的状态文件（git-dir/knowledge-gate-state）配合：
+#   有状态（eval 摘要或 skip）→ 记入；无状态但提交含知识文件 → 记 gate:"missed"（可审计的旁路信号）。
+cd "$(git rev-parse --show-toplevel)" || exit 1
+STATE="$(git rev-parse --git-dir)/knowledge-gate-state"
+GATE="$(dirname "$0")/../scripts/knowledge-gate.mjs"
+
+base=$(git rev-parse HEAD~1 2>/dev/null || echo "--root")
+files=$(git diff --name-only $base HEAD | grep -E '^(skills/|eval_dataset\.json)' || true)
+[ -z "$files" ] && { rm -f "$STATE"; exit 0; }
+
+node "$GATE" --record "$(git rev-parse HEAD)" \
+  --state "${STATE:-/nonexistent}" \
+  --files "$(printf '%s' "$files" | tr '\n' ' ')" || echo "[knowledge-gate] 台账写入失败（不影响提交）" >&2
+rm -f "$STATE"
+exit 0

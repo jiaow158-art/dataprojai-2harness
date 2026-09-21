@@ -29,6 +29,10 @@
 ## 快速开始
 
 ```bash
+# 0.（clone 后一次）知识发布门安装：改 skills/ 或 eval_dataset.json 的提交
+#    将自动过 85 场景离线回归（零 API 成本），FAIL 拒绝提交
+node scripts/knowledge-gate.mjs --install
+node scripts/knowledge-gate.mjs --history   # 查看知识版本台账
 # 1. dsh profile 装载（幂等，含安全自检：工具白名单 + 读域围栏 + MCP 注入）
 cd engine-gateway && node scripts/setup-dsh-profile.mjs --profile sdk
 

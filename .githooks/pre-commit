@@ -1,0 +1,36 @@
+#!/bin/sh
+# M4-C2 知识发布门（pre-commit）——知识文件改动必须过 85 场景离线回归。
+# 触发面：staged 含 skills/** 或 eval_dataset.json。
+# 逃生口：SKIP_KNOWLEDGE_GATE=1（仅紧急回滚用；台账会记 skipped，可审计）。
+# 钩子只读 staged 做检测，绝不 git add（不破坏路径限定提交惯例）。
+cd "$(git rev-parse --show-toplevel)" || exit 1
+STATE="$(git rev-parse --git-dir)/knowledge-gate-state"
+rm -f "$STATE"
+
+changed=$(git diff --cached --name-only | grep -E '^(skills/|eval_dataset\.json)' || true)
+[ -z "$changed" ] && exit 0
+
+if [ "$SKIP_KNOWLEDGE_GATE" = "1" ]; then
+  echo "[knowledge-gate] SKIP_KNOWLEDGE_GATE=1 —— 跳过离线回归（台账将记 skipped）" >&2
+  printf 'skip' > "$STATE"
+  exit 0
+fi
+
+EVAL_CMD="${KNOWLEDGE_EVAL_CMD:-python run_eval.py}"
+echo "[knowledge-gate] 知识文件改动（$(echo "$changed" | wc -l) 个）→ 运行全量离线 eval…" >&2
+t0=$(date +%s%3N)
+out=$(eval "$EVAL_CMD" 2>&1); rc=$?
+elapsed=$(( $(date +%s%3N) - t0 ))
+
+if [ "$rc" -ne 0 ]; then
+  echo "$out" | grep -E "FAIL" | head -20 >&2
+  echo "" >&2
+  echo "[knowledge-gate] ✗ 拒绝提交：离线回归未全过（如上清单）。修复知识或数据集后再提交；" >&2
+  echo "                  紧急回滚逃生口：SKIP_KNOWLEDGE_GATE=1 git commit …（记入台账 skipped）" >&2
+  exit 1
+fi
+
+passed=$(printf '%s' "$out" | grep -c "PASS")
+printf '%s|%s' "$passed" "$elapsed" > "$STATE"
+echo "[knowledge-gate] ✓ 离线回归全过（${passed} PASS，${elapsed}ms）——放行" >&2
+exit 0
