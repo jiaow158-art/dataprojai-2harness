@@ -30,11 +30,20 @@ def _parse_date(v):
             continue
     return None
 
+def _iter_values(v):
+    if isinstance(v, (list, tuple)):
+        return v
+    return [v]
+
 def assert_point_in_time(params: dict, as_of: date) -> None:
     for k, v in params.items():
-        d = _parse_date(v)
-        if d is not None and d > as_of:
-            raise AssertionError(f"look-ahead：参数 {k}={v} 晚于 as_of {as_of}")
+        for item in _iter_values(v):
+            if isinstance(item, date):     # datetime 是 date 子类，比较仍正确
+                d = item
+            else:
+                d = _parse_date(item)
+            if d is not None and d > as_of:
+                raise AssertionError(f"look-ahead：参数 {k}={item} 晚于 as_of {as_of}")
 
 class BoundedRunner:
     def __init__(self, inner, as_of: date):
@@ -51,17 +60,22 @@ def run_window(run, start: date, end: date, step_days: int, detectors: list[str]
     while d <= end:
         ctx = ReplayContext(as_of=d)
         for name in detectors:
-            det = REGISTRY[name]()
-            res = det.detect(BoundedRunner(run, d), ctx)
-            if res.status != "ok" or res.note:           # ★ 可观测回显
-                print(f"[backtest] {d.isoformat()} {name} status={res.status} "
-                      f"note={res.note[:120]}", file=sys.stderr)
-            for f in res.findings:
-                out.append({"data_date": f.data_date, "detector": f.detector,
-                            "anchor": f.dim_keys["anchor_id"],
-                            "norm_score": f.norm_score, "metrics": f.metrics,
-                            "point_in_time_mode": det.cfg["backtest"]["point_in_time_mode"]})
+            try:
+                det = REGISTRY[name]()
+                res = det.detect(BoundedRunner(run, d), ctx)
+                if res.status != "ok" or res.note:       # ★ 可观测回显
+                    print(f"[backtest] {d.isoformat()} {name} status={res.status} "
+                          f"note={res.note[:120]}", file=sys.stderr)
+                for f in res.findings:
+                    out.append({"data_date": f.data_date, "detector": f.detector,
+                                "anchor": f.dim_keys["anchor_id"],
+                                "norm_score": f.norm_score, "metrics": f.metrics,
+                                "point_in_time_mode": det.cfg["backtest"]["point_in_time_mode"]})
+            except Exception as e:                       # 单雷达崩溃不炸整窗（可观测非静默）
+                print(f"[backtest] {d.isoformat()} {name} status=crash "
+                      f"note={repr(e)[:120]}", file=sys.stderr)
         d += timedelta(days=step_days)
+    out.sort(key=lambda r: (r["data_date"], r["detector"], r["anchor"]))  # SQL 行序非契约
     return out
 
 def main():
@@ -72,10 +86,16 @@ def main():
     ap.add_argument("--out", default="insight/backtest_results.jsonl")
     a = ap.parse_args()
     start = date.fromisoformat(a.start); end = date.fromisoformat(a.end)
+    if start > end:
+        ap.error("--start 必须不晚于 --end")
+    names = [t.strip() for t in a.detectors.split(",") if t.strip()]
+    unknown = [n for n in names if n not in REGISTRY]
+    if unknown:
+        ap.error(f"未知雷达: {unknown}，可用: {sorted(REGISTRY)}")
     runner = DwsQueryRunner(app_name="insight-backtest", timeout_ms=300000)
     try:
-        with open(a.out, "a", encoding="utf-8") as fh:
-            for row in run_window(runner, start, end, 7, a.detectors.split(",")):
+        with open(a.out, "a", encoding="utf-8", newline="\n") as fh:
+            for row in run_window(runner, start, end, 7, names):
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     finally:
         runner.close()

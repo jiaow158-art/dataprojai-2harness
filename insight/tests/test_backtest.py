@@ -21,6 +21,17 @@ def test_point_in_time_covers_all_date_like_params():    # 裁定 #7：不止 da
     assert_point_in_time({"limit": 5}, as_of)                       # 非日期参数不误伤
     assert_point_in_time({"comp_codes": ["X1"]}, as_of)
 
+def test_point_in_time_rejects_future_element_in_list():   # 守卫硬化：列表逐元素解析
+    with pytest.raises(AssertionError):
+        assert_point_in_time({"month_ends": ["20260630", "20261231"]}, date(2025, 9, 30))
+
+def test_point_in_time_allows_past_list():
+    assert_point_in_time({"month_ends": ["20250630", "20250901"]}, date(2025, 9, 30))
+
+def test_point_in_time_compares_date_objects_directly():   # 守卫硬化：date 对象直比
+    with pytest.raises(AssertionError):
+        assert_point_in_time({"snap": date(2026, 1, 1)}, date(2025, 9, 30))
+
 def test_replay_bounds_every_query_to_window_end():
     run, log = _fake_run_log()
     run_window(run, start=date(2025, 9, 1), end=date(2025, 9, 30), step_days=7,
@@ -67,3 +78,18 @@ def test_non_ok_status_echoed_to_stderr(capsys):        # ★ 控制端新增
     assert out == []
     err = capsys.readouterr().err
     assert "target" in err and "not_ready" in err
+
+def test_crashed_detector_doesnt_abort_window(capsys):  # 崩溃可观测但不炸整窗
+    def run(sql, params=None):
+        if "sales_target" in sql:
+            raise RuntimeError("boom")
+        if "ct_sales_performance_t" in sql:
+            months = [f"{s[:4]}-{s[4:6]}" for s in params["month_ends"]]
+            return [{"month": m, "org_name": "华南营销中心", "channel": "GD01",
+                     "cur_amt": 26660000.0, "ly_amt": 30000000.0} for m in months]
+        return []
+    out = run_window(run, date(2025, 9, 1), date(2025, 9, 1), 7,
+                     ["region_sales", "target"])
+    assert any(r["detector"] == "region_sales" for r in out)   # region 照常产出
+    err = capsys.readouterr().err
+    assert "crash" in err and "boom" in err
