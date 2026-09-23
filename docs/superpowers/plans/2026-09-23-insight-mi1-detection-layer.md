@@ -9,7 +9,7 @@
 **Tech Stack:** Python 3.12、pytest、sqlite3（stdlib，insight.db WAL）、psycopg2（run_eval.py 已用）。
 
 **Spec:** `docs/superpowers/specs/2026-09-23-ai-business-assistant-v1-design.md`（v1.2）
-**修订记录:** v2 = 用户 17 项工程复审回填（占位符统一/双层只读/timeout 实测/canonical date/point-in-time 全参守卫/exact-retrospective/AR 数学与快照/Target NULL-0/完整自然月/删伪 month-batch/M-i1-M-i2 出口分家）；v2.1 = 执行期勘误（以提交为准：T1 open_db 幂等化 00d0be6；T3 shift_month 日保留+月末钳位语义 9d366e5；T4 watermark parse 纳入防御域+%Y-%m 月粒度比较防假 stale——代码已修，正文未逐处回写）
+**修订记录:** v2 = 用户 17 项工程复审回填（占位符统一/双层只读/timeout 实测/canonical date/point-in-time 全参守卫/exact-retrospective/AR 数学与快照/Target NULL-0/完整自然月/删伪 month-batch/M-i1-M-i2 出口分家）；v2.1 = 执行期勘误（以提交为准：T1 open_db 幂等化 00d0be6；T3 shift_month 日保留+月末钳位语义 9d366e5；T4 watermark parse 纳入防御域+%Y-%m 月粒度比较防假 stale——代码已修，正文未逐处回写；T5 percentile 公式与自测矛盾→严格小于÷(n-1)+钳位100 f012e46；T6 NULL cur 守卫+两闸钉测；T10 fixture 金额抬生产量级——正文已回写）
 
 ---
 
@@ -1264,7 +1264,9 @@ def _fixture_run():     # 按 SQL 内容分派：region 三月连降 / target �
         if "ct_sales_performance_t" in sql:
             months = [f"{s[:4]}-{s[4:6]}" for s in params["month_ends"]]
             return [{"month": m, "org_name": "华南营销中心", "channel": "GD01",
-                     "cur_amt": 9000.0, "ly_amt": 10135.0} for m in months]
+                     "cur_amt": 26660000.0, "ly_amt": 30000000.0} for m in months]
+            # v2.1 勘误：金额抬到生产量级（ly=3000万 ≥ min_ly_amt 2000万）——
+            # 原玩具金额 10135 会被生产下限闸静默吞掉，determinism 测试假失败
         if "sales_target" in sql:
             return [{"actual_amt": 69400000.0, "target_amt": 100000000.0}]
         return []
