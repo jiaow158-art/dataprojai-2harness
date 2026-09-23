@@ -34,8 +34,9 @@ class DetectResult:
     findings: list = field(default_factory=list)
 
 def percentile_score(value: float, baseline: list[float]) -> int:
-    """0-100 标准化（端点钉死）：基线最小值→0，最大值→100；空/单点基线无分布信息→50。"""
+    """0-100 标准化（端点钉死）：基线最小值→0，最大值→100，超出上界截到 100（下界自然为 0）；
+    空/单点基线无分布信息→50。"""
     if len(baseline) < 2:
         return 50
     s = sorted(baseline)
-    return round(100 * sum(1 for b in s if b < value) / (len(s) - 1))
+    return min(100, round(100 * sum(1 for b in s if b < value) / (len(s) - 1)))
