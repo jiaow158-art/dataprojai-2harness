@@ -4,7 +4,7 @@
   "deps": [
     {"table": "dwrfin.dwr_ar_receivable_aging_2023_info_f", "date_col": "query_date",
      "date_format": "%Y-%m-%d", "required": "data_date",
-     "extra_where": "COALESCE(special_general_ledger,'') = ''"}
+     "extra_where": "(special_general_ledger IS NULL OR special_general_ledger = '')"}
   ],
   "anchor": {"type": "customer", "id_field": "cust_code"},
   "applicable_factors": ["impact", "persistence", "scope", "worsening"],
@@ -13,5 +13,5 @@
   "norm": {"metric": "abs_delta_wan", "baseline_wan": [200, 500, 1000, 2000, 4000]},
   "backtest": {"point_in_time_mode": "exact"},
   "timeout_ms": 120000,
-  "notes": "comp_codes=全计划唯一占位：Task 11 live gate 强制从 sources-of-truth/business-context 公司主数据回填，未回填不得进 M-i1 完成态"
+  "notes": "comp_codes=全计划唯一占位：Task 11 live gate 强制从 sources-of-truth/business-context 公司主数据回填，未回填不得进 M-i1 完成态；top5_share_threshold_pct 仅信息展示阈值，M-i2 排序才消费，M-i1 detect 不用"
 }

@@ -18,7 +18,7 @@ SELECT MAX(query_date) AS snap
 FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
 WHERE query_date <= %(bound)s
   AND comp_code = ANY(%(comp_codes)s)
-  AND COALESCE(special_general_ledger,'') = ''
+  AND (special_general_ledger IS NULL OR special_general_ledger = '')
 """
 
 DETAIL_SQL = f"""
@@ -29,7 +29,7 @@ WITH snap AS (
   WHERE query_date IN (%(cur_snap)s, %(prev_snap)s)
     AND query_date <= %(as_of_iso)s
     AND comp_code = ANY(%(comp_codes)s)
-    AND COALESCE(special_general_ledger,'') = ''
+    AND (special_general_ledger IS NULL OR special_general_ledger = '')
   GROUP BY 1, 2
 )
 SELECT cust_code, MAX(cust_name) AS cust_name,
@@ -80,7 +80,7 @@ class ArRiskDetector:
         total = round(sum(d for _, d in deltas), 1)
         findings = []
         if total >= p["delta_threshold_wan"]:
-            top = sorted(deltas, key=lambda x: -x[1])[:5]
+            top = sorted(deltas, key=lambda x: (-x[1], x[0]["cust_code"]))[:5]  # tie-break 确定性
             share = round(sum(d for _, d in top) / total * 100)
             findings.append(Finding(
                 detector=self.cfg["name"], data_date=ctx.as_of.isoformat(),

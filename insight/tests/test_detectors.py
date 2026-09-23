@@ -159,6 +159,21 @@ def test_ar_sql_future_row_guard():
     ArRiskDetector.for_test().detect(run, AR_CTX)
     detail_sql = next(s for s, _ in log if "cust_code" in s)
     assert "query_date <= %(as_of_iso)s" in detail_sql
-    assert "special_general_ledger" in detail_sql
+    # 实测 Oracle A 兼容库 ''≡NULL：COALESCE(col,'')='' 恒 0 行匹配，录制口径形态不可回退
+    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in detail_sql
     snap_sql = next(s for s, _ in log if "MAX(query_date)" in s)
     assert "<= %(bound)s" in snap_sql
+    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in snap_sql
+
+def test_ar_prev_equals_cur_is_insufficient():       # prev 解析到同一快照 → 无环比可言
+    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-09-22"}, _ar_rows(), [])
+    res = ArRiskDetector.for_test().detect(run, AR_CTX)
+    assert res.status == "insufficient_history" and res.findings == []
+
+def test_ar_negative_delta_excluded():               # 下降客户不计入（纯正增量口径钉死）
+    rows = _ar_rows() + [{"cust_code": "D8", "cust_name": "回款良好",
+                          "over90": 80.0, "prev_over90": 200.0}]   # delta -120
+    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, rows, [])
+    res = ArRiskDetector.for_test().detect(run, AR_CTX)
+    m = res.findings[0].metrics
+    assert m["delta_wan"] == 980 and m["top5_share_pct"] == 95
