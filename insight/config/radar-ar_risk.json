@@ -9,9 +9,11 @@
   "anchor": {"type": "customer", "id_field": "cust_code"},
   "applicable_factors": ["impact", "persistence", "scope", "worsening"],
   "params": {"delta_threshold_wan": 300, "top5_share_threshold_pct": 60,
-             "prev_lag_days": 30, "comp_codes": ["PLACEHOLDER_TASK11_FILL"]},
+             "prev_lag_days": 30,
+             "comp_codes": ["1200", "1300", "1500", "1600", "7100", "7900",
+                            "7A00", "8100", "8200", "8300", "8800", "8A00"]},
   "norm": {"metric": "abs_delta_wan", "baseline_wan": [200, 500, 1000, 2000, 4000]},
   "backtest": {"point_in_time_mode": "exact"},
   "timeout_ms": 120000,
-  "notes": "comp_codes=全计划唯一占位：Task 11 live gate 强制从 sources-of-truth/business-context 公司主数据回填，未回填不得进 M-i1 完成态；top5_share_threshold_pct 仅信息展示阈值，M-i2 排序才消费，M-i1 detect 不用"
+  "notes": "comp_codes 已回填（Task 11 live gate 2026-09-24，全计划唯一占位销账）：来源=公司主数据(sources-of-truth/business-context/company-plant.md → dwrdim.dwr_dim_company_d) × AR 表全史 comp_code 探针，规则=公司名称含'陶瓷'（瓷砖实体名称法）：1200淄博卡普尔/1300清远纳福娜/1500丰城东鹏/1600澧县新鹏/7100常州淘鹏/7900佛山东鹏/7A00东鹏陶瓷发展/8100深圳/8200广州/8300上海/8A00重庆石湾（其中 1300/1500/1600 主数据明标瓷砖生产基地、8A00 重庆基地，交叉印证）；8800 现名广西粤鹏建材但 dim 历史名=广西东鹏陶瓷，同一实体保留。排除：华盛昌1700（名称无陶瓷标识）、乐淘陶7200（主数据=电商）、建材/贸易类区域销售公司（名称无陶瓷：8000/8500/7600 等）、控股母公司1000、卫浴/家居/新材料类。已知局限：AR 行级 business_department=H11000001(瓷砖事业部) 横跨 39 个 comp_code——comp_code 属名称法近似而非行级口径，精确口径应改 business_department 过滤（口径变更留待用户裁决）。top5_share_threshold_pct 仅信息展示阈值，M-i2 排序才消费，M-i1 detect 不用"
 }
