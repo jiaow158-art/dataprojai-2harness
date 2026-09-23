@@ -9,6 +9,7 @@
 """
 import os
 import re
+from decimal import Decimal
 import psycopg2
 
 _FORBIDDEN = re.compile(
@@ -55,7 +56,8 @@ class DwsQueryRunner:
             with self._conn.cursor() as cur:
                 cur.execute(sql, params)
                 cols = [d[0] for d in cur.description]
-                return [dict(zip(cols, row)) for row in cur.fetchall()]
+                return [{k: (float(v) if isinstance(v, Decimal) else v)
+                         for k, v in zip(cols, row)} for row in cur.fetchall()]
         finally:
             self._recover()
 

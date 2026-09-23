@@ -113,3 +113,12 @@ def test_recover_rollback_failure_drops_connection(monkeypatch):
     def fake_connect(**kw): return _FakeConn([(2,)])
     monkeypatch.setattr(psycopg2, "connect", fake_connect)
     assert r("SELECT 2") == [{"x": 2}]     # 下一次调用重建连接
+
+def test_decimal_coerced_to_float():       # SUM(numeric) 回读即转，防下游 jsonl 序列化崩溃
+    from decimal import Decimal
+    conn = _FakeConn([(Decimal("1.5"),)])
+    r = DwsQueryRunner.__new__(DwsQueryRunner)
+    r._conn, r._kwargs = conn, {}
+    result = r("SELECT 1")
+    assert result == [{"x": 1.5}]
+    assert isinstance(result[0]["x"], float)
