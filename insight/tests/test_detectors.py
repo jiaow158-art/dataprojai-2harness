@@ -43,3 +43,23 @@ def test_sql_complete_month_binds():
     assert "<= %(as_of_calday)s" in seen["sql"]                              # 防未来
     assert "node_desc2 = '瓷砖事业部'" in seen["sql"]
     assert ":data_date" not in seen["sql"]                                   # 无旧占位符
+
+def test_missing_month_breaks_consecutive():           # 缺任一完整月→不构成"连续"
+    det = RegionSalesDetector.for_test()
+    rows = [{"month": "2026-06", "org_name": "华南营销中心", "channel": "GD01",
+             "cur_amt": 17700000.0, "ly_amt": 19900000.0},
+            {"month": "2026-08", "org_name": "华南营销中心", "channel": "GD01",
+             "cur_amt": 17700000.0, "ly_amt": 19900000.0}]   # 2026-07 缺
+    res = det.detect(lambda sql, p=None: rows, CTX)
+    assert res.status == "ok" and res.findings == []
+
+def test_production_floor_filters_small_amounts():     # 生产构造：min_ly_amt=2000 万
+    det = RegionSalesDetector()
+    months = ["2026-06", "2026-07", "2026-08"]
+    small = [{"month": m, "org_name": "华南营销中心", "channel": "GD01",
+              "cur_amt": 17700000.0, "ly_amt": 19900000.0} for m in months]  # ly<2000 万→闸掉
+    assert det.detect(lambda sql, p=None: small, CTX).findings == []
+    big = [{"month": m, "org_name": "华南营销中心", "channel": "GD01",
+            "cur_amt": 17850000.0, "ly_amt": 20100000.0} for m in months]    # ly≥2000 万→触发
+    res = det.detect(lambda sql, p=None: big, CTX)
+    assert len(res.findings) == 1

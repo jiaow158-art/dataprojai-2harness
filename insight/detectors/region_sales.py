@@ -48,7 +48,7 @@ class RegionSalesDetector:
             if sorted(months) != expected:            # 缺任一完整月 → 不构成"连续"
                 continue
             seq = [months[m] for m in expected]
-            if any((r["ly_amt"] or 0) < p["min_ly_amt"] for r in seq):
+            if any((r["ly_amt"] or 0) < p["min_ly_amt"] or r["cur_amt"] is None for r in seq):
                 continue
             yoys = [(r["cur_amt"] - r["ly_amt"]) / r["ly_amt"] * 100 for r in seq]
             if all(y < p["yoy_threshold_pct"] for y in yoys):
