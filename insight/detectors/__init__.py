@@ -1,1 +1,4 @@
-"""雷达注册表（后续 task 填充）。"""
+"""雷达注册表。"""
+from .region_sales import RegionSalesDetector
+
+REGISTRY = {"region_sales": RegionSalesDetector}

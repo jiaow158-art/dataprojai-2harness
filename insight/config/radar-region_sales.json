@@ -1,0 +1,16 @@
+{
+  "name": "region_sales",
+  "scope": "瓷砖事业部",
+  "deps": [
+    {"table": "dm.ct_sales_performance_t", "date_col": "calday", "date_format": "%Y%m%d",
+     "required": "last_month_end", "extra_where": "1=1"}
+  ],
+  "anchor": {"type": "org_channel", "org_field": "node_desc5", "channel_field": "integrate_channel"},
+  "applicable_factors": ["impact", "target_gap", "persistence", "scope", "worsening"],
+  "params": {"consecutive_months": 3, "yoy_threshold_pct": -8.0,
+             "min_ly_amt": 20000000, "ly_field": "last_year_month_achievement"},
+  "norm": {"metric": "abs_delta_wan", "baseline_wan": [100, 300, 800, 2000, 5000]},
+  "backtest": {"point_in_time_mode": "exact"},
+  "timeout_ms": 60000,
+  "notes": "完整自然月口径（裁定#14）：仅统计已结束自然月的真实月末快照；当前月/周/旬不参与，周旬=后续版本"
+}
