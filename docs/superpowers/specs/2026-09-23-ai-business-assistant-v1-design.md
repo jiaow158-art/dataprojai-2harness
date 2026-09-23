@@ -3,7 +3,7 @@
 | 项 | 值 |
 |---|---|
 | 日期 | 2026-09-23 |
-| 状态 | 待用户评审 |
+| 状态 | **v1.1（用户审计 P0×4/P1×5 回填完毕），待复审** |
 | 来源 | brainstorm 会话（总裁视角愿景 → 旁路架构约束 → 4 雷达范围 → 事件式产品模型 → D1-D8 裁定 + UI/UX 裁定） |
 | 总原则 | **扩能力，不重构核心**。现有 AI 问数 = 稳定底座；经营洞察 = 独立增强层 |
 
@@ -50,6 +50,8 @@
 | D7 | Business Event 保留 **365 天**；Evidence 原始结果保留 **90 天** |
 | D8 | 本人灰度 ≥10 有效工作日且累计 ≥20 候选事件；开放业务负责人前五条全满足：①简报按时就绪率 ≥95% ②Top 事件认可率 ≥85% ③严重误报=0 ④85 场景问数回归零退化 ⑤简报数字与问数数字不一致事故=0 |
 | UI | 事件驱动非 BI 驾驶舱；白/浅灰/极浅蓝底、蓝色主操作色、红橙只用于真异常、大量留白、卡片圆角适中；禁止深色大屏风；事件卡只允许一张小而明确的图；AI 建议动作与事实/归因视觉区隔；首页显示经营事件而非 detector 名称；无可靠评分算法就不显示分数 |
+| 定位（v1.1 补） | v1 只服务拥有瓷砖事业部/集团全局经营数据权限的高管用户；**不做区域级/组织级事件数据权限裁剪**；Feature Flag 仅控制灰度入口。未来下沉区域负责人时再单独设计数据权限体系，不在 v1 预埋 |
+| 审计回填（v1.1） | P0-1 事件身份重构（event_key/episode）/ P0-2 每日发布快照 / P0-3 09:30 freeze 与晚到发现 / P0-4 DWS 资源护栏 / P1-1 评分 N/A 再归一化 / P1-2 severity 与 event_type 拆分 / P1-3 日期语义区分 / P1-4 目标时间进度口径优先级 / P1-5 归因结构化 JSON 输出 |
 
 ## 3. 数据现实基线（2026-09-23 直连 DWS 实测）
 
@@ -84,7 +86,7 @@ insight-worker (新, 无端口, pm2)
 | 进程 | 状态 | 端口 | 说明 |
 |---|---|---|---|
 | engine-gateway | 现有 | 58080 仅本机 | **零改动** |
-| UI BFF | 现有 | 58090 内网 | 最小侵入（见 §17） |
+| UI BFF | 现有 | 58090 内网 | 最小侵入（见 §18） |
 | insight-api | **新增** | 58095 仅本机 | Python FastAPI，只读服务 BFF；BFF 是唯一客户端 |
 | insight-worker | **新增** | 无 | Python 调度+检测+排序+归因编排 |
 
@@ -107,7 +109,7 @@ insight/
 │  ├─ region_sales.py        # 区域×渠道业绩雷达
 │  ├─ gross_margin.py        # 毛利雷达
 │  └─ ar_risk.py             # 应收风险雷达
-├─ merge_rank.py             # 合并规则 + 五因子排序（读 ranking.json）
+├─ merge_rank.py             # 合并规则 + 五因子排序（读 ranking.json）+ 事件生命周期（event_key 延续/新 episode/resolve）
 ├─ attribution.py            # 归因提交/轮询/解析/降级（走网关公开 API）
 ├─ brief.py                  # 简报定稿落库（09:30 cutoff）
 ├─ retention.py              # 365d/90d 清理（对齐 M4 SOP，dry-run 默认）
@@ -171,18 +173,22 @@ CREATE TABLE detector_finding (
   dim_keys_json TEXT NOT NULL,      -- {事业部, 组织节点(编码+名), 渠道, 时间窗}
   metrics_json TEXT NOT NULL,       -- {当前值, 同比, 影响金额万, 持续期, 目标缺口贡献…}
   norm_score INTEGER NOT NULL,      -- detector 内标准化 0-100
-  threshold_passed INTEGER NOT NULL,
+  threshold_passed INTEGER NOT NULL, is_late INTEGER NOT NULL DEFAULT 0,  -- P0-3：09:30 cutoff 后到达=晚到发现
   merged_into_event_id TEXT, created_at INTEGER);
 
--- 经营事件（一等实体）
+-- 经营事件（一等实体；P0-1：event_key=业务问题身份，event_id=episode）
 CREATE TABLE business_event (
-  event_id TEXT PRIMARY KEY,        -- 确定性：<detector族>+<数据日>+<dim_keys 哈希>
-  data_date TEXT NOT NULL, first_seen_date TEXT NOT NULL, persist_days INTEGER NOT NULL,
+  event_id TEXT PRIMARY KEY,        -- episode 身份：ev-<uuid>（新发时生成；恢复后再发=新 episode）
+  event_key TEXT NOT NULL,          -- 稳定业务身份：hash(event_type+scope+org_code+channel+metric)，不含日期
+  lifecycle TEXT NOT NULL,          -- active|resolved（底层生命周期）
+  data_date TEXT NOT NULL,          -- episode 内最近检测日
+  first_seen_date TEXT NOT NULL, last_seen_date TEXT NOT NULL,
+  persist_days INTEGER NOT NULL, resolved_at INTEGER,
   detector TEXT NOT NULL,           -- 主发现雷达；facet_json 记其余雷达命中
   event_type TEXT NOT NULL,         -- sales_decline|margin_drop|ar_overdue|target_gap
   title TEXT NOT NULL,              -- 人话标题："华南零售销售连续下滑"（禁 detector 名）
   summary TEXT NOT NULL,            -- 一句话摘要（检测层数据生成，非 LLM）
-  severity TEXT NOT NULL,           -- major|minor|target_gap（重大异常/一般异常/目标偏差）
+  severity TEXT NOT NULL,           -- major|minor（P1-2：severity 独立于 event_type，可扩展）
   scope_json TEXT NOT NULL,         -- {范围:"瓷砖事业部", 组织节点, 渠道}
   period_json TEXT NOT NULL,        -- {类型:周|月, 起, 止}
   facts_json TEXT NOT NULL,         -- [{label:"华南零售同比", value:"-11.2%", …}]（只放事实）
@@ -191,12 +197,13 @@ CREATE TABLE business_event (
   status TEXT NOT NULL,             -- discovered|analyzed（v1 只实现这两个；其余预留）
   facet_json TEXT, merged_from_json TEXT,
   -- 归因（10:00 后回填）
-  attribution_status TEXT NOT NULL DEFAULT 'pending',  -- pending|running|done|failed
+  attribution_status TEXT NOT NULL DEFAULT 'pending',  -- pending|running|done|degraded|failed
   attribution_summary TEXT,         -- 执行摘要（LLM 产，源自网关 answer）
   attribution_json TEXT,            -- {path[], findings[], waterfall, entities}（尽力解析）
   attribution_run_id TEXT,          -- 网关 run_id（溯源+报告链接）
   attribution_generated_at INTEGER,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_event_key_active ON business_event(event_key, lifecycle); -- 同 key 至多一个 active episode（代码保证）
 
 -- 证据（365d：行留存；90d：result_ref 指向的文件由 retention 清）
 CREATE TABLE event_evidence (
@@ -204,13 +211,23 @@ CREATE TABLE event_evidence (
   kind TEXT NOT NULL,               -- sql|result|watermark|attribution_raw
   sql_text TEXT, result_ref TEXT, note TEXT, created_at INTEGER);
 
--- 每日简报
+-- 每日简报（P1-3：brief_date=发布日；各雷达真实数据日期在 freshness_json 的 effective_data_date）
 CREATE TABLE daily_brief (
-  data_date TEXT PRIMARY KEY, scope TEXT NOT NULL,
+  brief_date TEXT PRIMARY KEY, scope TEXT NOT NULL,
   status TEXT NOT NULL,             -- assembling|final|not_ready|stale
   cutoff_at INTEGER, published_at INTEGER,
-  event_count INTEGER, freshness_json TEXT,  -- 各雷达 {detector, ready, watermark, checked_at}
+  event_count INTEGER, freshness_json TEXT,  -- 各雷达 {detector, ready, effective_data_date, watermark, checked_at}
   attribution_started_at INTEGER);
+
+-- 每日发布快照（P0-2：历史简报可精确还原"某天高管实际看到的 Top 事件及当时数据"——
+-- business_event 可持续演进，但历史简报绝不因事件后续更新被覆盖）
+CREATE TABLE daily_brief_event (
+  brief_date TEXT NOT NULL, event_id TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  score_snapshot REAL NOT NULL, severity_snapshot TEXT NOT NULL,
+  title_snapshot TEXT NOT NULL, summary_snapshot TEXT NOT NULL,
+  facts_snapshot TEXT NOT NULL, published_at INTEGER NOT NULL,
+  PRIMARY KEY (brief_date, event_id));
 
 -- followup 审计
 CREATE TABLE followup_session (
@@ -232,7 +249,7 @@ CREATE TABLE IF NOT EXISTS user_flags (
 
 ### 6.3 配置（版本化 JSON，非数据库）
 
-`radar-*.json`：依赖表清单+watermark 规则、检测 SQL 参数、阈值、detector 内标准化参数（分位/log 标度）、scope 过滤（瓷砖事业部）。`ranking.json`：五因子权重（0.30/0.25/0.20/0.15/0.10）、上榜门槛、severity 分段。**任何配置改动必须重跑回测并留变更台账**（对齐 C2 精神）。
+`radar-*.json`：依赖表清单+watermark 规则、检测 SQL 参数、阈值、detector 内标准化参数（分位/log 标度）、scope 过滤（瓷砖事业部）、本雷达 `applicable_factors`（P1-1，如 ar_risk 不含"目标缺口贡献"）。`ranking.json`：五因子权重（0.30/0.25/0.20/0.15/0.10）、上榜门槛、severity 分段、事件生命周期参数（`resolve_after_clean_days`，默认 3）。**任何配置改动必须重跑回测并留变更台账**（对齐 C2 精神）。
 
 ## 7. 四个经营雷达（detector）
 
@@ -242,10 +259,11 @@ CREATE TABLE IF NOT EXISTS user_flags (
 2. **确定性 SQL**：模板从对应域 metrics.md §七路由派生，写死三条防线：scope=瓷砖事业部、实际数、日期 ≤ 数据日。无自由发挥。
 3. **候选发现**：输出 `detector_finding`（含 dim_keys/metrics）。
 4. **detector 内标准化 0-100**：影响金额相对本 detector 历史分布（回测期）取分位；跨 detector 只比标准化分，不比原始金额（D3）。
+5. **资源纪律（P0-4，详见 §14）**：四雷达默认**串行**执行；每条 SQL 带 statement timeout（config），超时即该雷达当日 unavailable 自降级，不死磕；insight 连接设置独立 `application_name=insight-*` 便于数仓侧监控区分。
 
 | 雷达 | 依赖（口径来源） | 检测逻辑（阈值进 config，回测定稿） | 事件形态 |
 |---|---|---|---|
-| target | mix 实绩 + `dm_dp_api_sales_target`（org_type 防翻倍；两关联键） | 月度达成率 vs 时间进度的落后幅度越阈；去年同期达成对照 sanity | "目标达成低于时间进度"（severity=target_gap） |
+| target | mix 实绩 + `dm_dp_api_sales_target`（org_type 防翻倍；两关联键） | 月度达成率 vs 时间进度的落后幅度越阈；去年同期达成对照 sanity。**时间进度口径优先级（P1-4）：①已有业务目标分解曲线 ②工作日进度 ③自然日进度仅兜底——不得未经验证直接用 current_day/days_in_month 下经营判断；实际采用的口径写入 evidence，可解释可追溯** | "目标达成低于时间进度"（event_type=target_gap；severity 按分数段映射 major/minor） |
 | region_sales | mix（业绩序列）+ ct_sales_performance_t（同比） | 区域×渠道周/旬同比连续 N 期 < -X%；影响金额=同比差额折算 | "华南零售销售连续下滑" |
 | gross_margin | mix 毛利额/不含税收入（域标准公式） | 渠道/区域毛利率环比/同比变动 < -X pct 且金额越阈 | "工程毛利率明显下降" |
 | ar_risk | ar 域路由表（`dm_ar_analysis_rpt_f` 主事实 + aging 分段层，日层 06:31 落数） | 90 天+余额环比增量越阈；top 客户集中度（前 5 贡献%）；连续逾期客户数 | "90天以上应收明显增加" |
@@ -266,18 +284,20 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
 ```
 
 - 持续性：连续越阈天数（封顶）；影响范围：组织层级+涉及下级节点数；新发/恶化：7 天内新发满分、持续事件按边际恶化程度取分
-- 上榜门槛：score ≥ config 门槛才展示（门槛优先，上限 3）；severity 按分数段映射 major/minor/target_gap
+- **N/A 因子处理（P1-1）**：每 detector 在 config 声明 `applicable_factors`；N/A 因子**不得按 0 分计**，按剩余有效权重重新归一化：score = Σ(wᵢ×fᵢ, applicable) ÷ Σ(wᵢ, applicable)——避免某类 detector（如无目标缺口的 ar_risk）天然低分
+- **severity 与 event_type 拆分（P1-2）**：event_type = sales_decline｜margin_drop｜ar_overdue｜target_gap（事件类型）；severity = major｜minor（未来可扩）。首页统计口径：**重大/一般异常按 severity，目标偏差按 event_type**
+- 上榜门槛：score ≥ config 门槛才展示（门槛优先，上限 3）；severity 按分数段映射 major/minor
 - `score_breakdown` 落库并在 UI 展开"为什么推给我"
 
-**跨日续接**：维度键相同且仍越阈 → 更新 `persist_days`，首页标"持续第 N 天"；事件消失=自然恢复，不发恢复卡（避免噪音）。
+**事件生命周期（P0-1）**：`event_key` = 稳定业务问题身份（event_type + scope + org_code + channel + metric，**不含日期**）；`event_id`（episode）= 一次连续发生。同 event_key 连续越阈 → 延续当前 episode（`persist_days`+1，首页标"持续第 N 天"）；连续 R 天回落阈值内（config `resolve_after_clean_days`，默认 3）→ `resolved_at` 落位、episode 关闭；**恢复后再次越阈 → 创建新 episode，不复用历史事件**。底层 lifecycle = active|resolved；v1 UI 仍只映射展示"已发现/分析完成"。不发恢复通知卡（避免噪音）。
 
 ## 9. 归因管道
 
 - **触发**：10:00（D5），只对上榜 Top ≤3 提交；候选事件不烧 API
 - **执行**：`POST {GW_URL}/api/tasks`，`Authorization: Bearer <GW_AUTH_TOKEN>`，`X-User: insight-svc`（网关现有公开 API，与 ask.py/评测驱动同通道——**网关零改动**；insight-svc 身份在网关审计中天然可区分）
 - **问题构造**：事件上下文（指标/组织/时间窗/异常数值/已有事实）+ 指定按对应域 analyst 技能的 6 步工作流做下钻归因（引擎按问题域路由到 sales-performance / fin-cost / ar 域——技能零改动，复用其对抗审查）
-- **产物契约**：轮询 `GET /api/tasks/:run_id`（属主 insight-svc ✓）至终态；answer + report 存档；结构化字段（执行摘要/drill path/关键发现/影响对象）**尽力解析，解析失败降级为原文呈现**。检测层数据是硬结构化证据；归因层是 agent 产物，靠 run_id 溯源 + 域技能对抗审查背书。**关键发现必须出自查询结果**——解析时丢弃无查询结果支撑的发现条目
-- **降级**：归因失败/超时（重试至 14:00 后放弃）→ 事件照常上榜，`attribution_status=failed`，执行摘要退回检测层事实摘要；[继续分析] 从不依赖预计算归因
+- **产物契约（P1-5）**：轮询 `GET /api/tasks/:run_id`（属主 insight-svc ✓）至终态；answer + report 存档。**归因 prompt 要求 agent 在正常文字答案之外追加一个严格机器可读的 JSON 区块**（fenced ```json，schema：`summary / path[] / findings[] / waterfall[] / entities[]`），worker 解析器做 schema validation。**解析失败时严禁从自然语言猜字段**——直接降级：检测层事实 + AI 文字分析原文 + [继续问AI]（Path/Waterfall/Findings/Entities 区块不渲染）。findings 条目必须引用查询结果，无支撑条目丢弃。**不改 skills/gateway——只约束 insight 提交任务时的 prompt 与解析器**
+- **降级**：归因失败/超时（重试至 14:00 后放弃）或 JSON 校验失败 → 事件照常上榜，`attribution_status=failed|degraded`，执行摘要退回检测层事实摘要；[继续分析] 从不依赖预计算归因
 
 ## 10. 时序（就绪驱动两段式）
 
@@ -287,9 +307,11 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
   ├─ region_sales / gross_margin   mix/ct 就绪即扫
   └─ ar_risk     按 ar 路由选层（日层 ~06:31 / 月汇总 ~08:00）
 09:30  排序定稿 cutoff（全部就绪可提前）；未就绪雷达在 freshness 标「数据未就绪」
-       → daily_brief.status=final，简报可读（第一段：发生了什么）
+       → daily_brief.status=final + 写 daily_brief_event 发布快照，简报可读（第一段：发生了什么）
 10:00  Top ≤3 归因提交 → ~10:30 摘要回填（第二段：为什么），事件卡原地升级
 ```
+
+**Freeze 规则（P0-3）**：09:30 final 后冻结当日上榜 event_id / rank / score / severity / facts（快照落 `daily_brief_event`）。10:00 后仅允许 enrichment：attribution / executive summary / findings / entities / followup prompts。**晚到数据不得重洗当日 Top 3**——09:30 后到达的发现记 `detector_finding.is_late=1`，进 Event Center（标"晚到"）与下一轮候选，绝不静默改变已发布简报。
 
 晨间体验两段式：早上打开="今天要关注什么"（事件+数字+影响分，全量可溯源）；10:30 后补齐"为什么"。周末照跑（周一早看周末累计），无异常自然显示无异常。
 
@@ -299,11 +321,12 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
 
 ```
 GET /api/insight/daily?date=&scope=
-  → { date, scope, dataFreshness:{ overall:"ready|partial|not_ready",
-        radars:[{detector, ready, watermark, checkedAt}] },
+  → { briefDate, scope, dataFreshness:{ overall:"ready|partial|not_ready",
+        radars:[{detector, ready, effectiveDataDate, watermark, checkedAt}] },
       eventCount, stale:bool,
-      events:[{ eventId, title, summary, severity, eventType, metric,
-                scope, period, facts[], score, status, createdAt }] }
+      events:[{ eventId, eventKey, lifecycle, persistDays, title, summary,
+                severity, eventType, metric, scope, period, facts[], score,
+                status, createdAt }] }
 
 GET /api/insight/events/:eventId
   → { event, executiveSummary, facts, attribution:{status, summary, path[],
@@ -315,6 +338,8 @@ GET /api/insight/timeline?days=30
 
 GET /api/insight/health   → 进程/DB/最近 run 概要（观测用）
 ```
+
+契约注记：**P1-3**——`briefDate` = 简报发布日，`radars[].effectiveDataDate` = 各雷达真实数据日；正常时 UI 合并显示"数据截至 XXXX"，任一雷达滞后时必须分雷达明示未就绪/滞后，**不得笼统写"截至昨日"**。**P0-2**——`?date=` 指向历史日期时，daily 从 `daily_brief_event` 快照还原当日所见（rank/score/severity/title/summary/facts 均为快照值），不读事件当前态。
 
 UI 不感知 insight.db（D6）。
 
@@ -346,17 +371,17 @@ POST /api/insight/events/:id/followup {prompt?}
 
 ### 12.2 驾驶舱首页（OperatingDashboardPage）
 
-1. **今日经营关注**："截至昨日，发现 N 件值得关注的经营事项" + 轻量摘要标签（重大异常 x｜一般异常 x｜目标偏差 x——只是摘要不是 KPI 主体）
-2. **0-3 张事件卡**（PC 横向三列）：序号 + severity 徽标（红=重大/橙=一般/蓝=目标偏差）+ 人话标题 + 摘要 + 关键数字（如 同比 -11.2%｜影响集团零售增长 -2.3pct）+ **至多一张**小而明确的趋势/柱状图 + AI 洞察一句话（须出自结构化归因证据；归因完成前该行显示检测层事实摘要，10:30 后原地升级）+ `[查看详情]` `[继续分析]` `[一键问AI]` + `持续第 N 天` 标签 + 展开式影响分明细（"为什么推给我"）
+1. **今日经营关注**："发现 N 件值得关注的经营事项" + 数据截至说明（P1-3：全部就绪时合并显示"数据截至 XX 日"；有滞后时**分雷达明示**哪个未就绪/滞后）+ 轻量摘要标签（P1-2：**重大异常/一般异常按 severity 统计；目标偏差按 event_type 统计**——只是摘要不是 KPI 主体）
+2. **0-3 张事件卡**（PC 横向三列）：序号 + severity 徽标（P1-2：红=major/橙=minor；event_type=target_gap 的事件附"目标偏差"类型标签）+ 人话标题 + 摘要 + 关键数字（如 同比 -11.2%｜影响集团零售增长 -2.3pct）+ **至多一张**小而明确的趋势/柱状图 + AI 洞察一句话（须出自结构化归因证据；归因完成前该行显示检测层事实摘要，10:30 后原地升级）+ `[查看详情]` `[继续分析]` `[一键问AI]` + `持续第 N 天` 标签 + 展开式影响分明细（"为什么推给我"）
 3. 右侧窄栏（不抢视觉中心）：经营健康概览（销售/毛利/应收/目标 各显示 正常/关注/异常 三态——**不做未经业务验证的评分数字**）+ 年度/月度目标进度（目标/实际/时间进度）
-4. 底部：**经营事件时间线**（近期事件，可点入历史详情）
+4. 底部：**经营事件时间线**（近期事件，可点入历史详情；晚到发现的事件只进 Event Center 并标"晚到"，不进当日简报——P0-3）
 5. 空态：**「今日暂无重大经营异常」**+ 四雷达运行状态行（何时扫/多少项检查/结论）；数据未就绪态：**「数据未就绪」**（明示哪些雷达未就绪，绝不算作无异常）
 
 ### 12.3 事件详情页（EventDetailPage）
 
 页面顺序（裁定：摘要先行，不是图表先行）：
 
-1. 顶部：返回 + 标题 + severity 标签 + 发现时间/事件类型/涉及时间范围/当前状态（v1 状态机：`已发现` `分析完成`；发现中/分析中/待跟进/已跟踪/已关闭为未来预留，v1 不做闭环逻辑）
+1. 顶部：返回 + 标题 + severity 标签（+event_type 类型标签）+ 发现时间/首现日期/持续天数（episode 身份，P0-1）/事件类型/涉及时间范围/当前状态（底层 lifecycle=active|resolved；v1 UI 状态机仍只展示 `已发现` `分析完成`，其余为未来预留，v1 不做闭环逻辑）
 2. **AI 执行摘要**（右侧 `[基于本事件继续问AI]`）
 3. **核心事实区**：3-4 张事实卡（同比/影响 pct/主要影响区域/持续时间——只放事实，无 AI 主观评分）
 4. **自动归因分析**（核心模块）：Drill-down Path（集团→华南→广东→核心门店→规格，逐级贡献度）+ Waterfall 瀑布图（去年同期→各因子→本期）+ 关键发现列表（**必须由结构化证据生成，无证据条目在解析层已丢弃**）+ `[查看数据]` 展示 evidence（SQL+结果，只读）
@@ -380,15 +405,27 @@ POST /api/insight/events/:id/followup {prompt?}
 - `user_flags` 表（§6.2），flag 名 `insight_cockpit`，默认关
 - 管理：`insight-flag-cli.ts`（独立脚本，不动 admin-cli.ts）；放量节奏 = 用户本人 → 少量业务负责人 → 集团高管（D4/D8 门槛逐级把关）
 - 灰度只控制"谁看见"：insight-worker 从第一天对全量数据跑（攒回测延续数据与信任证据）
-- flag 关闭用户：登录落地 chat 页（现状），无任何 insight 入口可见
+- flag 关闭用户：登录落地 chat 页（现状），无任何 insight 入口可见。**flag 只控制入口灰度，不做数据权限裁剪**（定位裁定：v1 用户 = 拥有瓷砖事业部/集团全局经营数据权限的高管）
 
-## 14. Insight 故障降级策略
+## 14. DWS Resource Guardrail（资源隔离，P0-4）
+
+**代码零侵入 ≠ 基础设施零影响**：insight-worker 与在线 AI 问数共用同一 DWS，必须防止雷达扫描/回测拖慢在线问数。
+
+1. v1 detector **默认串行执行**（严格限制并发），禁止四雷达无限并行
+2. 所有 SQL 强制时间范围 + scope（瓷砖事业部）+ 分区/日期过滤；**禁止无边界全表扫描**（仓规红线：>10M 行大表必须时间过滤）
+3. 配置 query/statement timeout（radar config）；超时 → 该雷达当日 unavailable 自降级，**不死磕查询**
+4. insight 全部 DWS 连接设置独立 `application_name`（`insight-radar` / `insight-backtest`），数仓侧监控可区分 insight 与 AI 问数流量
+5. **12 个月回测不得与晨间生产扫描同时运行**：手动触发、非业务高峰、按月分批执行
+6. 回测与生产扫描同受第 2/3 条超时与过滤纪律约束
+7. 总原则：**Insight 宁可某雷达当日 unavailable，也不得与在线 AI 问数争抢数仓资源**——这是"新功能不得影响现有问数"的基础设施级保护
+
+## 15. Insight 故障降级策略
 
 | 故障 | 行为 | 对问数影响 |
 |---|---|---|
 | insight-api 挂 | BFF `/api/insight/*` 回 503 封闭集错误；前端驾驶舱页显示"经营洞察暂不可用"，侧栏 AI问数 正常 | **零** |
 | insight-worker 挂 | 显示昨日简报 + 「数据过期」横幅（带数据日）；pm2 拉起 | **零** |
-| 某雷达失败/DWS 不可用 | 该雷达 freshness 标「数据未就绪」，其余雷达与已定稿事件照常 | **零** |
+| 某雷达失败/DWS 不可用/**SQL 超时（§14 护栏自降级）** | 该雷达当日 unavailable，freshness 标「数据未就绪」，其余雷达与已定稿事件照常；不死磕重试拖垮数仓 | **零** |
 | 10:00 归因时网关挂 | 重试退避至 14:00 后放弃 → attribution_status=failed，事件照常上榜，摘要退回检测层事实 | **零**（网关自身故障另有既有处理） |
 | 归因超时/失败 | 同上；[继续分析] 不受影响（不依赖预计算归因） | **零** |
 | followup 失败 | 前端错误提示，可重试 | **零** |
@@ -396,24 +433,25 @@ POST /api/insight/events/:id/followup {prompt?}
 
 **诚实性红线（代码级约束）**：数据未就绪 ≠ 无异常；无异常日不凑数；不可溯源的数字不上首页。
 
-## 15. 回归保护与测试（四层）
+## 16. 回归保护与测试（四层）
 
 1. **现有问数基线（零新建，直接复用）**：85 场景离线 eval（期望 SQL 直连 DWS，零 API 成本）+ 金点子 10 条 live 复判。v1 开发期间**每次合入必跑**；放行条件含"零退化"（D8 ④）
 2. **口径守护**：4 雷达检测 SQL 入 `eval_dataset.json`（变更清单纪律）→ C2 门自动守护简报口径
-3. **insight 单测**：watermark 探针（空表/滞后/未来行 fixture）、合并规则、五因子排序数学、标准化、归因解析降级、retention、followup 编排（上下文拼接/身份/审计行）、BFF flag 门禁（未开 403）
+3. **insight 单测**：watermark 探针（空表/滞后/未来行 fixture）、合并规则、五因子排序数学（含 **N/A 因子再归一化**）、标准化、**事件生命周期**（同 event_key 延续 episode / 恢复后再发开新 episode / resolve 规则 / 同 key 唯一 active）、**09:30 freeze 与晚到发现不重洗 Top3**、**daily_brief_event 快照不可变**（事件后续演进不改历史简报）、归因 JSON schema 校验与**解析失败降级（严禁从自然语言猜字段）**、**SQL 超时自降级**、retention、followup 编排（上下文拼接/身份/审计行）、BFF flag 门禁（未开 403）
 4. **行为红线测试**（fixture 驱动）：无异常日 → 输出"暂无重大经营异常"且不造事件；正常波动 → 不报警；预算/未来日期行 → 不得当实绩；数据未就绪 → 不得发布"无异常"
 5. **E2E smoke**（开发环境）：fixture 事件 → 简报 → 详情 → followup 建会话 → chat 正常作答 → chat 全功能回归不受影响
 
-## 16. 历史回测与放行门
+## 17. 历史回测与放行门
 
 - `backtest.py`：对过去 12 个月每个数据日离线重放 雷达→合并→排序（批量直连 DWS，零 API；归因不回放），产出逐月 Top 3 事件流 + 空跑日统计 + 去年同期 sanity 对照
+- 执行纪律（P0-4/§14）：**手动触发、非业务高峰、按月分批**，禁止与晨间生产扫描同时运行；连接 `application_name=insight-backtest`
 - 校准回路：用户逐月抽检 Top 3（"值得总裁看？"）→ 调阈值/权重 → 重跑（config 改动强制重跑，台账留痕）
 - 放行线：进本人灰度前 认可率 ≥80% 且严重误报=0（D4）；高管前 ≥90%
 - 灰度放量门（D8）：≥10 有效工作日、≥20 候选事件、五指标全绿才开业务负责人
 
-## 17. 侵入性复核（用户要求的再确认）
+## 18. 侵入性复核（用户要求的再确认）
 
-### 17.1 明确禁止修改清单
+### 18.1 明确禁止修改清单
 
 | 对象 | 清单 | 结论 |
 |---|---|---|
@@ -424,7 +462,7 @@ POST /api/insight/events/:id/followup {prompt?}
 | 评测语义 | `eval/judge.py` 判分语义 | 零改动（只按纪律**新增**场景） |
 | 契约冻结 | M2 集成检查报告冻结的既有契约 | 零改动（insight API 全为新端点） |
 
-### 17.2 允许的最小侵入改动（逐文件、逐行级）
+### 18.2 允许的最小侵入改动（逐文件、逐行级）
 
 | 文件 | 改动 | 预估规模 |
 |---|---|---|
@@ -438,7 +476,7 @@ POST /api/insight/events/:id/followup {prompt?}
 
 合计对既有文件的净侵入 ≈ 25 行装配代码 + 3 个追加块，全部为"挂载/透传/追加"，不触碰任何既有逻辑分支。**四对象结论：engine-gateway 零侵入；现有 chat 链路零逻辑侵入（仅装配）；skills 零侵入；现有问数页面零逻辑侵入（仅视图挂载与侧栏入口）。**
 
-## 18. 安全与红线（延续仓规）
+## 19. 安全与红线（延续仓规）
 
 - 密钥只走 env（`DWS_PASSWORD`/`GW_AUTH_TOKEN`/`INSIGHT_*`），任何文件/日志/测试输出不得含值；insight 两进程日志消毒（PASSWORD|TOKEN|SECRET|KEY 模式），与网关 stderr 消毒同级
 - `INSIGHT_DB_PATH`/`INSIGHT_EVIDENCE_DIR` 必须在平台 Temp 树外
@@ -446,11 +484,11 @@ POST /api/insight/events/:id/followup {prompt?}
 - 后台代理并行作业时提交必须路径限定（`git commit -m msg -- <paths>`）
 - evidence 展示只读；无写回业务系统的任何通道（v1 全只读）
 
-## 19. 非目标（v1 明确不做）
+## 20. 非目标（v1 明确不做）
 
-任务督办闭环（指派/跟踪/验证=v4）、推送外发（企微/邮件——v1 首页拉取式）、库存雷达（先做日汇总/快照层再接入，用户裁定）、预测与目标缺口弥补测算（v3）、经销商分型/SKU 月报/作战地图交互版（v2）、综合健康评分数字、移动端专项适配（PC 优先）、多事业部扫描（框架预留 scope 字段）、恢复通知卡。
+任务督办闭环（指派/跟踪/验证=v4）、推送外发（企微/邮件——v1 首页拉取式）、库存雷达（先做日汇总/快照层再接入，用户裁定）、预测与目标缺口弥补测算（v3）、经销商分型/SKU 月报/作战地图交互版（v2）、综合健康评分数字、移动端专项适配（PC 优先）、多事业部扫描（框架预留 scope 字段）、区域/组织级事件数据权限裁剪（定位裁定：v1 高管全局权限，下沉再设计）、恢复通知卡。
 
-## 20. 里程碑建议（供 writing-plans 细化）
+## 21. 里程碑建议（供 writing-plans 细化）
 
 | 阶段 | 内容 | 出口 |
 |---|---|---|
