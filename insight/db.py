@@ -101,5 +101,6 @@ def open_db(path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(p)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.executescript(SCHEMA)
+    # SCHEMA 保持 spec §6.1 逐字（供 diff 审）；幂等性在执行层转换，不改 SCHEMA 本身
+    conn.executescript(SCHEMA.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS "))
     return conn
