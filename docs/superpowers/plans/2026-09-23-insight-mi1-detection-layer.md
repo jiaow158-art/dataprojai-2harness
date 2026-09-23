@@ -9,7 +9,7 @@
 **Tech Stack:** Python 3.12、pytest、sqlite3（stdlib，insight.db WAL）、psycopg2（run_eval.py 已用）。
 
 **Spec:** `docs/superpowers/specs/2026-09-23-ai-business-assistant-v1-design.md`（v1.2）
-**修订记录:** v2 = 用户 17 项工程复审回填（占位符统一/双层只读/timeout 实测/canonical date/point-in-time 全参守卫/exact-retrospective/AR 数学与快照/Target NULL-0/完整自然月/删伪 month-batch/M-i1-M-i2 出口分家）；v2.1 = 执行期勘误（以提交为准：T1 open_db 幂等化 00d0be6；T3 shift_month 日保留+月末钳位语义 9d366e5；T4 watermark parse 纳入防御域+%Y-%m 月粒度比较防假 stale——代码已修，正文未逐处回写；T5 percentile 公式与自测矛盾→严格小于÷(n-1)+钳位100 f012e46；T6 NULL cur 守卫+两闸钉测；T7 fixture 与最终实现不一致（预计算 gmp 字段/玩具金额）→控制端给定生产量级 fixture；T10 fixture 金额抬生产量级——正文已回写）
+**修订记录:** v2 = 用户 17 项工程复审回填（占位符统一/双层只读/timeout 实测/canonical date/point-in-time 全参守卫/exact-retrospective/AR 数学与快照/Target NULL-0/完整自然月/删伪 month-batch/M-i1-M-i2 出口分家）；v2.1 = 执行期勘误（以提交为准：T1 open_db 幂等化 00d0be6；T3 shift_month 日保留+月末钳位语义 9d366e5；T4 watermark parse 纳入防御域+%Y-%m 月粒度比较防假 stale——代码已修，正文未逐处回写；T5 percentile 公式与自测矛盾→严格小于÷(n-1)+钳位100 f012e46；T6 NULL cur 守卫+两闸钉测；T7 fixture 与最终实现不一致（预计算 gmp 字段/玩具金额）→控制端给定生产量级 fixture；T8 sgl 过滤形态错误——本库 Oracle A 兼容 ''≡NULL，`COALESCE(sgl,'')=''` 实测 0 行匹配，正确形态 `IS NULL OR = ''`（对齐 eval_dataset 录制口径），计划正文 SQL/extra_where 未逐处回写以提交为准；T10 fixture 金额抬生产量级——正文已回写）
 
 ---
 
