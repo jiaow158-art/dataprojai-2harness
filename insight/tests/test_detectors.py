@@ -177,3 +177,43 @@ def test_ar_negative_delta_excluded():               # 下降客户不计入（�
     res = ArRiskDetector.for_test().detect(run, AR_CTX)
     m = res.findings[0].metrics
     assert m["delta_wan"] == 980 and m["top5_share_pct"] == 95
+
+# --- target 雷达（retrospective；NULL≠0；追加）---
+from insight.detectors.target import TargetDetector
+
+def test_target_fires_when_behind_schedule():    # 69.4 - 72.7 = -3.3 ≤ -3.0
+    det = TargetDetector.for_test()
+    run = lambda sql, p=None: [{"actual_amt": 69400000.0, "target_amt": 100000000.0}]
+    res = det.detect(run, CTX)
+    assert len(res.findings) == 1
+    m = res.findings[0].metrics
+    assert m["achieve_pct"] == 69.4 and m["gap_pct"] == -3.3
+    assert m["progress_basis"] == "workday"
+
+def test_target_quiet_when_on_track():           # 75.0 - 72.7 = +2.3
+    det = TargetDetector.for_test()
+    run = lambda sql, p=None: [{"actual_amt": 75000000.0, "target_amt": 100000000.0}]
+    assert det.detect(run, CTX).findings == []
+
+def test_target_null_is_missing_not_zero():      # 裁定 #13
+    det = TargetDetector.for_test()
+    run = lambda sql, p=None: [{"actual_amt": None, "target_amt": 100000000.0}]
+    res = det.detect(run, CTX)
+    assert res.findings == [] and "缺数据" in res.note
+
+def test_target_actual_zero_is_severe_and_fires():   # 真实销售 0 = 重大异常，不许跳过
+    det = TargetDetector.for_test()
+    run = lambda sql, p=None: [{"actual_amt": 0.0, "target_amt": 100000000.0}]
+    res = det.detect(run, CTX)
+    assert len(res.findings) == 1 and res.findings[0].metrics["achieve_pct"] == 0.0
+
+def test_target_sql_guards():
+    det = TargetDetector.for_test()
+    seen = {}
+    run = lambda sql, p=None: (seen.update(sql=sql, p=p) or [])
+    det.detect(run, CTX)
+    assert "org_type = '业务单位'" in seen["sql"]        # 防总分翻倍
+    assert "* 10000" in seen["sql"]                       # 万元→元
+    assert "stat_month <= %(cur_month_ym)s" in seen["sql"]  # 排除未来目标月
+    assert seen["p"]["cur_month_ym"] == "2026-09"
+    assert seen["p"]["center_set_month_ym"] == "2026-08"

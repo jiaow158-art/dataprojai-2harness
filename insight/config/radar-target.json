@@ -1,0 +1,19 @@
+{
+  "name": "target",
+  "scope": "瓷砖事业部",
+  "deps": [
+    {"table": "dm.dm_fin_operations_mix_sum_t", "date_col": "calday", "date_format": "%Y%m%d",
+     "required": "data_date",
+     "extra_where": "node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','')"},
+    {"table": "dm.dm_dp_api_sales_target", "date_col": "stat_month", "date_format": "%Y-%m",
+     "required": "last_month_end", "extra_where": "org_type = '业务单位'"}
+  ],
+  "anchor": {"type": "org_channel", "org_field": null, "channel_field": null},
+  "applicable_factors": ["impact", "target_gap", "persistence", "scope"],
+  "params": {"gap_threshold_pct": -3.0, "progress_basis": "workday",
+             "progress_curve": null, "center_set_month_lag": 1},
+  "norm": {"metric": "abs_gap_wan", "baseline_wan": [500, 1500, 3000, 6000, 12000]},
+  "backtest": {"point_in_time_mode": "retrospective"},
+  "timeout_ms": 60000,
+  "notes": "retrospective：目标表只保留当前记录，历史调整不可恢复，回测为事后模拟（裁定#8）。达成率=当月MTD实绩/当月目标；时间进度优先级=曲线>工作日>自然日（裁定 P1-4）"
+}
