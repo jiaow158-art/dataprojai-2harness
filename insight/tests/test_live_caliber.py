@@ -1,6 +1,6 @@
-# insight/tests/live_caliber_test.py
+# insight/tests/test_live_caliber.py
 """直连 DWS 的口径与防护实测（默认 SKIP，仿 EVAL_LIVE 先例）。
-运行：INSIGHT_LIVE=1 DWS_PASSWORD=... python -m pytest insight/tests/live_caliber_test.py -v"""
+运行：INSIGHT_LIVE=1 DWS_PASSWORD=... python -m pytest insight/tests/test_live_caliber.py -v"""
 import os
 import psycopg2
 import pytest

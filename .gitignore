@@ -47,3 +47,7 @@ engine-gateway/scripts/.ask-session.json
 
 # 执行产物目录（可重生成）
 /m0/results/
+
+# insight 回测产物（可重生成，防 git add insight/ 卷入）
+insight/backtest_results.jsonl
+insight/bt-*.jsonl
