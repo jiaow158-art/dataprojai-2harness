@@ -219,6 +219,8 @@ def test_target_sql_guards():
     assert "org_type = '业务单位'" in seen["sql"]        # 防总分翻倍
     assert "* 10000" in seen["sql"]                       # 万元→元
     assert "stat_month <= %(cur_month_ym)s" in seen["sql"]  # 排除未来目标月
+    assert "calday <= %(as_of_calday)s" in seen["sql"]     # actual 侧 point-in-time 封顶
     assert seen["p"]["cur_month_ym"] == "2026-09"
     assert seen["p"]["center_set_month_ym"] == "2026-08"
+    assert seen["p"]["as_of_calday"] == "20260922"
     assert res.status == "not_ready"                      # mock 返回 [] → 空行=缺数据

@@ -1,6 +1,8 @@
 # insight/detectors/target.py
 """目标达成雷达（retrospective）。裁定 #13：NULL=缺数据（跳过+note），0=真实业务值
-（照常参与计算——真实销售为 0 是重大异常）。"""
+（照常参与计算——真实销售为 0 是重大异常）。
+actual 侧 point-in-time 封顶（mix 有 calday 历史，calday<=as_of 防月中重放看到整月实绩）；
+retrospective 仅指目标表侧（目标表只留当前记录，历史不可恢复）。"""
 import calendar
 from datetime import date
 from ..replay_ctx import ReplayContext, shift_month
@@ -34,6 +36,7 @@ WITH actual AS (
   FROM dm.dm_fin_operations_mix_sum_t
   WHERE calmonth = %(cur_month_ym)s
     AND calmonth <= %(cur_month_ym)s
+    AND calday <= %(as_of_calday)s
     AND node_desc2 = '瓷砖事业部'
     AND data_source IN ('S','T','D','')
 ),
@@ -70,6 +73,7 @@ class TargetDetector:
     def detect(self, run, ctx: ReplayContext) -> DetectResult:
         p = self.cfg["params"]
         rows = run(SQL, {"cur_month_ym": ctx.ym(),
+                         "as_of_calday": ctx.calday(),
                          "center_set_month_ym": shift_month(ctx.as_of, -p["center_set_month_lag"])
                          .strftime("%Y-%m")})
         if not rows:                       # 生产 CROSS JOIN 聚合恒 1 行；空行=缺数据（防崩）
