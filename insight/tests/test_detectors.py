@@ -93,3 +93,19 @@ def test_margin_sql_complete_months_binds():
     assert "gross_profit_after_sharing" in seen["sql"]
     assert "notax_sales_net_amt" in seen["sql"]
     assert "calmonth <= %(cur_ym)s" in seen["sql"]          # 预算月防线
+
+def test_margin_guard_and_floor():                     # 守卫四态：单侧月缺数/零净额/小额闸
+    det = GrossMarginDetector.for_test()
+    guards = [                                         # 任一侧缺数 → 不构成可比环比
+        {"channel": "GD04", "gp": None, "net_amt": 200000000.0,
+         "prev_gp": 62000000.0, "prev_net_amt": 200000000.0},  # 当月渠道消失
+        {"channel": "GD05", "gp": 56000000.0, "net_amt": 200000000.0,
+         "prev_gp": None, "prev_net_amt": 200000000.0},        # 新渠道无基数
+        {"channel": "GD06", "gp": 56000000.0, "net_amt": 0.0,
+         "prev_gp": 62000000.0, "prev_net_amt": 200000000.0},  # 零净额（除零守卫）
+    ]
+    res = det.detect(lambda sql, p=None: guards, CTX)
+    assert res.status == "ok" and res.findings == []
+    floor = [{"channel": "GD09", "gp": 4000000.0, "net_amt": 20000000.0,
+              "prev_gp": 6000000.0, "prev_net_amt": 20000000.0}]  # -10pct 但 gp=400万<500万闸
+    assert det.detect(lambda sql, p=None: floor, CTX).findings == []
