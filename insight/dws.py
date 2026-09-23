@@ -39,6 +39,7 @@ class DwsQueryRunner:
 
     @staticmethod
     def _guard(sql: str) -> None:
+        # 白名单不防 `SELECT some_write_proc()`——写防护以 session read-only（第一层）为准，白名单仅纵深防御
         s = sql.lstrip()
         if not (s[:6].upper() == "SELECT" or s[:4].upper() == "WITH"):
             raise ValueError(f"非只读语句（仅允许 SELECT / WITH...SELECT）：{s[:60]}")

@@ -14,7 +14,8 @@ def test_kwargs_env_appname_readonly_timeout(monkeypatch):
     assert kw["password"] == "sekret"
 
 def test_kwargs_defaults(monkeypatch):
-    monkeypatch.delenv("DWS_HOST", raising=False)
+    for var in ("DWS_HOST", "DWS_PORT", "DWS_DBNAME", "DWS_USER", "DWS_PASSWORD"):
+        monkeypatch.delenv(var, raising=False)
     kw = build_connect_kwargs()
     assert kw["host"] == "121.37.200.214" and kw["dbname"] == "DP_DWS"
 
@@ -38,6 +39,21 @@ def test_guard_allows_select_and_with_select():
 def test_guard_rejects_writes_and_show(bad):
     with pytest.raises(ValueError):
         DwsQueryRunner._guard(bad)
+
+@pytest.mark.parametrize("sql,allowed", [
+    ("SELECT updated_at, settings FROM t OFFSET 5", True),   # 禁词仅匹配整词：updated_at/settings/OFFSET 不误伤
+    ("SELECT 'settled' FROM t", True),                       # 字符串字面量里的词根不误伤
+    ("SELECT 1; DROP TABLE t", False),                       # 多语句注入
+    ("SELECT 1; SHOW x", False),                             # 多语句夹带 SHOW
+    ("EXPLAIN SELECT 1", False),                             # 非 SELECT/WITH 开头
+    ("/* c */ SELECT 1", False),                             # 注释开头不算 SELECT 开头
+])
+def test_guard_boundary_characterization(sql, allowed):
+    if allowed:
+        assert DwsQueryRunner._guard(sql) is None
+    else:
+        with pytest.raises(ValueError):
+            DwsQueryRunner._guard(sql)
 
 class _FakeCursor:
     def __init__(self, results, exc=None): self._r, self._exc = results, exc
@@ -83,3 +99,17 @@ def test_broken_connection_rebuilt(monkeypatch):   # 裁定 #4：连接失效重
     dead = _FakeConn([]); dead.closed = 1
     r._conn = dead
     assert r("SELECT 1") == [{"x": 1}] and calls["n"] == 1
+
+class _RaisingRollbackConn(_FakeConn):             # rollback 自身失败（连接已死）
+    def rollback(self):
+        raise psycopg2.OperationalError("rollback on dead conn")
+
+def test_recover_rollback_failure_drops_connection(monkeypatch):
+    conn = _RaisingRollbackConn([(1,)])
+    r = DwsQueryRunner.__new__(DwsQueryRunner)
+    r._conn, r._kwargs = conn, {}
+    assert r("SELECT 1") == [{"x": 1}]     # 查询本身成功（结果先于 finally 返回）
+    assert r._conn is None                 # rollback 失败 → 弃连接待重建
+    def fake_connect(**kw): return _FakeConn([(2,)])
+    monkeypatch.setattr(psycopg2, "connect", fake_connect)
+    assert r("SELECT 2") == [{"x": 2}]     # 下一次调用重建连接
