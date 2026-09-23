@@ -1,0 +1,17 @@
+{
+  "name": "ar_risk",
+  "scope": "瓷砖事业部",
+  "deps": [
+    {"table": "dwrfin.dwr_ar_receivable_aging_2023_info_f", "date_col": "query_date",
+     "date_format": "%Y-%m-%d", "required": "data_date",
+     "extra_where": "COALESCE(special_general_ledger,'') = ''"}
+  ],
+  "anchor": {"type": "customer", "id_field": "cust_code"},
+  "applicable_factors": ["impact", "persistence", "scope", "worsening"],
+  "params": {"delta_threshold_wan": 300, "top5_share_threshold_pct": 60,
+             "prev_lag_days": 30, "comp_codes": ["PLACEHOLDER_TASK11_FILL"]},
+  "norm": {"metric": "abs_delta_wan", "baseline_wan": [200, 500, 1000, 2000, 4000]},
+  "backtest": {"point_in_time_mode": "exact"},
+  "timeout_ms": 120000,
+  "notes": "comp_codes=全计划唯一占位：Task 11 live gate 强制从 sources-of-truth/business-context 公司主数据回填，未回填不得进 M-i1 完成态"
+}

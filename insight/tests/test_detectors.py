@@ -109,3 +109,56 @@ def test_margin_guard_and_floor():                     # 守卫四态：单侧�
     floor = [{"channel": "GD09", "gp": 4000000.0, "net_amt": 20000000.0,
               "prev_gp": 6000000.0, "prev_net_amt": 20000000.0}]  # -10pct 但 gp=400万<500万闸
     assert det.detect(lambda sql, p=None: floor, CTX).findings == []
+
+# --- ar_risk 雷达（双侧最新快照，exact；追加）---
+from insight.detectors.ar_risk import ArRiskDetector
+
+AR_CTX = ReplayContext(as_of=date(2026, 9, 22))       # prev_bound = 2026-08-23
+
+def _ar_rows():   # 7 个正增量客户：360/280/190/60/40/30/20 → 总 980，Top5=930 → 95%
+    return [
+        {"cust_code": "D1", "cust_name": "经销商A", "over90": 920.0, "prev_over90": 560.0},
+        {"cust_code": "D2", "cust_name": "工程客户B", "over90": 680.0, "prev_over90": 400.0},
+        {"cust_code": "D3", "cust_name": "经销商C", "over90": 510.0, "prev_over90": 320.0},
+        {"cust_code": "D4", "cust_name": "客户D", "over90": 160.0, "prev_over90": 100.0},
+        {"cust_code": "D5", "cust_name": "客户E", "over90": 140.0, "prev_over90": 100.0},
+        {"cust_code": "D6", "cust_name": "客户F", "over90": 130.0, "prev_over90": 100.0},
+        {"cust_code": "D7", "cust_name": "客户G", "over90": 120.0, "prev_over90": 100.0},
+    ]
+
+def _ar_run(snaps, detail_rows, log):
+    def run(sql, params=None):
+        log.append((sql, params))
+        if "MAX(query_date)" in sql:
+            return [{"snap": snaps.get(params["bound"])}]
+        return detail_rows
+    return run
+
+def test_ar_math_total_and_top5_share():
+    log = []
+    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, _ar_rows(), log)
+    res = ArRiskDetector.for_test().detect(run, AR_CTX)
+    assert res.status == "ok" and len(res.findings) == 1
+    m = res.findings[0].metrics
+    assert m["delta_wan"] == 980                        # 360+280+190+60+40+30+20
+    assert m["top5_share_pct"] == 95                    # (360+280+190+60+40)/980
+    assert m["current_snapshot_date"] == "2026-09-22"
+    assert m["previous_snapshot_date"] == "2026-08-23"
+
+def test_ar_insufficient_history_not_zero():           # 裁定 #11：缺上期≠0
+    log = []
+    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": None}, _ar_rows(), log)
+    res = ArRiskDetector.for_test().detect(run, AR_CTX)
+    assert res.status == "insufficient_history" and res.findings == []
+    assert "2026-08-23" in res.note
+    assert not any("cust_code" in s for s, _ in log)    # 未做对比查询
+
+def test_ar_sql_future_row_guard():
+    log = []
+    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, _ar_rows(), log)
+    ArRiskDetector.for_test().detect(run, AR_CTX)
+    detail_sql = next(s for s, _ in log if "cust_code" in s)
+    assert "query_date <= %(as_of_iso)s" in detail_sql
+    assert "special_general_ledger" in detail_sql
+    snap_sql = next(s for s, _ in log if "MAX(query_date)" in s)
+    assert "<= %(bound)s" in snap_sql
