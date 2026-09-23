@@ -29,6 +29,7 @@ class WatermarkResult:
     rows: int
     reason: str                 # ok | stale | empty | error
     checked_at: str
+    detail: str = ""            # error 时截断的异常 repr
 
 def check_dependency(dep: Dependency, run, ctx: ReplayContext) -> WatermarkResult:
     now = datetime.now().isoformat(timespec="seconds")
@@ -38,15 +39,19 @@ def check_dependency(dep: Dependency, run, ctx: ReplayContext) -> WatermarkResul
     bound = dep.fmt(ctx.as_of)
     try:
         row = run(sql, {"data_date": bound})[0]
-    except Exception:
-        return WatermarkResult(dep, False, None, 0, "error", now)
-    max_day = dep.parse(row["max_day"])
+        max_day = dep.parse(row["max_day"])
+    except Exception as e:
+        return WatermarkResult(dep, False, None, 0, "error", now, detail=repr(e)[:200])
     if max_day is None or row["rows_"] == 0:
         return WatermarkResult(dep, False, None, row["rows_"], "empty", now)
     if dep.required == "last_month_end":
         req = month_end_of(shift_month(ctx.as_of, -1))
     else:
         req = ctx.as_of
-    if max_day < req:
+    if dep.date_format == "%Y-%m":
+        stale = (max_day.year, max_day.month) < (req.year, req.month)
+    else:
+        stale = max_day < req
+    if stale:
         return WatermarkResult(dep, False, max_day, row["rows_"], "stale", now)
     return WatermarkResult(dep, True, max_day, row["rows_"], "ok", now)
