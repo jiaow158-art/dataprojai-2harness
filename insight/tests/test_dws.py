@@ -3,14 +3,13 @@ import psycopg2
 import pytest
 from insight.dws import DwsQueryRunner, build_connect_kwargs
 
-def test_kwargs_env_appname_readonly_timeout(monkeypatch):
+def test_kwargs_env_appname_timeout(monkeypatch):
     monkeypatch.setenv("DWS_HOST", "h"); monkeypatch.setenv("DWS_PORT", "8000")
     monkeypatch.setenv("DWS_DBNAME", "d"); monkeypatch.setenv("DWS_USER", "u")
     monkeypatch.setenv("DWS_PASSWORD", "sekret")
     kw = build_connect_kwargs(app_name="insight-radar", timeout_ms=30000)
     assert kw["application_name"] == "insight-radar"
     assert "statement_timeout=30000" in kw["options"]
-    assert "default_transaction_read_only=on" in kw["options"]   # session 级只读
     assert kw["password"] == "sekret"
 
 def test_kwargs_defaults(monkeypatch):

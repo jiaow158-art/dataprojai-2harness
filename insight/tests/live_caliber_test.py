@@ -16,10 +16,11 @@ def run():
     r.close()
 
 def test_session_really_readonly():      # 裁定 #2/#3：第一层墙的真实性
+    # 本库锁死 read-only GUC，实测验证的是账号授权墙；零行 UPDATE 非只读会静默成功
     from insight.dws import build_connect_kwargs
     conn = psycopg2.connect(**build_connect_kwargs(app_name="insight-livecheck"))
     try:
-        with pytest.raises(psycopg2.Error):
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
             with conn.cursor() as cur:
                 cur.execute("UPDATE dm.dm_dp_api_sales_target SET target_sales_amt = 1 "
                             "WHERE 1 = 0")     # 零行 UPDATE：非只读会静默成功

@@ -1,8 +1,10 @@
 # insight/dws.py
 """只读 DWS 查询通道——DWS Resource Guardrail 的落地（spec §14，裁定 #2/#3/#4）。
 
-双层防护：①session 级 default_transaction_read_only=on（真正的墙）
-         ②SQL 白名单仅 SELECT / WITH...SELECT（含全句禁词扫描，拒绝 SHOW 与数据改性 CTE）
+双层防护：①账号 GRANT 层只读（aiuser 写授权全撤——本 GaussDB 锁死 default_transaction_read_only，
+         连接时设置即 FATAL "cannot be changed now"；实测零行 UPDATE → InsufficientPrivilege，
+         GRANT 墙比 session GUC 更强）②SQL 白名单仅 SELECT / WITH...SELECT（含全句禁词扫描，
+         拒绝 SHOW 与数据改性 CTE，纵深防御）
 异常恢复：查询异常 → rollback 清 aborted；连接失效 → 置 None 下次重建。
 某 detector 超时 → 自降级 unavailable → runner 恢复 → 下一个 detector 不受污染。
 密钥只走 env；REDACT 供日志侧消毒。
@@ -26,8 +28,7 @@ def build_connect_kwargs(app_name: str = "insight-radar",
         "password": os.environ.get("DWS_PASSWORD", ""),
         "application_name": app_name,
         "connect_timeout": 10,
-        "options": (f"-c statement_timeout={timeout_ms} "
-                    f"-c default_transaction_read_only=on"),
+        "options": f"-c statement_timeout={timeout_ms}",
     }
 
 def REDACT(kwargs: dict) -> dict:
@@ -40,7 +41,7 @@ class DwsQueryRunner:
 
     @staticmethod
     def _guard(sql: str) -> None:
-        # 白名单不防 `SELECT some_write_proc()`——写防护以 session read-only（第一层）为准，白名单仅纵深防御
+        # 白名单不防 `SELECT some_write_proc()`——写防护以账号 GRANT 层只读（第一层）为准，白名单仅纵深防御
         s = sql.lstrip()
         if not (s[:6].upper() == "SELECT" or s[:4].upper() == "WITH"):
             raise ValueError(f"非只读语句（仅允许 SELECT / WITH...SELECT）：{s[:60]}")
