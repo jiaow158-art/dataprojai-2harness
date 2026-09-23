@@ -21,3 +21,7 @@ def test_calendar_helpers():
     assert month_end_of(date(2026, 2, 10)) == date(2026, 2, 28)
     assert shift_month(date(2026, 1, 15), -1) == date(2025, 12, 15)
     assert shift_month(date(2026, 12, 5), 1) == date(2027, 1, 5)
+    assert shift_month(date(2026, 3, 31), -1) == date(2026, 2, 28)   # 月末钳位
+    assert shift_month(date(2024, 1, 31), 1) == date(2024, 2, 29)    # 闰年钳位
+    assert shift_month(date(2023, 1, 31), 1) == date(2023, 2, 28)    # 平年钳位
+    assert month_end_of(date(2024, 2, 10)) == date(2024, 2, 29)      # 闰年月末
