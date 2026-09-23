@@ -3,7 +3,7 @@
 | 项 | 值 |
 |---|---|
 | 日期 | 2026-09-23 |
-| 状态 | **v1.1（用户审计 P0×4/P1×5 回填完毕），待复审** |
+| 状态 | **v1.2（终审修订回填完毕：partial unique index / 稳定锚点 / 快照补状态 / 归因版本表 / 保留期 / 灰度文案 / 回测 point-in-time），待终审放行** |
 | 来源 | brainstorm 会话（总裁视角愿景 → 旁路架构约束 → 4 雷达范围 → 事件式产品模型 → D1-D8 裁定 + UI/UX 裁定） |
 | 总原则 | **扩能力，不重构核心**。现有 AI 问数 = 稳定底座；经营洞察 = 独立增强层 |
 
@@ -48,10 +48,11 @@
 | D5 | 09:30 排序 cutoff；10:00 启动归因（避开夜间数仓 ETL 窗口）。每个 detector 必须先做 data freshness/watermark 检查；数据未就绪明示「数据未就绪」，**不得用旧数据伪装当天事件** |
 | D6 | BFF → insight HTTP API → insight.db。BFF **不**直读 SQLite。insight 故障只影响经营洞察，绝不影响 AI 问数 |
 | D7 | Business Event 保留 **365 天**；Evidence 原始结果保留 **90 天** |
-| D8 | 本人灰度 ≥10 有效工作日且累计 ≥20 候选事件；开放业务负责人前五条全满足：①简报按时就绪率 ≥95% ②Top 事件认可率 ≥85% ③严重误报=0 ④85 场景问数回归零退化 ⑤简报数字与问数数字不一致事故=0 |
+| D8 | 本人灰度 ≥10 有效工作日且累计 ≥20 候选事件；开放高管试点前五条全满足：①简报按时就绪率 ≥95% ②Top 事件认可率 ≥85% ③严重误报=0 ④85 场景问数回归零退化 ⑤简报数字与问数数字不一致事故=0 |
 | UI | 事件驱动非 BI 驾驶舱；白/浅灰/极浅蓝底、蓝色主操作色、红橙只用于真异常、大量留白、卡片圆角适中；禁止深色大屏风；事件卡只允许一张小而明确的图；AI 建议动作与事实/归因视觉区隔；首页显示经营事件而非 detector 名称；无可靠评分算法就不显示分数 |
 | 定位（v1.1 补） | v1 只服务拥有瓷砖事业部/集团全局经营数据权限的高管用户；**不做区域级/组织级事件数据权限裁剪**；Feature Flag 仅控制灰度入口。未来下沉区域负责人时再单独设计数据权限体系，不在 v1 预埋 |
 | 审计回填（v1.1） | P0-1 事件身份重构（event_key/episode）/ P0-2 每日发布快照 / P0-3 09:30 freeze 与晚到发现 / P0-4 DWS 资源护栏 / P1-1 评分 N/A 再归一化 / P1-2 severity 与 event_type 拆分 / P1-3 日期语义区分 / P1-4 目标时间进度口径优先级 / P1-5 归因结构化 JSON 输出 |
+| 终审修订（v1.2） | active episode 改 **partial unique index**（数据库层保证）；event_key 改 **稳定锚点**（anchor 投影，主雷达变更不漂移）；快照补当天状态字段；新增归因版本表 `event_analysis_run`；保留期补 daily_brief_event/analysis；灰度口径统一"**高管试点**"；回测增 **point-in-time 可重建检查** |
 
 ## 3. 数据现实基线（2026-09-23 直连 DWS 实测）
 
@@ -109,7 +110,7 @@ insight/
 │  ├─ region_sales.py        # 区域×渠道业绩雷达
 │  ├─ gross_margin.py        # 毛利雷达
 │  └─ ar_risk.py             # 应收风险雷达
-├─ merge_rank.py             # 合并规则 + 五因子排序（读 ranking.json）+ 事件生命周期（event_key 延续/新 episode/resolve）
+├─ merge_rank.py             # 合并规则（anchor 投影）+ 五因子排序（读 ranking.json）+ 事件生命周期（event_key 延续/新 episode/resolve）
 ├─ attribution.py            # 归因提交/轮询/解析/降级（走网关公开 API）
 ├─ brief.py                  # 简报定稿落库（09:30 cutoff）
 ├─ retention.py              # 365d/90d 清理（对齐 M4 SOP，dry-run 默认）
@@ -179,7 +180,7 @@ CREATE TABLE detector_finding (
 -- 经营事件（一等实体；P0-1：event_key=业务问题身份，event_id=episode）
 CREATE TABLE business_event (
   event_id TEXT PRIMARY KEY,        -- episode 身份：ev-<uuid>（新发时生成；恢复后再发=新 episode）
-  event_key TEXT NOT NULL,          -- 稳定业务身份：hash(event_type+scope+org_code+channel+metric)，不含日期
+  event_key TEXT NOT NULL,          -- 稳定锚点身份：hash(scope+anchor_type+anchor_id)——不含日期/detector/event_type（v1.2：主雷达变更不漂移）
   lifecycle TEXT NOT NULL,          -- active|resolved（底层生命周期）
   data_date TEXT NOT NULL,          -- episode 内最近检测日
   first_seen_date TEXT NOT NULL, last_seen_date TEXT NOT NULL,
@@ -196,20 +197,31 @@ CREATE TABLE business_event (
   metric TEXT NOT NULL,             -- 主指标名
   status TEXT NOT NULL,             -- discovered|analyzed（v1 只实现这两个；其余预留）
   facet_json TEXT, merged_from_json TEXT,
-  -- 归因（10:00 后回填）
+  -- 归因（10:00 后回填；此处仅存"当前最新"，逐次历史版本见 event_analysis_run）
   attribution_status TEXT NOT NULL DEFAULT 'pending',  -- pending|running|done|degraded|failed
   attribution_summary TEXT,         -- 执行摘要（LLM 产，源自网关 answer）
   attribution_json TEXT,            -- {path[], findings[], waterfall, entities}（尽力解析）
   attribution_run_id TEXT,          -- 网关 run_id（溯源+报告链接）
   attribution_generated_at INTEGER,
   created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_event_key_active ON business_event(event_key, lifecycle); -- 同 key 至多一个 active episode（代码保证）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_event_key_active ON business_event(event_key) WHERE lifecycle = 'active'; -- v1.2：partial unique index，数据库层保证同 key 至多一个 active episode
 
 -- 证据（365d：行留存；90d：result_ref 指向的文件由 retention 清）
 CREATE TABLE event_evidence (
   evidence_id TEXT PRIMARY KEY, event_id TEXT NOT NULL,
   kind TEXT NOT NULL,               -- sql|result|watermark|attribution_raw
   sql_text TEXT, result_ref TEXT, note TEXT, created_at INTEGER);
+
+-- 归因历史版本（v1.2：business_event 只存当前最新，逐次分析在此留档可回看）
+CREATE TABLE event_analysis_run (
+  analysis_id TEXT PRIMARY KEY,     -- an-<uuid>
+  event_id TEXT NOT NULL,           -- episode
+  analysis_date TEXT NOT NULL,      -- 触发日（= brief_date）
+  gateway_run_id TEXT, status TEXT NOT NULL,  -- submitted|succeeded|degraded|failed
+  answer_md TEXT, report_path TEXT,
+  parsed_json TEXT,                 -- schema 校验通过的结构化产物；校验失败为 NULL（降级态）
+  submitted_at INTEGER, finished_at INTEGER);
+CREATE INDEX IF NOT EXISTS idx_analysis_event ON event_analysis_run(event_id, analysis_date);
 
 -- 每日简报（P1-3：brief_date=发布日；各雷达真实数据日期在 freshness_json 的 effective_data_date）
 CREATE TABLE daily_brief (
@@ -226,7 +238,11 @@ CREATE TABLE daily_brief_event (
   rank INTEGER NOT NULL,
   score_snapshot REAL NOT NULL, severity_snapshot TEXT NOT NULL,
   title_snapshot TEXT NOT NULL, summary_snapshot TEXT NOT NULL,
-  facts_snapshot TEXT NOT NULL, published_at INTEGER NOT NULL,
+  facts_snapshot TEXT NOT NULL,
+  event_type_snapshot TEXT NOT NULL,          -- v1.2：当天状态一并冻结
+  persist_days_snapshot INTEGER NOT NULL, first_seen_date_snapshot TEXT NOT NULL,
+  lifecycle_snapshot TEXT NOT NULL,           -- 发布时恒为 active（写入时冻结，防漂移）
+  published_at INTEGER NOT NULL,
   PRIMARY KEY (brief_date, event_id));
 
 -- followup 审计
@@ -235,7 +251,7 @@ CREATE TABLE followup_session (
   ui_session_id TEXT NOT NULL, gateway_session_id TEXT, created_at INTEGER);
 ```
 
-保留策略（D7）：`business_event`/`daily_brief`/`radar_run`/`detector_finding`/`followup_session`/`event_evidence` 行保留 **365 天**；evidence `result_ref` 指向的原始结果文件保留 **90 天**。清理并入 M4 数据保留 SOP（默认 dry-run，显式 `--apply`）。
+保留策略（D7 + v1.2）：`business_event`/`daily_brief`/`daily_brief_event`/`event_analysis_run`/`radar_run`/`detector_finding`/`followup_session`/`event_evidence` 行保留 **365 天**；evidence `result_ref` 与归因 answer/report 原始文件保留 **90 天**。清理并入 M4 数据保留 SOP（默认 dry-run，显式 `--apply`）。
 
 ### 6.2 BFF 记账库（ dataplat-ui/server/schema.sql 追加，CREATE TABLE IF NOT EXISTS，不 ALTER 现有表）
 
@@ -249,7 +265,7 @@ CREATE TABLE IF NOT EXISTS user_flags (
 
 ### 6.3 配置（版本化 JSON，非数据库）
 
-`radar-*.json`：依赖表清单+watermark 规则、检测 SQL 参数、阈值、detector 内标准化参数（分位/log 标度）、scope 过滤（瓷砖事业部）、本雷达 `applicable_factors`（P1-1，如 ar_risk 不含"目标缺口贡献"）。`ranking.json`：五因子权重（0.30/0.25/0.20/0.15/0.10）、上榜门槛、severity 分段、事件生命周期参数（`resolve_after_clean_days`，默认 3）。**任何配置改动必须重跑回测并留变更台账**（对齐 C2 精神）。
+`radar-*.json`：依赖表清单+watermark 规则、检测 SQL 参数、阈值、detector 内标准化参数（分位/log 标度）、scope 过滤（瓷砖事业部）、本雷达 `applicable_factors`（P1-1，如 ar_risk 不含"目标缺口贡献"）、**anchor 投影**（v1.2：merge 兼容与 event_key 稳定性的唯一来源，改动必须重跑回测）。`ranking.json`：五因子权重（0.30/0.25/0.20/0.15/0.10）、上榜门槛、severity 分段、事件生命周期参数（`resolve_after_clean_days`，默认 3）。**任何配置改动必须重跑回测并留变更台账**（对齐 C2 精神）。
 
 ## 7. 四个经营雷达（detector）
 
@@ -272,8 +288,8 @@ CREATE TABLE IF NOT EXISTS user_flags (
 
 ## 8. 合并与排序
 
-**合并（规则，非 AI）**：
-- 同组织节点+同渠道被多雷达命中 → 一个事件；主发现=标准化分最高者；其余降级为 facet（如"业绩下滑"事件附带"毛利率同时 -2.7pct"）
+**合并（规则，非 AI；v1.2：合并键 = anchor 投影）**：
+- **Merge Compatibility**：两个发现投影出相同 anchor（业绩族=org_code+channel；应收族=customer_code）→ 合并为一个事件；主发现=标准化分最高者，其余降级为 facet（如"业绩下滑"事件附带"毛利率同时 -2.7pct"）。**主发现跨日变更只改可变属性（event_type/metric/facet），不产生新 event_key——stable anchor 防漂移**
 - 组织树父子节点都命中 → 父级上榜，子级进归因/影响对象，不单独占位（子级分数显著更高时例外）
 
 **排序（五因子，全可解释，权重进 ranking.json）**：
@@ -289,7 +305,7 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
 - 上榜门槛：score ≥ config 门槛才展示（门槛优先，上限 3）；severity 按分数段映射 major/minor
 - `score_breakdown` 落库并在 UI 展开"为什么推给我"
 
-**事件生命周期（P0-1）**：`event_key` = 稳定业务问题身份（event_type + scope + org_code + channel + metric，**不含日期**）；`event_id`（episode）= 一次连续发生。同 event_key 连续越阈 → 延续当前 episode（`persist_days`+1，首页标"持续第 N 天"）；连续 R 天回落阈值内（config `resolve_after_clean_days`，默认 3）→ `resolved_at` 落位、episode 关闭；**恢复后再次越阈 → 创建新 episode，不复用历史事件**。底层 lifecycle = active|resolved；v1 UI 仍只映射展示"已发现/分析完成"。不发恢复通知卡（避免噪音）。
+**事件生命周期（P0-1 + v1.2 稳定锚点）**：`event_key` = 稳定业务问题身份 = hash(**anchor 投影** + scope)，**不含日期、不含 detector、不含 event_type/metric**——anchor 由各 detector 在 config 声明投影（业绩族 target/region_sales/gross_margin 统一投影为 org_code+channel；应收族 ar_risk 投影为 customer_code），**投影相同即 Merge Compatible**。主发现跨日变更只更新 episode 的可变属性（event_type/metric/facet），**不产生新 key**。`event_id`（episode）= 一次连续发生。同 event_key 连续越阈 → 延续当前 episode（`persist_days`+1，首页标"持续第 N 天"）；连续 R 天回落阈值内（config `resolve_after_clean_days`，默认 3）→ `resolved_at` 落位、episode 关闭；**恢复后再次越阈 → 创建新 episode，不复用历史事件**。底层 lifecycle = active|resolved；v1 UI 仍只映射展示"已发现/分析完成"。不发恢复通知卡（避免噪音）。**anchor 投影属 config——改动必须重跑回测（防 key 语义漂移）**。
 
 ## 9. 归因管道
 
@@ -297,6 +313,7 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
 - **执行**：`POST {GW_URL}/api/tasks`，`Authorization: Bearer <GW_AUTH_TOKEN>`，`X-User: insight-svc`（网关现有公开 API，与 ask.py/评测驱动同通道——**网关零改动**；insight-svc 身份在网关审计中天然可区分）
 - **问题构造**：事件上下文（指标/组织/时间窗/异常数值/已有事实）+ 指定按对应域 analyst 技能的 6 步工作流做下钻归因（引擎按问题域路由到 sales-performance / fin-cost / ar 域——技能零改动，复用其对抗审查）
 - **产物契约（P1-5）**：轮询 `GET /api/tasks/:run_id`（属主 insight-svc ✓）至终态；answer + report 存档。**归因 prompt 要求 agent 在正常文字答案之外追加一个严格机器可读的 JSON 区块**（fenced ```json，schema：`summary / path[] / findings[] / waterfall[] / entities[]`），worker 解析器做 schema validation。**解析失败时严禁从自然语言猜字段**——直接降级：检测层事实 + AI 文字分析原文 + [继续问AI]（Path/Waterfall/Findings/Entities 区块不渲染）。findings 条目必须引用查询结果，无支撑条目丢弃。**不改 skills/gateway——只约束 insight 提交任务时的 prompt 与解析器**
+- **版本策略（v1.2）**：每次归因提交在 `event_analysis_run` 留一行（gateway_run_id / answer / 解析产物 / 状态）；`business_event.attribution_*` 仅是当前最新的快路径读；详情 API 默认取最新，可按日期回看当日分析版本
 - **降级**：归因失败/超时（重试至 14:00 后放弃）或 JSON 校验失败 → 事件照常上榜，`attribution_status=failed|degraded`，执行摘要退回检测层事实摘要；[继续分析] 从不依赖预计算归因
 
 ## 10. 时序（就绪驱动两段式）
@@ -329,7 +346,7 @@ GET /api/insight/daily?date=&scope=
                 status, createdAt }] }
 
 GET /api/insight/events/:eventId
-  → { event, executiveSummary, facts, attribution:{status, summary, path[],
+  → { event, executiveSummary, facts, attribution:{status, analysisId, summary, path[],
         findings[], waterfall, trend, entities[], runId, reportPath},
       evidence[], suggestedActions[], followupPrompts[] }
 
@@ -403,7 +420,7 @@ POST /api/insight/events/:id/followup {prompt?}
 ## 13. Feature Flag 与灰度
 
 - `user_flags` 表（§6.2），flag 名 `insight_cockpit`，默认关
-- 管理：`insight-flag-cli.ts`（独立脚本，不动 admin-cli.ts）；放量节奏 = 用户本人 → 少量业务负责人 → 集团高管（D4/D8 门槛逐级把关）
+- 管理：`insight-flag-cli.ts`（独立脚本，不动 admin-cli.ts）；放量节奏 = 用户本人 → **高管试点** → 集团高管全面开放（D4/D8 门槛逐级把关）
 - 灰度只控制"谁看见"：insight-worker 从第一天对全量数据跑（攒回测延续数据与信任证据）
 - flag 关闭用户：登录落地 chat 页（现状），无任何 insight 入口可见。**flag 只控制入口灰度，不做数据权限裁剪**（定位裁定：v1 用户 = 拥有瓷砖事业部/集团全局经营数据权限的高管）
 
@@ -437,7 +454,7 @@ POST /api/insight/events/:id/followup {prompt?}
 
 1. **现有问数基线（零新建，直接复用）**：85 场景离线 eval（期望 SQL 直连 DWS，零 API 成本）+ 金点子 10 条 live 复判。v1 开发期间**每次合入必跑**；放行条件含"零退化"（D8 ④）
 2. **口径守护**：4 雷达检测 SQL 入 `eval_dataset.json`（变更清单纪律）→ C2 门自动守护简报口径
-3. **insight 单测**：watermark 探针（空表/滞后/未来行 fixture）、合并规则、五因子排序数学（含 **N/A 因子再归一化**）、标准化、**事件生命周期**（同 event_key 延续 episode / 恢复后再发开新 episode / resolve 规则 / 同 key 唯一 active）、**09:30 freeze 与晚到发现不重洗 Top3**、**daily_brief_event 快照不可变**（事件后续演进不改历史简报）、归因 JSON schema 校验与**解析失败降级（严禁从自然语言猜字段）**、**SQL 超时自降级**、retention、followup 编排（上下文拼接/身份/审计行）、BFF flag 门禁（未开 403）
+3. **insight 单测**：watermark 探针（空表/滞后/未来行 fixture）、合并规则（含 **anchor 投影**）、五因子排序数学（含 **N/A 因子再归一化**）、标准化、**事件生命周期**（同 event_key 延续 episode / 恢复后再发开新 episode / resolve 规则 / 同 key 唯一 active = **partial unique index 数据库层拒绝重复插入** / **anchor 稳定性：主发现跨日变更 key 不变**）、**09:30 freeze 与晚到发现不重洗 Top3**、**daily_brief_event 快照不可变**（事件后续演进不改历史简报）、**event_analysis_run 版本留档**、归因 JSON schema 校验与**解析失败降级（严禁从自然语言猜字段）**、**SQL 超时自降级**、**回测 point-in-time 确定性**（同日二跑一致/无 look-ahead）、retention（含 daily_brief_event/analysis）、followup 编排（上下文拼接/身份/审计行）、BFF flag 门禁（未开 403）
 4. **行为红线测试**（fixture 驱动）：无异常日 → 输出"暂无重大经营异常"且不造事件；正常波动 → 不报警；预算/未来日期行 → 不得当实绩；数据未就绪 → 不得发布"无异常"
 5. **E2E smoke**（开发环境）：fixture 事件 → 简报 → 详情 → followup 建会话 → chat 正常作答 → chat 全功能回归不受影响
 
@@ -445,9 +462,10 @@ POST /api/insight/events/:id/followup {prompt?}
 
 - `backtest.py`：对过去 12 个月每个数据日离线重放 雷达→合并→排序（批量直连 DWS，零 API；归因不回放），产出逐月 Top 3 事件流 + 空跑日统计 + 去年同期 sanity 对照
 - 执行纪律（P0-4/§14）：**手动触发、非业务高峰、按月分批**，禁止与晨间生产扫描同时运行；连接 `application_name=insight-backtest`
+- **point-in-time 可重建检查（v1.2）**：重放按数据日封界——所有查询日期 ≤ 该 data_date，杜绝 look-ahead（预算/未来日期行防线同步生效）；同一 data_date 二次重放的 findings 必须完全一致（确定性断言）；抽样日与生产管道 dry-run 输出对拍一致方可信
 - 校准回路：用户逐月抽检 Top 3（"值得总裁看？"）→ 调阈值/权重 → 重跑（config 改动强制重跑，台账留痕）
 - 放行线：进本人灰度前 认可率 ≥80% 且严重误报=0（D4）；高管前 ≥90%
-- 灰度放量门（D8）：≥10 有效工作日、≥20 候选事件、五指标全绿才开业务负责人
+- 灰度放量门（D8）：≥10 有效工作日、≥20 候选事件、五指标全绿才开高管试点
 
 ## 18. 侵入性复核（用户要求的再确认）
 
@@ -495,7 +513,7 @@ POST /api/insight/events/:id/followup {prompt?}
 | M-i1 | 检测层四雷达 + watermark + 回测框架 | 12 个月回测可跑；用户抽检校准通过 D4 线 |
 | M-i2 | 合并排序 + insight.db + insight-api + 简报管道 | 09:30 定稿/10:00 归因全链路（开发环境） |
 | M-i3 | BFF 路由/flag + 前端两页 + followup | E2E smoke 绿；85 场景回归零退化 |
-| M-i4 | 本人灰度运行 | D8 五指标全绿 → 开放业务负责人 |
+| M-i4 | 本人灰度运行 | D8 五指标全绿 → 开放高管试点 |
 
 ---
 
