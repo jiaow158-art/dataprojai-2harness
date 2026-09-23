@@ -1,0 +1,16 @@
+{
+  "name": "gross_margin",
+  "scope": "瓷砖事业部",
+  "deps": [
+    {"table": "dm.dm_fin_operations_mix_sum_t", "date_col": "calday", "date_format": "%Y%m%d",
+     "required": "data_date",
+     "extra_where": "node_desc2 = '瓷砖事业部' AND data_source IN ('S','T','D','')"}
+  ],
+  "anchor": {"type": "org_channel", "org_field": null, "channel_field": "integrate_channel"},
+  "applicable_factors": ["impact", "target_gap", "persistence", "scope", "worsening"],
+  "params": {"delta_threshold_pct": -2.0, "min_gp_wan": 500},
+  "norm": {"metric": "abs_delta_wan", "baseline_wan": [100, 300, 800, 2000, 5000]},
+  "backtest": {"point_in_time_mode": "exact"},
+  "timeout_ms": 60000,
+  "notes": "最近两个完整自然月对比（cur=最近已结束月）"
+}

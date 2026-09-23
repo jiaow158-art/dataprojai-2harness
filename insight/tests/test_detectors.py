@@ -63,3 +63,33 @@ def test_production_floor_filters_small_amounts():     # 生产构造：min_ly_a
             "cur_amt": 17850000.0, "ly_amt": 20100000.0} for m in months]    # ly≥2000 万→触发
     res = det.detect(lambda sql, p=None: big, CTX)
     assert len(res.findings) == 1
+
+# --- gross_margin 雷达（最近两个完整自然月，exact）---
+from insight.detectors.gross_margin import GrossMarginDetector
+
+def test_margin_fires_on_drop():
+    det = GrossMarginDetector.for_test()
+    run = lambda sql, p=None: [{"channel": "GD03", "gp": 56000000.0, "net_amt": 200000000.0,
+                                "prev_gp": 62000000.0, "prev_net_amt": 200000000.0}]
+    res = det.detect(run, CTX)                     # 28.0% vs 31.0% → delta -3.0 ≤ -2.0
+    assert res.status == "ok" and len(res.findings) == 1
+    f = res.findings[0]
+    assert f.metrics["delta_pct"] == -3.0
+    assert f.metrics["gmp_pct"] == 28.0 and f.metrics["prev_gmp_pct"] == 31.0
+    assert f.dim_keys["anchor_type"] == "org_channel"
+
+def test_margin_quiet_on_small_drop():
+    det = GrossMarginDetector.for_test()
+    run = lambda sql, p=None: [{"channel": "GD03", "gp": 61000000.0, "net_amt": 200000000.0,
+                                "prev_gp": 62000000.0, "prev_net_amt": 200000000.0}]
+    assert det.detect(run, CTX).findings == []      # 30.5% vs 31.0% → -0.5 未越阈
+
+def test_margin_sql_complete_months_binds():
+    det = GrossMarginDetector.for_test()
+    seen = {}
+    run = lambda sql, p=None: (seen.update(sql=sql, p=p) or [])
+    det.detect(run, CTX)
+    assert seen["p"]["cur_ym"] == "2026-08" and seen["p"]["prev_ym"] == "2026-07"
+    assert "gross_profit_after_sharing" in seen["sql"]
+    assert "notax_sales_net_amt" in seen["sql"]
+    assert "calmonth <= %(cur_ym)s" in seen["sql"]          # 预算月防线
