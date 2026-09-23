@@ -8,7 +8,8 @@ from .base import DetectResult, Finding, load_config, percentile_score
 
 def time_progress_pct(as_of: date, basis: str, curve: dict | None = None) -> float:
     """时间进度（P1-4 优先级）。curve={day: pct}：精确命中取值，两点间线性插值，
-    超出最后点取最后值；basis=curve 但无曲线 → 自然日兜底（显式规则，均有测试）。"""
+    早于首点取首点值，超出最后点取最后值；basis=curve 但无曲线 → 自然日兜底（显式规则，均有测试）。
+    workday 不含法定节假日（假期密集月用曲线口径）。"""
     days_in = calendar.monthrange(as_of.year, as_of.month)[1]
     if basis == "curve" and curve:
         pts = sorted(curve.items())
@@ -72,12 +73,12 @@ class TargetDetector:
                          "center_set_month_ym": shift_month(ctx.as_of, -p["center_set_month_lag"])
                          .strftime("%Y-%m")})
         if not rows:                       # 生产 CROSS JOIN 聚合恒 1 行；空行=缺数据（防崩）
-            return DetectResult(self.cfg["name"], "ok", "缺数据：查询无行返回")
+            return DetectResult(self.cfg["name"], "not_ready", "缺数据：查询无行返回")
         r = rows[0]
         if r["actual_amt"] is None or r["target_amt"] is None:
-            return DetectResult(self.cfg["name"], "ok", "缺数据：actual/target 为 NULL")
+            return DetectResult(self.cfg["name"], "not_ready", "缺数据：actual/target 为 NULL")
         if r["target_amt"] == 0:
-            return DetectResult(self.cfg["name"], "ok", "数据异常：target_amt=0")
+            return DetectResult(self.cfg["name"], "not_ready", "数据异常：target_amt=0")
         achieve = round(r["actual_amt"] / r["target_amt"] * 100, 1)   # actual=0 → 0.0 照常
         tp = time_progress_pct(ctx.as_of, p["progress_basis"], p["progress_curve"])
         gap = round(achieve - tp, 1)

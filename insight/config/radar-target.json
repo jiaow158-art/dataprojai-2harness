@@ -15,5 +15,5 @@
   "norm": {"metric": "abs_gap_wan", "baseline_wan": [500, 1500, 3000, 6000, 12000]},
   "backtest": {"point_in_time_mode": "retrospective"},
   "timeout_ms": 60000,
-  "notes": "retrospective：目标表只保留当前记录，历史调整不可恢复，回测为事后模拟（裁定#8）。达成率=当月MTD实绩/当月目标；时间进度优先级=曲线>工作日>自然日（裁定 P1-4）"
+  "notes": "retrospective：目标表只保留当前记录，历史调整不可恢复，回测为事后模拟（裁定#8）。达成率=当月MTD实绩/当月目标；时间进度优先级=曲线>工作日>自然日（裁定 P1-4）；workday=周一~周五不含法定节假日——假期密集月（十一/春节/五一）须配 progress_curve 或容忍误报，回测校准时知悉"
 }

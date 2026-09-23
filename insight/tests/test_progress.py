@@ -21,3 +21,6 @@ def test_curve_no_later_point_clamps_to_last():              # 曲线只到 day1
 
 def test_curve_missing_falls_back_to_basis():                # basis=curve 但无曲线 → 自然日兜底
     assert time_progress_pct(date(2026, 9, 22), "curve", None) == 73.3
+
+def test_curve_before_first_point_uses_first():              # 早于首点 → 取首点值
+    assert time_progress_pct(date(2026, 9, 1), "curve", {5: 10.0, 20: 60.0}) == 10.0

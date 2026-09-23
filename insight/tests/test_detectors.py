@@ -199,21 +199,26 @@ def test_target_null_is_missing_not_zero():      # 裁定 #13
     det = TargetDetector.for_test()
     run = lambda sql, p=None: [{"actual_amt": None, "target_amt": 100000000.0}]
     res = det.detect(run, CTX)
+    assert res.status == "not_ready"
     assert res.findings == [] and "缺数据" in res.note
 
 def test_target_actual_zero_is_severe_and_fires():   # 真实销售 0 = 重大异常，不许跳过
     det = TargetDetector.for_test()
     run = lambda sql, p=None: [{"actual_amt": 0.0, "target_amt": 100000000.0}]
     res = det.detect(run, CTX)
-    assert len(res.findings) == 1 and res.findings[0].metrics["achieve_pct"] == 0.0
+    assert len(res.findings) == 1
+    m = res.findings[0].metrics
+    assert m["achieve_pct"] == 0.0
+    assert m["gap_pct"] == -72.7 and m["abs_gap_wan"] == 7270   # 钉 target*tp/100 项
 
 def test_target_sql_guards():
     det = TargetDetector.for_test()
     seen = {}
     run = lambda sql, p=None: (seen.update(sql=sql, p=p) or [])
-    det.detect(run, CTX)
+    res = det.detect(run, CTX)
     assert "org_type = '业务单位'" in seen["sql"]        # 防总分翻倍
     assert "* 10000" in seen["sql"]                       # 万元→元
     assert "stat_month <= %(cur_month_ym)s" in seen["sql"]  # 排除未来目标月
     assert seen["p"]["cur_month_ym"] == "2026-09"
     assert seen["p"]["center_set_month_ym"] == "2026-08"
+    assert res.status == "not_ready"                      # mock 返回 [] → 空行=缺数据
