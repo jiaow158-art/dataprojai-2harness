@@ -165,6 +165,18 @@ def test_ar_sql_guards():
     assert "calmonth <= %(cur_ym)s" in joined
     assert "natural_receivables_1461" in joined                 # 7 段都在
 
+def test_ar_production_threshold_gate():        # T6 先例：for_test 降阈后生产闸仍需钉测
+    def _gate_rows(deltas):                     # 每客户 prev=100，cur=100+delta
+        return [{"cust_code": f"G{i+1}", "cust_name": f"客户{i+1}",
+                 "over90": 100.0 + d, "prev_over90": 100.0, "overdue_cur": 0.0}
+                for i, d in enumerate(deltas)]
+    under = _gate_rows([730, 560, 380, 120, 80, 60, 60])        # 合计 1990 < 2000
+    over = _gate_rows([750, 570, 390, 120, 80, 60, 40])        # 合计 2010 ≥ 2000
+    det = ArRiskDetector()                                     # 生产构造（阈 2000 万）
+    assert det.detect(_ar_run(["2026-09", "2026-08"], under, []), AR_CTX).findings == []
+    res = det.detect(_ar_run(["2026-09", "2026-08"], over, []), AR_CTX)
+    assert len(res.findings) == 1 and res.findings[0].metrics["delta_wan"] == 2010
+
 # --- target 雷达（retrospective；NULL≠0；追加）---
 from insight.detectors.target import TargetDetector
 
