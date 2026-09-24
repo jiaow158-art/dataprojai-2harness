@@ -53,13 +53,14 @@
 | 定位（v1.1 补） | v1 只服务拥有瓷砖事业部/集团全局经营数据权限的高管用户；**不做区域级/组织级事件数据权限裁剪**；Feature Flag 仅控制灰度入口。未来下沉区域负责人时再单独设计数据权限体系，不在 v1 预埋 |
 | 审计回填（v1.1） | P0-1 事件身份重构（event_key/episode）/ P0-2 每日发布快照 / P0-3 09:30 freeze 与晚到发现 / P0-4 DWS 资源护栏 / P1-1 评分 N/A 再归一化 / P1-2 severity 与 event_type 拆分 / P1-3 日期语义区分 / P1-4 目标时间进度口径优先级 / P1-5 归因结构化 JSON 输出 |
 | 终审修订（v1.2） | active episode 改 **partial unique index**（数据库层保证）；event_key 改 **稳定锚点**（anchor 投影，主雷达变更不漂移）；快照补当天状态字段；新增归因版本表 `event_analysis_run`；保留期补 daily_brief_event/analysis；灰度口径统一"**高管试点**"；回测增 **point-in-time 可重建检查** |
+| ar 换源（2026-09-24） | ar_risk 数据源裁定为 **`dm.dm_ar_analysis_rpt_f`（综合分析报表）**：主指标=**自然账龄 90 天+应收**（natural_receivables 91 天起七段之和，实测 78.7 亿量级）；组织口径=**node_desc2 直筛**（comp_codes 名称法退役）；当月 vs 上月（当月为月内即时会计期间 → backtest=retrospective）；覆盖=综合分析报表口径（与 aging 全量口径基数不同，历史对照 78.7 vs 94.4 亿总逾期）；overdue_receivables 作 facet |
 
 ## 3. 数据现实基线（2026-09-23 直连 DWS 实测）
 
 | 事实 | 设计后果 |
 |---|---|
 | 目标表 `dm_dp_api_sales_target` 凌晨 ~00:15 刷新（max stat_month=2026-12，全年目标已录） | 目标雷达可最早完成 |
-| 应收日层 `dwr_ar_receivable_aging_2023_info_f` ~06:31 刷新；月汇总 `dm_ar_receivable_accage_t` ~08:00（当前版本 20260831） | 应收雷达落数时点按 ar 域路由选层后确定 |
+| 应收日层 `dwr_ar_receivable_aging_2023_info_f` ~06:31 刷新；月汇总 `dm_ar_receivable_accage_t` ~08:00（当前版本 20260831）；**ar 雷达新源 `dm_ar_analysis_rpt_f`（月度会计期间，当月即时刷新 ~06:20）** | ar 雷达落数时点以 analysis 表当月行是否出现为准 |
 | `dm_rpt_region_performance_daily_report_t` **实测 0 行**（知识在册、ETL 在册、无数据） | 业绩/毛利雷达不依赖该表，按 metrics.md §七路由从主事实表派生；就绪探针必须含行数检查。**这是真实数仓侧异常，建议另行排查（不在本 v1 范围）** |
 | mix 表含预算/预测月份（2022-01~2026-12）、账龄层含 2026-12-31 未来日期行 | 雷达 SQL 模板**写死**过滤：实际数 + 日期 ≤ 数据日，防止把预算数当实绩报警 |
 | 落数时点三表三样（00:15 / 06:31 / 08:00） | 调度必须**就绪驱动**，不能定时傻跑 |
@@ -282,7 +283,7 @@ CREATE TABLE IF NOT EXISTS user_flags (
 | target | mix 实绩 + `dm_dp_api_sales_target`（org_type 防翻倍；两关联键） | 月度达成率 vs 时间进度的落后幅度越阈；去年同期达成对照 sanity。**时间进度口径优先级（P1-4）：①已有业务目标分解曲线 ②工作日进度 ③自然日进度仅兜底——不得未经验证直接用 current_day/days_in_month 下经营判断；实际采用的口径写入 evidence，可解释可追溯** | "目标达成低于时间进度"（event_type=target_gap；severity 按分数段映射 major/minor） |
 | region_sales | mix（业绩序列）+ ct_sales_performance_t（同比） | 区域×渠道周/旬同比连续 N 期 < -X%；影响金额=同比差额折算 | "华南零售销售连续下滑" |
 | gross_margin | mix 毛利额/不含税收入（域标准公式） | 渠道/区域毛利率环比/同比变动 < -X pct 且金额越阈 | "工程毛利率明显下降" |
-| ar_risk | ar 域路由表（`dm_ar_analysis_rpt_f` 主事实 + aging 分段层，日层 06:31 落数） | 90 天+余额环比增量越阈；top 客户集中度（前 5 贡献%）；连续逾期客户数 | "90天以上应收明显增加" |
+| ar_risk | **`dm.dm_ar_analysis_rpt_f`（2026-09-24 裁定换源）**，node_desc2 直筛；sgl 正常口径 | **自然账龄 90 天+应收**（7 段之和）当月 vs 上月增量越阈；top 客户集中度；overdue 作 facet；缺期间→not_ready | "90天以上应收明显增加"（自然账龄口径） |
 
 **每张雷达的检测 SQL 作为新场景录入 `eval_dataset.json`**（expected SQL=同一查询）——从此 85 场景离线回归同时守护简报口径，改动必过 C2 门（约束 5 的机制化）。insight 引用的表登记入 etl_watch 监测清单（表下线/变更告警自动覆盖雷达）。
 
