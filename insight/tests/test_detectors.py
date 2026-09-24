@@ -110,73 +110,60 @@ def test_margin_guard_and_floor():                     # 守卫四态：单侧�
               "prev_gp": 6000000.0, "prev_net_amt": 20000000.0}]  # -10pct 但 gp=400万<500万闸
     assert det.detect(lambda sql, p=None: floor, CTX).findings == []
 
-# --- ar_risk 雷达（双侧最新快照，exact；追加）---
+# --- ar_risk 雷达（综合分析报表 当月vs上月，retrospective；用户裁定 2026-09-24）---
 from insight.detectors.ar_risk import ArRiskDetector
 
-AR_CTX = ReplayContext(as_of=date(2026, 9, 22))       # prev_bound = 2026-08-23
+AR_CTX = ReplayContext(as_of=date(2026, 9, 22))          # cur=2026-09, prev=2026-08
 
-def _ar_rows():   # 7 个正增量客户：360/280/190/60/40/30/20 → 总 980，Top5=930 → 95%
+def _ar_rows():   # 7 正增量 360/280/190/60/40/30/20 → 980, Top5=930 → 95%
     return [
-        {"cust_code": "D1", "cust_name": "经销商A", "over90": 920.0, "prev_over90": 560.0},
-        {"cust_code": "D2", "cust_name": "工程客户B", "over90": 680.0, "prev_over90": 400.0},
-        {"cust_code": "D3", "cust_name": "经销商C", "over90": 510.0, "prev_over90": 320.0},
-        {"cust_code": "D4", "cust_name": "客户D", "over90": 160.0, "prev_over90": 100.0},
-        {"cust_code": "D5", "cust_name": "客户E", "over90": 140.0, "prev_over90": 100.0},
-        {"cust_code": "D6", "cust_name": "客户F", "over90": 130.0, "prev_over90": 100.0},
-        {"cust_code": "D7", "cust_name": "客户G", "over90": 120.0, "prev_over90": 100.0},
+        {"cust_code": "D1", "cust_name": "经销商A", "over90": 920.0, "prev_over90": 560.0, "overdue_cur": 500.0},
+        {"cust_code": "D2", "cust_name": "工程客户B", "over90": 680.0, "prev_over90": 400.0, "overdue_cur": 400.0},
+        {"cust_code": "D3", "cust_name": "经销商C", "over90": 510.0, "prev_over90": 320.0, "overdue_cur": 300.0},
+        {"cust_code": "D4", "cust_name": "客户D", "over90": 160.0, "prev_over90": 100.0, "overdue_cur": 90.0},
+        {"cust_code": "D5", "cust_name": "客户E", "over90": 140.0, "prev_over90": 100.0, "overdue_cur": 80.0},
+        {"cust_code": "D6", "cust_name": "客户F", "over90": 130.0, "prev_over90": 100.0, "overdue_cur": 70.0},
+        {"cust_code": "D7", "cust_name": "客户G", "over90": 120.0, "prev_over90": 100.0, "overdue_cur": 60.0},
     ]
 
-def _ar_run(snaps, detail_rows, log):
+def _ar_run(present_months, detail_rows, log):
     def run(sql, params=None):
         log.append((sql, params))
-        if "MAX(query_date)" in sql:
-            return [{"snap": snaps.get(params["bound"])}]
+        if "COUNT(*)" in sql and "GROUP BY 1" in sql:
+            return [{"calmonth": m, "rows_": 100} for m in present_months]
         return detail_rows
     return run
 
 def test_ar_math_total_and_top5_share():
     log = []
-    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, _ar_rows(), log)
-    res = ArRiskDetector.for_test().detect(run, AR_CTX)
+    res = ArRiskDetector.for_test().detect(_ar_run(["2026-09", "2026-08"], _ar_rows(), log), AR_CTX)
     assert res.status == "ok" and len(res.findings) == 1
     m = res.findings[0].metrics
-    assert m["delta_wan"] == 980                        # 360+280+190+60+40+30+20
-    assert m["top5_share_pct"] == 95                    # (360+280+190+60+40)/980
-    assert m["current_snapshot_date"] == "2026-09-22"
-    assert m["previous_snapshot_date"] == "2026-08-23"
-
-def test_ar_insufficient_history_not_zero():           # 裁定 #11：缺上期≠0
-    log = []
-    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": None}, _ar_rows(), log)
-    res = ArRiskDetector.for_test().detect(run, AR_CTX)
-    assert res.status == "insufficient_history" and res.findings == []
-    assert "2026-08-23" in res.note
-    assert not any("cust_code" in s for s, _ in log)    # 未做对比查询
-
-def test_ar_sql_future_row_guard():
-    log = []
-    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, _ar_rows(), log)
-    ArRiskDetector.for_test().detect(run, AR_CTX)
-    detail_sql = next(s for s, _ in log if "cust_code" in s)
-    assert "query_date <= %(as_of_iso)s" in detail_sql
-    # 实测 Oracle A 兼容库 ''≡NULL：COALESCE(col,'')='' 恒 0 行匹配，录制口径形态不可回退
-    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in detail_sql
-    snap_sql = next(s for s, _ in log if "MAX(query_date)" in s)
-    assert "<= %(bound)s" in snap_sql
-    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in snap_sql
-
-def test_ar_prev_equals_cur_is_insufficient():       # prev 解析到同一快照 → 无环比可言
-    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-09-22"}, _ar_rows(), [])
-    res = ArRiskDetector.for_test().detect(run, AR_CTX)
-    assert res.status == "insufficient_history" and res.findings == []
-
-def test_ar_negative_delta_excluded():               # 下降客户不计入（纯正增量口径钉死）
-    rows = _ar_rows() + [{"cust_code": "D8", "cust_name": "回款良好",
-                          "over90": 80.0, "prev_over90": 200.0}]   # delta -120
-    run = _ar_run({"2026-09-22": "2026-09-22", "2026-08-23": "2026-08-23"}, rows, [])
-    res = ArRiskDetector.for_test().detect(run, AR_CTX)
-    m = res.findings[0].metrics
     assert m["delta_wan"] == 980 and m["top5_share_pct"] == 95
+    assert m["current_period"] == "2026-09" and m["previous_period"] == "2026-08"
+    assert m["overdue_wan_cur"] == 1500.0                       # facet 求和
+    assert res.findings[0].dim_keys["anchor_id"] == "瓷砖|nat90"
+
+def test_ar_missing_period_is_not_ready_not_zero():            # 缺期间≠0
+    log = []
+    res = ArRiskDetector.for_test().detect(_ar_run(["2026-09"], _ar_rows(), log), AR_CTX)
+    assert res.status == "not_ready" and res.findings == []
+    assert not any("cust_code" in s for s, _ in log)            # 未做明细查询
+
+def test_ar_negative_delta_excluded():
+    rows = _ar_rows() + [{"cust_code": "D8", "cust_name": "回款良好",
+                          "over90": 80.0, "prev_over90": 200.0, "overdue_cur": 0.0}]
+    res = ArRiskDetector.for_test().detect(_ar_run(["2026-09", "2026-08"], rows, []), AR_CTX)
+    assert res.findings[0].metrics["delta_wan"] == 980          # -120 不计入
+
+def test_ar_sql_guards():
+    log = []
+    ArRiskDetector.for_test().detect(_ar_run(["2026-09", "2026-08"], _ar_rows(), log), AR_CTX)
+    joined = " ".join(s for s, _ in log)
+    assert "node_desc2 = '瓷砖事业部'" in joined
+    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in joined
+    assert "calmonth <= %(cur_ym)s" in joined
+    assert "natural_receivables_1461" in joined                 # 7 段都在
 
 # --- target 雷达（retrospective；NULL≠0；追加）---
 from insight.detectors.target import TargetDetector

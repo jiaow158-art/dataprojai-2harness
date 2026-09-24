@@ -64,12 +64,6 @@ def test_target_center_coverage(run):
     rate = r["matched"] / r["total"] if r["total"] else 0
     assert rate >= 0.9, f"目标中心覆盖率 {rate:.0%} < 90%——升级用户裁决（口径分歧登记）"
 
-def test_ar_comp_codes_filled(run):     # 裁定 #15：唯一占位强制回填
-    from insight.detectors.base import load_config
-    assert "PLACEHOLDER" not in str(load_config("ar_risk")["params"]["comp_codes"]), \
-        "comp_codes 未回填：读 sources-of-truth/business-context/ 公司主数据，" \
-        "列出瓷砖事业部分公司 comp_code 写入 radar-ar_risk.json 后重跑"
-
 def test_mix_actual_rows_current_month(run):
     rows = run("""SELECT COUNT(*) AS c FROM dm.dm_fin_operations_mix_sum_t
                   WHERE calmonth = to_char(current_date, 'YYYY-MM')
@@ -79,25 +73,24 @@ def test_mix_actual_rows_current_month(run):
 
 def test_ar_sgl_filter_matches_rows(run):       # ★ T8 Critical 级防复发：过滤形态必须非 0 行
     rows = run("""
-      SELECT COUNT(*) AS c FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
-      WHERE (special_general_ledger IS NULL OR special_general_ledger = '')
-        AND query_date = (SELECT MAX(query_date)
-                          FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
-                          WHERE query_date <= to_char(current_date, 'YYYY-MM-DD'))""")
+      SELECT COUNT(*) AS c FROM dm.dm_ar_analysis_rpt_f
+      WHERE calmonth = to_char(current_date,'YYYY-MM')
+        AND node_desc2 = '瓷砖事业部'
+        AND (special_general_ledger IS NULL OR special_general_ledger = '')""")
     assert rows[0]["c"] > 0, "sgl 正常口径过滤 0 行——过滤形态又坏了（Oracle A 兼容 ''≡NULL）"
 
-def test_ar_snapshot_integrity(run):            # ★ 半载快照检测（06:31 批载中不可信当日数）
+def test_ar_snapshot_integrity(run):            # ★ 月度行数完整性（批载中不可信当月数）
     rows = run("""
-      WITH snaps AS (
-        SELECT query_date, COUNT(*) AS c
-        FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
-        WHERE query_date <= to_char(current_date, 'YYYY-MM-DD')
+      WITH months AS (
+        SELECT calmonth, COUNT(*) AS c
+        FROM dm.dm_ar_analysis_rpt_f
+        WHERE node_desc2 = '瓷砖事业部'
           AND (special_general_ledger IS NULL OR special_general_ledger = '')
         GROUP BY 1 ORDER BY 1 DESC LIMIT 2)
-      SELECT MIN(c) AS lo, MAX(c) AS hi FROM snaps""")
+      SELECT MIN(c) AS lo, MAX(c) AS hi FROM months""")
     r = rows[0]
     assert r["lo"] and r["hi"] and r["lo"] >= r["hi"] * 0.5, \
-        f"最新快照行数 {r['lo']} 不足上一份 {r['hi']} 的 50%——疑似批载中/半载，当日 ar 数不可信"
+        f"当月行数 {r['lo']} 不足上月 {r['hi']} 的 50%——疑似批载中，当月 ar 数不可信"
 
 def test_mix_null_channel_share_low(run):       # ★ T7 minor：NULL 渠道占比探针
     # FILTER (WHERE ...) 本 GaussDB 不支持（实测 syntax error）→ SUM(CASE) 等价便携写法

@@ -1,49 +1,40 @@
 # insight/detectors/ar_risk.py
-"""应收风险雷达：90 天+ 双侧最新快照增量 + top5 集中度（anchor=customer）。
+"""应收风险雷达：自然账龄 90 天+ 应收 当月vs上月增量 + top5 集中度（anchor=customer）。
 
-裁定 #11：当前/对比快照各取 <= bound 的最新一份；找不到对比快照 →
-insufficient_history，绝不以 0 代替（防巨额假新增）。"""
-from datetime import date, datetime
+用户裁定 2026-09-24：数据源=dm.dm_ar_analysis_rpt_f（综合分析报表），node_desc2 直筛瓷砖。
+当月为月内即时会计期间；缺当月/上月行 → not_ready，绝不以 0 代替。"""
 from ..replay_ctx import ReplayContext
 from .base import DetectResult, Finding, load_config, percentile_score
 
-_OVER90 = " + ".join(
-    f"COALESCE({seg}_{fam},0)"
-    for seg in ("overdue_receivables_91_275_day", "overdue_receivables_276_730_day",
-                "overdue_receivables_731_1460_day", "overdue_receivables_1461_day")
-    for fam in ("2023_after", "2023_ago"))
+_NAT90 = " + ".join(
+    f"COALESCE({seg},0)" for seg in
+    ("natural_receivables_91_180", "natural_receivables_181_275",
+     "natural_receivables_276_365", "natural_receivables_366_730",
+     "natural_receivables_731_1095", "natural_receivables_1095_1460",
+     "natural_receivables_1461"))
 
-SNAP_SQL = f"""
-SELECT MAX(query_date) AS snap
-FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
-WHERE query_date <= %(bound)s
-  AND comp_code = ANY(%(comp_codes)s)
+PRESENCE_SQL = f"""
+SELECT calmonth, COUNT(*) AS rows_
+FROM dm.dm_ar_analysis_rpt_f
+WHERE calmonth IN (%(cur_ym)s, %(prev_ym)s)
+  AND calmonth <= %(cur_ym)s
+  AND node_desc2 = '瓷砖事业部'
   AND (special_general_ledger IS NULL OR special_general_ledger = '')
+GROUP BY 1
 """
 
 DETAIL_SQL = f"""
-WITH snap AS (
-  SELECT query_date, cust_code, MAX(cust_name) AS cust_name,
-         SUM({_OVER90}) / 10000 AS over90
-  FROM dwrfin.dwr_ar_receivable_aging_2023_info_f
-  WHERE query_date IN (%(cur_snap)s, %(prev_snap)s)
-    AND query_date <= %(as_of_iso)s
-    AND comp_code = ANY(%(comp_codes)s)
-    AND (special_general_ledger IS NULL OR special_general_ledger = '')
-  GROUP BY 1, 2
-)
 SELECT cust_code, MAX(cust_name) AS cust_name,
-       MAX(CASE WHEN query_date = %(cur_snap)s THEN over90 END) AS over90,
-       MAX(CASE WHEN query_date = %(prev_snap)s THEN over90 END) AS prev_over90
-FROM snap GROUP BY 1
+       SUM(CASE WHEN calmonth = %(cur_ym)s THEN {_NAT90} END) / 10000 AS over90,
+       SUM(CASE WHEN calmonth = %(prev_ym)s THEN {_NAT90} END) / 10000 AS prev_over90,
+       SUM(CASE WHEN calmonth = %(cur_ym)s THEN COALESCE(overdue_receivables, 0) END) / 10000 AS overdue_cur
+FROM dm.dm_ar_analysis_rpt_f
+WHERE calmonth IN (%(cur_ym)s, %(prev_ym)s)
+  AND calmonth <= %(cur_ym)s
+  AND node_desc2 = '瓷砖事业部'
+  AND (special_general_ledger IS NULL OR special_general_ledger = '')
+GROUP BY 1
 """
-
-def _as_date(v) -> date | None:
-    if v is None:
-        return None
-    if isinstance(v, datetime):     # datetime 是 date 子类，须先剥（防 isoformat 带 T00:00:00）
-        return v.date()
-    return v if isinstance(v, date) else datetime.strptime(str(v), "%Y-%m-%d").date()
 
 class ArRiskDetector:
     def __init__(self, cfg: dict | None = None):
@@ -51,7 +42,11 @@ class ArRiskDetector:
 
     @classmethod
     def for_test(cls):
-        return cls(load_config("ar_risk"))
+        cfg = load_config("ar_risk")
+        # 单测数据为玩具量级（total≈980 万），生产阈值（2000 万，待回测校准）会吞掉
+        # 全部场景 → 测试构造路径降到 300，生产路径（load_config/构造注入）不受影响。
+        cfg["params"]["delta_threshold_wan"] = 300
+        return cls(cfg)
 
     def check_watermark(self, run, ctx: ReplayContext):
         from ..watermark import Dependency, check_dependency
@@ -59,37 +54,35 @@ class ArRiskDetector:
 
     def detect(self, run, ctx: ReplayContext) -> DetectResult:
         p = self.cfg["params"]
-        binds = {"comp_codes": p["comp_codes"]}
-        cur_snap = _as_date(run(SNAP_SQL, {"bound": ctx.iso(), **binds})[0]["snap"])
-        prev_bound = ctx.minus_days(p["prev_lag_days"]).isoformat()
-        prev_snap = _as_date(run(SNAP_SQL, {"bound": prev_bound, **binds})[0]["snap"])
-        if cur_snap is None or prev_snap is None or prev_snap >= cur_snap:
-            return DetectResult(self.cfg["name"], "insufficient_history",
-                                note=f"cur_snap={cur_snap} prev_bound={prev_bound} prev_snap={prev_snap}")
-        rows = run(DETAIL_SQL, {"cur_snap": cur_snap.isoformat(),
-                                "prev_snap": prev_snap.isoformat(),
-                                "as_of_iso": ctx.iso(), **binds})
+        cur_ym, prev_ym = ctx.ym(), ctx.prev_month_ym()
+        binds = {"cur_ym": cur_ym, "prev_ym": prev_ym}
+        present = {r["calmonth"] for r in run(PRESENCE_SQL, binds)}
+        if cur_ym not in present or prev_ym not in present:
+            return DetectResult(self.cfg["name"], "not_ready",
+                                note=f"期间缺数据：cur={cur_ym in present} prev={prev_ym in present}")
+        rows = run(DETAIL_SQL, binds)
         deltas = []
+        overdue_cur = 0.0
         for r in rows:
-            cur, prev = r["over90"], r["prev_over90"]
-            if cur is None or prev is None:
-                continue
-            d = round(cur - prev, 1)
+            if r["over90"] is None or r["prev_over90"] is None:
+                continue                      # 单侧月缺失的客户跳过（非 0）
+            overdue_cur += r["overdue_cur"] or 0
+            d = round(r["over90"] - r["prev_over90"], 1)
             if d > 0:
                 deltas.append((r, d))
         total = round(sum(d for _, d in deltas), 1)
         findings = []
         if total >= p["delta_threshold_wan"]:
-            top = sorted(deltas, key=lambda x: (-x[1], x[0]["cust_code"]))[:5]  # tie-break 确定性
+            top = sorted(deltas, key=lambda x: (-x[1], x[0]["cust_code"]))[:5]
             share = round(sum(d for _, d in top) / total * 100)
             findings.append(Finding(
                 detector=self.cfg["name"], data_date=ctx.as_of.isoformat(),
-                dim_keys={"anchor_type": "customer", "anchor_id": "瓷砖|over90", "channel": None},
+                dim_keys={"anchor_type": "customer", "anchor_id": "瓷砖|nat90", "channel": None},
                 metrics={"delta_wan": total, "top5_share_pct": share,
-                         "current_snapshot_date": cur_snap.isoformat(),
-                         "previous_snapshot_date": prev_snap.isoformat(),
+                         "current_period": cur_ym, "previous_period": prev_ym,
                          "top_customers": [{"code": r["cust_code"], "name": r["cust_name"],
                                             "delta_wan": d} for r, d in top],
-                         "abs_delta_wan": total},
+                         "abs_delta_wan": total,
+                         "overdue_wan_cur": round(overdue_cur, 1)},   # facet：当月逾期合计
                 norm_score=percentile_score(total, self.cfg["norm"]["baseline_wan"])))
         return DetectResult(self.cfg["name"], "ok", findings=findings)
