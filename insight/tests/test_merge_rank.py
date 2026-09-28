@@ -1,5 +1,6 @@
 # insight/tests/test_merge_rank.py
-from insight.merge_rank import event_key_of, factor_values, score_finding, rank_findings
+from insight.merge_rank import (RANKING, event_key_of, factor_values,
+                                score_finding, rank_findings)
 
 def _finding(detector="region_sales", norm=80, anchor="华南|GD01",
              atype="org_channel", metrics=None, persist_days=1):
@@ -25,7 +26,7 @@ def test_factors_and_na_renormalization():
     assert abs(sum(w for k, w in sc["used_weights"].items())) > 0.99
     # impact=80/100, persistence=40, scope=40(customer), worsening=60
     expect = (0.30 * 80 + 0.20 * 40 + 0.15 * 40 + 0.10 * 60) / 0.75
-    assert abs(sc["score"] - round(expect, 1)) < 0.6
+    assert abs(sc["score"] - round(expect, 1)) < 0.05   # 实现已达精确值，宽容差会掩盖权重装载错误
 
 def test_target_gap_factor_only_for_target_radar():
     f = _finding(detector="target", anchor="瓷砖事业部|ALL", atype="org_channel",
@@ -45,3 +46,25 @@ def test_publish_gate_and_severity():
     low = _finding(norm=25, anchor="低|GD01", metrics={"yoy_pct": -8.1}, persist_days=1)
     ranked = rank_findings([low])
     assert ranked == []                                    # 低于门槛不上榜
+
+def test_rank_dedupes_same_event_key():
+    a1 = _finding(norm=100, anchor="华南|GD01")           # 同 anchor+atype → 同 event_key
+    a2 = _finding(norm=90, anchor="华南|GD01")            # 同日重跑双插的第二条
+    b = _finding(norm=95, anchor="其他|GD01")
+    ranked = rank_findings([a1, a2, b])
+    assert len(ranked) == 2                                # 同事件无双占位
+    assert ranked[0][0]["norm_score"] == 100               # 排序后首见=最高分
+    assert ranked[1][0]["dim_keys"]["anchor_id"] == "其他|GD01"
+
+def test_top_n_truncation():
+    four = [_finding(norm=95, anchor=f"区{i}|GD01") for i in range(4)]
+    ranked = rank_findings(four)                           # 4 条全过门槛且 event_key 互异
+    assert len(ranked) == 3                                # Top0-3 出口标准
+
+def test_full_weight_path_target_83():
+    # 协调方规格 norm=50 与 pinned score 83.0 矛盾（50→74.0）；测试名/断言钉 83.0 → norm=80
+    f = _finding(detector="target", norm=80, anchor="瓷砖事业部|ALL", atype="org_channel",
+                 metrics={"gap_pct": -21.0}, persist_days=9)
+    sc = score_finding(f)
+    assert sc["score"] == 83.0                             # 全五因子，无再归一
+    assert sc["used_weights"] == RANKING["weights"]        # 仅真 N/A 才再归一
