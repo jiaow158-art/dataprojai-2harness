@@ -62,3 +62,33 @@ def test_empty_freshness_is_not_ready(tmp_path):
         "SELECT COUNT(*) c FROM daily_brief_event").fetchone()["c"] == 0
     assert s.db.execute(
         "SELECT COUNT(*) c FROM business_event").fetchone()["c"] == 0   # 事件状态完全不动
+
+def test_rerun_after_final_keeps_published_brief(tmp_path):
+    s = _seed(tmp_path, [_FI])
+    _ok = [{"detector": "region_sales", "ready": True}]
+    freeze_brief(s, "2026-09-28", "2026-09-27", _ok)             # 首发发布 -11.2% 快照
+    first = s.db.execute(
+        "SELECT summary_snapshot FROM daily_brief_event").fetchone()["summary_snapshot"]
+    # cutoff 后同锚晚到高分 finding 到达（无守卫时会夺主发现改写快照）
+    s.insert_finding("2026-09-27", "region_sales", _FI["dim_keys"],
+                     {"yoy_pct": -20.0}, 95, is_late=True)
+    out = freeze_brief(s, "2026-09-28", "2026-09-27", _ok)
+    assert out["status"] == "final" and out["event_count"] == 1
+    snap = s.db.execute(
+        "SELECT summary_snapshot FROM daily_brief_event").fetchone()
+    assert snap["summary_snapshot"] == first and "-11.2" in snap["summary_snapshot"]
+    active = s.db.execute(
+        "SELECT COUNT(*) c FROM business_event WHERE lifecycle='active'").fetchone()
+    assert active["c"] == 1        # 晚到仍延续事件生命周期（发布面冻结≠生命周期冻结）
+
+def test_all_fail_rerun_after_final_keeps_final(tmp_path):
+    s = _seed(tmp_path, [_FI])
+    freeze_brief(s, "2026-09-28", "2026-09-27",
+                 [{"detector": "region_sales", "ready": True}])
+    out = freeze_brief(s, "2026-09-28", "2026-09-27",
+                       [{"detector": "region_sales", "ready": False}])
+    assert out["status"] == "final"                           # 全失败重跑不回退 final
+    assert out["event_count"] == 1
+    rows = s.db.execute(
+        "SELECT COUNT(*) c FROM daily_brief_event").fetchone()
+    assert rows["c"] == 1                                     # 快照行数不变（无孤儿）
