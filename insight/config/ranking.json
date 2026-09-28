@@ -1,0 +1,13 @@
+{
+  "weights": {"impact": 0.30, "target_gap": 0.25, "persistence": 0.20,
+              "scope": 0.15, "worsening": 0.10},
+  "publish_min_score": 55,
+  "top_n": 3,
+  "severity_bands": {"major": 75},
+  "scope_factor": {"bu_level": 100, "org_channel": 60, "customer": 40},
+  "persistence_full_days": 5,
+  "worsening": {"new_day": 100, "days_2_7": 60, "days_gt_7": 30},
+  "target_gap_scale": 4.0,
+  "resolve_after_clean_days": 3,
+  "notes": "v1 启发式（前置事实#4），灰度期可调但改动必须重跑回测并留台账（对齐 C2 精神）"
+}
