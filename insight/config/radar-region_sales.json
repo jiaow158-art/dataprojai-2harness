@@ -5,7 +5,7 @@
     {"table": "dm.ct_sales_performance_t", "date_col": "calday", "date_format": "%Y%m%d",
      "required": "last_month_end", "extra_where": "1=1"}
   ],
-  "anchor": {"type": "org_channel", "org_field": "node_desc5", "channel_field": "integrate_channel"},
+  "anchor": {"type": "org_channel", "org_field": "node_desc5", "channel_field": "integrate_channel_code"},
   "applicable_factors": ["impact", "target_gap", "persistence", "scope", "worsening"],
   "params": {"consecutive_months": 3, "yoy_threshold_pct": -8.0,
              "min_ly_amt": 20000000, "ly_field": "last_year_month_achievement"},

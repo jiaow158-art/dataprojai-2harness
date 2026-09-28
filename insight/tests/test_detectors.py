@@ -42,6 +42,7 @@ def test_sql_complete_month_binds():
     assert "ANY(%(month_ends)s)" in seen["sql"]
     assert "<= %(as_of_calday)s" in seen["sql"]                              # 防未来
     assert "node_desc2 = '瓷砖事业部'" in seen["sql"]
+    assert "integrate_channel_code" in seen["sql"]                  # ct 表真列名（首轮回测实测踩坑）
     assert ":data_date" not in seen["sql"]                                   # 无旧占位符
 
 def test_missing_month_breaks_consecutive():           # 缺任一完整月→不构成"连续"

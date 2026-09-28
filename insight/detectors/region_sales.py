@@ -5,7 +5,7 @@ from .base import DetectResult, Finding, load_config, percentile_score
 
 SQL = """
 SELECT to_char(to_date(p.calday, 'YYYYMMDD'), 'YYYY-MM') AS month,
-       s.node_desc5 AS org_name, p.integrate_channel AS channel,
+       s.node_desc5 AS org_name, p.integrate_channel_code AS channel,
        SUM(p.month_achievement) AS cur_amt,
        SUM(p.{ly_field}) AS ly_amt
 FROM dm.ct_sales_performance_t p
