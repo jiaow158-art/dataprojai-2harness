@@ -51,54 +51,38 @@ def build_prompt(title: str, summary: str, metric: str, scope: str, period: str,
 findings 每条必须带 evidence（对应哪次查询的结果）；五键齐全，不要输出其他键。"""
 
 
-def _load_sse_json(raw: str):
-    """解析 SSE data 合并串：先严格 json.loads，失败退 strict=False（容忍裸嵌
-    markdown 里的真实换行）。返回 (是否可解析, payload)，绝不抛异常。"""
-    for strict in (True, False):
-        try:
-            return True, json.loads(raw, strict=strict)
-        except json.JSONDecodeError:
-            continue
-    return False, None
-
-
 def parse_sse_stream(lines) -> AttributionResult:
-    """SSE 行迭代器 → AttributionResult。镜像 ask.py 的事件面：data: 行累积至
-    空行合并（join "\\n"）解析分发。对裸嵌答案 markdown（含真实换行、续行无
-    data: 前缀）的容错：空行处解析失败则保留缓冲续积、后续行并入；事件边界
-    与流末强制冲刷（不可解析残包放弃）。"""
+    """SSE 行迭代器 → AttributionResult。镜像 ask.py 的帧解析：跳过 : 注释行；
+    event: 记当前事件；data: 行累积；空行（及流末）时 join("\\n") 严格
+    json.loads 后按事件分发，解析失败丢弃该事件——网关唯一写帧点
+    （http.ts sseFrame）实 wire 即单行转义 JSON，损坏流不宽容、直接降级。"""
     res = AttributionResult()
     ev: str | None = None
     buf: list[str] = []
 
-    def try_flush(keep_on_fail: bool) -> None:
-        nonlocal buf
-        if not ev or not buf:
-            return
-        ok, payload = _load_sse_json("\n".join(buf))
-        if not ok:
-            if not keep_on_fail:
-                buf = []                 # 事件边界：残包放弃
-            return                       # keep：裸嵌数据的中间空行，续积
-        if isinstance(payload, dict):
-            _apply_event(res, ev, payload)
-        buf = []
+    def dispatch() -> None:
+        nonlocal ev, buf
+        if ev is not None and buf:
+            try:
+                payload = json.loads("\n".join(buf))
+            except json.JSONDecodeError:
+                payload = None           # 损坏事件丢弃，绝不猜
+            if isinstance(payload, dict):
+                _apply_event(res, ev, payload)
+        ev, buf = None, []
 
     for raw_line in lines:
         line = raw_line.rstrip("\r\n")
         if line.startswith(":"):
             continue                     # SSE 注释/心跳行
-        if line.startswith("event: "):
-            try_flush(keep_on_fail=False)
+        if not line.strip():             # 空行 = 帧边界，分发并复位
+            dispatch()
+        elif line.startswith("event: "):
             ev = line[7:].strip()
         elif line.startswith("data: "):
             buf.append(line[6:])
-        elif not line.strip():
-            try_flush(keep_on_fail=True)
-        elif buf:
-            buf.append(line)             # 裸嵌续行（无 data: 前缀）并入缓冲
-        # 其余未知行（如 id:/retry:）忽略，与 ask.py 一致
-    try_flush(keep_on_fail=False)        # 流末冲刷
+        # 其余行（如 id:/retry:）忽略，与 ask.py 一致
+    dispatch()                           # 流末冲刷
     return res
 
 

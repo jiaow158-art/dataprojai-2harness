@@ -35,7 +35,7 @@ def test_build_prompt_ar_hints_analysis_table():
 _SSE = (
     "event: stage\ndata: {\"stage\":\"querying\"}\n\n"
     "event: answer\ndata: {\"markdown\":\"第一段\"}\n\n"
-    "event: answer\ndata: {\"markdown\":\"" + ANSWER_OK.replace('"', '\\"') + "\"}\n\n"
+    "event: answer\ndata: " + json.dumps({"markdown": ANSWER_OK}, ensure_ascii=False) + "\n\n"
     "event: report\ndata: {\"path\":\"/reports/r1.html\"}\n\n"
     "event: done\ndata: {\"status\":\"succeeded\",\"elapsed_ms\":61000}\n\n"
 )
