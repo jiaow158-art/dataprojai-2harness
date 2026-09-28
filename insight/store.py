@@ -59,6 +59,7 @@ class Store:
     # 注意：不用 INSERT OR REPLACE——REPLACE 是 DELETE+INSERT，会把 attribution_* /
     # created_at / first_seen_date 全部重置为默认值（事件跨日延续即丢归因）。
     # 这里用 ON CONFLICT(event_id) DO UPDATE 只更新可变列，归因列不碰即保留。
+    # 跨日新数据回到 discovered（attribution_* 保留最新归因，UI 由 attribution_status 区分）
     def upsert_episode(self, event_key: str, event_id: str, data_date: str,
                        detector: str, event_type: str, title: str, summary: str,
                        severity: str, scope: dict, period: dict, facts: list,
@@ -72,8 +73,10 @@ class Store:
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%s','now'),"
             "strftime('%s','now'))"
             " ON CONFLICT(event_id) DO UPDATE SET"
-            " lifecycle='active', data_date=excluded.data_date,"
-            " last_seen_date=excluded.last_seen_date, persist_days=excluded.persist_days,"
+            " lifecycle='active',"
+            " data_date=MAX(excluded.data_date, data_date),"   # 倒序重放旧日期：不回退最近检测日
+            " last_seen_date=MAX(excluded.last_seen_date, last_seen_date),"
+            " persist_days=excluded.persist_days,"
             " detector=excluded.detector, event_type=excluded.event_type,"
             " title=excluded.title, summary=excluded.summary, severity=excluded.severity,"
             " scope_json=excluded.scope_json, period_json=excluded.period_json,"
@@ -88,7 +91,7 @@ class Store:
              json.dumps(scope, ensure_ascii=False), json.dumps(period, ensure_ascii=False),
              json.dumps(facts, ensure_ascii=False), score,
              json.dumps(breakdown, ensure_ascii=False), metric, "discovered",
-             dim_keys and json.dumps(dim_keys, ensure_ascii=False)))
+             json.dumps(dim_keys, ensure_ascii=False) if dim_keys else None))
         self.db.commit()
         return event_id
 
@@ -102,8 +105,8 @@ class Store:
                               " WHERE event_id=?", (event_id,)).fetchone()
         if not row:
             return 1
-        # 跨日延续：persist_days+1；同日重跑：保持（幂等）
-        if row["last_seen_date"] == data_date:
+        # 跨日延续：persist_days+1；同日重跑：保持（幂等）；倒序重放旧日期：不膨胀
+        if data_date <= row["last_seen_date"]:
             return row["persist_days"]
         return row["persist_days"] + 1
 

@@ -43,6 +43,41 @@ def test_findings_for_date_excludes_late(tmp_path):
     got_all = s.findings_for_date("2026-09-27", include_late=True)   # 事件延续用
     assert len(got_all) == 2
 
+def test_continue_preserves_attribution_and_resets_status(tmp_path):
+    s = _store(tmp_path)
+    s.upsert_episode(event_key="K1", event_id="ev-1", data_date="2026-09-25",
+                     detector="region_sales", event_type="sales_decline",
+                     title="t", summary="s", severity="minor",
+                     scope={}, period={}, facts=[], score=60.0, breakdown={},
+                     metric="yoy", dim_keys={})
+    # 模拟 Task 6 归因回填
+    s.db.execute("UPDATE business_event SET status='analyzed',"
+                 " attribution_status='done', attribution_summary='归因摘要',"
+                 " attribution_run_id='gw-1' WHERE event_id='ev-1'")
+    s.db.commit()
+    # 次日延续（同 event_id 继续 upsert）
+    s.upsert_episode(event_key="K1", event_id="ev-1", data_date="2026-09-26",
+                     detector="region_sales", event_type="sales_decline",
+                     title="t2", summary="s2", severity="major",
+                     scope={}, period={}, facts=[], score=70.0, breakdown={},
+                     metric="yoy", dim_keys={})
+    ep = s.active_episode("K1")
+    assert ep["attribution_status"] == "done" and ep["attribution_summary"] == "归因摘要"
+    assert ep["attribution_run_id"] == "gw-1"
+    assert ep["first_seen_date"] == "2026-09-25" and ep["persist_days"] == 2
+    assert ep["status"] == "discovered"        # 契约：跨日新数据回 discovered（facts 已换，旧 analyzed 标签不作数）；UI 由 attribution_status 区分
+
+def test_backward_date_replay_keeps_persist_and_last_seen(tmp_path):
+    s = _store(tmp_path)
+    kw = dict(event_key="K1", event_id="ev-1", detector="region_sales",
+              event_type="sales_decline", title="t", summary="s", severity="minor",
+              scope={}, period={}, facts=[], score=60.0, breakdown={},
+              metric="yoy", dim_keys={})
+    s.upsert_episode(data_date="2026-09-26", **kw)
+    s.upsert_episode(data_date="2026-09-24", **kw)   # 倒序重放旧日期
+    ep = s.active_episode("K1")
+    assert ep["persist_days"] == 1 and ep["last_seen_date"] == "2026-09-26"
+
 def test_active_episode_lookup(tmp_path):
     s = _store(tmp_path)
     s.upsert_episode(event_key="K1", event_id="ev-1", data_date="2026-09-25",
