@@ -90,3 +90,12 @@ def test_active_episode_lookup(tmp_path):
     ep = s.active_episode("K1")
     assert ep["event_id"] == "ev-1" and ep["lifecycle"] == "active"
     assert s.active_episode("K-nope") is None
+
+def test_backward_date_replay_does_not_overwrite_scalars(tmp_path):
+    s = _store(tmp_path)
+    kw = dict(event_key="K1", event_id="ev-1", detector="region_sales",
+              event_type="sales_decline", title="t", summary="s", severity="minor",
+              scope={}, period={}, facts=[], breakdown={}, metric="yoy", dim_keys={})
+    s.upsert_episode(data_date="2026-09-26", score=70.0, **kw)
+    s.upsert_episode(data_date="2026-09-25", score=40.0, **kw)   # 倒序重放旧日期
+    assert s.active_episode("K1")["score"] == 70.0               # 旧数据不覆写标量

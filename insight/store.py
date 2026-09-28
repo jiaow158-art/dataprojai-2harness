@@ -60,21 +60,24 @@ class Store:
     # created_at / first_seen_date 全部重置为默认值（事件跨日延续即丢归因）。
     # 这里用 ON CONFLICT(event_id) DO UPDATE 只更新可变列，归因列不碰即保留。
     # 跨日新数据回到 discovered（attribution_* 保留最新归因，UI 由 attribution_status 区分）
+    # WHERE 守卫：倒序重放旧日期整体跳过（score/title/summary/severity 等标量不被旧数据覆写）
     def upsert_episode(self, event_key: str, event_id: str, data_date: str,
                        detector: str, event_type: str, title: str, summary: str,
                        severity: str, scope: dict, period: dict, facts: list,
-                       score: float, breakdown: dict, metric: str, dim_keys: dict) -> str:
+                       score: float, breakdown: dict, metric: str, dim_keys: dict,
+                       facets: dict | None = None) -> str:
+        facet_set = " facet_json=excluded.facet_json," if facets is not None else ""
         self.db.execute(
             "INSERT INTO business_event (event_id, event_key, lifecycle,"
             " data_date, first_seen_date, last_seen_date, persist_days, detector,"
             " event_type, title, summary, severity, scope_json, period_json, facts_json,"
-            " score, score_breakdown_json, metric, status, merged_from_json,"
+            " score, score_breakdown_json, metric, status, merged_from_json, facet_json,"
             " created_at, updated_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,strftime('%s','now'),"
-            "strftime('%s','now'))"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,"
+            "strftime('%s','now'),strftime('%s','now'))"
             " ON CONFLICT(event_id) DO UPDATE SET"
             " lifecycle='active',"
-            " data_date=MAX(excluded.data_date, data_date),"   # 倒序重放旧日期：不回退最近检测日
+            " data_date=MAX(excluded.data_date, data_date),"   # WHERE 已挡旧日期，双保险不回退
             " last_seen_date=MAX(excluded.last_seen_date, last_seen_date),"
             " persist_days=excluded.persist_days,"
             " detector=excluded.detector, event_type=excluded.event_type,"
@@ -83,7 +86,9 @@ class Store:
             " facts_json=excluded.facts_json, score=excluded.score,"
             " score_breakdown_json=excluded.score_breakdown_json, metric=excluded.metric,"
             " status=excluded.status, merged_from_json=excluded.merged_from_json,"
-            " updated_at=excluded.updated_at",
+            + facet_set +
+            " updated_at=excluded.updated_at"
+            " WHERE excluded.data_date >= business_event.data_date",
             (event_id, event_key, "active", data_date,
              self._first_seen(event_id, data_date), data_date,
              self._persist_days(event_id, data_date),
@@ -91,7 +96,8 @@ class Store:
              json.dumps(scope, ensure_ascii=False), json.dumps(period, ensure_ascii=False),
              json.dumps(facts, ensure_ascii=False), score,
              json.dumps(breakdown, ensure_ascii=False), metric, "discovered",
-             json.dumps(dim_keys, ensure_ascii=False) if dim_keys else None))
+             json.dumps(dim_keys, ensure_ascii=False) if dim_keys else None,
+             json.dumps(facets, ensure_ascii=False) if facets is not None else None))
         self.db.commit()
         return event_id
 

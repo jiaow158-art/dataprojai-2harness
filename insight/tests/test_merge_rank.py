@@ -70,6 +70,7 @@ def test_full_weight_path_target_83():
     assert sc["used_weights"] == RANKING["weights"]        # 仅真 N/A 才再归一
 
 # —— Task 3：episode 生命周期与合并（追加）——
+import json
 from insight.db import open_db
 from insight.store import Store
 from insight.merge_rank import update_episodes, TITLE_TEMPLATES
@@ -108,8 +109,45 @@ def test_merge_same_anchor_two_radars(tmp_path):
     assert len(evs) == 1                      # 同 event_key 合并：主发现=高分者
     assert evs[0]["detector"] == "region_sales"
     assert evs[0]["facets"]["gross_margin"] == {"delta_pct": -3.0}
+    facet = s.db.execute("SELECT facet_json FROM business_event").fetchone()
+    assert json.loads(facet["facet_json"]) == {"gross_margin": {"delta_pct": -3.0}}  # 合并证据链持久化
 
 def test_title_uses_template_not_detector_name():
     f = _finding(detector="region_sales", anchor="华南|GD01")
     t = TITLE_TEMPLATES["region_sales"](f)
     assert "华南|GD01" in t and "region_sales" not in t and "雷达" not in t
+
+# —— 质量复审修复（Fix 1/4 追加）——
+def test_same_day_rerun_idempotent(tmp_path):
+    s = _store(tmp_path)
+    update_episodes(s, "2026-09-25", [_finding(anchor="华南|GD01")])
+    ev2 = update_episodes(s, "2026-09-26", [_finding(anchor="华南|GD01")])
+    assert ev2[0]["persist_days"] == 2
+    first = s.db.execute("SELECT score, persist_days FROM business_event WHERE event_id=?",
+                         (ev2[0]["event_id"],)).fetchone()
+    rerun = update_episodes(s, "2026-09-26", [_finding(anchor="华南|GD01")])  # 同日重跑
+    assert rerun[0]["persist_days"] == 2                    # 内存视图不漂移
+    row = s.db.execute("SELECT score, persist_days FROM business_event WHERE event_id=?",
+                       (ev2[0]["event_id"],)).fetchone()
+    assert row["persist_days"] == 2 and row["score"] == first["score"]   # 落库 score 不漂移
+
+def test_resolve_lower_bound(tmp_path):
+    s = _store(tmp_path)
+    update_episodes(s, "2026-09-25", [_finding(anchor="华南|GD01")])
+    update_episodes(s, "2026-09-26", [_finding(anchor="华南|GD01")])
+    update_episodes(s, "2026-09-27", [])                    # 仅 clean 1 天
+    row = s.db.execute("SELECT lifecycle FROM business_event").fetchone()
+    assert row["lifecycle"] == "active"                     # clean<3 不 resolve
+
+def test_primary_detector_change_continues(tmp_path):
+    s = _store(tmp_path)
+    ev1 = update_episodes(s, "2026-09-25",
+                          [_finding(detector="region_sales", anchor="华南|GD01", norm=85)])
+    f = _finding(detector="gross_margin", anchor="华南|GD01", norm=95,
+                 metrics={"delta_pct": -3.0, "gmp_pct": 31.0})
+    ev2 = update_episodes(s, "2026-09-26", [f])
+    assert ev2[0]["event_id"] == ev1[0]["event_id"]         # spec v1.2 stable anchor：episode 延续
+    row = s.db.execute("SELECT event_type, title, metric FROM business_event"
+                       " WHERE event_id=?", (ev1[0]["event_id"],)).fetchone()
+    assert row["event_type"] == "margin_drop"               # 主发现变更：派生字段跟随
+    assert "毛利率" in row["title"] and row["metric"] == "gmp"

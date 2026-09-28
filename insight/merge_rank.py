@@ -118,7 +118,12 @@ def update_episodes(store, data_date: str, findings: list[dict]) -> list[dict]:
         group.sort(key=lambda f: (-f["norm_score"], f["detector"]))
         primary, facets_raw = group[0], group[1:]
         ep = store.active_episode(key)
-        persist = (ep["persist_days"] + 1) if ep else 1
+        if ep is None:
+            persist = 1
+        elif data_date > ep["last_seen_date"]:
+            persist = ep["persist_days"] + 1
+        else:                                  # 同日重跑/倒序重放：与 store._persist_days 守卫一致
+            persist = ep["persist_days"]
         fdict = {g["detector"]: g.get("metrics", {}) for g in facets_raw}
         sc = score_finding({**primary, "persist_days": persist})
         severity = "major" if sc["score"] >= RANKING["severity_bands"]["major"] else "minor"
@@ -137,7 +142,7 @@ def update_episodes(store, data_date: str, findings: list[dict]) -> list[dict]:
                                           "weights": sc["used_weights"]},
             metric={"region_sales": "yoy", "gross_margin": "gmp",
                     "ar_risk": "nat90", "target": "achieve"}[primary["detector"]],
-            dim_keys=primary["dim_keys"])
+            dim_keys=primary["dim_keys"], facets=fdict)   # 合并证据链落 facet_json（M-i3 详情页可用）
         out.append({"event_key": key, "event_id": event_id, "persist_days": persist,
                     "detector": primary["detector"], "lifecycle": "active",
                     "facets": fdict})
