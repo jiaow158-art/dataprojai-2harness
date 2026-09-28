@@ -68,3 +68,48 @@ def test_full_weight_path_target_83():
     sc = score_finding(f)
     assert sc["score"] == 83.0                             # 全五因子，无再归一
     assert sc["used_weights"] == RANKING["weights"]        # 仅真 N/A 才再归一
+
+# —— Task 3：episode 生命周期与合并（追加）——
+from insight.db import open_db
+from insight.store import Store
+from insight.merge_rank import update_episodes, TITLE_TEMPLATES
+
+def _store(tmp_path):
+    return Store(open_db(tmp_path / "i.db"))
+
+def test_new_episode_then_continue_then_resolve(tmp_path):
+    s = _store(tmp_path)
+    # 第 1 日：新发
+    ev1 = update_episodes(s, "2026-09-25", [_finding(anchor="华南|GD01")])
+    assert len(ev1) == 1 and ev1[0]["persist_days"] == 1 and ev1[0]["lifecycle"] == "active"
+    key = ev1[0]["event_key"]
+    # 第 2 日：延续
+    ev2 = update_episodes(s, "2026-09-26", [_finding(anchor="华南|GD01")])
+    assert ev2[0]["event_id"] == ev1[0]["event_id"] and ev2[0]["persist_days"] == 2
+    # 第 3-5 日无该锚 → resolve（clean 3 天）
+    for d in ("2026-09-27", "2026-09-28", "2026-09-29"):
+        update_episodes(s, d, [])
+    resolved = s.db.execute("SELECT lifecycle FROM business_event WHERE event_key=?",
+                            (key,)).fetchone()
+    assert resolved["lifecycle"] == "resolved"
+    # 第 6 日再发 → 新 episode（不复用）
+    ev3 = update_episodes(s, "2026-09-30", [_finding(anchor="华南|GD01")])
+    assert ev3[0]["event_id"] != ev1[0]["event_id"] and ev3[0]["persist_days"] == 1
+
+def test_merge_same_anchor_two_radars(tmp_path):
+    s = _store(tmp_path)
+    f1 = _finding(detector="region_sales", anchor="华南|GD01", norm=85)
+    f2 = _finding(detector="gross_margin", anchor="华南|GD01", norm=60,
+                  metrics={"delta_pct": -3.0})
+    # 同 anchor_id 同 anchor_type → 同 event_key → 合并
+    f2["dim_keys"] = {"anchor_type": "org_channel", "anchor_id": "华南|GD01",
+                      "channel": "GD01"}
+    evs = update_episodes(s, "2026-09-25", [f1, f2])
+    assert len(evs) == 1                      # 同 event_key 合并：主发现=高分者
+    assert evs[0]["detector"] == "region_sales"
+    assert evs[0]["facets"]["gross_margin"] == {"delta_pct": -3.0}
+
+def test_title_uses_template_not_detector_name():
+    f = _finding(detector="region_sales", anchor="华南|GD01")
+    t = TITLE_TEMPLATES["region_sales"](f)
+    assert "华南|GD01" in t and "region_sales" not in t and "雷达" not in t
