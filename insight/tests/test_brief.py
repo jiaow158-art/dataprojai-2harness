@@ -31,7 +31,8 @@ def test_freeze_writes_brief_and_snapshots(tmp_path):
 def test_late_finding_not_in_snapshot_but_episode_continues(tmp_path):
     late = {**_FI, "is_late": True, "norm_score": 90}
     s = _seed(tmp_path, [late])
-    out = freeze_brief(s, "2026-09-28", "2026-09-27", [])
+    out = freeze_brief(s, "2026-09-28", "2026-09-27",
+                       [{"detector": "region_sales", "ready": True}])
     assert out["event_count"] == 0                       # 晚到不进当日榜（P0-3）
     rows = s.db.execute("SELECT COUNT(*) c FROM daily_brief_event").fetchone()
     assert rows["c"] == 0
@@ -41,8 +42,9 @@ def test_late_finding_not_in_snapshot_but_episode_continues(tmp_path):
 
 def test_freeze_idempotent_same_day_rerun(tmp_path):
     s = _seed(tmp_path, [_FI])
-    freeze_brief(s, "2026-09-28", "2026-09-27", [])
-    freeze_brief(s, "2026-09-28", "2026-09-27", [])      # 重跑不翻倍不洗牌
+    _ok = [{"detector": "region_sales", "ready": True}]
+    freeze_brief(s, "2026-09-28", "2026-09-27", _ok)
+    freeze_brief(s, "2026-09-28", "2026-09-27", _ok)     # 重跑不翻倍不洗牌
     rows = s.db.execute("SELECT COUNT(*) c FROM daily_brief_event").fetchone()
     assert rows["c"] == 1
 
@@ -51,3 +53,12 @@ def test_not_ready_when_no_radar_ready(tmp_path):
     out = freeze_brief(s, "2026-09-28", "2026-09-27",
                        [{"detector": "region_sales", "ready": False}])
     assert out["status"] == "not_ready"                  # 数据未就绪≠无异常
+
+def test_empty_freshness_is_not_ready(tmp_path):
+    s = _seed(tmp_path, [_FI])
+    out = freeze_brief(s, "2026-09-28", "2026-09-27", [])   # 空=无就绪信息
+    assert out["status"] == "not_ready"                     # fail-closed：不得假平安发布
+    assert s.db.execute(
+        "SELECT COUNT(*) c FROM daily_brief_event").fetchone()["c"] == 0
+    assert s.db.execute(
+        "SELECT COUNT(*) c FROM business_event").fetchone()["c"] == 0   # 事件状态完全不动

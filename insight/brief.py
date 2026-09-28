@@ -2,15 +2,15 @@
 
 - 晚到 finding 已由 store 标 is_late=1：不进当日榜，但 update_episodes 用
   include_late=True 的全集延续生命周期（事件连续性与 freeze 解耦）。
-- 未就绪诚实态：雷达已回报但全部 ready=False → not_ready，且完全不动
-  episode 状态（无数据≠clean，跑 update_episodes 会误 resolve 活跃事件）。
-  freshness=[]（无就绪检查数据）不过门，直接按 findings 计算。
+- 未就绪诚实态（fail-closed）：freshness 为空（无就绪信息）或雷达已回报但
+  全部 ready=False → 一律 not_ready，且完全不动 episode 状态（无数据≠clean，
+  跑 update_episodes 会误 resolve 活跃事件；防线针对 worker 误传 [] 的假平安发布）。
 - 幂等：同 brief_date 重跑先删旧快照再写（重跑场景，不洗牌=同输入同输出）。"""
 import json
 from .merge_rank import update_episodes, rank_findings, event_key_of
 
 def freeze_brief(store, brief_date: str, data_date: str, freshness: list[dict]) -> dict:
-    if freshness and not any(r.get("ready") for r in freshness):
+    if not freshness or not any(r.get("ready") for r in freshness):
         store.db.execute(
             "INSERT OR REPLACE INTO daily_brief (brief_date, scope, status, cutoff_at,"
             " published_at, event_count, freshness_json, attribution_started_at)"
