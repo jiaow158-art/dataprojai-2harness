@@ -165,7 +165,7 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 ## 9. UI 接入（M-i3）
 
 ### BFF 接线
-- env：`INSIGHT_URL`（缺省 `http://127.0.0.1:58095`；未设时 BFF 的 /api/insight/* 返回 503 INSIGHT_UNAVAILABLE，chat 不受影响）
+- env：insight-api 默认监听 127.0.0.1:58095；BFF 的 `INSIGHT_URL` 未设 → /api/insight/* 返回 503 INSIGHT_UNAVAILABLE（无缺省值，必须显式设）
 - 灰度：`cd server && npm run insight:flag -- on <username>`（off/list 同理；flag 默认全关——只控驾驶舱入口，不做数据权限）
 - 部署顺序：insight-worker 首跑（建 insight.db）→ insight-api → BFF（INSIGHT_URL）→ web build（`cd web && npm run build`，静态产物由 BFF 托管）
 - 验证：`curl http://127.0.0.1:58095/api/insight/health`（经 BFF：登录态 + flag on 后 GET /api/insight/daily 应 200）
