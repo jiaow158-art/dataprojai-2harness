@@ -331,6 +331,8 @@ score = 0.30×经营影响度(标准化分) + 0.25×目标缺口贡献 + 0.20×�
 
 **Freeze 规则（P0-3）**：09:30 final 后冻结当日上榜 event_id / rank / score / severity / facts（快照落 `daily_brief_event`）。10:00 后仅允许 enrichment：attribution / executive summary / findings / entities / followup prompts。**晚到数据不得重洗当日 Top 3**——09:30 后到达的发现记 `detector_finding.is_late=1`，进 Event Center（标"晚到"）与下一轮候选，绝不静默改变已发布简报。
 
+> v1.2.3 勘误（2026-09-29）：is_late 判定改为发布态——当日简报已 final 后到达的发现记晚到；未发布首跑（含 09:30 后）照常发布（published_at 诚实记录）。归因对持续上榜事件按日重分析（分析日期落后当日即重归因，网关幂等键当日去重）。
+
 晨间体验两段式：早上打开="今天要关注什么"（事件+数字+影响分，全量可溯源）；10:30 后补齐"为什么"。周末照跑（周一早看周末累计），无异常自然显示无异常。
 
 ## 11. API contract

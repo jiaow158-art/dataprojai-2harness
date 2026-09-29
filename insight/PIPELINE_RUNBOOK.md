@@ -16,12 +16,40 @@ pm2 start python --name insight-worker --no-autorestart -- -m insight.worker_mai
 pm2 start python --name insight-api -- -m insight.api_main
 ```
 
+**cwd 前提**：pm2 进程的工作目录必须是**仓根**——`python -m insight.*` 靠 cwd 找到
+`insight` 包，cwd 不对直接 `ModuleNotFoundError: No module named 'insight'`。用
+`--cwd`（或 shell 包装先 `cd` 仓根再 exec）：
+
+```bash
+pm2 start python --name insight-api --cwd D:/dataprojai-2harness -- -m insight.api_main
+```
+
+**首次部署顺序**：先初始化 db 再起 api——api 的 `mode=ro` 连接在 db 文件不存在时
+直接打不开（worker 首跑前 api 抢跑会崩）：
+
+```bash
+python -c "import os; from insight.db import open_db; open_db(os.environ['INSIGHT_DB_PATH'])"
+```
+
 **触发节奏：固定 09:05 单发**（pm2 cron 或 Windows 任务计划程序均可，二选一）。
 实测四个雷达底表落数时点均 <09:00，09:05 单发已覆盖数据就绪；多轮晨间轮询留 M-i4 生产化。
 
 **双触发推荐配置**：cron 09:05（主跑：就绪探针→雷达→freeze）+ cron **10:05**（二发：
 skip-ran 跳过全部雷达，仅执行归因窗口逻辑，代价近零）——单发 09:05 会让归因当天永不触发
 （窗口 10:00 后），二发是生产自动归因的最小配置；14:00 前失败重试可再加 12:05 三发（可选）。
+
+**cron 机制示例**（双触发的落地，任选其一）：
+
+```bash
+# pm2 方式：--no-autorestart 退出即停，--cron-restart 到点拉起（与上方单发同一入口，双任务分名）
+pm2 start python --name insight-worker-0905 --no-autorestart --cron-restart "5 9 * * *" \
+  --cwd D:/dataprojai-2harness -- -m insight.worker_main
+pm2 start python --name insight-worker-1005 --no-autorestart --cron-restart "5 10 * * *" \
+  --cwd D:/dataprojai-2harness -- -m insight.worker_main
+```
+
+Windows 任务计划程序方式：每日两条任务（09:05 / 10:05），操作均为
+`python -m insight.worker_main`，**"起始于"必须填仓根**（同 cwd 前提）。
 
 **归因窗口提示**：`run_prod` 的归因阶段受 10:00-14:00 窗口门控，09:05 主跑时窗口未开、
 自动跳过（worker 打印完简报即退出）。若需**当日**完成归因，在窗口内（如 10:05）用同命令
@@ -56,8 +84,8 @@ worker 与 api 共用的环境变量（pm2 env 或系统级设置；**密钥只�
    `is_late=1`（发布态判定，见 §4）。
 4. **freeze**：当日非晚到 findings → episode → Top 3 榜单快照落 `daily_brief_event`，
    简报置 final。全雷达未就绪 → not_ready（fail-closed）。
-5. **归因（10:00-14:00 窗口）**：窗口内对榜上 `attribution_status != 'done'` 的事件
-   逐一提交网关（跳过 done 不重复烧 API）；09:05 主跑时窗口未开自动空过，见 §1。
+5. **归因（10:00-14:00 窗口）**：窗口内对榜上需归因事件（pending，或 done 但分析日期
+   落后当日——每日重归因）逐一提交网关；09:05 主跑时窗口未开自动空过，见 §1。
 
 ## 4. 重跑语义
 
@@ -70,8 +98,21 @@ worker 与 api 共用的环境变量（pm2 env 或系统级设置；**密钥只�
   not_ready。未 final 前同 brief_date 重跑：先删旧快照再写（同输入同输出）。
 - **late 判定（发布态）**：`is_late` 只在"该 brief_date 已发布 final 之后到达"时置位；
   **未发布前的首跑（含 09:30 后，如 10:30 补跑）照常发布**，不标 late——防"空 final 假平安"。
-- **归因层**：只处理 `attribution_status != 'done'` 的事件（重跑跳 done 不重复烧 API）；
-  网关侧幂等键 = `event_id:analysis_date`，同日重提原样返回旧任务。
+- **归因层**：done 且 analysis_date=当日才跳过——done 但分析日期落后当日会重归因
+  （每日重归因语义，见下节）；网关侧幂等键 = `event_id:analysis_date`，同日重提
+  原样返回旧任务。
+
+### 每日重归因语义
+
+归因循环不只跑 pending：**done 但 `event_analysis_run` 的最新 analysis_date 落后当日
+→ 重归因**——持续上榜事件的分析不得冻结在首日；仅 done 且当日已分析才跳过。幂等键
+`event_id:analysis_date` 保证当日多次触发（09:05/10:05/12:05）网关侧去重，同日重提
+原样返回旧任务、不重复烧 API；窗口（10:00-14:00）外触发一律不跑。
+
+**补归因**：机器在窗口内宕机错过当日归因时，窗口内补跑
+`python -m insight.worker_main --brief-date YYYY-MM-DD`（data_date 自动=前一日；
+雷达 skip-ran、freeze first-final-wins 均幂等，实际效果=补该日归因；窗口门控仍
+生效——整个窗口已错过则次日 10:05 二发自然重分析）。
 
 ## 5. 观测
 

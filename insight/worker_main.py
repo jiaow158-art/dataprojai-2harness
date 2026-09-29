@@ -89,14 +89,24 @@ def run_attributions(store: Store, brief_date: str, now_t: dtime) -> list[dict]:
                             "error": repr(e)[:200]})
     return results
 
+def _brief_date(argv: list[str]) -> str:
+    """--brief-date YYYY-MM-DD（可选）：补跑指定简报日（缺省 today）。补归因场景：
+    机器在 10:00-14:00 窗口内宕机后补发当日 Top——雷达 skip-ran、freeze
+    first-final-wins 均幂等，实际效果=补该日归因（窗口门控仍生效）。"""
+    if "--brief-date" in argv:
+        return date.fromisoformat(argv[argv.index("--brief-date") + 1]).isoformat()
+    return datetime.now().date().isoformat()
+
 def run_prod():
-    """生产入口（pm2）。env：INSIGHT_DB_PATH / DWS_* / GW_URL / GW_AUTH_TOKEN / INSIGHT_GW_USER。"""
+    """生产入口（pm2）。env：INSIGHT_DB_PATH / DWS_* / GW_URL / GW_AUTH_TOKEN / INSIGHT_GW_USER。
+    可选 --brief-date YYYY-MM-DD：补跑指定简报日（缺省 today）。"""
     import os
+    import sys
     from .watermark import Dependency, check_dependency
     store = Store(open_db(os.environ["INSIGHT_DB_PATH"]))
-    today = datetime.now().date()
-    data_date = (today - timedelta(days=1)).isoformat()
-    brief_date = today.isoformat()
+    d = date.fromisoformat(_brief_date(sys.argv[1:]))
+    data_date = (d - timedelta(days=1)).isoformat()
+    brief_date = d.isoformat()
     runners = {}
     wm_detail: dict[str, str] = {}            # watermark detail → radar_run.error 列
 

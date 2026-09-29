@@ -1,5 +1,7 @@
 # insight/tests/test_worker.py
+import sys
 from datetime import datetime, time as dtime
+import pytest
 from insight import worker_main
 from insight.brief import freeze_brief
 from insight.db import open_db
@@ -197,3 +199,34 @@ def test_run_attributions_isolation(tmp_path, monkeypatch):
     assert res[0]["event_id"] == ids[0] and res[0]["status"] == "failed" \
         and res[0]["error"]
     assert res[1]["event_id"] == ids[1] and res[1]["status"] == "done"
+
+# —— run_prod --brief-date（补归因入口）——
+
+def test_brief_date_arg_default_and_override():
+    from insight.worker_main import _brief_date
+    assert _brief_date(["--brief-date", "2026-09-29"]) == "2026-09-29"
+    assert _brief_date([]) == datetime.now().date().isoformat()   # 缺省 today
+    with pytest.raises(ValueError):                               # 非法日期显式炸
+        _brief_date(["--brief-date", "not-a-date"])
+
+def test_run_prod_brief_date_override_wiring(tmp_path, monkeypatch):
+    """--brief-date D：data_date=D-1、freeze 与归因循环均用 D（补归因路径接线）。"""
+    calls = {}
+
+    class FakeDT(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 30, 11, 0)
+
+    monkeypatch.setattr(worker_main, "datetime", FakeDT)
+    monkeypatch.setenv("INSIGHT_DB_PATH", str(tmp_path / "i.db"))
+    monkeypatch.setattr(worker_main, "run_day",
+                        lambda s, dd, bd, now, runner_for, watermark_ok, freshness_detail:
+                        calls.update(data_date=dd, brief_date=bd) or {"brief": {}})
+    monkeypatch.setattr(worker_main, "run_attributions",
+                        lambda s, bd, t: calls.update(attr_brief=bd, attr_t=t) or [])
+    monkeypatch.setattr(sys, "argv",
+                        ["-m", "insight.worker_main", "--brief-date", "2026-09-29"])
+    worker_main.run_prod()
+    assert calls["brief_date"] == "2026-09-29" and calls["data_date"] == "2026-09-28"
+    assert calls["attr_brief"] == "2026-09-29" and calls["attr_t"] == dtime(11, 0)

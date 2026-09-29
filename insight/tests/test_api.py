@@ -43,6 +43,31 @@ def test_daily_historical_reads_snapshots(base):
     st, body = _get(f"{base}/api/insight/daily?date=2026-09-28")
     assert st == 200 and body["events"][0]["eventId"]            # 快照还原（P0-2）
 
+def test_daily_historical_snapshot_survives_event_evolution(tmp_path):
+    """P0-2 加固：day1 发布后事件在 day2 演进（同锚更高分新 finding）→
+    business_event 当前态前移，但 ?date=day1 读到的仍是 day1 快照（发布面不漂移）。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    anchor = {"anchor_type": "org_channel", "anchor_id": "华南|GD01", "channel": "GD01"}
+    s.insert_finding("2026-09-27", "region_sales", anchor, {"yoy_pct": -11.2}, 85,
+                     is_late=False)
+    freeze_brief(s, "2026-09-28", "2026-09-27", [{"detector": "region_sales", "ready": True}])
+    snap1 = dict(s.db.execute("SELECT * FROM daily_brief_event"
+                              " WHERE brief_date='2026-09-28'").fetchone())
+    s.insert_finding("2026-09-28", "region_sales", anchor, {"yoy_pct": -25.0}, 95,
+                     is_late=False)                 # 同锚新 finding：persist 1→2、norm 85→95
+    freeze_brief(s, "2026-09-29", "2026-09-28", [{"detector": "region_sales", "ready": True}])
+    cur = s.db.execute("SELECT score FROM business_event WHERE event_id=?",
+                       (snap1["event_id"],)).fetchone()
+    assert cur["score"] != snap1["score_snapshot"]  # 事件确实演进（64.7 → 68.7）
+    srv, base = _serve(s)
+    try:
+        st, body = _get(f"{base}/api/insight/daily?date=2026-09-28")
+        assert st == 200 and body["events"][0]["eventId"] == snap1["event_id"]
+        assert body["events"][0]["score"] == snap1["score_snapshot"]   # day1 快照原值
+        assert body["events"][0]["score"] != cur["score"]              # 不随当前态漂移
+    finally:
+        srv.shutdown()
+
 def test_event_detail(base):
     st, daily = _get(f"{base}/api/insight/daily")
     eid = daily["events"][0]["eventId"]
