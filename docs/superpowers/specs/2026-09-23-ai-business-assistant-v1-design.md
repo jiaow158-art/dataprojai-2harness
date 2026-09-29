@@ -218,7 +218,7 @@ CREATE TABLE event_analysis_run (
   analysis_id TEXT PRIMARY KEY,     -- an-<uuid>
   event_id TEXT NOT NULL,           -- episode
   analysis_date TEXT NOT NULL,      -- 触发日（= brief_date）
-  gateway_run_id TEXT, status TEXT NOT NULL,  -- submitted|succeeded|degraded|failed
+  gateway_run_id TEXT, status TEXT NOT NULL,  -- done|degraded|failed（v1.2.2 勘误 2026-09-29：持久化三态；submitted/succeeded 为传输态永不落库，网关 EOF-无 done/cancelled 等非常规终态一律归一 failed）
   answer_md TEXT, report_path TEXT,
   parsed_json TEXT,                 -- schema 校验通过的结构化产物；校验失败为 NULL（降级态）
   submitted_at INTEGER, finished_at INTEGER);
