@@ -98,8 +98,8 @@ def _apply_event(res: AttributionResult, ev: str, payload: dict) -> None:
 
 
 def extract_structured(answer_md: str) -> dict | None:
-    """提取最后一个 ```json 块并做宽松 schema 校验；无证据 findings 条目剔除；
-    任何不满足 → None（调用方降级，绝不猜字段）。"""
+    """提取最后一个 ```json 块并做逐键类型校验（summary:str，其余四键:list；
+    缺键/错形 → None，绝不猜字段）；无证据 findings 条目剔除。"""
     blocks = _JSON_BLOCK.findall(answer_md or "")
     if not blocks:
         return None
@@ -107,8 +107,10 @@ def extract_structured(answer_md: str) -> dict | None:
         obj = json.loads(blocks[-1])
     except json.JSONDecodeError:
         return None
-    for k in ("summary", "path", "findings", "waterfall", "entities"):
-        if k not in obj or not isinstance(obj[k], (str, list)):
+    if not isinstance(obj, dict) or not isinstance(obj.get("summary"), str):
+        return None
+    for k in ("path", "findings", "waterfall", "entities"):
+        if not isinstance(obj.get(k), list):
             return None
     kept = [f for f in obj["findings"]
             if isinstance(f, dict) and str(f.get("evidence") or "").strip()]

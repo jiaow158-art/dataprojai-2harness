@@ -56,3 +56,28 @@ def test_extract_structured_ok_and_filters_unevidenced():
 def test_extract_structured_missing_block_degrades():
     parsed = extract_structured("没有 json 块的自然语言回答")
     assert parsed is None                                   # 严禁猜字段（P1-5）
+
+def test_extract_wrong_types_degrade():                    # 错形=降级（防 T6 InterfaceError）
+    def _blk(obj):
+        return "```json\n" + json.dumps(obj, ensure_ascii=False) + "\n```"
+    assert extract_structured(_blk({"summary": ["华南"], "path": [], "findings": [],
+                                   "waterfall": [], "entities": []})) is None
+    assert extract_structured(_blk({"summary": "x", "path": "集团→广东", "findings": [],
+                                   "waterfall": [], "entities": []})) is None
+
+def test_corrupted_data_event_dropped_stream_survives():   # 损坏帧丢弃不宽容（裁定核心）
+    sse = ("event: stage\ndata: {broken\n\n"
+           "event: answer\ndata: {\"markdown\":\"正常回答\"}\n\n"
+           "event: done\ndata: {\"status\":\"succeeded\"}\n\n")
+    res = parse_sse_stream(iter(sse.splitlines()))
+    assert res.status == "succeeded" and "正常回答" in res.answer_md
+    assert res.error_code == ""                             # 丢弃≠转成 error 事件
+
+def test_multi_data_line_frame_joins():                    # SSE 规范多 data 行 join 后解析
+    sse = ("id: 42\n"
+           "event: done\n"
+           "data: {\"status\":\n"
+           "data: \"failed\"}\n"
+           "\n")
+    res = parse_sse_stream(iter(sse.splitlines()))
+    assert res.status == "failed"
