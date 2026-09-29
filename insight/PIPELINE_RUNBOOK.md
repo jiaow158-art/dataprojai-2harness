@@ -161,3 +161,16 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 - **api 只读**：sqlite `mode=ro`、绑定 127.0.0.1、BFF 是唯一客户端；api 侧禁止任何写路径。
 - **engine-gateway / skills / 现有 chat 零改动**：insight 是旁路增量，归因经网关标准
   `/api/tasks` 契约提交（X-User=insight-svc），不碰既有会话与评测体系。
+
+## 9. UI 接入（M-i3）
+
+### BFF 接线
+- env：`INSIGHT_URL`（缺省 `http://127.0.0.1:58095`；未设时 BFF 的 /api/insight/* 返回 503 INSIGHT_UNAVAILABLE，chat 不受影响）
+- 灰度：`cd server && npm run insight:flag -- on <username>`（off/list 同理；flag 默认全关——只控驾驶舱入口，不做数据权限）
+- 部署顺序：insight-worker 首跑（建 insight.db）→ insight-api → BFF（INSIGHT_URL）→ web build（`cd web && npm run build`，静态产物由 BFF 托管）
+- 验证：`curl http://127.0.0.1:58095/api/insight/health`（经 BFF：登录态 + flag on 后 GET /api/insight/daily 应 200）
+
+### 前端
+- flag off 用户：登录默认落 chat 页，侧栏无驾驶舱入口——现状零变化
+- flag on 用户：登录默认落驾驶舱（今日经营关注）；事件详情 → 追问 → 自动跳聊天页并发送种子问题（走现有问数链路，SSE 流式照旧）
+- 人工验收：见 dataplat-ui 仓 `INSIGHT_UI_SMOKE.md`
