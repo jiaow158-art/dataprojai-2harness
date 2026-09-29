@@ -5,9 +5,12 @@ stdlib http.server（环境无 fastapi/flask，零新依赖；spec §4 技术描
 import json
 import re
 import sqlite3
+from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
+
+from .merge_rank import event_key_of
 
 _EVENT_ID_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)$")
 
@@ -18,6 +21,17 @@ def _daily_payload(db, brief_date: str) -> dict:
     brief = db.execute("SELECT * FROM daily_brief WHERE brief_date=?",
                        (brief_date,)).fetchone()
     freshness = json.loads(brief["freshness_json"])["radars"] if brief else []
+    if not brief or brief["status"] == "not_ready":
+        overall = "not_ready"       # fail-closed：无数据≠ready，绝不冒充（Fix 1）
+    elif any(not r.get("ready") for r in freshness):
+        overall = "partial"
+    else:
+        overall = "ready"
+    # P0-2 冻结面不含 status——读 business_event 当前态合规（Fix 4）
+    status_by_id = {r["event_id"]: r["status"] for r in
+                    _rows(db, "SELECT event_id, status FROM business_event"
+                          " WHERE event_id IN (SELECT event_id FROM daily_brief_event"
+                          " WHERE brief_date=?)", (brief_date,))}
     evs = []
     for s in _rows(db, "SELECT * FROM daily_brief_event WHERE brief_date=?"
                        " ORDER BY rank", (brief_date,)):
@@ -28,11 +42,11 @@ def _daily_payload(db, brief_date: str) -> dict:
                     "eventType": s["event_type_snapshot"], "metric": None,
                     "scope": {"范围": "瓷砖事业部"}, "period": {"类型": "月"},
                     "facts": json.loads(s["facts_snapshot"]),
-                    "score": s["score_snapshot"], "status": "discovered",
+                    "score": s["score_snapshot"],
+                    "status": status_by_id.get(s["event_id"], "discovered"),
                     "createdAt": s["published_at"]})
     return {"briefDate": brief_date, "scope": "瓷砖事业部",
-            "dataFreshness": {"overall": "ready" if evs or brief else "not_ready",
-                              "radars": freshness},
+            "dataFreshness": {"overall": overall, "radars": freshness},
             "eventCount": brief["event_count"] if brief else 0,
             "stale": False, "events": evs}
 
@@ -46,11 +60,14 @@ def _event_detail(db, event_id: str) -> dict | None:
                         " ORDER BY analysis_date DESC, analysis_id DESC LIMIT 1",
                         (event_id,)).fetchone()
     parsed = json.loads(latest["parsed_json"]) if latest and latest["parsed_json"] else None
-    evidence = _rows(db, "SELECT finding_id, detector, metrics_json, norm_score, is_late"
-                         " FROM detector_finding WHERE data_date=? ORDER BY finding_id",
-                     (ev["data_date"],))
-    for e in evidence:
+    evidence = []
+    for e in _rows(db, "SELECT finding_id, detector, dim_keys_json, metrics_json,"
+                       " norm_score, is_late FROM detector_finding"
+                       " WHERE data_date=? ORDER BY finding_id", (ev["data_date"],)):
+        if event_key_of({"dim_keys": json.loads(e.pop("dim_keys_json"))}) != ev["event_key"]:
+            continue                 # 只归属本事件的 findings（同锚多雷达 facet 含内，Fix 2）
         e["metrics"] = json.loads(e.pop("metrics_json"))
+        evidence.append(e)
     return {"event": {k: ev[k] for k in ("event_id", "event_key", "lifecycle",
                                           "data_date", "first_seen_date", "persist_days",
                                           "detector", "event_type", "title", "summary",
@@ -90,24 +107,38 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
             q = parse_qs(u.query)
             try:
                 if u.path == "/api/insight/daily":
-                    date = (q.get("date") or [""])[0]
-                    payload = _daily_payload(ro, date) if date else _daily_payload(
-                        ro, ro.execute("SELECT MAX(brief_date) b FROM daily_brief"
-                                       ).fetchone()["b"] or "1970-01-01")
+                    want = (q.get("date") or [""])[0]
+                    if want:
+                        payload = _daily_payload(ro, want)  # 显式回看：stale 恒 False
+                    else:
+                        latest = (ro.execute("SELECT MAX(brief_date) b FROM daily_brief"
+                                             ).fetchone()["b"]) or "1970-01-01"
+                        payload = _daily_payload(ro, latest)
+                        payload["stale"] = latest < date.today().isoformat()  # Fix 3
                     body, code = payload, 200
                 elif (m := _EVENT_ID_RE.match(u.path)):
                     detail = _event_detail(ro, m.group(1))
                     body, code = (detail, 200) if detail else ({"error": "NOT_FOUND"}, 404)
                 elif u.path == "/api/insight/timeline":
-                    days = int((q.get("days") or ["30"])[0])
-                    body = [{"eventId": r["event_id"], "title": r["title"],
-                             "severity": r["severity"], "dataDate": r["data_date"],
-                             "createdAt": r["updated_at"]}
-                            for r in _rows(ro, "SELECT * FROM business_event"
-                                                 " ORDER BY updated_at DESC LIMIT ?", (days,))]
-                    code = 200
+                    try:
+                        days = int((q.get("days") or ["30"])[0])
+                        if days < 0:
+                            raise ValueError
+                        body = [{"eventId": r["event_id"], "title": r["title"],
+                                 "severity": r["severity"], "dataDate": r["data_date"],
+                                 "createdAt": r["created_at"]}   # updated_at 因归因回填会重排（Fix 3）
+                                for r in _rows(ro, "SELECT * FROM business_event"
+                                                   " ORDER BY created_at DESC LIMIT ?",
+                                               (days,))]
+                        code = 200
+                    except ValueError:
+                        body, code = {"error": "BAD_DAYS"}, 400
                 elif u.path == "/api/insight/health":
-                    body, code = {"ok": True, "db": "open"}, 200
+                    try:
+                        ro.execute("SELECT 1")
+                        body, code = {"ok": True, "db": "open"}, 200
+                    except Exception:
+                        body, code = {"ok": False, "db": "error"}, 200
                 else:
                     body, code = {"error": "NOT_FOUND"}, 404
             except Exception as e:
