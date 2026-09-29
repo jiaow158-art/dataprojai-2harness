@@ -129,14 +129,17 @@ def _gw_cfg() -> dict:
             "user": os.environ.get("INSIGHT_GW_USER", "insight-svc")}
 
 
-def _gw_submit(prompt: str) -> str:
+def _gw_submit(prompt: str, client_submission_id: str) -> str:
     cfg = _gw_cfg()
     u = _urlparse(cfg["url"])
     conn = _http.HTTPConnection(u.hostname, u.port or 80, timeout=30)
-    body = json.dumps({"question": prompt})
+    body = json.dumps({"question": prompt,
+                       "client_submission_id": client_submission_id}).encode("utf-8")
+    # bytes body：http.client 自设字节精确的 Content-Length（中文 prompt 下手工
+    # len(str) 会算字符数而非字节数）
     conn.request("POST", "/api/tasks", body, {
         "Authorization": f"Bearer {cfg['token']}", "X-User": cfg["user"],
-        "Content-Type": "application/json", "Content-Length": str(len(body))})
+        "Content-Type": "application/json"})
     resp = conn.getresponse()
     data = resp.read().decode("utf-8", "replace")
     conn.close()
@@ -171,17 +174,24 @@ def run_attribution(store, event_id: str, analysis_date: str) -> dict:
     持久化三态 done|degraded|failed（succeeded/submitted 只是传输层中间态，不落库）。"""
     ev = store.db.execute("SELECT * FROM business_event WHERE event_id=?",
                           (event_id,)).fetchone()
+    if ev is None:
+        raise ValueError(f"event not found: {event_id}")
     prompt = build_prompt(title=ev["title"], summary=ev["summary"], metric=ev["metric"],
                           scope=json.loads(ev["scope_json"]).get("范围", "瓷砖事业部"),
                           period=json.loads(ev["period_json"]).get("类型", "月"),
                           facts=json.loads(ev["facts_json"]), detector=ev["detector"])
     result = AttributionResult(status="submitted")
     try:
-        result.run_id = _gw_submit(prompt)
+        result.run_id = _gw_submit(prompt, f"{event_id}:{analysis_date}")
         result = _gw_consume(result.run_id)
     except Exception as e:                      # 网关层任何异常 → failed（重试由 worker 编排）
         result.status = "failed"
         result.degraded_reason = repr(e)[:200]  # 网关异常不含 token（只进请求头）
+    if result.status not in ("succeeded", "failed"):
+        # 非异常的非 succeeded 终态归一：EOF 无 done（status=""）或 done 带未知
+        # 终态（如 cancelled）——先记 reason 再改 status，保留原始终态语义
+        result.degraded_reason = f"gateway-terminal:{result.status or 'no-done-event'}"
+        result.status = "failed"
 
     parsed = None
     if result.status == "succeeded":
@@ -206,7 +216,7 @@ def run_attribution(store, event_id: str, analysis_date: str) -> dict:
         " attribution_generated_at=strftime('%s','now'),"
         " status=CASE WHEN ?='done' THEN 'analyzed' ELSE status END,"
         " updated_at=strftime('%s','now') WHERE event_id=?",
-        (result.status, (parsed or {}).get("summary", result.answer_md[:200]),
+        (result.status, (parsed or {}).get("summary") or ev["summary"],
          json.dumps(parsed, ensure_ascii=False) if parsed else None,
          result.run_id, result.status, event_id))
     store.db.commit()

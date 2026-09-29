@@ -103,9 +103,10 @@ def test_run_attribution_persists_analysis_and_updates_event(tmp_path, monkeypat
     _mk_event(s)
     calls = {"submit": 0, "sse": 0}
 
-    def fake_submit(prompt: str) -> str:
+    def fake_submit(prompt: str, client_submission_id: str) -> str:
         calls["submit"] += 1
         assert "华南零售销售连续下滑" in prompt
+        assert client_submission_id == "ev-1:2026-09-28"   # 同日重试网关幂等键
         return "gw-run-1"
 
     def fake_consume(run_id: str):
@@ -131,7 +132,7 @@ def test_run_attribution_persists_analysis_and_updates_event(tmp_path, monkeypat
 def test_run_attribution_degrades_without_json(monkeypatch, tmp_path):
     s = Store(open_db(tmp_path / "i.db"))
     _mk_event(s)
-    monkeypatch.setattr("insight.attribution._gw_submit", lambda p: "gw-run-2")
+    monkeypatch.setattr("insight.attribution._gw_submit", lambda p, cid: "gw-run-2")
     bad = AttributionResult(run_id="gw-run-2", status="succeeded",
                             answer_md="纯自然语言没有代码块")
     monkeypatch.setattr("insight.attribution._gw_consume", lambda rid: bad)
@@ -140,14 +141,15 @@ def test_run_attribution_degrades_without_json(monkeypatch, tmp_path):
     row = s.db.execute("SELECT answer_md, parsed_json, status FROM event_analysis_run").fetchone()
     assert "纯自然语言" in row["answer_md"] and row["parsed_json"] is None
     assert row["status"] == "degraded"
-    ev = s.db.execute("SELECT attribution_status, status FROM business_event"
-                      " WHERE event_id='ev-1'").fetchone()
+    ev = s.db.execute("SELECT attribution_status, attribution_summary, status"
+                      " FROM business_event WHERE event_id='ev-1'").fetchone()
     assert ev["attribution_status"] == "degraded" and ev["status"] == "discovered"
+    assert ev["attribution_summary"] == "s"    # 无结构化摘要→退回检测层摘要（_mk_event 的 "s"）
 
 def test_run_attribution_gateway_failure(tmp_path, monkeypatch):
     s = Store(open_db(tmp_path / "i.db"))
     _mk_event(s)
-    def boom(prompt):
+    def boom(prompt, client_submission_id):
         raise RuntimeError("gateway down")
     monkeypatch.setattr("insight.attribution._gw_submit", boom)
     res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
@@ -157,3 +159,33 @@ def test_run_attribution_gateway_failure(tmp_path, monkeypatch):
     ev = s.db.execute("SELECT attribution_status, status FROM business_event"
                       " WHERE event_id='ev-1'").fetchone()
     assert ev["attribution_status"] == "failed" and ev["status"] == "discovered"
+
+def test_run_attribution_eof_no_done_normalizes_failed(tmp_path, monkeypatch):
+    s = Store(open_db(tmp_path / "i.db"))
+    _mk_event(s)
+    monkeypatch.setattr("insight.attribution._gw_submit", lambda p, cid: "gw-run-3")
+    eof = AttributionResult(run_id="gw-run-3", status="", answer_md="流断在 stage 后")
+    monkeypatch.setattr("insight.attribution._gw_consume", lambda rid: eof)
+    res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
+    assert res["status"] == "failed"                          # EOF 无 done → 归一 failed
+    assert res["degraded_reason"] == "gateway-terminal:no-done-event"
+    row = s.db.execute("SELECT status, answer_md FROM event_analysis_run").fetchone()
+    assert row["status"] == "failed" and "流断" in row["answer_md"]  # 原文仍留档
+    ev = s.db.execute("SELECT attribution_status FROM business_event"
+                      " WHERE event_id='ev-1'").fetchone()
+    assert ev["attribution_status"] == "failed"
+
+def test_run_attribution_cancelled_normalizes_failed(tmp_path, monkeypatch):
+    s = Store(open_db(tmp_path / "i.db"))
+    _mk_event(s)
+    monkeypatch.setattr("insight.attribution._gw_submit", lambda p, cid: "gw-run-4")
+    cxl = AttributionResult(run_id="gw-run-4", status="cancelled", answer_md="")
+    monkeypatch.setattr("insight.attribution._gw_consume", lambda rid: cxl)
+    res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
+    assert res["status"] == "failed"                          # 未知终态 → 归一 failed
+    assert res["degraded_reason"] == "gateway-terminal:cancelled"
+    row = s.db.execute("SELECT status FROM event_analysis_run").fetchone()
+    assert row["status"] == "failed"
+    ev = s.db.execute("SELECT attribution_status FROM business_event"
+                      " WHERE event_id='ev-1'").fetchone()
+    assert ev["attribution_status"] == "failed"
