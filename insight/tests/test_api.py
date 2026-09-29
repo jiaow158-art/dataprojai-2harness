@@ -37,6 +37,7 @@ def test_daily_today(base):
     ev = body["events"][0]
     assert ev["title"].endswith("业绩连续下滑") and "雷达" not in ev["title"]
     assert ev["severity"] in ("major", "minor")
+    assert ev["eventKey"] and ev["metric"] == "yoy"    # 契约补全：回查 business_event，非 None
 
 def test_daily_historical_reads_snapshots(base):
     st, body = _get(f"{base}/api/insight/daily?date=2026-09-28")

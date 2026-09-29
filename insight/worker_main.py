@@ -67,16 +67,20 @@ def run_day(store: Store, data_date: str, brief_date: str, now: datetime,
     return {"brief": brief}
 
 def run_attributions(store: Store, brief_date: str, now_t: dtime) -> list[dict]:
-    """归因循环（可测）：窗口外返回空表；只归因榜上 attribution_status != 'done'
-    的事件（重跑跳 done 不重复烧 API）；单事件异常记 failed 不中断后续。"""
+    """归因循环（可测）：窗口外返回空表；每日重归因裁定——done 且 analysis_date=当日
+    才跳过，分析日期落后当日即重归因（持续上榜事件的分析不得冻结在首日）；幂等键
+    event_id:analysis_date 保证当日多次触发网关去重；单事件异常记 failed 不中断后续。"""
     if not (ATTRIBUTION_FROM <= now_t <= ATTRIBUTION_UNTIL):
         return []
     results = []
     for row in store.db.execute(
             "SELECT b.event_id FROM daily_brief_event b"
             " JOIN business_event e ON e.event_id = b.event_id"
-            " WHERE b.brief_date=? AND e.attribution_status != 'done'"
-            " ORDER BY b.rank", (brief_date,)).fetchall():
+            " LEFT JOIN (SELECT event_id, MAX(analysis_date) ad FROM event_analysis_run"
+            " GROUP BY event_id) a ON a.event_id = b.event_id"
+            " WHERE b.brief_date=? AND (e.attribution_status != 'done'"
+            " OR a.ad IS NULL OR a.ad < ?)"
+            " ORDER BY b.rank", (brief_date, brief_date)).fetchall():
         try:
             r = run_attribution(store, row["event_id"], brief_date)
             results.append({"event_id": row["event_id"], **r})

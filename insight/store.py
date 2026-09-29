@@ -59,7 +59,8 @@ class Store:
     # 注意：不用 INSERT OR REPLACE——REPLACE 是 DELETE+INSERT，会把 attribution_* /
     # created_at / first_seen_date 全部重置为默认值（事件跨日延续即丢归因）。
     # 这里用 ON CONFLICT(event_id) DO UPDATE 只更新可变列，归因列不碰即保留。
-    # 跨日新数据回到 discovered（attribution_* 保留最新归因，UI 由 attribution_status 区分）
+    # status 单调不回退：跨日/同日重复 upsert 均不把 analyzed 打回 discovered
+    # （attribution_* 保留最新归因，UI 由 attribution_status 区分新旧）
     # WHERE 守卫：倒序重放旧日期整体跳过（score/title/summary/severity 等标量不被旧数据覆写）
     def upsert_episode(self, event_key: str, event_id: str, data_date: str,
                        detector: str, event_type: str, title: str, summary: str,
@@ -85,7 +86,10 @@ class Store:
             " scope_json=excluded.scope_json, period_json=excluded.period_json,"
             " facts_json=excluded.facts_json, score=excluded.score,"
             " score_breakdown_json=excluded.score_breakdown_json, metric=excluded.metric,"
-            " status=excluded.status, merged_from_json=excluded.merged_from_json,"
+            " status=CASE WHEN business_event.status='analyzed'"
+            " AND excluded.status='discovered' THEN business_event.status"
+            " ELSE excluded.status END,"
+            " merged_from_json=excluded.merged_from_json,"
             + facet_set +
             " updated_at=excluded.updated_at"
             " WHERE excluded.data_date >= business_event.data_date",

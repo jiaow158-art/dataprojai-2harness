@@ -166,17 +166,22 @@ def test_run_attributions_window(tmp_path, monkeypatch):
     assert worker_main.run_attributions(s, "2026-09-28", dtime(14, 1)) == []  # 越窗不跑
     assert not calls
 
-def test_run_attributions_skips_done(tmp_path, monkeypatch):
+def test_run_attributions_skips_done_today_reanalyses_stale(tmp_path, monkeypatch):
+    """每日重归因裁定：done+analysis_date=当日 → 跳过；done+分析日期落后当日 → 重归因。"""
     s = _published_store(tmp_path)
     ids = _ranked_event_ids(s)
-    s.db.execute("UPDATE business_event SET attribution_status='done' WHERE event_id=?",
-                 (ids[0],))
+    for eid, ad in ((ids[0], "2026-09-28"), (ids[1], "2026-09-27")):  # 今日/昨日分析
+        s.db.execute("UPDATE business_event SET attribution_status='done' WHERE event_id=?",
+                     (eid,))
+        s.db.execute("INSERT INTO event_analysis_run (analysis_id, event_id, analysis_date,"
+                     " gateway_run_id, status, submitted_at, finished_at)"
+                     " VALUES (?,?,?,'gw-x','done',0,0)", (f"an-{ad}", eid, ad))
     s.db.commit()
     calls = []
     monkeypatch.setattr(worker_main, "run_attribution",
                         lambda store, eid, d: calls.append(eid) or {"status": "done"})
     res = worker_main.run_attributions(s, "2026-09-28", dtime(11, 0))
-    assert calls == [ids[1]]                                # 只归因 pending
+    assert calls == [ids[1]]          # 今日已分析的跳过；分析日期落后的重归因（幂等键当日去重）
     assert len(res) == 1
 
 def test_run_attributions_isolation(tmp_path, monkeypatch):

@@ -27,23 +27,26 @@ def _daily_payload(db, brief_date: str) -> dict:
         overall = "partial"
     else:
         overall = "ready"
-    # P0-2 冻结面不含 status——读 business_event 当前态合规（Fix 4）
-    status_by_id = {r["event_id"]: r["status"] for r in
-                    _rows(db, "SELECT event_id, status FROM business_event"
-                          " WHERE event_id IN (SELECT event_id FROM daily_brief_event"
-                          " WHERE brief_date=?)", (brief_date,))}
+    # P0-2 冻结面不含 status/event_key/metric——读 business_event 当前态合规（Fix 4；
+    # event_key 是锚点恒定身份、metric 事件内不变，回查即契约值）
+    cur_by_id = {r["event_id"]: r for r in
+                 _rows(db, "SELECT event_id, status, event_key, metric FROM business_event"
+                       " WHERE event_id IN (SELECT event_id FROM daily_brief_event"
+                       " WHERE brief_date=?)", (brief_date,))}
     evs = []
     for s in _rows(db, "SELECT * FROM daily_brief_event WHERE brief_date=?"
                        " ORDER BY rank", (brief_date,)):
-        evs.append({"eventId": s["event_id"], "eventKey": None, "lifecycle":
-                    s["lifecycle_snapshot"], "persistDays": s["persist_days_snapshot"],
+        cur = cur_by_id.get(s["event_id"], {})
+        evs.append({"eventId": s["event_id"], "eventKey": cur.get("event_key"),
+                    "lifecycle": s["lifecycle_snapshot"],
+                    "persistDays": s["persist_days_snapshot"],
                     "title": s["title_snapshot"], "summary": s["summary_snapshot"],
                     "severity": s["severity_snapshot"],
-                    "eventType": s["event_type_snapshot"], "metric": None,
+                    "eventType": s["event_type_snapshot"], "metric": cur.get("metric"),
                     "scope": {"范围": "瓷砖事业部"}, "period": {"类型": "月"},
                     "facts": json.loads(s["facts_snapshot"]),
                     "score": s["score_snapshot"],
-                    "status": status_by_id.get(s["event_id"], "discovered"),
+                    "status": cur.get("status", "discovered"),
                     "createdAt": s["published_at"]})
     return {"briefDate": brief_date, "scope": "瓷砖事业部",
             "dataFreshness": {"overall": overall, "radars": freshness},
@@ -57,7 +60,8 @@ def _event_detail(db, event_id: str) -> dict | None:
         return None
     ev = dict(ev)
     latest = db.execute("SELECT * FROM event_analysis_run WHERE event_id=?"
-                        " ORDER BY analysis_date DESC, analysis_id DESC LIMIT 1",
+                        " ORDER BY analysis_date DESC, submitted_at DESC,"
+                        " analysis_id DESC LIMIT 1",
                         (event_id,)).fetchone()
     parsed = json.loads(latest["parsed_json"]) if latest and latest["parsed_json"] else None
     evidence = []
