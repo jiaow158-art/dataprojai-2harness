@@ -2,7 +2,10 @@
 import json
 import pytest
 from insight.attribution import (build_prompt, parse_sse_stream,
-                                 extract_structured, AttributionResult)
+                                 extract_structured, AttributionResult,
+                                 run_attribution)
+from insight.db import open_db
+from insight.store import Store
 
 ANSWER_OK = """华南零售下滑主要来自广东区域（贡献约 61%）。
 
@@ -81,3 +84,76 @@ def test_multi_data_line_frame_joins():                    # SSE 规范多 data 
            "\n")
     res = parse_sse_stream(iter(sse.splitlines()))
     assert res.status == "failed"
+
+# —— Task 6：run_attribution 编排（网关传输函数 monkeypatch，不碰真网关）——
+
+def _mk_event(s, detector="region_sales", event_type="sales_decline",
+              title="华南零售销售连续下滑"):
+    s.upsert_episode(event_key="K1", event_id="ev-1", data_date="2026-09-27",
+                     detector=detector, event_type=event_type,
+                     title=title, summary="s", severity="major",
+                     scope={"范围": "瓷砖事业部"}, period={"类型": "月"},
+                     facts=[{"label": "同比", "value": "-11.2%"}], score=80.0,
+                     breakdown={}, metric="yoy",
+                     dim_keys={"anchor_type": "org_channel", "anchor_id": "华南|GD01",
+                               "channel": "GD01"})
+
+def test_run_attribution_persists_analysis_and_updates_event(tmp_path, monkeypatch):
+    s = Store(open_db(tmp_path / "i.db"))
+    _mk_event(s)
+    calls = {"submit": 0, "sse": 0}
+
+    def fake_submit(prompt: str) -> str:
+        calls["submit"] += 1
+        assert "华南零售销售连续下滑" in prompt
+        return "gw-run-1"
+
+    def fake_consume(run_id: str):
+        calls["sse"] += 1
+        r = parse_sse_stream(iter(_SSE.splitlines()))
+        r.run_id = run_id
+        r.status = "succeeded"
+        return r
+
+    monkeypatch.setattr("insight.attribution._gw_submit", fake_submit)
+    monkeypatch.setattr("insight.attribution._gw_consume", fake_consume)
+    res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
+    assert res["status"] == "done" and res["parsed"] is not None
+    assert calls == {"submit": 1, "sse": 1}
+    row = s.db.execute("SELECT * FROM event_analysis_run").fetchone()
+    assert row["gateway_run_id"] == "gw-run-1" and row["parsed_json"] is not None
+    assert row["status"] == "done"
+    ev = s.db.execute("SELECT attribution_status, attribution_summary, status FROM business_event"
+                      " WHERE event_id='ev-1'").fetchone()
+    assert ev["attribution_status"] == "done" and ev["status"] == "analyzed"
+    assert ev["attribution_summary"].startswith("华南零售")
+
+def test_run_attribution_degrades_without_json(monkeypatch, tmp_path):
+    s = Store(open_db(tmp_path / "i.db"))
+    _mk_event(s)
+    monkeypatch.setattr("insight.attribution._gw_submit", lambda p: "gw-run-2")
+    bad = AttributionResult(run_id="gw-run-2", status="succeeded",
+                            answer_md="纯自然语言没有代码块")
+    monkeypatch.setattr("insight.attribution._gw_consume", lambda rid: bad)
+    res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
+    assert res["status"] == "degraded"                    # 降级但原文存档
+    row = s.db.execute("SELECT answer_md, parsed_json, status FROM event_analysis_run").fetchone()
+    assert "纯自然语言" in row["answer_md"] and row["parsed_json"] is None
+    assert row["status"] == "degraded"
+    ev = s.db.execute("SELECT attribution_status, status FROM business_event"
+                      " WHERE event_id='ev-1'").fetchone()
+    assert ev["attribution_status"] == "degraded" and ev["status"] == "discovered"
+
+def test_run_attribution_gateway_failure(tmp_path, monkeypatch):
+    s = Store(open_db(tmp_path / "i.db"))
+    _mk_event(s)
+    def boom(prompt):
+        raise RuntimeError("gateway down")
+    monkeypatch.setattr("insight.attribution._gw_submit", boom)
+    res = run_attribution(s, event_id="ev-1", analysis_date="2026-09-28")
+    assert res["status"] == "failed" and "gateway down" in res["degraded_reason"]
+    row = s.db.execute("SELECT * FROM event_analysis_run").fetchone()  # 失败也留审计行
+    assert row is not None and row["status"] == "failed"
+    ev = s.db.execute("SELECT attribution_status, status FROM business_event"
+                      " WHERE event_id='ev-1'").fetchone()
+    assert ev["attribution_status"] == "failed" and ev["status"] == "discovered"

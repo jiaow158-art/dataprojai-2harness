@@ -5,8 +5,11 @@
 GET /api/tasks/{run_id}/events（事件 stage/sql/answer/report/error/done）。
 解析失败严禁从自然语言猜字段——直接降级（检测层事实+AI 原文+继续问AI）。"""
 import json
+import os
 import re
+import http.client as _http
 from dataclasses import dataclass
+from urllib.parse import urlparse as _urlparse
 
 
 @dataclass
@@ -116,3 +119,101 @@ def extract_structured(answer_md: str) -> dict | None:
             if isinstance(f, dict) and str(f.get("evidence") or "").strip()]
     obj["findings"] = kept
     return obj
+
+
+# —— 网关传输与编排（Task 6 追加；传输函数可 monkeypatch 测试）——
+
+def _gw_cfg() -> dict:
+    return {"url": os.environ.get("GW_URL", "http://127.0.0.1:58080"),
+            "token": os.environ.get("GW_AUTH_TOKEN", ""),
+            "user": os.environ.get("INSIGHT_GW_USER", "insight-svc")}
+
+
+def _gw_submit(prompt: str) -> str:
+    cfg = _gw_cfg()
+    u = _urlparse(cfg["url"])
+    conn = _http.HTTPConnection(u.hostname, u.port or 80, timeout=30)
+    body = json.dumps({"question": prompt})
+    conn.request("POST", "/api/tasks", body, {
+        "Authorization": f"Bearer {cfg['token']}", "X-User": cfg["user"],
+        "Content-Type": "application/json", "Content-Length": str(len(body))})
+    resp = conn.getresponse()
+    data = resp.read().decode("utf-8", "replace")
+    conn.close()
+    if resp.status != 201:
+        # 注意：错误信息只带响应体前 120 字符（网关响应不含 token，token 只进请求头）
+        raise RuntimeError(f"gateway submit {resp.status}: {data[:120]}")
+    return json.loads(data)["run_id"]
+
+
+def _gw_consume(run_id: str) -> AttributionResult:
+    """SSE 长连接读到 done（镜像 ask.py：一次连接顺序读事件行）。"""
+    cfg = _gw_cfg()
+    u = _urlparse(cfg["url"])
+    conn = _http.HTTPConnection(u.hostname, u.port or 80, timeout=1900)
+    conn.request("GET", f"/api/tasks/{run_id}/events", headers={
+        "Authorization": f"Bearer {cfg['token']}", "X-User": cfg["user"]})
+    resp = conn.getresponse()
+    if resp.status != 200:
+        conn.close()
+        raise RuntimeError(f"gateway events {resp.status}")
+    lines = (raw.decode("utf-8", "replace").rstrip("\r\n") for raw in resp)
+    res = parse_sse_stream(lines)
+    res.run_id = run_id
+    conn.close()
+    return res
+
+
+def run_attribution(store, event_id: str, analysis_date: str) -> dict:
+    """提交→消费→提取→落 event_analysis_run（每行一版本）→更新事件当前态。
+
+    失败/超时/JSON 校验失败 → failed|degraded；事件照常在榜（归因是增强不是阻塞）。
+    持久化三态 done|degraded|failed（succeeded/submitted 只是传输层中间态，不落库）。"""
+    ev = store.db.execute("SELECT * FROM business_event WHERE event_id=?",
+                          (event_id,)).fetchone()
+    prompt = build_prompt(title=ev["title"], summary=ev["summary"], metric=ev["metric"],
+                          scope=json.loads(ev["scope_json"]).get("范围", "瓷砖事业部"),
+                          period=json.loads(ev["period_json"]).get("类型", "月"),
+                          facts=json.loads(ev["facts_json"]), detector=ev["detector"])
+    result = AttributionResult(status="submitted")
+    try:
+        result.run_id = _gw_submit(prompt)
+        result = _gw_consume(result.run_id)
+    except Exception as e:                      # 网关层任何异常 → failed（重试由 worker 编排）
+        result.status = "failed"
+        result.degraded_reason = repr(e)[:200]  # 网关异常不含 token（只进请求头）
+
+    parsed = None
+    if result.status == "succeeded":
+        parsed = extract_structured(result.answer_md)
+        if parsed is None:
+            result.status = "degraded"
+            result.degraded_reason = "no-valid-json-block"
+        else:
+            result.status = "done"
+
+    store.db.execute(
+        "INSERT INTO event_analysis_run (analysis_id, event_id, analysis_date,"
+        " gateway_run_id, status, answer_md, report_path, parsed_json,"
+        " submitted_at, finished_at)"
+        " VALUES (?,?,?,?,?,?,?,?,strftime('%s','now'),strftime('%s','now'))",
+        (_uid("an"), event_id, analysis_date, result.run_id, result.status,
+         result.answer_md, result.report_path,
+         json.dumps(parsed, ensure_ascii=False) if parsed else None))
+    store.db.execute(
+        "UPDATE business_event SET attribution_status=?, attribution_summary=?,"
+        " attribution_json=?, attribution_run_id=?,"
+        " attribution_generated_at=strftime('%s','now'),"
+        " status=CASE WHEN ?='done' THEN 'analyzed' ELSE status END,"
+        " updated_at=strftime('%s','now') WHERE event_id=?",
+        (result.status, (parsed or {}).get("summary", result.answer_md[:200]),
+         json.dumps(parsed, ensure_ascii=False) if parsed else None,
+         result.run_id, result.status, event_id))
+    store.db.commit()
+    return {"status": result.status, "parsed": parsed,
+            "degraded_reason": result.degraded_reason, "run_id": result.run_id}
+
+
+def _uid(prefix: str) -> str:
+    import uuid as _uuid
+    return f"{prefix}-{_uuid.uuid4().hex[:12]}"
