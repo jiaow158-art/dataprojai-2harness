@@ -380,6 +380,8 @@ POST /api/insight/events/:id/followup {prompt?}
 
 **followup 的零侵入设计**：网关提交仍走现有 GatewayClient + 现有 chat 代码路径（Bearer/X-User 唯一注入点红线不破）；BFF 不新增任何直连网关的提交代码；种子问题经浏览器回环（用户能在会话里看到上下文首条，反而符合透明原则）。网关侧看到的就是一个普通问数任务（D14 历史从该会话第一条自然累积）。**绝不创建第二套问数 Agent。**
 
+> v1.2.4 勘误（2026-09-29）：followup_session 审计表落 **BFF 记账库**（表名 `followup_log`），不进 insight.db——对齐"任务/事件事实源在网关/insight，UI 域便利数据在 BFF"的既有分工；insight-api 保持纯只读。
+
 ## 12. UI 页面结构
 
 路由形态：遵循现有 state 视图切换模式（App.tsx 的 chat/admin 先例，**不引入路由库**）；`view="insights"`，内部子视图 list/detail。
