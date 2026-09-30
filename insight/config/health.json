@@ -1,0 +1,7 @@
+{
+  "sales": {"factor": 2.0},
+  "margin": {"factor": 10.0},
+  "ar": {},
+  "inventory_reason": "库存雷达未接入（需日汇总层）",
+  "notes": "D-c2：因子是灰度期校准点——改动必须留台账 eval_results/insight-gray/（对齐 ranking.json 纪律），且不影响事件检测/榜单/D8 证据"
+}
