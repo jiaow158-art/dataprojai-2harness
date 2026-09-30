@@ -17,6 +17,19 @@ WHERE calmonth IN (%(cur_ym)s, %(prev_ym)s)
 GROUP BY 1
 """
 
+TREND_SQL = """
+SELECT calmonth AS month,
+       SUM(gross_profit_after_sharing) AS gp,
+       SUM(notax_sales_net_amt) AS net_amt
+FROM dm.dm_fin_operations_mix_sum_t
+WHERE calmonth = ANY(%(ym)s)
+  AND calmonth <= %(cur_ym)s
+  AND node_desc2 = '瓷砖事业部'
+  AND data_source IN ('S','T','D','')
+  AND integrate_channel = %(channel)s
+GROUP BY 1 ORDER BY 1
+"""
+
 class GrossMarginDetector:
     def __init__(self, cfg: dict | None = None):
         self.cfg = cfg or load_config("gross_margin")
@@ -54,3 +67,16 @@ class GrossMarginDetector:
                              "abs_delta_wan": round(delta_wan)},
                     norm_score=percentile_score(delta_wan, self.cfg["norm"]["baseline_wan"])))
         return DetectResult(self.cfg["name"], "ok", findings=findings)
+
+    def trend(self, run, ctx: ReplayContext, anchor_id: str, months: int = 12) -> dict:
+        """渠道月度毛利率序列（spec §4.1 kind=month_single）。net=0/None → cur=None。"""
+        _, _, ch = anchor_id.partition("|")
+        ends = ctx.completed_month_ends(months)
+        rows = run(TREND_SQL, {"ym": [e.strftime("%Y-%m") for e in ends],
+                               "cur_ym": ctx.ym(), "channel": ch})
+        return {"detector": self.cfg["name"], "anchor_id": anchor_id, "unit": "%",
+                "kind": "month_single",
+                "series": [{"month": r["month"], "cur": (
+                                round(r["gp"] / r["net_amt"] * 100, 1)
+                                if r["gp"] is not None and r["net_amt"] else None),
+                            "prev": None} for r in rows]}

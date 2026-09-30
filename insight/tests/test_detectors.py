@@ -253,3 +253,20 @@ def test_region_sales_trend_sql_reuses_detector_predicates():
     assert "node_desc2 = '瓷砖事业部'" in seen["sql"]
     assert "integrate_channel_code = %(channel)s" in seen["sql"]
     assert "<= %(as_of_calday)s" in seen["sql"]
+
+# ---- gross_margin trend()：渠道月度毛利率序列（spec §4.1 kind=month_single）----
+
+def test_gross_margin_trend_month_single():
+    det = GrossMarginDetector.for_test()
+    seen = {}
+    rows = [{"month": "2026-07", "gp": 800.0, "net_amt": 10000.0},
+            {"month": "2026-08", "gp": 900.0, "net_amt": 12000.0}]  # 8%→7.5%
+    run = lambda sql, p=None: (seen.update(sql=sql, p=p) or rows)
+    out = det.trend(run, CTX, "瓷砖事业部|GD01", months=2)
+    assert out["kind"] == "month_single" and out["unit"] == "%"
+    assert out["series"][0] == {"month": "2026-07", "cur": 8.0, "prev": None}
+    assert out["series"][1]["cur"] == 7.5
+    assert seen["p"]["ym"] == ["2026-07", "2026-08"]        # 完整月 ym
+    assert seen["p"]["channel"] == "GD01"
+    assert "integrate_channel = %(channel)s" in seen["sql"]
+    assert "data_source IN ('S','T','D','')" in seen["sql"]  # 与检测同谓词
