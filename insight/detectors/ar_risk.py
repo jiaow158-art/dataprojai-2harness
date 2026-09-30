@@ -3,7 +3,7 @@
 
 用户裁定 2026-09-24：数据源=dm.dm_ar_analysis_rpt_f（综合分析报表），node_desc2 直筛瓷砖。
 当月为月内即时会计期间；缺当月/上月行 → not_ready，绝不以 0 代替。"""
-from ..replay_ctx import ReplayContext
+from ..replay_ctx import ReplayContext, shift_month
 from .base import DetectResult, Finding, load_config, percentile_score
 
 _NAT90 = " + ".join(
@@ -34,6 +34,17 @@ WHERE calmonth IN (%(cur_ym)s, %(prev_ym)s)
   AND node_desc2 = '瓷砖事业部'
   AND (special_general_ledger IS NULL OR special_general_ledger = '')
 GROUP BY 1
+"""
+
+TREND_SQL = f"""
+SELECT calmonth AS month,
+       SUM({_NAT90}) / 10000 AS nat90_wan
+FROM dm.dm_ar_analysis_rpt_f
+WHERE calmonth = ANY(%(ym)s)
+  AND calmonth <= %(cur_ym)s
+  AND node_desc2 = '瓷砖事业部'
+  AND (special_general_ledger IS NULL OR special_general_ledger = '')
+GROUP BY 1 ORDER BY 1
 """
 
 class ArRiskDetector:
@@ -86,3 +97,13 @@ class ArRiskDetector:
                          "overdue_wan_cur": round(overdue_cur, 1)},   # facet：当月逾期合计
                 norm_score=percentile_score(total, self.cfg["norm"]["baseline_wan"])))
         return DetectResult(self.cfg["name"], "ok", findings=findings)
+
+    def trend(self, run, ctx: ReplayContext, anchor_id: str, months: int = 12) -> dict:
+        """BU 级 nat90 月度余额序列（spec §4.1 kind=month_single）。窗口含当月即时快照
+        （ar 与销售/毛利不同：detect 本身就用当月，趋势同语义）。anchor 仅保持签名一致。"""
+        ym = [shift_month(ctx.as_of, -i).strftime("%Y-%m") for i in range(months - 1, -1, -1)]
+        rows = run(TREND_SQL, {"ym": ym, "cur_ym": ctx.ym()})
+        return {"detector": self.cfg["name"], "anchor_id": anchor_id, "unit": "万元",
+                "kind": "month_single",
+                "series": [{"month": r["month"], "cur": r["nat90_wan"], "prev": None}
+                           for r in rows]}

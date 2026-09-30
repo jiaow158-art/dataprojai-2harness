@@ -270,3 +270,19 @@ def test_gross_margin_trend_month_single():
     assert seen["p"]["channel"] == "GD01"
     assert "integrate_channel = %(channel)s" in seen["sql"]
     assert "data_source IN ('S','T','D','')" in seen["sql"]  # 与检测同谓词
+
+# ---- ar_risk trend()：BU 级 nat90 月度余额序列（spec §4.1 kind=month_single）----
+
+def test_ar_risk_trend_includes_current_month():
+    det = ArRiskDetector.for_test()
+    seen = {}
+    rows = [{"month": "2026-08", "nat90_wan": 79482.6},
+            {"month": "2026-09", "nat90_wan": 81227.7}]
+    run = lambda sql, p=None: (seen.update(sql=sql, p=p) or rows)
+    out = det.trend(run, CTX, "瓷砖|nat90", months=2)
+    assert out["kind"] == "month_single" and out["unit"] == "万元"
+    assert out["series"][-1] == {"month": "2026-09", "cur": 81227.7, "prev": None}
+    # ar 是月内即时快照：窗口含当月（与 detect 的 cur_ym 语义一致），与销售/毛利的"完整月"不同
+    assert seen["p"]["ym"] == ["2026-08", "2026-09"]
+    assert "special_general_ledger IS NULL OR special_general_ledger = ''" in seen["sql"]
+    assert "receivables_am" not in seen["sql"]            # 趋势只有 nat90 序列；占比归 health
