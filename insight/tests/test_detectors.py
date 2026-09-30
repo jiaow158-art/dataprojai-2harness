@@ -224,3 +224,32 @@ def test_target_sql_guards():
     assert seen["p"]["center_set_month_ym"] == "2026-08"
     assert seen["p"]["as_of_calday"] == "20260922"
     assert res.status == "not_ready"                      # mock 返回 [] → 空行=缺数据
+
+# ---- M-i5 trend()：首页卡内嵌图与详情页趋势卡共用（spec §4.1 month_compare）----
+
+def test_region_sales_trend_month_compare():
+    det = RegionSalesDetector.for_test()
+    seen = {}
+    rows = [{"month": "2026-05", "cur_wan": 100.0, "prev_wan": 120.0},
+            {"month": "2026-06", "cur_wan": 110.0, "prev_wan": None}]
+    run = lambda sql, p=None: (seen.update(sql=sql, p=p) or rows)
+    out = det.trend(run, CTX, "华南营销中心|GD01", months=4)
+    assert out["kind"] == "month_compare" and out["unit"] == "万元"
+    assert out["anchor_id"] == "华南营销中心|GD01"
+    assert out["series"][0] == {"month": "2026-05", "cur": 100.0, "prev": 120.0}
+    assert out["series"][1]["prev"] is None            # ly 缺→None，不造 0
+    assert len(seen["p"]["month_ends"]) == 4           # 完整自然月末 ×4
+    assert seen["p"]["org_name"] == "华南营销中心" and seen["p"]["channel"] == "GD01"
+    assert seen["p"]["as_of_calday"] == "20260922"     # point-in-time 封顶
+    assert "last_year_month_achievement" in seen["sql"]
+
+def test_region_sales_trend_sql_reuses_detector_predicates():
+    det = RegionSalesDetector()
+    seen = {}
+    run = lambda sql, p=None: (seen.update(sql=sql) or [])
+    det.trend(run, CTX, "华南营销中心|GD01")
+    # 口径=检测 SQL 同源（spec D-c3）：同表同 JOIN 同事业部谓词同渠道真列名
+    assert "ct_sales_performance_t" in seen["sql"]
+    assert "node_desc2 = '瓷砖事业部'" in seen["sql"]
+    assert "integrate_channel_code = %(channel)s" in seen["sql"]
+    assert "<= %(as_of_calday)s" in seen["sql"]

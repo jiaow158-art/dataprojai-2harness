@@ -16,6 +16,20 @@ WHERE p.calday = ANY(%(month_ends)s)
 GROUP BY 1, 2, 3
 """
 
+TREND_SQL = """
+SELECT to_char(to_date(p.calday, 'YYYYMMDD'), 'YYYY-MM') AS month,
+       SUM(p.month_achievement) / 10000 AS cur_wan,
+       SUM(p.{ly_field}) / 10000 AS prev_wan
+FROM dm.ct_sales_performance_t p
+JOIN dm.dm_rpt_sales_group_t s
+  ON p.org_code = s.node_name10 AND s.node_desc2 = '瓷砖事业部'
+WHERE p.calday = ANY(%(month_ends)s)
+  AND p.calday <= %(as_of_calday)s
+  AND s.node_desc5 = %(org_name)s
+  AND p.integrate_channel_code = %(channel)s
+GROUP BY 1 ORDER BY 1
+"""
+
 class RegionSalesDetector:
     def __init__(self, cfg: dict | None = None):
         self.cfg = cfg or load_config("region_sales")
@@ -61,3 +75,16 @@ class RegionSalesDetector:
                              "abs_delta_wan": round(delta_wan), "months": expected},
                     norm_score=percentile_score(delta_wan, self.cfg["norm"]["baseline_wan"])))
         return DetectResult(self.cfg["name"], "ok", findings=findings)
+
+    def trend(self, run, ctx: ReplayContext, anchor_id: str, months: int = 12) -> dict:
+        """锚点月度序列（spec §4.1 kind=month_compare）——SQL 与 detect() 同表同谓词（D-c3，
+        首页图与检测口径不得两张皮）。序列只含完整自然月；ly 缺→None 不造 0。"""
+        org, _, ch = anchor_id.partition("|")
+        ends = ctx.completed_month_ends(months)
+        rows = run(TREND_SQL.format(ly_field=self.cfg["params"]["ly_field"]),
+                   {"month_ends": [e.strftime("%Y%m%d") for e in ends],
+                    "as_of_calday": ctx.calday(), "org_name": org, "channel": ch})
+        return {"detector": self.cfg["name"], "anchor_id": anchor_id, "unit": "万元",
+                "kind": "month_compare",
+                "series": [{"month": r["month"], "cur": r["cur_wan"], "prev": r["prev_wan"]}
+                           for r in rows]}
