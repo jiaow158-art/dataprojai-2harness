@@ -286,3 +286,30 @@ def test_ar_risk_trend_includes_current_month():
     assert seen["p"]["ym"] == ["2026-08", "2026-09"]
     assert "special_general_ledger IS NULL OR special_general_ledger = ''" in seen["sql"]
     assert "receivables_am" not in seen["sql"]            # 趋势只有 nat90 序列；占比归 health
+
+# ---- target trend()：年内累计达成率 vs 年日内进度双线（spec §4.1 kind=cumulative_dual）----
+
+def test_target_trend_cumulative_dual():
+    det = TargetDetector.for_test()
+    seen = {}
+    # CTX as_of=2026-09-22 → 年内 1..9 月；actual: 1月100万、9月800万（累计 900 万）；
+    # target: 1月200万、9月1800万（累计 2000 万）；中间月无行=0 累计贡献
+    def run(sql, p=None):
+        seen["last"] = (sql, p)
+        if "ambperformance" in sql:
+            return [{"month": "2026-01", "actual_amt": 1000000.0},
+                    {"month": "2026-09", "actual_amt": 8000000.0}]
+        return [{"month": "2026-01", "target_amt": 2000000.0},
+                {"month": "2026-09", "target_amt": 18000000.0}]
+    out = det.trend(run, CTX, "瓷砖事业部|ALL")
+    assert out["kind"] == "cumulative_dual" and out["unit"] == "%"
+    assert len(out["series"]) == 9                            # 年内 1..9 月逐月
+    s1, s9 = out["series"][0], out["series"][8]
+    assert s1["cur"] == 50.0                                  # 100/200 万
+    assert s9["cur"] == round(9000000.0 / 20000000.0 * 100, 1)  # 累计 900/2000 万
+    assert 72.0 < s9["prev"] < 73.0                           # 9/22 年日内占比 72.6（265/365）
+    assert s1["prev"] == round(31 / 365 * 100, 1)             # 1 月末=第 31 天
+    assert out["meta"]["cum_actual_wan"] == 900.0             # 供 health 目标环复用
+    assert out["meta"]["cum_target_wan"] == 2000.0
+    assert seen["last"][1]["as_of_calday"] == "20260922"      # point-in-time 封顶同 detect
+    assert "org_type = '业务单位'" in seen["last"][0]          # 目标侧谓词同源
