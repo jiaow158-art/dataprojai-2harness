@@ -41,12 +41,12 @@
   "trend": { "days": 30, "points": [
       {"date": "2026-09-28", "total": 5, "major": 0, "minor": 5} ] },
   "eventTypeDistribution": [
-      {"eventType": "sales_decline", "label": "销售下滑", "count": 3},
-      {"eventType": "ar_overdue",    "label": "应收风险", "count": 1},
-      {"eventType": "target_gap",    "label": "目标缺口", "count": 1} ],
+      {"key": "sales_decline", "label": "销售下滑", "count": 3},
+      {"key": "ar_overdue",    "label": "应收风险", "count": 1},
+      {"key": "target_gap",    "label": "目标缺口", "count": 1} ],
   "lifecycleDistribution": [
-      {"lifecycle": "active",   "label": "进行中", "count": 5},
-      {"lifecycle": "resolved", "label": "已解除", "count": 0} ],
+      {"key": "active",   "label": "进行中", "count": 5},
+      {"key": "resolved", "label": "已解除", "count": 0} ],
   "events": [ { "event_id": "ev-…", "title": "…", "summary": "…",
       "severity": "minor", "event_type": "sales_decline", "detector": "region_sales",
       "org": "粤东运营中心", "channel": "GD03",
