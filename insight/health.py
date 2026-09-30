@@ -66,8 +66,8 @@ def _sales_ring(run, ctx) -> dict:
     prev, cur = rows[-2], rows[-1]
     yoy_prev = (prev["cur_amt"] - prev["ly_amt"]) / prev["ly_amt"] * 100
     yoy_cur = (cur["cur_amt"] - cur["ly_amt"]) / cur["ly_amt"] * 100
-    s_prev = round(100 - _clip(-yoy_prev) * k, 1)
-    s_cur = round(100 - _clip(-yoy_cur) * k, 1)
+    s_prev = max(0.0, round(100 - _clip(-yoy_prev) * k, 1))
+    s_cur = max(0.0, round(100 - _clip(-yoy_cur) * k, 1))
     return {"available": True, "score": s_cur, "mom_delta": round(s_cur - s_prev, 1),
             "formula": f"100 − 完整自然月同比降幅(pt) × {k}",
             "inputs": {"yoy_pct": round(yoy_cur, 1), "month": cur["month"]}}
@@ -82,7 +82,7 @@ def _margin_ring(run, ctx) -> dict:
     if len(gmp) < 3:
         return {"available": False, "reason": "完整月毛利率数据不足"}
     d1, d2 = round(gmp[1] - gmp[0], 1), round(gmp[2] - gmp[1], 1)   # 上月环比 / 当月环比
-    s = lambda d: round(100 - _clip(-d) * k, 1)
+    s = lambda d: max(0.0, round(100 - _clip(-d) * k, 1))
     return {"available": True, "score": s(d2), "mom_delta": round(s(d2) - s(d1), 1),
             "formula": f"100 − 毛利率环比降幅(pt) × {k}",
             "inputs": {"delta_pct": d2, "month": rows[-1]["month"]}}
@@ -96,8 +96,9 @@ def _ar_ring(run, ctx) -> dict:
         return {"available": False, "reason": "当月/上月应收快照缺失"}
     share = lambda r: r["nat90"] / r["total"] * 100
     s_cur, s_prev = round(share(cur), 1), round(share(prev), 1)
-    return {"available": True, "score": round(100 - s_cur, 1),
-            "mom_delta": round((100 - s_cur) - (100 - s_prev), 1),
+    sc, sp = max(0.0, round(100 - s_cur, 1)), max(0.0, round(100 - s_prev, 1))
+    return {"available": True, "score": sc,
+            "mom_delta": round(sc - sp, 1),
             "formula": "100 − nat90 占应收余额比例(%)",
             "inputs": {"nat90_share_pct": s_cur, "month": ctx.ym()}}
 

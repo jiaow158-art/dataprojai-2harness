@@ -76,6 +76,22 @@ def test_ar_ring_share_formula():
     assert r["inputs"]["nat90_share_pct"] == 38.0
 
 
+def test_score_floor_at_zero_and_clip_upper():
+    # 地板 0：yoy=-60 → clip(60)=60 → 100-60×2=-20 → 0；两期同值 → delta 0（展示分一致性）
+    p = compute(_runner(sales=_sales_rows(-60.0, -60.0)), CTX)
+    assert _ring(p, "sales")["score"] == 0.0
+    assert _ring(p, "sales")["mom_delta"] == 0.0
+    # clip 上界+地板：gmp 100→100→0 → 当月环比 -100pt → clip(100)=100 → 100-100×10=-900 → 0；
+    # 上月环比 0 → 100 分 → mom_delta -100；inputs.delta_pct 保留真实值（分数封地板，输入可见）
+    m = compute(_runner(margins=_margin_rows(10000.0, 10000.0, 0.0)), CTX)
+    r = _ring(m, "margin")
+    assert r["score"] == 0.0 and r["mom_delta"] == -100.0
+    assert r["inputs"]["delta_pct"] == -100.0
+    # AR 同兜底：nat90 占比 150% → 100-150=-50 → 0（两期同值 delta 0）
+    a = compute(_runner(ar=_ar_rows(150.0, 150.0)), CTX)
+    assert _ring(a, "ar")["score"] == 0.0 and _ring(a, "ar")["mom_delta"] == 0.0
+
+
 def test_partial_degradation_one_ring_down():
     p = compute(_runner(sales=_sales_rows(-5, -5), fail_on="gross_profit"), CTX)
     assert _ring(p, "sales")["available"] is True
