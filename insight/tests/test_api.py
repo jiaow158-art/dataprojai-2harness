@@ -205,6 +205,66 @@ def test_trend_endpoint_cached_and_validated(tmp_path):
     finally:
         srv.shutdown()
 
+def _seed_region_event(s):
+    s.insert_finding("2026-09-27", "region_sales",
+                     {"anchor_type": "org_channel", "anchor_id": "华南营销中心|GD01",
+                      "channel": "GD01"},
+                     {"yoy_pct": -11.2}, 85, is_late=False)
+    freeze_brief(s, "2026-09-28", "2026-09-27",
+                 [{"detector": "region_sales", "ready": True}])
+    return s.db.execute("SELECT event_id FROM business_event").fetchone()["event_id"]
+
+class _ConnDroppedRunner:
+    """连接级失败形态：首调抛 SSL 掐断且 _conn=None（_recover 已弃连接）→ 允许重试。"""
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = 0
+        self._conn = None
+    def __call__(self, sql, params=None):
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("SSL connection has been closed unexpectedly")
+        return self.rows
+
+class _TimeoutRunner:
+    """非连接级失败形态：语句超时 rollback 成功、连接仍活（_conn 非 None）→ 照抛。"""
+    def __init__(self):
+        self.calls = 0
+        self._conn = object()
+    def __call__(self, sql, params=None):
+        self.calls += 1
+        raise RuntimeError("canceling statement due to statement timeout")
+
+def test_trend_retries_once_on_discarded_connection(tmp_path):
+    """生产冒烟回归：空闲后首个 trend 请求吃到被服务端掐断的缓存连接（_conn 已弃）
+    → 重建后原样重跑一次，用户首请求不吃 500。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    eid = _seed_region_event(s)
+    runner = _ConnDroppedRunner([{"month": "2026-08", "cur_wan": 100.0, "prev_wan": 120.0}])
+    srv, base = _serve_runner(s, runner)
+    try:
+        st, body = _get(f"{base}/api/insight/events/{eid}/trend")
+        assert st == 200 and body["kind"] == "month_compare"
+        assert runner.calls == 2                       # 弃连接→重试一次后成功
+        st, again = _get(f"{base}/api/insight/events/{eid}/trend")
+        assert st == 200 and again == body and runner.calls == 2   # 成功后照常缓存
+    finally:
+        srv.shutdown()
+
+def test_trend_no_retry_when_connection_alive(tmp_path):
+    """语句超时等非连接级失败：_conn 仍在 → 不重试（调用计数 1），首请求如实 500。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    eid = _seed_region_event(s)
+    runner = _TimeoutRunner()
+    srv, base = _serve_runner(s, runner)
+    try:
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(f"{base}/api/insight/events/{eid}/trend")
+        assert e.value.code == 500
+        assert runner.calls == 1                       # 连接未弃→未重试
+    finally:
+        srv.shutdown()
+
 def test_health_score_endpoint(tmp_path):
     s = Store(open_db(tmp_path / "i.db"))
     as_of = date.today() - timedelta(days=1)                    # 端点口径：今天-1

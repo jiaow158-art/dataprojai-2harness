@@ -21,6 +21,16 @@ class TrendService:
         self._cache: dict = {}
         self._lock = threading.Lock()
 
+    def _run_with_conn_retry(self, fn):
+        """连接级失败重试一次：空闲连接被 DWS 服务端掐断时 runner._recover 已弃连接
+        （rollback 失败→_conn=None），重建后原样重跑；连接仍在（如语句超时）则照抛。"""
+        try:
+            return fn()
+        except Exception:
+            if getattr(self.runner, "_conn", None) is not None:
+                raise
+            return fn()
+
     def trend_for_event(self, db, event_id: str, months: int = 12) -> dict | None:
         ev = db.execute("SELECT event_id, event_key, detector, data_date"
                         " FROM business_event WHERE event_id=?", (event_id,)).fetchone()
@@ -38,8 +48,9 @@ class TrendService:
             with self._lock:
                 if key not in self._cache:   # double-check：并发同 key 只查一次
                     ctx = ReplayContext(as_of=date.fromisoformat(ev["data_date"]))
-                    self._cache[key] = REGISTRY[ev["detector"]]().trend(
-                        self.runner, ctx, anchor, months)
+                    self._cache[key] = self._run_with_conn_retry(
+                        lambda: REGISTRY[ev["detector"]]().trend(
+                            self.runner, ctx, anchor, months))
         return self._cache[key]
 
     def health(self, as_of: date) -> dict:
@@ -47,6 +58,9 @@ class TrendService:
         if key not in self._cache:
             with self._lock:
                 if key not in self._cache:   # double-check：并发同 key 只查一次
+                    # 连接级失败不套 _run_with_conn_retry：compute 环级 try/except 吞
+                    # 异常→available:false，永不外抛，外层重试抓不到；跨请求自愈由
+                    # 下面"全降级不缓存"承担（下次重查时 runner 已重建连接）。
                     out = compute(self.runner, ReplayContext(as_of=as_of))
                     # 三数据环（sales/margin/ar）全降级=疑似 DWS 故障：结果不落缓存，
                     # 下次请求重查（防全红卡按天钉死）；target 不参与该判定
