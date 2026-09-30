@@ -163,18 +163,18 @@ def _serve_runner(store, runner):
 
 def _ins_event(db, event_id, key, score, created_at, etype="sales_decline",
                org="华南营销中心", lifecycle="active", resolved_at=None,
-               first="2026-09-26", sev="minor"):
+               first="2026-09-26", sev="minor", attribution_generated_at=None):
     db.execute(
         "INSERT INTO business_event (event_id,event_key,lifecycle,data_date,"
         "first_seen_date,last_seen_date,persist_days,detector,event_type,title,summary,"
         "severity,scope_json,period_json,facts_json,score,score_breakdown_json,metric,"
-        "status,attribution_status,created_at,updated_at,resolved_at)"
+        "status,attribution_status,attribution_generated_at,created_at,updated_at,resolved_at)"
         " VALUES (?,?,?,'2026-09-27',?,'2026-09-27',2,'region_sales',"
         "?,?,'s',?,?,'{\"类型\":\"月\"}','[]',?,'{}','yoy',"
-        "'discovered','pending',?,?,?)",
+        "'discovered','pending',?,?,?,?)",
         (event_id, key, lifecycle, first, etype, f"{event_id} 业绩连续下滑", sev,
          json.dumps({"范围": "瓷砖事业部", "组织节点": org}, ensure_ascii=False),
-         score, created_at, created_at, resolved_at))
+         score, attribution_generated_at, created_at, created_at, resolved_at))
 
 def test_trend_endpoint_cached_and_validated(tmp_path):
     s = Store(open_db(tmp_path / "i.db"))
@@ -484,6 +484,26 @@ def test_event_center_summary_windows_and_trend(tmp_path):
     # 分布=全量（7 事件全计，含两窗外旧发与已解除）
     assert {d["key"]: d["count"] for d in p["eventTypeDistribution"]}["sales_decline"] == 4
     assert {d["key"]: d["count"] for d in p["lifecycleDistribution"]} == {"active": 5, "resolved": 2}
+    # M-i6.1 动态时间线数据面：events 透出发现/归因时刻
+    ev0 = p["events"][0]
+    assert "created_at" in ev0 and "attribution_generated_at" in ev0
+    assert isinstance(ev0["created_at"], int) and ev0["created_at"] == 100
+
+def test_event_center_attribution_timestamp_passthrough(tmp_path):
+    """M-i6.1：attribution_generated_at 透传——done+123 原样透出、未归因为 NULL。"""
+    from insight.api_main import _event_center
+    db = open_db(tmp_path / "ec-ts.db")
+    _ins_event(db, "ev-new1", "k-n1", 90.0, 100, first="2026-09-28")
+    _ins_event(db, "ev-done", "k-done", 80.0, 200, first="2026-09-27",
+               attribution_generated_at=123)
+    db.execute("UPDATE business_event SET attribution_status='done'"
+               " WHERE event_id='ev-done'")
+    db.commit()
+    p = _event_center(db, date(2026, 9, 30))
+    ev0 = p["events"][0]                       # first_seen_date DESC → ev-new1 居首
+    assert ev0["created_at"] == 100 and ev0["attribution_generated_at"] is None
+    done = next(e for e in p["events"] if e["event_id"] == "ev-done")
+    assert done["created_at"] == 200 and done["attribution_generated_at"] == 123
 
 def test_event_center_late_badge_and_org_parse_and_state_branch(tmp_path):
     """端点级：state=all 200 + late 派生（同 event_key 的 is_late finding）+ org 解析；

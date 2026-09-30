@@ -162,7 +162,8 @@ def _event_center(db, today: date) -> dict:
     rows = _rows(db, "SELECT event_id, event_key, detector, event_type, title, summary,"
                      " severity, scope_json, facts_json, score, persist_days,"
                      " first_seen_date, last_seen_date, lifecycle, resolved_at,"
-                     " attribution_status FROM business_event"
+                     " attribution_status, created_at, attribution_generated_at"
+                     " FROM business_event"
                      " ORDER BY first_seen_date DESC, event_id")
     truncated = len(rows) > _EVENT_CENTER_LIMIT
     rows = rows[:_EVENT_CENTER_LIMIT]
@@ -232,6 +233,8 @@ def _event_center(db, today: date) -> dict:
                     "last_seen_date": r["last_seen_date"],
                     "lifecycle": r["lifecycle"], "resolved_at": r["resolved_at"],
                     "attribution_status": r["attribution_status"],
+                    "created_at": r["created_at"],
+                    "attribution_generated_at": r["attribution_generated_at"],
                     "late": r["event_key"] in late_keys,
                     "publishedToday": r["event_id"] in pub,
                     "rankToday": pub.get(r["event_id"]),
