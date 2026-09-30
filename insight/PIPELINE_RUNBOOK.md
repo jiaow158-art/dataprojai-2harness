@@ -184,3 +184,9 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 - **口径裁定（2026-09-30 用户，D-c2 台账）**：ar 环=100−nat90 占应收余额比例，生产实测 2026-09 占比 85.6%（receivables_am=分段和精确成立，公式无误）——工程渠道长账期致结构性偏高，健康度 14.4。**裁定：保持公式不动，要真实**——数字难看但真实，分数点开可见公式与输入；后续不再就此复议除非口径本身有错。
 - 目标环 time_pct=年日内自然日占比（与事件/雷达的月度工作日进度是两个窗口，spec v1.0.2）。
 - 冒烟（2026-09-30 实测全绿）：health ok / active 200 / trend 真序列（target 事件 cumulative_dual 1-9 月）/ health-score 三环+target 82.8% vs 时间 74.5%。
+
+## §M-i6 经营事件中心（2026-09-30）
+
+- `/api/insight/events?state=all`：事件中心页专用——服务端返回 summary（近30新发 vs 前30，分母0→delta null）/trend（30点补零）/类型与生命周期分布（全量）/全量事件列表（500 截断标记 truncated）。统计口径唯一权威在服务端（D-e5）。
+- lifecycle / attribution_status / is_late 三概念分立：两列两筛选，late 仅 Badge（D-e2）。
+- org 展示归一：锚点串取首段、"瓷砖"短名回显范围字段（数据与 event_key 不动）。
