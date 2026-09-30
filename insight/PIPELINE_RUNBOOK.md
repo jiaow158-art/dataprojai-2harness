@@ -181,6 +181,6 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 - trend/health-score **需要 DWS_PASSWORD**（ecosystem.config.cjs insight-api 块已配，同 worker）；缺失时进程照常起（db 端点正常），这两个端点 503 DWS_UNAVAILABLE——BFF 显示降级态不炸页。
 - 缓存进程内（key 含数据日/事件锚点，as_of 变更自然失效；health 三数据环全降级时不缓存，恢复后自动重查）；重启即冷；多线程下 DWS 查询持锁串行。
 - 健康度因子：`insight/config/health.json`（sales×2.0 / margin×10.0 / ar=100−占比）——改动留台账 eval_results/insight-gray/（D-c2）。分数地板 0。
-- **已知口径议题（灰度期裁定）**：ar 环=100−nat90 占应收余额比例，生产实测 2026-09 占比 85.6%（receivables_am=分段和精确成立，公式无误）——工程渠道长账期致结构性偏高，健康度 14.4 的业务观感待用户裁定是否调因子。
+- **口径裁定（2026-09-30 用户，D-c2 台账）**：ar 环=100−nat90 占应收余额比例，生产实测 2026-09 占比 85.6%（receivables_am=分段和精确成立，公式无误）——工程渠道长账期致结构性偏高，健康度 14.4。**裁定：保持公式不动，要真实**——数字难看但真实，分数点开可见公式与输入；后续不再就此复议除非口径本身有错。
 - 目标环 time_pct=年日内自然日占比（与事件/雷达的月度工作日进度是两个窗口，spec v1.0.2）。
 - 冒烟（2026-09-30 实测全绿）：health ok / active 200 / trend 真序列（target 事件 cumulative_dual 1-9 月）/ health-score 三环+target 82.8% vs 时间 74.5%。
