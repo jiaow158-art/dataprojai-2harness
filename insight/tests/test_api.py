@@ -147,23 +147,33 @@ class _CountingRunner:
         self.calls += 1
         return self.rows
 
+class _DispatchRunner:
+    """fake DWS runner：按 SQL 分派 + 调用计数。"""
+    def __init__(self, fn):
+        self.fn = fn
+        self.calls = 0
+    def __call__(self, sql, params=None):
+        self.calls += 1
+        return self.fn(sql, params)
+
 def _serve_runner(store, runner):
     srv = make_server(store.db, host="127.0.0.1", port=0, trend_runner=runner)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv, f"http://127.0.0.1:{srv.server_address[1]}"
 
-def _ins_event(db, event_id, key, score, created_at):
+def _ins_event(db, event_id, key, score, created_at, etype="sales_decline",
+               org="华南营销中心", lifecycle="active", resolved_at=None):
     db.execute(
         "INSERT INTO business_event (event_id,event_key,lifecycle,data_date,"
         "first_seen_date,last_seen_date,persist_days,detector,event_type,title,summary,"
         "severity,scope_json,period_json,facts_json,score,score_breakdown_json,metric,"
-        "status,attribution_status,created_at,updated_at)"
-        " VALUES (?,?,'active','2026-09-27','2026-09-26','2026-09-27',2,'region_sales',"
-        "'sales_decline',?,'s','minor',?,'{\"类型\":\"月\"}','[]',?,'{}','yoy',"
-        "'discovered','pending',?,?)",
-        (event_id, key, f"{event_id} 业绩连续下滑",
-         json.dumps({"范围": "瓷砖事业部", "组织节点": "华南营销中心"}, ensure_ascii=False),
-         score, created_at, created_at))
+        "status,attribution_status,created_at,updated_at,resolved_at)"
+        " VALUES (?,?,?,'2026-09-27','2026-09-26','2026-09-27',2,'region_sales',"
+        "?,?,'s','minor',?,'{\"类型\":\"月\"}','[]',?,'{}','yoy',"
+        "'discovered','pending',?,?,?)",
+        (event_id, key, lifecycle, etype, f"{event_id} 业绩连续下滑",
+         json.dumps({"范围": "瓷砖事业部", "组织节点": org}, ensure_ascii=False),
+         score, created_at, created_at, resolved_at))
 
 def test_trend_endpoint_cached_and_validated(tmp_path):
     s = Store(open_db(tmp_path / "i.db"))
@@ -244,6 +254,7 @@ def test_related_and_active_events(tmp_path):
     s = Store(open_db(tmp_path / "i.db"))
     _ins_event(s.db, "ev-a", "k-a", 40.0, 100)
     _ins_event(s.db, "ev-b", "k-b", 80.0, 200)
+    _ins_event(s.db, "ev-c", "k-c", 80.0, 150)   # 与 ev-b 同分：tie-break updated_at desc
     s.db.execute("INSERT INTO daily_brief VALUES ('2026-09-28','瓷砖事业部','final',0,"
                  "1000,1,'{}',0)")
     s.db.execute("INSERT INTO daily_brief_event VALUES ('2026-09-28','ev-b',1,80.0,"
@@ -253,8 +264,8 @@ def test_related_and_active_events(tmp_path):
     try:
         st, rel = _get(f"{base}/api/insight/events/ev-a/related")
         assert st == 200
-        assert [e["event_id"] for e in rel["sameType"]] == ["ev-b"]     # 同类型+排除自身
-        assert [e["event_id"] for e in rel["sameRegion"]] == ["ev-b"]   # 同组织节点
+        assert [e["event_id"] for e in rel["sameType"]] == ["ev-b", "ev-c"]  # 同类型+排除自身
+        assert [e["event_id"] for e in rel["sameRegion"]] == ["ev-b", "ev-c"]
         with pytest.raises(urllib.error.HTTPError) as e:
             _get(f"{base}/api/insight/events/ev-zz/related")
         assert e.value.code == 404
@@ -263,11 +274,100 @@ def test_related_and_active_events(tmp_path):
         assert st == 200
         assert act["briefDate"] == "2026-09-28"
         assert act["publishMinScore"] == RANKING["publish_min_score"]
-        assert [e["event_id"] for e in act["events"]] == ["ev-b", "ev-a"]   # score 降序
-        b, a = act["events"]
+        assert [e["event_id"] for e in act["events"]] == ["ev-b", "ev-c", "ev-a"]
+        b, c, a = act["events"]
         assert b["publishedToday"] is True and b["rankToday"] == 1
+        assert c["publishedToday"] is False and c["rankToday"] is None
         assert a["publishedToday"] is False and a["rankToday"] is None
         assert a["scoreGap"] == round(40.0 - RANKING["publish_min_score"], 1)   # -15.0
+    finally:
+        srv.shutdown()
+
+def test_related_not_truncated_by_recent_window(tmp_path):
+    """I-1 回归：105 条更新的异类型事件把 ev-b 挤出"全局最新 100"窗口——
+    按桶查询仍须配到 ev-b（旧全表 LIMIT 100 窗口实现会漏配）。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    for i in range(105):
+        _ins_event(s.db, f"ev-f{i}", f"kf{i}", 10.0, 300 + i,
+                   etype="margin_drop", org="华东营销中心")
+    _ins_event(s.db, "ev-a", "k-a", 40.0, 100)
+    _ins_event(s.db, "ev-b", "k-b", 80.0, 200)
+    s.db.commit()
+    srv, base = _serve(s)
+    try:
+        st, rel = _get(f"{base}/api/insight/events/ev-a/related")
+        assert st == 200
+        assert [e["event_id"] for e in rel["sameType"]] == ["ev-b"]     # 窗口外仍可配
+        assert [e["event_id"] for e in rel["sameRegion"]] == ["ev-b"]
+    finally:
+        srv.shutdown()
+
+def test_health_all_degraded_not_cached_normal_cached(tmp_path):
+    """I-2：三数据环全降级（疑似 DWS 故障）不落缓存→下次重查；正常结果缓存命中。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    degraded = _DispatchRunner(lambda sql, p: [])
+    srv, base = _serve_runner(s, degraded)
+    try:
+        st, body = _get(f"{base}/api/insight/health-score")
+        assert st == 200 and all(not r["available"] for r in body["rings"][:3])
+        n1 = degraded.calls
+        st, body = _get(f"{base}/api/insight/health-score")
+        assert st == 200 and degraded.calls > n1                # 全降级不缓存→重查
+    finally:
+        srv.shutdown()
+
+    as_of = date.today() - timedelta(days=1)
+    ym, prev_ym = as_of.strftime("%Y-%m"), shift_month(as_of, -1).strftime("%Y-%m")
+    def healthy(sql, params=None):                              # 三数据环全 available
+        if "ct_sales_performance_t" in sql:
+            return [{"month": "m1", "cur_amt": 90.0, "ly_amt": 100.0},
+                    {"month": "m2", "cur_amt": 88.0, "ly_amt": 100.0}]
+        if "gross_profit_after_sharing" in sql and "calmonth = ANY" in sql:
+            return [{"month": "a", "gp": 1000.0, "net_amt": 10000.0},
+                    {"month": "b", "gp": 950.0, "net_amt": 10000.0},
+                    {"month": "c", "gp": 900.0, "net_amt": 10000.0}]
+        if "dm_ar_analysis_rpt_f" in sql:
+            return [{"calmonth": prev_ym, "nat90": 41.0, "total": 100.0},
+                    {"calmonth": ym, "nat90": 38.0, "total": 100.0}]
+        return []
+    good = _DispatchRunner(healthy)
+    srv, base = _serve_runner(s, good)
+    try:
+        st, body = _get(f"{base}/api/insight/health-score")
+        assert st == 200 and all(r["available"] for r in body["rings"][:3])
+        n1 = good.calls
+        st, body = _get(f"{base}/api/insight/health-score")
+        assert st == 200 and good.calls == n1                    # 正常结果缓存命中
+    finally:
+        srv.shutdown()
+
+def test_daily_detail_attribution_done_and_resolved(tmp_path):
+    """M-3 补强：归因 done 的当前态回读（daily 摘要/generatedAt）+ resolved 事件 resolved_at。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    s.insert_finding("2026-09-27", "region_sales",
+                     {"anchor_type": "org_channel", "anchor_id": "华南|GD01",
+                      "channel": "GD01"},
+                     {"yoy_pct": -11.2}, 85, is_late=False)
+    freeze_brief(s, "2026-09-28", "2026-09-27",
+                 [{"detector": "region_sales", "ready": True}])
+    eid = s.db.execute("SELECT event_id FROM business_event").fetchone()["event_id"]
+    s.db.execute("UPDATE business_event SET attribution_summary='归因摘要',"
+                 " attribution_status='done', attribution_generated_at=123"
+                 " WHERE event_id=?", (eid,))
+    _ins_event(s.db, "ev-r", "k-r", 70.0, 50, lifecycle="resolved", resolved_at=123)
+    s.db.commit()
+    srv, base = _serve(s)
+    try:
+        st, body = _get(f"{base}/api/insight/daily?date=2026-09-28")
+        assert st == 200
+        ev = body["events"][0]
+        assert ev["attributionSummary"] == "归因摘要"           # 归因当前态回读
+        assert ev["attributionStatus"] == "done"
+        st, d = _get(f"{base}/api/insight/events/{eid}")
+        assert st == 200 and d["attribution"]["generatedAt"] == 123
+        st, d = _get(f"{base}/api/insight/events/ev-r")
+        assert st == 200 and d["event"]["lifecycle"] == "resolved"
+        assert d["event"]["resolved_at"] == 123                 # resolve 时点透出
     finally:
         srv.shutdown()
 

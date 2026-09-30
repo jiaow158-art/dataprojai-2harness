@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
-from .merge_rank import event_key_of
+from .merge_rank import RANKING, event_key_of
 from .trend_service import TrendService
 
 _EVENT_ID_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)$")
@@ -103,28 +103,29 @@ def _event_detail(db, event_id: str) -> dict | None:
             "followupPrompts": ["为什么？", "看重点影响对象明细", "生成完整分析报告"]}
 
 def _related(db, event_id: str) -> dict | None:
-    """同类型/同组织节点相关事件各至多 5 条（db-only，排除自身，created_at 降序）。"""
-    ev = db.execute("SELECT event_id, event_type, scope_json FROM business_event"
-                    " WHERE event_id=?", (event_id,)).fetchone()
+    """同类型/同组织节点相关事件各至多 5 条（db-only，排除自身，created_at 降序）。
+    按桶两条查询（I-1）：不做全表窗口扫描——LIMIT 100 截断会让窗口外的老事件漏配。"""
+    ev = db.execute("SELECT event_type,"
+                    " json_extract(scope_json,'$.组织节点') AS org"
+                    " FROM business_event WHERE event_id=?", (event_id,)).fetchone()
     if not ev:
         return None
-    org = json.loads(ev["scope_json"]).get("组织节点")
-    same_type, same_region = [], []
-    for r in db.execute("SELECT event_id, event_type, scope_json, title, severity,"
-                        " data_date, created_at FROM business_event"
-                        " WHERE event_id<>? ORDER BY created_at DESC LIMIT 100",
-                        (event_id,)):
-        item = {"event_id": r["event_id"], "title": r["title"], "severity": r["severity"],
-                "data_date": r["data_date"], "created_at": r["created_at"]}
-        if r["event_type"] == ev["event_type"] and len(same_type) < 5:
-            same_type.append(item)
-        if org and json.loads(r["scope_json"]).get("组织节点") == org and len(same_region) < 5:
-            same_region.append(item)
+    def bucket(where, args):
+        return [{"event_id": r["event_id"], "title": r["title"],
+                 "severity": r["severity"], "data_date": r["data_date"],
+                 "created_at": r["created_at"]}
+                for r in db.execute(
+                    "SELECT event_id, title, severity, data_date, created_at"
+                    " FROM business_event WHERE " + where +
+                    " ORDER BY created_at DESC LIMIT 5", args)]
+    same_type = bucket("event_type=? AND event_id<>?", (ev["event_type"], event_id))
+    same_region = (bucket("json_extract(scope_json,'$.组织节点')=? AND event_id<>?",
+                          (ev["org"], event_id)) if ev["org"] else [])
     return {"event_id": event_id, "sameType": same_type, "sameRegion": same_region}
 
 def _active_events(db) -> dict:
-    """active 事件全集按 score 降序，附当日发布态与达标缺口（db-only）。"""
-    from .merge_rank import RANKING
+    """active 事件全集按 score 降序，附当日发布态与达标缺口（db-only）。
+    排序 tie-break（M-1）：score 并列按 updated_at 降序再 event_id（确定性）。"""
     latest = (db.execute("SELECT MAX(brief_date) b FROM daily_brief").fetchone()["b"]) or ""
     pub = {r["event_id"]: r["rank"] for r in
            _rows(db, "SELECT event_id, rank FROM daily_brief_event WHERE brief_date=?",
@@ -133,7 +134,8 @@ def _active_events(db) -> dict:
     for r in _rows(db, "SELECT event_id, detector, event_type, title, summary, severity,"
                        " score, persist_days, first_seen_date, lifecycle,"
                        " attribution_status, updated_at FROM business_event"
-                       " WHERE lifecycle='active' ORDER BY score DESC"):
+                       " WHERE lifecycle='active'"
+                       " ORDER BY score DESC, updated_at DESC, event_id"):
         out.append({**r, "publishedToday": r["event_id"] in pub,
                     "rankToday": pub.get(r["event_id"]),
                     "scoreGap": round(r["score"] - RANKING["publish_min_score"], 1)})
