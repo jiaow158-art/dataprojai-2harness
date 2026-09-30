@@ -537,3 +537,17 @@ def test_event_center_truncates_at_505(tmp_path):
     p = _event_center(db, date(2026, 9, 30))
     assert p["truncated"] is True
     assert len(p["events"]) == 500
+
+def test_event_center_org_display_normalization(tmp_path):
+    """展示归一（不动数据/锚点/event_key）：组织节点存的是锚点串——
+    影响范围列取首段；BU 级首段短名"瓷砖"回显范围字段"瓷砖事业部"；
+    无竖线（粤东运营中心）原样直出。"""
+    from insight.api_main import _event_center
+    db = open_db(tmp_path / "ec5.db")
+    _ins_event(db, "ev-bu", "k-bu", 60.0, 100, first="2026-09-12", org="瓷砖|nat90")
+    _ins_event(db, "ev-plain", "k-plain", 60.0, 100, first="2026-09-13",
+               org="粤东运营中心")
+    p = _event_center(db, date(2026, 9, 30))
+    by_id = {e["event_id"]: e["org"] for e in p["events"]}
+    assert by_id["ev-bu"] == "瓷砖事业部"          # 锚点串首段"瓷砖"→范围字段
+    assert by_id["ev-plain"] == "粤东运营中心"     # 无竖线原样

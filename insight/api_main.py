@@ -219,10 +219,13 @@ def _event_center(db, today: date) -> dict:
             facts = json.loads(r["facts_json"] or "[]")
         except Exception:
             facts = []
+        org = (scope.get("组织节点") or "").partition("|")[0] or None   # 展示归一：锚点串取首段
+        if org == "瓷砖":                       # BU 级锚点首段短名 → 显示范围字段
+            org = scope.get("范围") or org
         out.append({"event_id": r["event_id"], "detector": r["detector"],
                     "event_type": r["event_type"], "title": r["title"],
                     "summary": r["summary"], "severity": r["severity"],
-                    "org": scope.get("组织节点"), "channel": scope.get("渠道"),
+                    "org": org, "channel": scope.get("渠道"),
                     "facts": facts, "score": r["score"],
                     "persist_days": r["persist_days"],
                     "first_seen_date": r["first_seen_date"],
