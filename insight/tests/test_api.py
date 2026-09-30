@@ -513,3 +513,27 @@ def test_event_center_late_badge_and_org_parse_and_state_branch(tmp_path):
         assert e.value.code == 400
     finally:
         srv.shutdown()
+
+def test_event_center_third_value_defense(tmp_path):
+    """第三值防御：severity 出现 major/minor 之外的值（如 critical）不炸——
+    计入 summary total 与 trend total 不丢；trend 点仍只输出 total/major/minor；
+    lifecycle 第三值计入 lc 但不进 lifecycleDistribution 输出。"""
+    from insight.api_main import _event_center
+    db = open_db(tmp_path / "ec3.db")
+    _ins_event(db, "ev-crit", "k-crit", 60.0, 100, first="2026-09-12", sev="critical")
+    p = _event_center(db, date(2026, 9, 30))          # 无守卫时此处 KeyError → 端点 500
+    assert p["summary"]["total"]["count"] == 1        # 第三值计入 total 不丢
+    d12 = next(x for x in p["trend"]["points"] if x["date"] == "2026-09-12")
+    assert d12 == {"date": "2026-09-12", "total": 1, "major": 0, "minor": 0}
+    assert {d["key"]: d["count"] for d in p["lifecycleDistribution"]} == {"active": 1, "resolved": 0}
+
+def test_event_center_truncates_at_505(tmp_path):
+    """500 截断正例：505 条 → truncated=True、events 恰 500（截断集口径，docstring 已披露）。"""
+    from insight.api_main import _event_center
+    db = open_db(tmp_path / "ec4.db")
+    for i in range(505):
+        _ins_event(db, f"ev-t{i}", f"kt{i}", 10.0, i, first="2026-09-01")
+    db.commit()
+    p = _event_center(db, date(2026, 9, 30))
+    assert p["truncated"] is True
+    assert len(p["events"]) == 500

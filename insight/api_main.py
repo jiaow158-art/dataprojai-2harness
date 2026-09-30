@@ -152,7 +152,9 @@ def _event_center(db, today: date) -> dict:
     """事件中心载荷（spec §3，D-e5 统计口径服务端唯一权威）。
     窗口（D-e6）：近30=[today-29, today]，前30=[today-59, today-30]（含界不重叠）；
     新发卡按 first_seen_date、解除卡按 resolved_at；分母 0 → delta None；
-    分布=全量（500 截断时分布基于截断集，v1 量级远达不到，注释即防线）。"""
+    分布=全量（500 截断时分布基于截断集，v1 量级远达不到，注释即防线）；
+    summary/trend 亦基于截断集（>500 时前窗 prevCount 可能被截断，delta 口径失真
+    ——v1 量级远达不到，达到时须改为截断前全集计算）。"""
     iso = today.isoformat()
     w_from = (today - timedelta(days=29)).isoformat()
     p_from = (today - timedelta(days=59)).isoformat()
@@ -185,17 +187,19 @@ def _event_center(db, today: date) -> dict:
         if r["first_seen_date"]:
             d = by_day.setdefault(r["first_seen_date"], {"total": 0, "major": 0, "minor": 0})
             d["total"] += 1
-            d[r["severity"]] += 1
+            d[r["severity"]] = d.get(r["severity"], 0) + 1   # 第三值防御：计入不炸（第三值只进 total）
     points = []
     for i in range(30):
         d = (today - timedelta(days=29 - i)).isoformat()
-        points.append({"date": d, **by_day.get(d, {"total": 0, "major": 0, "minor": 0})})
+        v = by_day.get(d, {})
+        points.append({"date": d, "total": v.get("total", 0),
+                       "major": v.get("major", 0), "minor": v.get("minor", 0)})
 
     tc: dict = {}
     lc = {"active": 0, "resolved": 0}
     for r in rows:
         tc[r["event_type"]] = tc.get(r["event_type"], 0) + 1
-        lc[r["lifecycle"]] += 1
+        lc[r["lifecycle"]] = lc.get(r["lifecycle"], 0) + 1   # 第三值防御：计入不炸（输出仍只两键）
 
     late_keys = {event_key_of({"dim_keys": json.loads(r["dim_keys_json"])})
                  for r in _rows(db, "SELECT dim_keys_json FROM detector_finding"
