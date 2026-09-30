@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | v1.0（2026-09-30 用户口头裁定"确定"：健康度确定性映射 + 范围=首页/详情页改版） |
+| 状态 | v1.0.1（v1.0 用户裁定"确定"；勘误回填：health-score 改名/related 端点补定义/BFF 4 条/trend ≤2 查/AR 分母列名锁定/数据更新行口径简化——2026-09-30 写计划时对实码盘点发现） |
 | 来源 | 用户提供理想驾驶舱两张原型图（东鹏驾驶舱.png / 东鹏驾驶舱2.png，仓根目录）+ 2026-09-30 对话差距分析 |
 | 上游 | `2026-09-23-ai-business-assistant-v1-design.md`（v1.2.4）——本 spec 是其 UI/展示层的迭代，不改检测/排序/归因语义 |
 | 并行关系 | M-i4 灰度运行继续攒 D8 证据，本迭代不动阈值/校准/事件语义，互不阻塞 |
@@ -48,7 +48,7 @@
 - `insight/health.py`：健康度计算（纯函数 + 查询注入，可测）
 - `insight/api_main.py`：3 个新 GET 端点（§4）
 - `insight/config/health.json`：公式因子（D-c2 台账纪律）
-- `dataplat-ui/server/src/insight.ts`：3 条新代理路由（GET，additive）
+- `dataplat-ui/server/src/insight.ts`：4 条新代理路由（GET，additive：health-score / events 列表 / events/:id/trend / events/:id/related）
 - `dataplat-ui/web/src/components/insights/`：改 4 个组件、新增 3 个（§6）
 
 ## 4. API 契约（insight-api → BFF 逐字代理，BFF 不解释）
@@ -78,7 +78,7 @@ kind 语义按雷达封闭（UI 按 kind 选图型）：
 - 序列截至该事件 data_date（point-in-time：月值只取完整自然月，当月进行中的值不带——与 region_sales 检测的"完整自然月同比"口径一致）
 - anchor 不存在/事件无对应序列 → 200 + `{"series": [], "reason": "…"}`（UI 显示空态，不 500）
 
-### 4.2 GET `/api/insight/health`
+### 4.2 GET `/api/insight/health-score`（勘误：原 /health 已被 api_main 的 pm2 存活检查占用）
 首页健康度卡数据。as_of 缺省 = 最新数据日。
 
 ```json
@@ -108,13 +108,21 @@ kind 语义按雷达封闭（UI 按 kind 选图型）：
 ### 4.3 GET `/api/insight/events?state=active`
 事件中心"观察中"列表（D-c4）。返回 active 事件全集（含已上榜），每项附 `published_today: bool` 与 `score_gap`（距 publish_min_score 的差值）。已上榜事件标 `rank_today`。
 
+### 4.4 GET `/api/insight/events/:id/related`（勘误补定义：§6 相关事件卡的数据源）
+详情页相关事件。纯 insight.db 查询（无 DWS）：
+```json
+{ "event_id": "ev-...",
+  "sameType": [ {"event_id","title","severity","data_date","created_at"} ],   // 同 event_type，最近 5 条，排除自身
+  "sameRegion": [ … ] }                                                        // scope_json 组织节点相同，最近 5 条，排除自身
+```
+
 ## 5. 健康度口径定义（D-c1 落地）
 
 | 环 | 公式 | 输入查询（全部瓷砖事业部域） | 因子（health.json） |
 |---|---|---|---|
 | 销售健康度 | `round(100 − clip(−yoy_pct,0,100) × k1, 1)` | 最近完整自然月全渠道销售同比（region_sales 同表同谓词聚合） | k1=2.0 |
 | 毛利健康度 | `round(100 − clip(−delta_pct,0,100) × k2, 1)` | 最近完整月毛利率环比变动（gross_margin 同口径） | k2=10.0 |
-| 应收健康度 | `round(100 − nat90_share_pct, 1)` | 当期 nat90 余额 / 应收总余额（ar_risk 同表） | — |
+| 应收健康度 | `round(100 − nat90_share_pct, 1)` | 当期 nat90 余额 / `receivables_am`（应收金额合计，describe 实证 2026-09-30；nat90 分段同 ar_risk `_NAT90`） | — |
 | mom_delta | 同公式跑上一期，取差 | 同上，期次 -1 | — |
 
 - 同比为正/环比改善 → 记 100（封顶）
@@ -142,7 +150,8 @@ kind 语义按雷达封闭（UI 按 kind 选图型）：
 
 - trend/health 查询走 `DwsQueryRunner(app_name=insight-trend)`：SELECT/WITH 白名单、statement_timeout、串行（同一请求内不并发打 DWS）
 - 进程内缓存 `dict[key=(sql,params), (as_of, result)]`：as_of（数据日）变更自然失效，无 TTL 定时器；进程重启即冷，量级几十条
-- months 上限 24；单事件单序列一次查询（不做 per-month 循环查库）
+- months 上限 24；单序列常数次有界查询（≤2——target 的 actual/target 两查；不做 per-month 循环查库）
+- **数据更新行口径（勘误简化）**：首页"数据更新"= `brief_date 简报 · 数据日 data_date`（两者推导关系恒定）；不做 per-radar effective_date 展示（freshness_json/radar_run 的 detail 是自由文本，解析脆弱）
 
 ## 8. 测试与验收
 
