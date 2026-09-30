@@ -162,16 +162,17 @@ def _serve_runner(store, runner):
     return srv, f"http://127.0.0.1:{srv.server_address[1]}"
 
 def _ins_event(db, event_id, key, score, created_at, etype="sales_decline",
-               org="华南营销中心", lifecycle="active", resolved_at=None):
+               org="华南营销中心", lifecycle="active", resolved_at=None,
+               first="2026-09-26", sev="minor"):
     db.execute(
         "INSERT INTO business_event (event_id,event_key,lifecycle,data_date,"
         "first_seen_date,last_seen_date,persist_days,detector,event_type,title,summary,"
         "severity,scope_json,period_json,facts_json,score,score_breakdown_json,metric,"
         "status,attribution_status,created_at,updated_at,resolved_at)"
-        " VALUES (?,?,?,'2026-09-27','2026-09-26','2026-09-27',2,'region_sales',"
-        "?,?,'s','minor',?,'{\"类型\":\"月\"}','[]',?,'{}','yoy',"
+        " VALUES (?,?,?,'2026-09-27',?,'2026-09-27',2,'region_sales',"
+        "?,?,'s',?,?,'{\"类型\":\"月\"}','[]',?,'{}','yoy',"
         "'discovered','pending',?,?,?)",
-        (event_id, key, lifecycle, etype, f"{event_id} 业绩连续下滑",
+        (event_id, key, lifecycle, first, etype, f"{event_id} 业绩连续下滑", sev,
          json.dumps({"范围": "瓷砖事业部", "组织节点": org}, ensure_ascii=False),
          score, created_at, created_at, resolved_at))
 
@@ -440,3 +441,75 @@ def test_daily_data_date_and_attribution_fields(base):
     assert st == 200
     assert d["event"]["resolved_at"] is None                    # 尚未 resolve
     assert d["attribution"]["generatedAt"] is None              # 尚未归因
+
+
+# —— M-i6 事件中心：state=all 统计口径（D-e5/D-e6，统计全在服务端）——
+
+def test_event_center_summary_windows_and_trend(tmp_path):
+    """窗口（D-e6）：近30=[today-29,today]=[09-01,09-30]、前30=[today-59,today-30]=
+    [08-02,08-31]（含界不重叠）；分布=全量（含窗口外旧发与已解除）。
+    种子日期已按窗口核算配平：prev 事件 08-20（前窗内）、旧发 07-30（两窗外）、
+    ev-r2 解除日 08-31（前窗尾）——计划稿 09-05/08-26/09-01 分别落错近窗/前窗/近窗。"""
+    from insight.api_main import _event_center
+    db = open_db(tmp_path / "ec.db")
+    today = date(2026, 9, 30)
+    # 近30天新发 3（1 major / 2 minor，其中 1 target_gap）；前30天 1（minor）；两窗外旧发 1
+    _ins_event(db, "ev-new1", "k-n1", 90.0, 100, first="2026-09-28", sev="major")
+    _ins_event(db, "ev-new2", "k-n2", 60.0, 100, first="2026-09-20")
+    _ins_event(db, "ev-new3", "k-n3", 60.0, 100, first="2026-09-10",
+               etype="target_gap")
+    _ins_event(db, "ev-prev1", "k-p1", 60.0, 100, first="2026-08-20",
+               etype="ar_overdue")
+    _ins_event(db, "ev-old", "k-old", 60.0, 100, first="2026-07-30",
+               etype="margin_drop")
+    # 已解除：解除日近窗 1、前窗尾 1（first 均在两窗外，不进新发卡分母）
+    _ins_event(db, "ev-r1", "k-r1", 60.0, 100, first="2026-08-01",
+               lifecycle="resolved", resolved_at="2026-09-15")
+    _ins_event(db, "ev-r2", "k-r2", 60.0, 100, first="2026-07-01",
+               lifecycle="resolved", resolved_at="2026-08-31")
+    p = _event_center(db, today)
+    s = p["summary"]
+    assert s["total"] == {"count": 3, "prevCount": 1, "delta": 200}
+    assert s["major"]["count"] == 1 and s["major"]["delta"] is None   # 前窗 0 → delta None
+    assert s["minor"]["count"] == 2 and s["minor"]["prevCount"] == 1
+    assert s["targetGap"]["count"] == 1
+    assert s["resolved"] == {"count": 1, "prevCount": 1, "delta": 0}
+    # trend：30 点补零、首点=2026-09-01、09-28 只有 ev-new1（major）
+    assert len(p["trend"]["points"]) == 30
+    assert p["trend"]["points"][0]["date"] == "2026-09-01"
+    d28 = next(x for x in p["trend"]["points"] if x["date"] == "2026-09-28")
+    assert d28 == {"date": "2026-09-28", "total": 1, "major": 1, "minor": 0}
+    assert all(x["total"] == 0 for x in p["trend"]["points"]
+               if x["date"] == "2026-09-03")                          # 空日补零
+    # 分布=全量（7 事件全计，含两窗外旧发与已解除）
+    assert {d["key"]: d["count"] for d in p["eventTypeDistribution"]}["sales_decline"] == 4
+    assert {d["key"]: d["count"] for d in p["lifecycleDistribution"]} == {"active": 5, "resolved": 2}
+
+def test_event_center_late_badge_and_org_parse_and_state_branch(tmp_path):
+    """端点级：state=all 200 + late 派生（同 event_key 的 is_late finding）+ org 解析；
+    state=active 契约形状不动；state 非 active/all → 400 BAD_STATE（M-i5 语义保留）。"""
+    from insight.merge_rank import event_key_of
+    s = Store(open_db(tmp_path / "ec2.db"))
+    dk = {"anchor_type": "org_channel", "anchor_id": "粤东运营中心|GD03", "channel": "GD03"}
+    _ins_event(s.db, "ev-l1", event_key_of({"dim_keys": dk}), 70.0, 100,
+               first="2026-09-28", org="粤东运营中心")
+    # 晚到 finding：与 ev-l1 同 event_key 且 is_late=1 → late Badge 派生命中
+    s.db.execute("INSERT INTO detector_finding (finding_id,data_date,detector,dim_keys_json,"
+                 "metrics_json,norm_score,threshold_passed,is_late) VALUES"
+                 "('f-late','2026-09-29','region_sales',?,'{}',50,1,1)",
+                 (json.dumps(dk, ensure_ascii=False),))
+    s.db.commit()
+    srv, base = _serve(s)
+    try:
+        st, body = _get(f"{base}/api/insight/events?state=all")
+        assert st == 200 and body["truncated"] is False
+        ev1 = body["events"][0]
+        assert ev1["late"] is True and ev1["org"] == "粤东运营中心"
+        st, act = _get(f"{base}/api/insight/events?state=active")
+        assert st == 200
+        assert set(act.keys()) >= {"briefDate", "publishMinScore", "events"}   # 契约形状不动
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(f"{base}/api/insight/events?state=xyz")
+        assert e.value.code == 400
+    finally:
+        srv.shutdown()

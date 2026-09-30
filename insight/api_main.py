@@ -142,6 +142,101 @@ def _active_events(db) -> dict:
     return {"briefDate": latest, "publishMinScore": RANKING["publish_min_score"],
             "events": out}
 
+_EVENT_TYPE_LABELS = {"sales_decline": "销售下滑", "margin_drop": "毛利下降",
+                      "ar_overdue": "应收风险", "target_gap": "目标缺口"}
+_LIFECYCLE_LABELS = {"active": "进行中", "resolved": "已解除"}
+_EVENT_CENTER_LIMIT = 500
+
+
+def _event_center(db, today: date) -> dict:
+    """事件中心载荷（spec §3，D-e5 统计口径服务端唯一权威）。
+    窗口（D-e6）：近30=[today-29, today]，前30=[today-59, today-30]（含界不重叠）；
+    新发卡按 first_seen_date、解除卡按 resolved_at；分母 0 → delta None；
+    分布=全量（500 截断时分布基于截断集，v1 量级远达不到，注释即防线）。"""
+    iso = today.isoformat()
+    w_from = (today - timedelta(days=29)).isoformat()
+    p_from = (today - timedelta(days=59)).isoformat()
+    p_to = (today - timedelta(days=30)).isoformat()
+    rows = _rows(db, "SELECT event_id, event_key, detector, event_type, title, summary,"
+                     " severity, scope_json, facts_json, score, persist_days,"
+                     " first_seen_date, last_seen_date, lifecycle, resolved_at,"
+                     " attribution_status FROM business_event"
+                     " ORDER BY first_seen_date DESC, event_id")
+    truncated = len(rows) > _EVENT_CENTER_LIMIT
+    rows = rows[:_EVENT_CENTER_LIMIT]
+
+    def _card(attr, sev=None, etype=None):
+        def n(lo, hi):
+            return sum(1 for r in rows if r[attr] and lo <= r[attr] <= hi
+                       and (sev is None or r["severity"] == sev)
+                       and (etype is None or r["event_type"] == etype))
+        cur, prev = n(w_from, iso), n(p_from, p_to)
+        return {"count": cur, "prevCount": prev,
+                "delta": None if prev == 0 else round((cur - prev) / prev * 100)}
+
+    summary = {"total": _card("first_seen_date"),
+               "major": _card("first_seen_date", sev="major"),
+               "minor": _card("first_seen_date", sev="minor"),
+               "targetGap": _card("first_seen_date", etype="target_gap"),
+               "resolved": _card("resolved_at")}
+
+    by_day: dict = {}
+    for r in rows:
+        if r["first_seen_date"]:
+            d = by_day.setdefault(r["first_seen_date"], {"total": 0, "major": 0, "minor": 0})
+            d["total"] += 1
+            d[r["severity"]] += 1
+    points = []
+    for i in range(30):
+        d = (today - timedelta(days=29 - i)).isoformat()
+        points.append({"date": d, **by_day.get(d, {"total": 0, "major": 0, "minor": 0})})
+
+    tc: dict = {}
+    lc = {"active": 0, "resolved": 0}
+    for r in rows:
+        tc[r["event_type"]] = tc.get(r["event_type"], 0) + 1
+        lc[r["lifecycle"]] += 1
+
+    late_keys = {event_key_of({"dim_keys": json.loads(r["dim_keys_json"])})
+                 for r in _rows(db, "SELECT dim_keys_json FROM detector_finding"
+                                    " WHERE is_late=1")}
+    latest = (db.execute("SELECT MAX(brief_date) b FROM daily_brief").fetchone()["b"]) or ""
+    pub = {r["event_id"]: r["rank"] for r in
+           _rows(db, "SELECT event_id, rank FROM daily_brief_event WHERE brief_date=?",
+                 (latest,))}
+    pmin = RANKING["publish_min_score"]
+    out = []
+    for r in rows:
+        try:
+            scope = json.loads(r["scope_json"] or "{}")
+        except Exception:
+            scope = {}
+        try:
+            facts = json.loads(r["facts_json"] or "[]")
+        except Exception:
+            facts = []
+        out.append({"event_id": r["event_id"], "detector": r["detector"],
+                    "event_type": r["event_type"], "title": r["title"],
+                    "summary": r["summary"], "severity": r["severity"],
+                    "org": scope.get("组织节点"), "channel": scope.get("渠道"),
+                    "facts": facts, "score": r["score"],
+                    "persist_days": r["persist_days"],
+                    "first_seen_date": r["first_seen_date"],
+                    "last_seen_date": r["last_seen_date"],
+                    "lifecycle": r["lifecycle"], "resolved_at": r["resolved_at"],
+                    "attribution_status": r["attribution_status"],
+                    "late": r["event_key"] in late_keys,
+                    "publishedToday": r["event_id"] in pub,
+                    "rankToday": pub.get(r["event_id"]),
+                    "scoreGap": round(r["score"] - pmin, 1)})
+    return {"asOf": iso, "summary": summary,
+            "trend": {"days": 30, "points": points},
+            "eventTypeDistribution": [{"key": k, "label": _EVENT_TYPE_LABELS.get(k, k), "count": v}
+                                      for k, v in sorted(tc.items(), key=lambda x: -x[1])],
+            "lifecycleDistribution": [{"key": k, "label": _LIFECYCLE_LABELS[k], "count": lc[k]}
+                                      for k in ("active", "resolved")],
+            "truncated": truncated, "events": out}
+
 def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                 port: int = 58095, trend_runner=None) -> ThreadingHTTPServer:
     # ThreadingHTTPServer 在工作线程跑 do_GET，而连接通常创建于主线程
@@ -174,10 +269,12 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                     body, code = payload, 200
                 elif u.path == "/api/insight/events":
                     state = (q.get("state") or ["active"])[0]
-                    if state != "active":
-                        body, code = {"error": "BAD_STATE"}, 400
-                    else:
+                    if state == "active":
                         body, code = _active_events(ro), 200
+                    elif state == "all":
+                        body, code = _event_center(ro, date.today()), 200
+                    else:
+                        body, code = {"error": "BAD_STATE"}, 400
                 elif (m := _EVENT_TREND_RE.match(u.path)):
                     if service is None:
                         body, code = {"error": "DWS_UNAVAILABLE"}, 503
