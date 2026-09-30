@@ -5,14 +5,17 @@ stdlib http.server（环境无 fastapi/flask，零新依赖；spec §4 技术描
 import json
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 from .merge_rank import event_key_of
+from .trend_service import TrendService
 
 _EVENT_ID_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)$")
+_EVENT_TREND_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)/trend$")
+_EVENT_RELATED_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)/related$")
 
 def _rows(db, sql, args=()):
     return [dict(r) for r in db.execute(sql, args).fetchall()]
@@ -30,7 +33,8 @@ def _daily_payload(db, brief_date: str) -> dict:
     # P0-2 冻结面不含 status/event_key/metric——读 business_event 当前态合规（Fix 4；
     # event_key 是锚点恒定身份、metric 事件内不变，回查即契约值）
     cur_by_id = {r["event_id"]: r for r in
-                 _rows(db, "SELECT event_id, status, event_key, metric FROM business_event"
+                 _rows(db, "SELECT event_id, status, event_key, metric,"
+                       " attribution_summary, attribution_status FROM business_event"
                        " WHERE event_id IN (SELECT event_id FROM daily_brief_event"
                        " WHERE brief_date=?)", (brief_date,))}
     evs = []
@@ -47,8 +51,12 @@ def _daily_payload(db, brief_date: str) -> dict:
                     "facts": json.loads(s["facts_snapshot"]),
                     "score": s["score_snapshot"],
                     "status": cur.get("status", "discovered"),
+                    "attributionSummary": cur.get("attribution_summary"),
+                    "attributionStatus": cur.get("attribution_status", "pending"),
                     "createdAt": s["published_at"]})
     return {"briefDate": brief_date, "scope": "瓷砖事业部",
+            "dataDate": (date.fromisoformat(brief_date) - timedelta(days=1)).isoformat()
+            if brief else None,
             "dataFreshness": {"overall": overall, "radars": freshness},
             "eventCount": brief["event_count"] if brief else 0,
             "stale": False, "events": evs}
@@ -74,6 +82,7 @@ def _event_detail(db, event_id: str) -> dict | None:
         evidence.append(e)
     return {"event": {k: ev[k] for k in ("event_id", "event_key", "lifecycle",
                                           "data_date", "first_seen_date", "persist_days",
+                                          "resolved_at",
                                           "detector", "event_type", "title", "summary",
                                           "severity", "scope_json", "facts_json",
                                           "score", "status")},
@@ -82,6 +91,7 @@ def _event_detail(db, event_id: str) -> dict | None:
             "attribution": {"status": ev["attribution_status"],
                             "analysisId": latest["analysis_id"] if latest else None,
                             "summary": ev["attribution_summary"],
+                            "generatedAt": ev["attribution_generated_at"],
                             "path": (parsed or {}).get("path", []),
                             "findings": (parsed or {}).get("findings", []),
                             "waterfall": (parsed or {}).get("waterfall", []),
@@ -92,8 +102,46 @@ def _event_detail(db, event_id: str) -> dict | None:
             "suggestedActions": [],            # v1 只生成不执行，M-i3 UI 层呈现
             "followupPrompts": ["为什么？", "看重点影响对象明细", "生成完整分析报告"]}
 
+def _related(db, event_id: str) -> dict | None:
+    """同类型/同组织节点相关事件各至多 5 条（db-only，排除自身，created_at 降序）。"""
+    ev = db.execute("SELECT event_id, event_type, scope_json FROM business_event"
+                    " WHERE event_id=?", (event_id,)).fetchone()
+    if not ev:
+        return None
+    org = json.loads(ev["scope_json"]).get("组织节点")
+    same_type, same_region = [], []
+    for r in db.execute("SELECT event_id, event_type, scope_json, title, severity,"
+                        " data_date, created_at FROM business_event"
+                        " WHERE event_id<>? ORDER BY created_at DESC LIMIT 100",
+                        (event_id,)):
+        item = {"event_id": r["event_id"], "title": r["title"], "severity": r["severity"],
+                "data_date": r["data_date"], "created_at": r["created_at"]}
+        if r["event_type"] == ev["event_type"] and len(same_type) < 5:
+            same_type.append(item)
+        if org and json.loads(r["scope_json"]).get("组织节点") == org and len(same_region) < 5:
+            same_region.append(item)
+    return {"event_id": event_id, "sameType": same_type, "sameRegion": same_region}
+
+def _active_events(db) -> dict:
+    """active 事件全集按 score 降序，附当日发布态与达标缺口（db-only）。"""
+    from .merge_rank import RANKING
+    latest = (db.execute("SELECT MAX(brief_date) b FROM daily_brief").fetchone()["b"]) or ""
+    pub = {r["event_id"]: r["rank"] for r in
+           _rows(db, "SELECT event_id, rank FROM daily_brief_event WHERE brief_date=?",
+                 (latest,))}
+    out = []
+    for r in _rows(db, "SELECT event_id, detector, event_type, title, summary, severity,"
+                       " score, persist_days, first_seen_date, lifecycle,"
+                       " attribution_status, updated_at FROM business_event"
+                       " WHERE lifecycle='active' ORDER BY score DESC"):
+        out.append({**r, "publishedToday": r["event_id"] in pub,
+                    "rankToday": pub.get(r["event_id"]),
+                    "scoreGap": round(r["score"] - RANKING["publish_min_score"], 1)})
+    return {"briefDate": latest, "publishMinScore": RANKING["publish_min_score"],
+            "events": out}
+
 def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
-                port: int = 58095) -> ThreadingHTTPServer:
+                port: int = 58095, trend_runner=None) -> ThreadingHTTPServer:
     # ThreadingHTTPServer 在工作线程跑 do_GET，而连接通常创建于主线程
     # （sqlite3 默认 check_same_thread=True 拒绝跨线程使用）——按路径重开
     # 一条线程安全的只读连接供服务用（红线上移：API 服务面恒 mode=ro）。
@@ -101,6 +149,8 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
     ro = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True,
                          check_same_thread=False)
     ro.row_factory = sqlite3.Row
+    # DWS 编排（trend/health-score）：runner 缺席（进程无 DWS_PASSWORD）→ 端点 503
+    service = TrendService(trend_runner) if trend_runner else None
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):     # 安静（pm2 管日志）
@@ -120,6 +170,34 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                         payload = _daily_payload(ro, latest)
                         payload["stale"] = latest < date.today().isoformat()  # Fix 3
                     body, code = payload, 200
+                elif u.path == "/api/insight/events":
+                    state = (q.get("state") or ["active"])[0]
+                    if state != "active":
+                        body, code = {"error": "BAD_STATE"}, 400
+                    else:
+                        body, code = _active_events(ro), 200
+                elif (m := _EVENT_TREND_RE.match(u.path)):
+                    if service is None:
+                        body, code = {"error": "DWS_UNAVAILABLE"}, 503
+                    else:
+                        try:
+                            months = int((q.get("months") or ["12"])[0])
+                            if not 1 <= months <= 24:
+                                raise ValueError
+                        except ValueError:
+                            body, code = {"error": "BAD_MONTHS"}, 400
+                        else:
+                            t = service.trend_for_event(ro, m.group(1), months)
+                            body, code = (t, 200) if t is not None \
+                                else ({"error": "NOT_FOUND"}, 404)
+                elif (m := _EVENT_RELATED_RE.match(u.path)):
+                    rel = _related(ro, m.group(1))
+                    body, code = (rel, 200) if rel else ({"error": "NOT_FOUND"}, 404)
+                elif u.path == "/api/insight/health-score":
+                    if service is None:
+                        body, code = {"error": "DWS_UNAVAILABLE"}, 503
+                    else:
+                        body, code = service.health(date.today() - timedelta(days=1)), 200
                 elif (m := _EVENT_ID_RE.match(u.path)):
                     detail = _event_detail(ro, m.group(1))
                     body, code = (detail, 200) if detail else ({"error": "NOT_FOUND"}, 404)
@@ -162,8 +240,12 @@ def main():
     db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)   # 只读（红线）
     db.row_factory = sqlite3.Row
     port = int(os.environ.get("INSIGHT_PORT", "58095"))
-    print(f"insight-api listening 127.0.0.1:{port}")
-    make_server(db, port=port).serve_forever()
+    runner = None
+    if os.environ.get("DWS_PASSWORD"):            # 密钥只走 env；缺席→trend/health-score 503
+        from .dws import DwsQueryRunner
+        runner = DwsQueryRunner(app_name="insight-trend", timeout_ms=30000)
+    print(f"insight-api listening 127.0.0.1:{port} dws={'on' if runner else 'off'}")
+    make_server(db, port=port, trend_runner=runner).serve_forever()
 
 if __name__ == "__main__":
     main()
