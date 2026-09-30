@@ -102,7 +102,7 @@ kind 语义按雷达封闭（UI 按 kind 选图型）：
 }
 ```
 
-- target = 年度口径：annual_target_wan = 当年各月目标求和（目标表 2026 段），actual_wan = 当年 YTD 实绩累计，time_pct = 已过工作日/全年工作日（与 target 雷达同定义）
+- target = 年度口径：annual_target_wan = 当年各月目标求和（目标表 2026 段），actual_wan = 当年 YTD 实绩累计，time_pct = **年日内自然日占比**（tm_yday/days_in_year，与 trend 双线的 prev 线同定义）——注意与事件/雷达的"月度工作日进度"（radar-target progress_basis=workday）是两个不同窗口的口径，不可混用（v1.0.2 勘误 2026-09-30：原文字误写"与 target 雷达同定义"）
 - 任何环的数据查询失败 → 该环 `available:false + reason`，其余环照常（局部降级，不整卡 503）
 
 ### 4.3 GET `/api/insight/events?state=active`
