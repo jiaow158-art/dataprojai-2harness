@@ -15,3 +15,20 @@ def list_notifications(db,user,unread=False):
     q='SELECT * FROM insight_notification WHERE user_id=?'+(' AND read_at IS NULL' if unread else '')+' ORDER BY created_at DESC LIMIT 200'; return [dict(r) for r in db.execute(q,(user,))]
 def mark_read(db,user,nid=None):
     c=db.execute('UPDATE insight_notification SET read_at=? WHERE user_id=?'+(' AND id=?' if nid else ' AND read_at IS NULL'), ((_now(),user,nid) if nid else (_now(),user))); db.commit(); return c.rowcount
+
+def matches(db,user):
+    import json
+    subs=[dict(r) for r in db.execute('SELECT * FROM insight_subscription WHERE user_id=? AND enabled=1',(user,))]
+    out=[]
+    for ev in db.execute('SELECT * FROM business_event ORDER BY created_at DESC LIMIT 500'):
+        try: scope=json.loads(ev['scope_json'] or '{}')
+        except (TypeError,ValueError): scope={}
+        org=str(scope.get('组织节点','')); hits=[s for s in subs if (s['kind']=='event' and s['value']==ev['event_id']) or (s['kind']=='region' and s['value'] in org) or (s['kind']=='metric' and s['value'] in (ev['event_type'],ev['metric']))]
+        if hits: out.append({'event':dict(ev),'matchedSubscriptions':hits})
+    return out
+
+def dispatch_event(db, ev, change='created'):
+    """Best-effort fanout; duplicate deliveries are ignored by the unique key."""
+    users={s['user_id'] for s in db.execute('SELECT * FROM insight_subscription WHERE enabled=1') if (s['kind']=='event' and s['value']==ev['event_id'])}
+    for user in users: db.execute('INSERT OR IGNORE INTO insight_notification VALUES (?,?,?,?,?,?,?,?,?)',(_id('note'),user,ev['event_id'],change,ev['title'],ev['summary'],ev['severity'],_now(),None))
+    db.commit(); return len(users)
