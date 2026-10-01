@@ -12,6 +12,7 @@ from urllib.parse import urlparse, parse_qs
 
 from .merge_rank import RANKING, event_key_of
 from .trend_service import TrendService
+from .subscriptions import list_subscriptions, add_subscription, remove_subscription, list_notifications, mark_read
 
 _EVENT_ID_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)$")
 _EVENT_TREND_RE = re.compile(r"^/api/insight/events/([A-Za-z0-9\-]+)/trend$")
@@ -256,6 +257,8 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
     ro = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True,
                          check_same_thread=False)
     ro.row_factory = sqlite3.Row
+    rw = sqlite3.connect(db_path, check_same_thread=False)
+    rw.row_factory = sqlite3.Row
     # DWS 编排（trend/health-score）：runner 缺席（进程无 DWS_PASSWORD）→ 端点 503
     service = TrendService(trend_runner) if trend_runner else None
 
@@ -266,8 +269,16 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
         def do_GET(self):
             u = urlparse(self.path)
             q = parse_qs(u.query)
+            user = self.headers.get("X-User", "anonymous").strip() or "anonymous"
             try:
-                if u.path == "/api/insight/daily":
+                if u.path == "/api/insight/subscriptions":
+                    body, code = {"items": list_subscriptions(rw, user)}, 200
+                elif u.path == "/api/insight/subscriptions/matches":
+                    from .subscriptions import matches
+                    body, code = {"items": matches(ro, user)}, 200
+                elif u.path == "/api/insight/notifications":
+                    body, code = {"items": list_notifications(rw, user, (q.get("unread_only") or ["0"])[0] == "1")}, 200
+                elif u.path == "/api/insight/daily":
                     want = (q.get("date") or [""])[0]
                     if want:
                         payload = _daily_payload(ro, want)  # 显式回看：stale 恒 False
@@ -340,6 +351,22 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+
+        def do_POST(self):
+            u=urlparse(self.path); user=self.headers.get("X-User","anonymous").strip() or "anonymous"
+            try:
+                raw=self.rfile.read(int(self.headers.get("Content-Length","0") or 0)); payload=json.loads(raw or b"{}")
+                if u.path == "/api/insight/subscriptions": body,code=add_subscription(rw,user,payload.get("kind"),payload.get("value"),payload.get("label")),201
+                elif u.path == "/api/insight/notifications/read-all": body,code={"updated":mark_read(rw,user)},200
+                elif re.match(r"^/api/insight/notifications/[A-Za-z0-9-]+/read$",u.path): body,code={"updated":mark_read(rw,user,u.path.rsplit('/',2)[1])},200
+                else: body,code={"error":"NOT_FOUND"},404
+            except (ValueError, json.JSONDecodeError) as e: body,code={"error":str(e)},400
+            data=json.dumps(body,ensure_ascii=False).encode(); self.send_response(code); self.send_header("Content-Type","application/json; charset=utf-8"); self.end_headers(); self.wfile.write(data)
+
+        def do_DELETE(self):
+            u=urlparse(self.path); user=self.headers.get("X-User","anonymous").strip() or "anonymous"; m=re.match(r"^/api/insight/subscriptions/([A-Za-z0-9-]+)$",u.path)
+            if not m: self.send_response(404); self.end_headers(); return
+            data=json.dumps({"removed":remove_subscription(rw,user,m.group(1))}).encode(); self.send_response(200); self.send_header("Content-Type","application/json"); self.end_headers(); self.wfile.write(data)
 
     return ThreadingHTTPServer((host, port), Handler)
 

@@ -103,4 +103,5 @@ def open_db(path: str | Path) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     # SCHEMA 保持 spec §6.1 逐字（供 diff 审）；幂等性在执行层转换，不改 SCHEMA 本身
     conn.executescript(SCHEMA.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS "))
+    conn.executescript('''CREATE TABLE IF NOT EXISTS insight_subscription (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, label TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id,kind,value)); CREATE TABLE IF NOT EXISTS insight_notification (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, event_id TEXT, kind TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, severity TEXT, created_at TEXT NOT NULL, read_at TEXT, UNIQUE(user_id,event_id,kind));''')
     return conn
