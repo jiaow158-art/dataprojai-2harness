@@ -67,6 +67,7 @@ class Store:
                        severity: str, scope: dict, period: dict, facts: list,
                        score: float, breakdown: dict, metric: str, dim_keys: dict,
                        facets: dict | None = None) -> str:
+        before = self.db.execute("SELECT severity FROM business_event WHERE event_id=?", (event_id,)).fetchone()
         facet_set = " facet_json=excluded.facet_json," if facets is not None else ""
         self.db.execute(
             "INSERT INTO business_event (event_id, event_key, lifecycle,"
@@ -103,6 +104,13 @@ class Store:
              json.dumps(dim_keys, ensure_ascii=False) if dim_keys else None,
              json.dumps(facets, ensure_ascii=False) if facets is not None else None))
         self.db.commit()
+        try:
+            from .subscriptions import dispatch_event
+            row = self.db.execute("SELECT * FROM business_event WHERE event_id=?", (event_id,)).fetchone()
+            change = "created" if before is None else ("escalated" if before["severity"] != severity and severity == "major" else None)
+            if change: dispatch_event(self.db, row, change)
+        except Exception:
+            pass  # 旁路通知失败不得影响事件事实写入
         return event_id
 
     def _first_seen(self, event_id: str, data_date: str) -> str:
@@ -131,3 +139,8 @@ class Store:
             " updated_at=strftime('%s','now') WHERE event_id=?",
             (resolved_at_day, event_id))
         self.db.commit()
+        try:
+            from .subscriptions import dispatch_event
+            dispatch_event(self.db, self.db.execute("SELECT * FROM business_event WHERE event_id=?", (event_id,)).fetchone(), "resolved")
+        except Exception:
+            pass
