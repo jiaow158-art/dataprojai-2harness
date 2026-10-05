@@ -318,6 +318,12 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                         body, code = {"error": "DWS_UNAVAILABLE"}, 503
                     else:
                         body, code = service.health(date.today() - timedelta(days=1)), 200
+                elif u.path == "/api/insight/target-overview":
+                    if service is None:
+                        body, code = {"error": "DWS_UNAVAILABLE"}, 503
+                    else:
+                        body, code = service.target_overview(
+                            date.today() - timedelta(days=1)), 200
                 elif (m := _EVENT_ID_RE.match(u.path)):
                     detail = _event_detail(ro, m.group(1))
                     body, code = (detail, 200) if detail else ({"error": "NOT_FOUND"}, 404)

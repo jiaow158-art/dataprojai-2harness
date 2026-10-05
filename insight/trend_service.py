@@ -13,6 +13,7 @@ from .detectors import REGISTRY
 from .health import compute
 from .merge_rank import event_key_of
 from .replay_ctx import ReplayContext
+from .target_report import target_overview as _report   # 别名防撞 TrendService.target_overview
 
 
 class TrendService:
@@ -66,6 +67,25 @@ class TrendService:
                     # 下次请求重查（防全红卡按天钉死）；target 不参与该判定
                     if any(r["key"] in ("sales", "margin", "ar") and r.get("available")
                            for r in out["rings"]):
+                        self._cache[key] = out
+                    else:
+                        return out
+        return self._cache[key]
+
+    def target_overview(self, as_of: date) -> dict:
+        key = ("target_overview", as_of.isoformat())
+        if key not in self._cache:
+            with self._lock:
+                if key not in self._cache:   # double-check：并发同 key 只查一次
+                    out = self._run_with_conn_retry(
+                        lambda: _report(self.runner, ReplayContext(as_of=as_of)))
+                    # annual/months/centers 三块全降级=疑似 DWS 故障：不落缓存，下次
+                    # 请求重查（同 health I-2 规则，防全降级页按天钉死）；projection
+                    # 依赖 annual，不参与判定
+                    def usable(block):
+                        return not (isinstance(block, dict)
+                                    and block.get("available") is False)
+                    if all(usable(out[k]) for k in ("annual", "months", "centers")):
                         self._cache[key] = out
                     else:
                         return out

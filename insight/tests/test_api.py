@@ -303,6 +303,10 @@ def test_dws_unavailable_503_local_isolation(tmp_path):
         with pytest.raises(urllib.error.HTTPError) as e:
             _get(f"{base}/api/insight/events/ev-x/trend")
         assert e.value.code == 503
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(f"{base}/api/insight/target-overview")   # M-i7：同 DWS 门禁
+        assert e.value.code == 503
+        assert json.loads(e.value.read())["error"] == "DWS_UNAVAILABLE"
         st, body = _get(f"{base}/api/insight/events?state=active")   # db-only 不受影响
         assert st == 200 and body["events"] == []
         with pytest.raises(urllib.error.HTTPError) as e:
@@ -571,3 +575,64 @@ def test_event_center_org_display_normalization(tmp_path):
     by_id = {e["event_id"]: e["org"] for e in p["events"]}
     assert by_id["ev-bu"] == "瓷砖事业部"          # 锚点串首段"瓷砖"→范围字段
     assert by_id["ev-plain"] == "粤东运营中心"     # 无竖线原样
+
+
+# —— M-i7 目标管理页：/api/insight/target-overview（缓存 / 全降级不缓存 / 无 DWS 503）——
+
+def _target_runner(actuals, targets, fail_on=None):
+    """端点级 fake runner：分派形态同 T1 test_target_report._runner——annual 同源走
+    target.py TREND_*（元单位 *_amt 列），月度查询 wan 列，目标表按特征串可 fail。"""
+    def run(sql, params=None):
+        if fail_on and fail_on in sql:
+            raise RuntimeError("dws down")
+        if "AS actual_amt" in sql:                 # TREND_ACTUAL（annual 同源，元）
+            return [{"month": m, "actual_amt": v * 10000.0} for m, v in actuals.items()]
+        if "AS target_amt" in sql:                 # TREND_TARGET（annual 同源，元）
+            return [{"month": m, "target_amt": v * 10000.0} for m, v in targets.items()]
+        if "dm_dp_api_sales_target" in sql:        # 月度目标 vs 中心目标两形（形状不同）
+            if "sales_center_code" in sql:
+                return []                          # 中心目标：端点测试不需要 centers 数据
+            return [{"month": m, "wan": v} for m, v in targets.items()]
+        if "GROUP BY m.calmonth" in sql:           # 月度实绩（上年键不匹配→yoy 缺省）
+            return [{"month": m, "wan": v} for m, v in actuals.items()]
+        return []
+    return run
+
+def test_target_overview_endpoint_cached(tmp_path):
+    s = Store(open_db(tmp_path / "i.db"))
+    as_of = date.today() - timedelta(days=1)                    # 端点口径：今天-1
+    acts = {f"{as_of.year}-{m:02d}": 1000.0 for m in range(1, as_of.month)} \
+        | {as_of.strftime("%Y-%m"): 500.0}                      # 完整月各 1000 + 当月 MTD 500
+    tgts = {f"{as_of.year}-{m:02d}": 1000.0
+            for m in range(1, as_of.month + 1)}
+    total_a = (as_of.month - 1) * 1000.0 + 500.0
+    total_t = as_of.month * 1000.0
+    runner = _DispatchRunner(_target_runner(acts, tgts))
+    srv, base = _serve_runner(s, runner)
+    try:
+        st, body = _get(f"{base}/api/insight/target-overview")
+        assert st == 200 and body["asOf"] == as_of.isoformat()
+        a = body["annual"]
+        assert a["actualWan"] == total_a and a["targetWan"] == total_t
+        assert a["achievePct"] == round(total_a / total_t * 100, 1)
+        n1 = runner.calls
+        st, again = _get(f"{base}/api/insight/target-overview")
+        assert st == 200 and again == body and runner.calls == n1   # 缓存命中不重查
+    finally:
+        srv.shutdown()
+
+def test_target_overview_all_degraded_not_cached(tmp_path):
+    """I-2 同规则：annual/months/centers 三块全降级（目标表挂，疑似 DWS 故障）→
+    不落缓存，两次请求 runner 两次被调（下次重查）。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    runner = _DispatchRunner(_target_runner({}, {}, fail_on="dm_dp_api_sales_target"))
+    srv, base = _serve_runner(s, runner)
+    try:
+        st, body = _get(f"{base}/api/insight/target-overview")
+        assert st == 200 and body["annual"]["available"] is False
+        assert body["months"]["available"] is False and body["centers"]["available"] is False
+        n1 = runner.calls
+        st, body = _get(f"{base}/api/insight/target-overview")
+        assert st == 200 and runner.calls > n1                  # 全降级不缓存→重查
+    finally:
+        srv.shutdown()
