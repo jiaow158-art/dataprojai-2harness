@@ -190,3 +190,8 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 - `/api/insight/events?state=all`：事件中心页专用——服务端返回 summary（近30新发 vs 前30，分母0→delta null）/trend（30点补零）/类型与生命周期分布（全量）/全量事件列表（500 截断标记 truncated）。统计口径唯一权威在服务端（D-e5）。
 - lifecycle / attribution_status / is_late 三概念分立：两列两筛选，late 仅 Badge（D-e2）。
 - org 展示归一：锚点串取首段、"瓷砖"短名回显范围字段（数据与 event_key 不动）。
+
+## §M-i7 目标管理页（2026-10-06）
+
+- `/api/insight/target-overview`（DWS 聚合，需 DWS_PASSWORD，无则 503）：annual（与 health-score target **同源逐位一致**，D-t6）/ projection（线性年化，负缺口=预计超额）/ months（MTD 封顶）/ centers（欠进度额=目标×年日进度−实绩，与雷达 abs_gap 同语义；恢复潜力=回到上年同期跑速）。缓存 key=(target_overview, as_of)，三块全降级不缓存。
+- `insight/target_report.py` 纯函数；centers lag 读 radar-target.json `center_set_month_lag`（防分叉）。
