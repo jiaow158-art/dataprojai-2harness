@@ -2,6 +2,7 @@
 # 月度 MTD 封顶 / centers 欠进度·占比·恢复潜力 / 局部降级
 from datetime import date
 
+from insight.health import _target_block
 from insight.replay_ctx import ReplayContext
 from insight.target_report import target_overview
 
@@ -51,11 +52,17 @@ def test_annual_matches_health_semantics():
     # 1-8 月实绩各 1000 万 + 9 月 MTD 500 万；目标各月 1000 万
     acts = {f"2026-{m:02d}": 1000.0 for m in range(1, 9)} | {"2026-09": 500.0}
     tgts = {f"2026-{m:02d}": 1000.0 for m in range(1, 10)}
-    out = target_overview(_runner(acts, tgts), CTX)
-    a = out["annual"]
+    run = _runner(acts, tgts)
+    a = target_overview(run, CTX)["annual"]
     assert a["actualWan"] == 8500.0 and a["targetWan"] == 9000.0
     assert a["achievePct"] == round(8500 / 9000 * 100, 1)
     assert a["timePct"] == round(265 / 365 * 100, 1)      # 与 health 同年日内自然日口径
+    # D-t6 跨模块对拍：同 runner/ctx 下 health._target_block 四字段与 annual 逐位相等
+    if "available" not in a:                              # None 守卫：annual 可用才比
+        h = _target_block(run, CTX)
+        assert h is not None
+        assert (a["achievePct"], a["actualWan"], a["targetWan"], a["timePct"]) == \
+               (h["achieve_pct"], h["actual_wan"], h["annual_target_wan"], h["time_pct"])
 
 
 def test_projection_linear_annualization():

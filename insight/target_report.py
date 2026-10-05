@@ -59,7 +59,7 @@ WHERE m.calmonth = ANY(%(ly_ym)s)
 GROUP BY m.node_name5
 """
 
-# 中心级目标：center 集=目标雷达同口径（centers CTE + center_set_month_lag=1 → 前置月）；
+# 中心级目标：center 集=目标雷达同口径（centers CTE，前置月 lag 读 config 与雷达同源）；
 # 名称 LEFT JOIN MAX(node_desc5)（D-t4 防树形重复，无映射 cname=NULL 回显码）
 CENTER_TARGET_SQL = """
 WITH centers AS (
@@ -94,8 +94,6 @@ def target_overview(run, ctx: ReplayContext) -> dict:
     ly_calday = calday.replace(str(y), str(y - 1), 1)   # 上年同日封顶=同窗对比
     year_binds = {"ym": ym, "as_of_calday": calday}
     ly_binds = {"ly_ym": ly_ym, "ly_as_of_calday": ly_calday}
-    center_binds = {"ym": ym,
-                    "center_set_month_ym": shift_month(ctx.as_of, -1).strftime("%Y-%m")}
 
     out = {"asOf": ctx.as_of.isoformat(), "year": y,
            "annual": {"available": False, "reason": "未执行"}, "projection": None,
@@ -156,6 +154,9 @@ def target_overview(run, ctx: ReplayContext) -> dict:
     # centers（D-t2 欠进度额=目标×时间进度%−实绩，与雷达 abs_gap 同语义；占比分母只计落后者；
     # D-t3 恢复潜力=该中心(上年同期日均−当前日均)×剩余自然日，max0 截断；按欠进度额降序）
     try:
+        lag = TargetDetector().cfg["params"]["center_set_month_lag"]   # 与 TREND_TARGET_SQL 同源
+        center_binds = {"ym": ym,
+                        "center_set_month_ym": shift_month(ctx.as_of, -lag).strftime("%Y-%m")}
         ca = {r["center"]: r["wan"] for r in run(CENTER_ACTUAL_SQL, year_binds)}
         cly = {r["center"]: r["wan"] for r in run(CENTER_LY_SQL, ly_binds)}
         trows = run(CENTER_TARGET_SQL, center_binds)
