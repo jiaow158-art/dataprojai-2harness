@@ -8,6 +8,7 @@
   面积过小的屿（bbox<0.15°）丢弃防噪。九段线（100000_JD）单独导出。
 生成物入 dataplat-ui 仓（一次性资产，改动需重跑本脚本）。"""
 import json
+import re
 import sys
 
 LNG0, LAT0 = 73.0, 54.5          # 左上原点（经、纬）
@@ -24,7 +25,7 @@ def ring_to_path(ring):
     return "M" + "L".join(f"{x} {y}" for x, y in pts) + "Z"
 
 
-def simplify(geometry):
+def simplify(geometry, adcode):
     """多环 → path 串；丢小屿。返回 (path, [ring...]) 供 bbox/centroid。"""
     rings = []
     polys = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
@@ -32,7 +33,8 @@ def simplify(geometry):
         ring = poly[0]                       # 外环即可（内环=湖泊细部，视觉可省）
         lngs = [p[0] for p in ring]
         lats = [p[1] for p in ring]
-        if max(lngs) - min(lngs) < 0.15 and max(lats) - min(lats) < 0.15:
+        if adcode != 820000 and (           # 澳门白名单（面积最小不防噪）
+                max(lngs) - min(lngs) < 0.15 and max(lats) - min(lats) < 0.15):
             continue                          # 小屿防噪
         rings.append(ring)
     return "".join(ring_to_path(r) for r in rings), rings
@@ -54,12 +56,13 @@ def main(src, dst):
         name, adcode = props.get("name"), props.get("adcode")
         if name is None or adcode is None:
             continue
-        path, rings = simplify(f["geometry"])
+        path, rings = simplify(f["geometry"], adcode)
         if not rings:
             continue
-        all_pts = [p for r in rings for p in r]
-        cx = (min(p[0] for p in all_pts) + max(p[0] for p in all_pts)) / 2
-        cy = (min(p[1] for p in all_pts) + max(p[1] for p in all_pts)) / 2
+        # centroid 必须与 path 同坐标系：原始经纬 bbox 中心过 to_svg 投影（F1 修复）
+        lngs = [p[0] for r in rings for p in r]
+        lats = [p[1] for r in rings for p in r]
+        cx, cy = to_svg((min(lngs) + max(lngs)) / 2, (min(lats) + max(lats)) / 2)
         if str(adcode) == "100000" or "JD" in str(adcode):
             nine_dash = path
             continue
@@ -68,10 +71,12 @@ def main(src, dst):
         short = norm_name(name)
         lookup[short] = adcode
         lookup[name] = adcode
+    ys = [float(t[1]) for t in re.findall(r"[ML](-?[\d.]+) (-?[\d.]+)", nine_dash + "".join(p["path"] for p in provinces))]
+    h = round(max(ys) + 8, 0)
     out = ["// 本文件由 harness scripts/build-china-map.py 生成（DataV 公开省界，勿手改）",
            f"// 生成自 100000_full.json；单位 {len(provinces)} + 九段线",
            "export interface ProvincePath { name: string; adcode: number; path: string; centroid: [number, number]; }",
-           f"export const VIEWBOX = [0, 0, 800, {round((LAT0 - 18.0) * (800 / 62.5) * 1.2207, 0)}];",
+           f"export const VIEWBOX = [0, 0, 800, {h}];",
            f"export const CHINA_PROVINCES: ProvincePath[] = {json.dumps(provinces, ensure_ascii=False, separators=(',', ':'))};",
            f"export const NAME_LOOKUP: Record<string, number> = {json.dumps(lookup, ensure_ascii=False, separators=(',', ':'))};",
            f"export const NINE_DASH = {json.dumps(nine_dash)};",
