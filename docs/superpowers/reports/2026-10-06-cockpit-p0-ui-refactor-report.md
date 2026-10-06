@@ -56,4 +56,4 @@ review 结论 PASS-with-nits（红线/规范/逻辑漂移逐项核过，详见�
 - **根因链**：DWS 空闲连接中断（10053）→ health.py 以异常 repr 作 sales 环 reason → P5 未接入单元格把 reason 原样渲染成值行 → margin/ar 可用触发当日缓存钉死降级态。"乱码"=OperationalError 英文异常串。
 - **修复**：①UI 消毒（dataplat-ui a19c2ac）——异常形态 reason → `数据暂不可用`，原文留 title 提示；②`pm2 restart insight-api` 清污染缓存换新连接。
 - **验证**：DOM 无异常文本（playwright 断言）；sales 环恢复 available（yoy_pct -5.9）；DWS 直查对拍 `(501,837,287−533,029,812)/533,029,812 = -5.85%` ✓。上午缓存的 -16.2% 为 9 月行日中重述前快照（推算 cur 差约 5500 万，落数时点现象），两次显示都诚实。
-- **待用户裁定的加固候选（涉 insight/ 代码，P0 范围外未动）**：①`_run_with_conn_retry` 目前只在连接已弃（_conn None）时重试，查询中途 10053 中断逃逸——可加 aborted-once 重试；②部分环异常降级时不应整结果按日缓存（现仅全降级不缓存）。
+- **加固已实施并上线（用户裁定"修"，同日）**：①环级连接自愈 `health._retry_if_conn_dropped`——异常且 `_conn` 已弃（10053 被 `_recover` 弃置）→ 重建重跑一次；连接仍在（语句超时）照抛，护栏语义不变（harness ba3d050）②异常致降级环带 `error` 标记（区别数据缺失型），health 缓存双条件=至少一环可用 且 无 error 环；UI 以 marker 为权威信号显示 数据暂不可用（dataplat-ui 35f4a48）。测试 +3（insight 200 passed +8 skipped 零回归）；review PASS-with-nits，其 finding 1（"不重试"用例假件误置 _conn=None、护栏分支零覆盖）已修（be8768c）。遗留 LOW 接受：硬断连期每环重试多一次 connect（有界 2×/环，BFF 5s 超时先断）；target 块单独失败仍可按日钉 None（既有行为，重试已降低概率）。部署：`pm2 restart insight-api`，线上三环 available、无 error 标记复验通过。
