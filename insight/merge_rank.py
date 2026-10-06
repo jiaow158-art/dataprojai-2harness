@@ -16,6 +16,15 @@ def event_key_of(finding: dict) -> str:
                     str(dk.get("anchor_id"))])
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
+def event_org(scope: dict) -> str | None:
+    """展示归一（不动数据/锚点/event_key）：组织节点存的是锚点串——取首段；
+    BU 级锚点首段短名"瓷砖"回显范围字段"瓷砖事业部"；无竖线原样直出。
+    事件中心影响范围列与 region_map 事件注入共用（org 与中心名同名域做关联）。"""
+    org = (scope.get("组织节点") or "").partition("|")[0] or None
+    if org == "瓷砖":                       # BU 级锚点首段短名 → 显示范围字段
+        org = scope.get("范围") or org
+    return org
+
 def _scope_factor(anchor_type: str, anchor_id: str) -> int:
     # bu_level 仅限 "|ALL" 后缀（target 事业部级锚点）；nat90 等客户级锚
     # 不升级（TDD：test_factors_and_na_renormalization 钉死 瓷砖|nat90→40）

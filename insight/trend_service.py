@@ -10,8 +10,10 @@ import threading
 from datetime import date
 
 from .detectors import REGISTRY
+from .detectors.target import TargetDetector
 from .health import compute
-from .merge_rank import event_key_of
+from .merge_rank import event_key_of, event_org
+from .region_map import region_map as _region_map   # 别名防撞 TrendService.region_map
 from .replay_ctx import ReplayContext
 from .target_report import target_overview as _report   # 别名防撞 TrendService.target_overview
 
@@ -86,6 +88,49 @@ class TrendService:
                         return not (isinstance(block, dict)
                                     and block.get("available") is False)
                     if all(usable(out[k]) for k in ("annual", "months", "centers")):
+                        self._cache[key] = out
+                    else:
+                        return out
+        return self._cache[key]
+
+    def region_map(self, db, as_of: date) -> dict:
+        """区域作战地图（M-i8）：events 锁外读 db（SQLite 快，不占 DWS 锁）；锁内一次
+        组合 lambda 先取 target trend 的达成率（D-r2 与 target-overview annual 同源）
+        再跑聚合——两次 DWS 序列化都在锁内，缓存命中后零查询。"""
+        key = ("region_map", as_of.isoformat())
+        if key not in self._cache:
+            events = []
+            for r in db.execute("SELECT event_id, title, severity, score, scope_json"
+                                " FROM business_event WHERE lifecycle='active'"
+                                " ORDER BY score DESC, event_id"):
+                try:
+                    scope = json.loads(r["scope_json"] or "{}")
+                except Exception:
+                    scope = {}
+                events.append({"event_id": r["event_id"], "title": r["title"],
+                               "severity": r["severity"], "score": r["score"],
+                               "org": event_org(scope)})
+            with self._lock:
+                if key not in self._cache:   # double-check：并发同 key 只查一次
+                    ctx = ReplayContext(as_of=as_of)
+
+                    def compute():
+                        try:    # 目标侧局部降级：达成率取不到→null，不拖垮地图主体
+                            t = self._run_with_conn_retry(
+                                lambda: TargetDetector().trend(
+                                    self.runner, ctx, "瓷砖事业部|ALL"))
+                            achieve = t["series"][-1]["cur"]
+                        except Exception:
+                            achieve = None
+                        return _region_map(self.runner, ctx, events, achieve)
+
+                    out = self._run_with_conn_retry(compute)
+                    # national+regions 双块全降级=疑似 DWS 故障：不落缓存（health/target
+                    # 同 I-2 规则）；其余块局部降级照常落缓存
+                    def usable(block):
+                        return not (isinstance(block, dict)
+                                    and block.get("available") is False)
+                    if usable(out["national"]) and usable(out["regions"]):
                         self._cache[key] = out
                     else:
                         return out

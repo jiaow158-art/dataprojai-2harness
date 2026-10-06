@@ -307,6 +307,10 @@ def test_dws_unavailable_503_local_isolation(tmp_path):
             _get(f"{base}/api/insight/target-overview")   # M-i7：同 DWS 门禁
         assert e.value.code == 503
         assert json.loads(e.value.read())["error"] == "DWS_UNAVAILABLE"
+        with pytest.raises(urllib.error.HTTPError) as e:
+            _get(f"{base}/api/insight/region-map")       # M-i8：同 DWS 门禁
+        assert e.value.code == 503
+        assert json.loads(e.value.read())["error"] == "DWS_UNAVAILABLE"
         st, body = _get(f"{base}/api/insight/events?state=active")   # db-only 不受影响
         assert st == 200 and body["events"] == []
         with pytest.raises(urllib.error.HTTPError) as e:
@@ -633,6 +637,88 @@ def test_target_overview_all_degraded_not_cached(tmp_path):
         assert body["months"]["available"] is False and body["centers"]["available"] is False
         n1 = runner.calls
         st, body = _get(f"{base}/api/insight/target-overview")
+        assert st == 200 and runner.calls > n1                  # 全降级不缓存→重查
+    finally:
+        srv.shutdown()
+
+
+# —— M-i8 区域作战地图：/api/insight/region-map（缓存 / 全降级不缓存 / 无 DWS 503）——
+
+def _region_runner(provs, acts, tgts, cp=None, fail_on=None):
+    """端点级 fake runner：TargetDetector.trend 两查（TREND_ACTUAL/TREND_TARGET，
+    分派串同 _target_runner）+ region_map 三查（AS cur_amt/trend_amt/cp_amt，
+    分派串同 T1 test_region_map._runner）。"""
+    def run(sql, params=None):
+        if fail_on and fail_on in sql:
+            raise RuntimeError("dws down")
+        if "AS actual_amt" in sql:                 # trend 实绩（元）
+            return [{"month": m, "actual_amt": v * 10000.0} for m, v in acts.items()]
+        if "AS target_amt" in sql:                 # trend 目标（元）
+            return [{"month": m, "target_amt": v * 10000.0} for m, v in tgts.items()]
+        if "AS cur_amt" in sql:                    # Q1 省份双年同窗（元）
+            return provs
+        if "AS cp_amt" in sql:                     # Q3 中心×省当月
+            return cp or []
+        return []                                  # Q2 趋势空 → 七区补零框架
+    return run
+
+
+def test_region_map_endpoint_values_cache_and_events(tmp_path):
+    """200 数值核算（national 五元组 / regions 首行 / 事件关联两态）+ achieve_pct 与
+    target-overview annual 同源（TargetDetector.trend series 末点 cur）+ 缓存命中零重查
+    （events 锁外读 db 不计 DWS 调用）。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    as_of = date.today() - timedelta(days=1)                    # 端点口径：今天-1
+    acts = {f"{as_of.year}-{m:02d}": 1000.0 for m in range(1, as_of.month)} \
+        | {as_of.strftime("%Y-%m"): 500.0}                      # 完整月各 1000 万 + 当月 MTD 500 万
+    tgts = {f"{as_of.year}-{m:02d}": 1000.0 for m in range(1, as_of.month + 1)}
+    achieve = round(((as_of.month - 1) * 1000.0 + 500.0) / (as_of.month * 1000.0) * 100, 1)
+    provs = [{"prov": "广东", "cur_amt": 10000.0 * 10000, "ly_amt": 8000.0 * 10000,
+              "gp": 2500.0 * 10000, "net_amt": 10000.0 * 10000},
+             {"prov": "上海", "cur_amt": 5000.0 * 10000, "ly_amt": 4000.0 * 10000,
+              "gp": 1000.0 * 10000, "net_amt": 5000.0 * 10000}]
+    cp = [{"center": "粤东运营中心", "prov": "广东", "cp_amt": 900.0}]
+    # active 事件两态：中心级（无竖线锚点首段=中心名）+ BU 级（"瓷砖|nat90"→归一"瓷砖事业部"）
+    _ins_event(s.db, "ev-ctr", "k-ctr", 80.0, 100, first=as_of.isoformat(),
+               org="粤东运营中心")
+    _ins_event(s.db, "ev-bu", "k-bu", 70.0, 200, first=as_of.isoformat(),
+               org="瓷砖|nat90")
+    s.db.commit()
+    runner = _DispatchRunner(_region_runner(provs, acts, tgts, cp=cp))
+    srv, base = _serve_runner(s, runner)
+    try:
+        st, body = _get(f"{base}/api/insight/region-map")
+        assert st == 200 and body["asOf"] == as_of.isoformat()
+        assert body["national"] == {"ytdWan": 15000.0, "lyWan": 12000.0,
+                                    "yoyPct": 25.0, "grossMarginPct": 23.3,
+                                    "achievePct": achieve}      # 分子和/分母和 + trend 注入
+        assert body["regions"][0] == {"region": "华南", "ytdWan": 10000.0,
+                                      "lyWan": 8000.0, "yoyPct": 25.0,
+                                      "sharePct": 66.7, "grossMarginPct": 25.0,
+                                      "level": "growth"}
+        assert len(body["regionTrend"]["months"]) == 12
+        ev = body["regionEvents"]
+        assert [e["event_id"] for e in ev["华南"]] == ["ev-ctr", "ev-bu"]  # 中心命中+BU 全区间
+        assert [e["event_id"] for e in ev["西北"]] == ["ev-bu"]   # BU 级 → 全部国内七区
+        assert ev["华南"][0]["org"] == "粤东运营中心"
+        n1 = runner.calls
+        st, again = _get(f"{base}/api/insight/region-map")
+        assert st == 200 and again == body and runner.calls == n1   # 缓存命中不重查 DWS
+    finally:
+        srv.shutdown()
+
+def test_region_map_all_degraded_not_cached(tmp_path):
+    """I-2 同规则：Q1 挂 → national+regions 双块全降级（疑似 DWS 故障）不落缓存，
+    二次请求重查（目标侧 trend 失败只降 achievePct，不参与该判定）。"""
+    s = Store(open_db(tmp_path / "i.db"))
+    runner = _DispatchRunner(_region_runner([], {}, {}, fail_on="AS cur_amt"))
+    srv, base = _serve_runner(s, runner)
+    try:
+        st, body = _get(f"{base}/api/insight/region-map")
+        assert st == 200 and body["national"]["available"] is False
+        assert body["regions"]["available"] is False
+        n1 = runner.calls
+        st, body = _get(f"{base}/api/insight/region-map")
         assert st == 200 and runner.calls > n1                  # 全降级不缓存→重查
     finally:
         srv.shutdown()

@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
-from .merge_rank import RANKING, event_key_of
+from .merge_rank import RANKING, event_key_of, event_org
 from .trend_service import TrendService
 from .subscriptions import list_subscriptions, add_subscription, remove_subscription, list_notifications, mark_read
 
@@ -221,9 +221,7 @@ def _event_center(db, today: date) -> dict:
             facts = json.loads(r["facts_json"] or "[]")
         except Exception:
             facts = []
-        org = (scope.get("组织节点") or "").partition("|")[0] or None   # 展示归一：锚点串取首段
-        if org == "瓷砖":                       # BU 级锚点首段短名 → 显示范围字段
-            org = scope.get("范围") or org
+        org = event_org(scope)
         out.append({"event_id": r["event_id"], "detector": r["detector"],
                     "event_type": r["event_type"], "title": r["title"],
                     "summary": r["summary"], "severity": r["severity"],
@@ -324,6 +322,12 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                     else:
                         body, code = service.target_overview(
                             date.today() - timedelta(days=1)), 200
+                elif u.path == "/api/insight/region-map":
+                    if service is None:
+                        body, code = {"error": "DWS_UNAVAILABLE"}, 503
+                    else:
+                        body, code = service.region_map(
+                            ro, date.today() - timedelta(days=1)), 200
                 elif (m := _EVENT_ID_RE.match(u.path)):
                     detail = _event_detail(ro, m.group(1))
                     body, code = (detail, 200) if detail else ({"error": "NOT_FOUND"}, 404)
