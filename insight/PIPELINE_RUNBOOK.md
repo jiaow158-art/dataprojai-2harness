@@ -195,3 +195,10 @@ consecutive_months 等）是**榜单正确性的口径契约**：任何改动必
 
 - `/api/insight/target-overview`（DWS 聚合，需 DWS_PASSWORD，无则 503）：annual（与 health-score target **同源逐位一致**，D-t6）/ projection（线性年化，负缺口=预计超额）/ months（MTD 封顶）/ centers（欠进度额=目标×年日进度−实绩，与雷达 abs_gap 同语义；恢复潜力=回到上年同期跑速）。缓存 key=(target_overview, as_of)，三块全降级不缓存。
 - `insight/target_report.py` 纯函数；centers lag 读 radar-target.json `center_set_month_lag`（防分叉）。
+
+## §M-i8 区域作战地图（2026-10-06）
+
+- `/api/insight/region-map`（DWS 聚合，需 DWS_PASSWORD，无则 503）：national/regions/provinces（双年同窗同比）/regionTrend（近12月）/regionEvents（center×province 当月销售关联）。缓存 key=(region_map, as_of)，national+regions 全降级不缓存。
+- 大区映射 `insight/config/region-map.json`（标准七大区）；NULL 省→未分区、表外值→海外、表外国内值→未分区+unmappedProvinces 披露；均不入地图/排名/趋势。
+- 着色三档=同比 ≤-8 decline / <0 watch / ≥0 growth（-8 与 region_sales 雷达阈值一致，D-r1）；大区/省**无达成率**（目标表无省份维度，mix 预算列只在无省汇总行——D-r2 诚实差异）。
+- 地图资产：`scripts/build-china-map.py`（DataV GeoJSON→SVG path，centroid 须过投影——曾因直存经纬致气泡错位；澳门白名单；VIEWBOX 自适应九段线）；产物 dataplat-ui web/src/assets/china-map.ts（勿手改）。
