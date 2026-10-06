@@ -2,8 +2,9 @@
 """trend/health-score 的 DWS 编排（M-i5）：事件→锚点→detector.trend，进程内缓存。
 
 缓存 key=(用途, detector, anchor, data_date/as_of, months)；数据日变更自然失效，
-无 TTL 定时器；进程重启即冷。例外：health 三数据环全降级不落缓存（疑似 DWS
-故障不按天钉死，下次请求重查）。ThreadingHTTPServer 多线程→持锁串行化（spec
+无 TTL 定时器；进程重启即冷。例外：health 结果"全降级"或"含异常致降级环（error
+标记）"不落缓存（疑似 DWS 故障/单环持续故障不按天钉死，下次请求重查——2026-10-06
+10053 事件加固）。ThreadingHTTPServer 多线程→持锁串行化（spec
 §7：同一时刻至多一条查询打 DWS）。"""
 import json
 import threading
@@ -61,14 +62,16 @@ class TrendService:
         if key not in self._cache:
             with self._lock:
                 if key not in self._cache:   # double-check：并发同 key 只查一次
-                    # 连接级失败不套 _run_with_conn_retry：compute 环级 try/except 吞
-                    # 异常→available:false，永不外抛，外层重试抓不到；跨请求自愈由
-                    # 下面"全降级不缓存"承担（下次重查时 runner 已重建连接）。
+                    # 连接自愈在 compute 内做（_retry_if_conn_dropped：环级异常且
+                    # 连接已弃→重跑一次）；瞬断在此自愈，无需外层 _run_with_conn_retry
+                    # （compute 环级 try/except 吞异常永不外抛，外层也抓不到）。
                     out = compute(self.runner, ReplayContext(as_of=as_of))
-                    # 三数据环（sales/margin/ar）全降级=疑似 DWS 故障：结果不落缓存，
-                    # 下次请求重查（防全红卡按天钉死）；target 不参与该判定
-                    if any(r["key"] in ("sales", "margin", "ar") and r.get("available")
-                           for r in out["rings"]):
+                    # 落缓存双条件（10053 事件加固）：①至少一数据环（sales/margin/ar）
+                    # 可用——全降级=疑似 DWS 故障不按天钉死；②无“异常致降级”环（error
+                    # 标记）——单环持续故障不把降级态钉进当日缓存；target 不参与判定
+                    data_rings = [r for r in out["rings"] if r["key"] in ("sales", "margin", "ar")]
+                    if (any(r.get("available") for r in data_rings)
+                            and not any(r.get("error") for r in data_rings)):
                         self._cache[key] = out
                     else:
                         return out

@@ -99,6 +99,86 @@ def test_partial_degradation_one_ring_down():
     assert m["available"] is False and "dws down" in m["reason"]
 
 
+# ── 10053 事件加固（2026-10-06）：环级连接自愈重试 + 异常致降级 error 标记 ──────────
+
+class _FlakyRunner:
+    """带 _conn 的假 runner，模拟 DwsQueryRunner 弃置语义：查询异常后 _conn=None
+    （_recover rollback 失败弃置）；重跑时重建（_conn=object）。margin/ar 表照常。"""
+
+    def __init__(self, sales=None, margins=None, ar=None, fail_on=None):
+        self._conn = object()
+        self._sales, self._margins, self._ar = sales, margins, ar
+        self._fail_on = fail_on
+        self.calls = 0
+
+    def __call__(self, sql, params=None):
+        self.calls += 1
+        if self._fail_on and self._fail_on in sql:
+            self._conn = None            # 模拟 _recover 弃置
+            raise RuntimeError("could not receive data ... (10053)")
+        if "ct_sales_performance_t" in sql:
+            self._conn = object()
+            return self._sales or []
+        if "gross_profit_after_sharing" in sql:
+            return self._margins or []
+        if "dm_ar_analysis_rpt_f" in sql:
+            return self._ar or []
+        return []
+
+
+def test_ring_retry_when_conn_dropped_then_recovers():
+    # 空闲断连（10053）：sales 首查异常+连接弃置 → 环内重跑一次成功，环可用
+    class _Once(_FlakyRunner):
+        def __init__(self, **kw):
+            super().__init__(**kw)
+            self._first = True
+
+        def __call__(self, sql, params=None):
+            if self._first and "ct_sales_performance_t" in sql:
+                self._first = False
+                self._conn = None
+                raise RuntimeError("OperationalError('could not receive data (10053)")
+            return super().__call__(sql, params)
+
+    r = _Once(sales=_sales_rows(-5, -5), margins=_margin_rows(1000, 950, 900),
+              ar=_ar_rows(30.0, 30.0))
+    p = compute(r, CTX)
+    s = _ring(p, "sales")
+    assert s["available"] is True and s["inputs"]["yoy_pct"] == -5.0   # 重跑救回
+    assert _ring(p, "margin")["available"] is True
+
+
+def test_ring_no_retry_and_error_marked_when_conn_alive():
+    # 连接仍在（如语句超时）：不重试（护栏语义），环带 error 标记（数据缺失型不带）
+    r = _FlakyRunner(sales=_sales_rows(-5, -5), fail_on="gross_profit")
+    p = compute(r, CTX)
+    m = _ring(p, "margin")
+    assert m["available"] is False and m.get("error") is True and "10053" in m["reason"]
+    assert _ring(p, "sales").get("error") is None                    # 可用环无标记
+    empty = compute(_FlakyRunner(sales=[]), CTX)                     # 数据缺失型降级
+    assert _ring(empty, "sales").get("error") is None and \
+        _ring(empty, "sales")["reason"] == "完整月同比数据不足"
+
+
+def test_health_cache_skips_error_ring_and_hits_clean():
+    from insight.trend_service import TrendService
+    # 异常致降级环（连接仍在，重试不救）→ 结果不落缓存：两次调用都真查
+    r = _FlakyRunner(sales=_sales_rows(-5, -5), fail_on="gross_profit")
+    svc = TrendService(r)
+    svc.health(CTX.as_of)
+    n = r.calls
+    svc.health(CTX.as_of)
+    assert r.calls > n
+    # 干净结果 → 落缓存：第二次零查询；瞬断自愈（error 环不存在）同样可缓存
+    r2 = _FlakyRunner(sales=_sales_rows(-5, -5), margins=_margin_rows(1000, 950, 900),
+                      ar=_ar_rows(30.0, 30.0))
+    svc2 = TrendService(r2)
+    svc2.health(CTX.as_of)
+    n2 = r2.calls
+    svc2.health(CTX.as_of)
+    assert r2.calls == n2
+
+
 def test_inventory_ring_honest_unavailable():
     p = compute(_runner(), CTX)
     inv = _ring(p, "inventory")

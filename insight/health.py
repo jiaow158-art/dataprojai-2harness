@@ -3,7 +3,9 @@
 
 三环各一次查询回 cur+prev 两期（无 per-ring 循环查库）；库存=未接入诚实态；
 target 复用 TargetDetector.trend 的 meta。因子 config/health.json（台账纪律）。
-任一环查询异常 → 该环 available:false+reason，其余照常（局部降级，不炸整卡）。"""
+任一环查询异常 → 该环 available:false+reason+error 标记，其余照常（局部降级，
+不炸整卡）。环级连接自愈：异常且 runner 已弃连接 → 重建重跑一次（2026-10-06
+10053 事件加固——异常 repr 作 reason 曾被 UI 原样渲染且按日缓存钉死降级环）。"""
 import json
 from pathlib import Path
 
@@ -54,6 +56,18 @@ GROUP BY 1
 
 def _clip(x: float) -> float:
     return min(100.0, max(0.0, x))
+
+
+def _retry_if_conn_dropped(run, fn):
+    """环级连接自愈：查询异常且 runner 已弃连接（_conn=None——空闲断连/中途 abort
+    被 DwsQueryRunner._recover 弃置）→ 重建后原样重跑一次；连接仍在（语句超时等）
+    不重试照抛（DWS 护栏：超时不重跑）。无 _conn 属性的测试假件不重试。"""
+    try:
+        return fn()
+    except Exception:
+        if not hasattr(run, "_conn") or run._conn is not None:
+            raise
+        return fn()
 
 
 def _sales_ring(run, ctx) -> dict:
@@ -120,15 +134,17 @@ def compute(run, ctx: ReplayContext) -> dict:
     labels = {"sales": "销售健康度", "margin": "毛利健康度", "ar": "应收健康度"}
     for key in ("sales", "margin", "ar"):
         try:
-            ring = builders[key](run, ctx)
+            ring = _retry_if_conn_dropped(run, lambda k=key: builders[k](run, ctx))
         except Exception as e:
-            ring = {"available": False, "reason": repr(e)[:120]}
+            # error 标记=异常致降级（区别于数据缺失型）：缓存层据此拒绝落缓存，
+            # UI 据此把异常 repr 转友好文案
+            ring = {"available": False, "reason": repr(e)[:120], "error": True}
         rings.append({"key": key, "label": labels[key], **ring})
     rings.append({"key": "inventory", "label": "库存健康度",
                   "available": False, "reason": CONFIG["inventory_reason"]})
     target = None
     try:
-        target = _target_block(run, ctx)
+        target = _retry_if_conn_dropped(run, lambda: _target_block(run, ctx))
     except Exception:
         target = None
     return {"as_of": ctx.as_of.isoformat(), "rings": rings, "target": target}
