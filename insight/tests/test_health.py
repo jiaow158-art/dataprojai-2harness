@@ -149,11 +149,26 @@ def test_ring_retry_when_conn_dropped_then_recovers():
 
 
 def test_ring_no_retry_and_error_marked_when_conn_alive():
-    # 连接仍在（如语句超时）：不重试（护栏语义），环带 error 标记（数据缺失型不带）
-    r = _FlakyRunner(sales=_sales_rows(-5, -5), fail_on="gross_profit")
+    # 连接仍在（语句超时语义：rollback 成功、_conn 非 None）→ 不重试（护栏分支），
+    # 环带 error 标记；数据缺失型降级不带标记
+    class _Timeout(_FlakyRunner):
+        """抛 QueryCanceled 但不动 _conn（连接活着）——钉住 _conn 非 None → 照抛分支。"""
+
+        def __init__(self, **kw):
+            super().__init__(**kw)
+            self.margin_calls = 0
+
+        def __call__(self, sql, params=None):
+            if "gross_profit_after_sharing" in sql:
+                self.margin_calls += 1
+                raise RuntimeError("QueryCanceled: statement timeout")
+            return super().__call__(sql, params)
+
+    r = _Timeout(sales=_sales_rows(-5, -5))
     p = compute(r, CTX)
     m = _ring(p, "margin")
-    assert m["available"] is False and m.get("error") is True and "10053" in m["reason"]
+    assert m["available"] is False and m.get("error") is True and "timeout" in m["reason"]
+    assert r.margin_calls == 1                    # 恰好一次：无重试（护栏）
     assert _ring(p, "sales").get("error") is None                    # 可用环无标记
     empty = compute(_FlakyRunner(sales=[]), CTX)                     # 数据缺失型降级
     assert _ring(empty, "sales").get("error") is None and \
