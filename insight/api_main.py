@@ -248,26 +248,47 @@ def _event_center(db, today: date) -> dict:
 
 def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                 port: int = 58095, trend_runner=None) -> ThreadingHTTPServer:
-    # ThreadingHTTPServer 在工作线程跑 do_GET，而连接通常创建于主线程
-    # （sqlite3 默认 check_same_thread=True 拒绝跨线程使用）——按路径重开
-    # 一条线程安全的只读连接供服务用（红线上移：API 服务面恒 mode=ro）。
+    # 线程安全（2026-10-07 生产修复）：ThreadingHTTPServer 每请求一线程，共享单条 sqlite 连接
+    # 并发使用会抛 InterfaceError('bad parameter or other API misuse')/IndexError → 偶发 500
+    # （驾驶舱首页并发 3-5 个 insight 请求即可命中，200 并发压测 20% 失败率复现）。
+    # 改为每请求按路径自开自关连接（sqlite 文件连接开销 µs 级；服务面恒 mode=ro 红线不变），
+    # busy_timeout 兜 WAL checkpoint 瞬时锁。DWS 侧 psycopg2 连接线程安全（模块级串行化），service 照旧共享。
     db_path = db.execute("PRAGMA database_list").fetchone()[2]
-    ro = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True,
-                         check_same_thread=False)
-    ro.row_factory = sqlite3.Row
-    rw = sqlite3.connect(db_path, check_same_thread=False)
-    rw.row_factory = sqlite3.Row
     # DWS 编排（trend/health-score）：runner 缺席（进程无 DWS_PASSWORD）→ 端点 503
     service = TrendService(trend_runner) if trend_runner else None
+
+    def open_ro() -> sqlite3.Connection:
+        c = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
+        c.row_factory = sqlite3.Row
+        c.execute("PRAGMA busy_timeout=3000")
+        return c
+
+    def open_rw() -> sqlite3.Connection:
+        c = sqlite3.connect(db_path)
+        c.row_factory = sqlite3.Row
+        c.execute("PRAGMA busy_timeout=3000")
+        return c
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):     # 安静（pm2 管日志）
             pass
 
+        def _send_json(self, code: int, body: dict | list) -> None:
+            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+            try:
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+            except (ConnectionAbortedError, BrokenPipeError):
+                pass  # 客户端早退（BFF 5s 超时掐断等）——正常业务噪声，不再刷错误日志
+
         def do_GET(self):
             u = urlparse(self.path)
             q = parse_qs(u.query)
             user = self.headers.get("X-User", "anonymous").strip() or "anonymous"
+            ro = open_ro()
             try:
                 if u.path == "/api/insight/subscriptions":
                     body, code = {"items": list_subscriptions(rw, user)}, 200
@@ -355,15 +376,13 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                     body, code = {"error": "NOT_FOUND"}, 404
             except Exception as e:
                 body, code = {"error": "INTERNAL", "detail": repr(e)[:120]}, 500
-            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-            self.send_response(code)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            finally:
+                ro.close()
+            self._send_json(code, body)
 
         def do_POST(self):
             u=urlparse(self.path); user=self.headers.get("X-User","anonymous").strip() or "anonymous"
+            rw = open_rw()
             try:
                 raw=self.rfile.read(int(self.headers.get("Content-Length","0") or 0)); payload=json.loads(raw or b"{}")
                 if u.path == "/api/insight/subscriptions": body,code=add_subscription(rw,user,payload.get("kind"),payload.get("value"),payload.get("label")),201
@@ -371,14 +390,25 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                 elif re.match(r"^/api/insight/notifications/[A-Za-z0-9-]+/read$",u.path): body,code={"updated":mark_read(rw,user,u.path.rsplit('/',2)[1])},200
                 else: body,code={"error":"NOT_FOUND"},404
             except (ValueError, json.JSONDecodeError) as e: body,code={"error":str(e)},400
-            data=json.dumps(body,ensure_ascii=False).encode(); self.send_response(code); self.send_header("Content-Type","application/json; charset=utf-8"); self.end_headers(); self.wfile.write(data)
+            finally:
+                rw.close()
+            self._send_json(code, body)
 
         def do_DELETE(self):
             u=urlparse(self.path); user=self.headers.get("X-User","anonymous").strip() or "anonymous"; m=re.match(r"^/api/insight/subscriptions/([A-Za-z0-9-]+)$",u.path)
-            if not m: self.send_response(404); self.end_headers(); return
-            data=json.dumps({"removed":remove_subscription(rw,user,m.group(1))}).encode(); self.send_response(200); self.send_header("Content-Type","application/json"); self.end_headers(); self.wfile.write(data)
+            if not m: self._send_json(404, {"error": "NOT_FOUND"}); return
+            rw = open_rw()
+            try:
+                body = {"removed": remove_subscription(rw, user, m.group(1))}
+            finally:
+                rw.close()
+            self._send_json(200, body)
 
-    return ThreadingHTTPServer((host, port), Handler)
+    # accept 队列加深：默认 5 在并发首屏（多面板同时拉取）下会拒连（压测 ECONNREFUSED 复现）
+    class Server(ThreadingHTTPServer):
+        request_queue_size = 128
+
+    return Server((host, port), Handler)
 
 def main():
     import os
