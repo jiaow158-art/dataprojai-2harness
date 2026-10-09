@@ -1,20 +1,45 @@
-# 管道运维 Runbook（M-i2）
+# 管道运维 Runbook（M-i2 · SCH-1 调度服务化 2026-10-09）
 
-insight 管道 = **worker（每日批量：四雷达→freeze→归因）+ api（只读 HTTP）**，两者共用同一块
-insight.db（SQLite WAL）。本文是唯一的日常运维入口；回测另见 `insight/BACKTEST_RUNBOOK.md`，
-阈值设计依据见 `docs/superpowers/` 对应 spec/报告。
+insight 管道 = **scheduler（常驻调度：触发/互斥/记账/队列）+ worker（业务内核：四雷达→freeze→归因）
++ api（只读 HTTP + 管理面）**，共用同一块 insight.db（SQLite WAL）。回测另见
+`insight/BACKTEST_RUNBOOK.md`；SCH-1 设计与验收见 `docs/superpowers/reports/2026-10-09-sch-1-report.md`。
 
-## 1. 进程与节奏
+## 1. 进程与节奏（SCH-1 后）
 
-两个进程角色，均由 pm2 托管：
+| 进程 | 角色 | 机制 |
+|---|---|---|
+| `insight-scheduler` | 常驻调度（pm2，Linux 终态 systemd） | APScheduler cron **09:05 daily / 10:05 归因二发**（Asia/Shanghai）；启动+每小时对账补漏（仅当日：daily<13:00、归因<13:55）；轮询 `trigger_queue` 执行管理端手动请求；60s 广播 `scheduler_state` |
+| `insight-api` | 只读 HTTP + `/admin/*` 管理面 | 127.0.0.1；admin 端点须 `X-Insight-Admin-Token`（BFF 注入） |
+| `insight-worker` | ~~pm2 cron 双进程~~ **已于 2026-10-09 退役**（`pm2 delete insight-worker insight-worker-1005`）；CLI 保留作运维兜底：`python -m insight.worker_main --brief-date YYYY-MM-DD` |
+
+**执行互斥（SCH-1 修正A）**：`pipeline_lock` 单例锁——定时/人工/重试全经同一把锁；心跳 30s、
+过期 5min CAS 夺回；管理端手动补跑在锁忙时明确拒绝。**调度触发去重**=`uq_pipeline_fire(job_type,phase,scheduled_at)`。
+
+**诚实声明（裁定2）**：09:30 **没有硬门控**——真实语义=first-final-wins（发布态判定），
+后台与文档一律不声称"严格 09:30 冻结"。`CUTOFF_FREEZE` 常量在 worker_main 中未使用。
+
+**漏跑补偿（修正D）**：APScheduler misfire_grace_time=300s/coalesce 只管进程内迟到；重启后
+由对账补当日缺口（永不自动补历史；first-final-wins 保证 final 不被改写）。
+
+**管理面**：Web 管理后台→「数据更新」Tab（仅 is_admin）：调度状态/下次计划/执行锁/最近运行/
+队列/缓存；手动操作仅真实能力（修正E）：**补跑流水线（brief_date 限今日/昨日）**、预热目标/
+区域（各自 watermark 就绪检查）、缓存失效（同日修订兜底——月表 watermark 检测不到内容修订）。
+
+**缓存（修正F）**：target/region 底表为月滚动表（calmonth）——ready=「已开当月账」；缓存键含
+effective 月（补数自然换键）；stale/empty 拦截不缓存；探针失败 fail-open；payload 附
+`dataFreshness{effective,ready}`，前端显示真实有效数据期而非日历 T-1。
+
+**env 增补**：`INSIGHT_ADMIN_TOKEN`（BFF/api/scheduler 三方同值，User 级 env）；
+`INSIGHT_API_URL`（scheduler→api 预热调用，缺省 127.0.0.1:58095）；`INSIGHT_SCHEDULER_SHADOW=1`
+（灰度 shadow 模式：只记账不执行不领队列）。其余沿用下表。
 
 ```bash
-# worker：单发日任务（跑完即退，不常驻）
-pm2 start python --name insight-worker --no-autorestart -- -m insight.worker_main
-
-# api：常驻只读服务（缺省 127.0.0.1:58095，仅本机，BFF 是唯一客户端）
-pm2 start python --name insight-api -- -m insight.api_main
+# scheduler（常驻；Linux 终态：systemd 单 service + EnvironmentFile）
+pm2 start python --name insight-scheduler --cwd <仓根> -- -m insight.scheduler_main
+# api
+pm2 start python --name insight-api --cwd <仓根> -- -m insight.api_main
 ```
+
 
 **cwd 前提**：pm2 进程的工作目录必须是**仓根**——`python -m insight.*` 靠 cwd 找到
 `insight` 包，cwd 不对直接 `ModuleNotFoundError: No module named 'insight'`。用

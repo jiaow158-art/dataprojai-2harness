@@ -3,6 +3,7 @@
 stdlib http.server（环境无 fastapi/flask，零新依赖；spec §4 技术描述在此勘误）。
 只读连接：sqlite file:...?mode=ro（WAL 跨进程读）。绑定 127.0.0.1，BFF 是唯一客户端。"""
 import json
+import os
 import re
 import sqlite3
 from datetime import date, timedelta
@@ -247,7 +248,7 @@ def _event_center(db, today: date) -> dict:
             "truncated": truncated, "events": out}
 
 def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
-                port: int = 58095, trend_runner=None) -> ThreadingHTTPServer:
+                port: int = 58095, trend_runner=None, admin_token: str | None = None) -> ThreadingHTTPServer:
     # 线程安全（2026-10-07 生产修复）：ThreadingHTTPServer 每请求一线程，共享单条 sqlite 连接
     # 并发使用会抛 InterfaceError('bad parameter or other API misuse')/IndexError → 偶发 500
     # （驾驶舱首页并发 3-5 个 insight 请求即可命中，200 并发压测 20% 失败率复现）。
@@ -256,6 +257,13 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
     db_path = db.execute("PRAGMA database_list").fetchone()[2]
     # DWS 编排（trend/health-score）：runner 缺席（进程无 DWS_PASSWORD）→ 端点 503
     service = TrendService(trend_runner) if trend_runner else None
+    # SCH-1 管理面：本机受控（绑定 127.0.0.1）+ 共享 token（裁定4：CSRF/Origin 由 BFF
+    # 会话层承担——BFF 是唯一客户端；此处再校验 X-Insight-Admin-Token 双保险）
+    from . import pipeline_log as pl
+
+    def _admin_ok(self) -> bool:
+        tok = admin_token or os.environ.get("INSIGHT_ADMIN_TOKEN")
+        return bool(tok) and self.headers.get("X-Insight-Admin-Token") == tok
 
     def open_ro() -> sqlite3.Connection:
         c = sqlite3.connect(f"file:{Path(db_path).as_posix()}?mode=ro", uri=True)
@@ -372,6 +380,25 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
                         body, code = {"ok": True, "db": "open"}, 200
                     except Exception:
                         body, code = {"ok": False, "db": "error"}, 200
+                elif u.path == "/admin/status":
+                    # SCH-1 管理面（只读）：调度状态/锁/最近运行/队列/缓存
+                    if not _admin_ok(self):
+                        body, code = {"error": "FORBIDDEN", "detail": "admin token"}, 403
+                    else:
+                        sch = ro.execute("SELECT v, updated_at FROM scheduler_state WHERE k='main'").fetchone()
+                        lock = ro.execute("SELECT holder, acquired_at, heartbeat_at, brief_date"
+                                          " FROM pipeline_lock WHERE id=1").fetchone()
+                        last_runs = [dict(r) for r in ro.execute(
+                            "SELECT * FROM pipeline_run ORDER BY scheduled_at DESC,"
+                            " started_at DESC LIMIT 20")]
+                        queue = [dict(r) for r in ro.execute(
+                            "SELECT * FROM trigger_queue ORDER BY requested_at DESC LIMIT 10")]
+                        body, code = {"scheduler": dict(sch) if sch else None,
+                                      "lock": dict(lock) if lock else None,
+                                      "recent_runs": last_runs, "queue": queue,
+                                      "cache": service.cache_status() if service else [],
+                                      # 诚实声明（裁定2）：无 09:30 硬门控
+                                      "freeze_note": "09:30 无硬门控，真实语义=first-final-wins（发布态判定）"}, 200
                 else:
                     body, code = {"error": "NOT_FOUND"}, 404
             except Exception as e:
@@ -382,6 +409,71 @@ def make_server(db: sqlite3.Connection, host: str = "127.0.0.1",
 
         def do_POST(self):
             u=urlparse(self.path); user=self.headers.get("X-User","anonymous").strip() or "anonymous"
+            # ── SCH-1 管理面（token 门禁 + 参数白名单校验 + 持久化队列幂等） ──
+            if u.path.startswith("/admin/"):
+                if not _admin_ok(self):
+                    self._send_json(403, {"error": "FORBIDDEN", "detail": "admin token"})
+                    return
+                raw = self.rfile.read(int(self.headers.get("Content-Length", "0") or 0))
+                try:
+                    payload = json.loads(raw or b"{}")
+                except json.JSONDecodeError:
+                    self._send_json(400, {"error": "BAD_JSON"})
+                    return
+                if u.path == "/admin/trigger":
+                    action = payload.get("action")
+                    if action not in pl.QUEUE_ACTIONS:
+                        self._send_json(400, {"error": "BAD_ACTION",
+                                               "allowed": sorted(pl.QUEUE_ACTIONS)})
+                        return
+                    brief = payload.get("brief_date")
+                    if action == "daily_run":
+                        # 修正E：只暴露真实安全能力——今日/昨日（worker 无 --phase，
+                        # 历史日期补跑仍走 CLI，由运维按 RUNBOOK 执行）
+                        today = date.today().isoformat()
+                        yesterday = (date.today() - timedelta(days=1)).isoformat()
+                        if brief not in (None, today, yesterday):
+                            self._send_json(400, {"error": "BAD_BRIEF_DATE",
+                                                   "allowed": [today, yesterday]})
+                            return
+                        brief = brief or today
+                    else:
+                        brief = None
+                    rw = open_rw()
+                    try:
+                        rid, st = pl.enqueue(rw, action=action, brief_date=brief,
+                                              requested_by=payload.get("by") or user)
+                    finally:
+                        rw.close()
+                    self._send_json(201, {"request_id": rid, "status": st})
+                    return
+                if u.path == "/admin/prewarm":
+                    kind = payload.get("kind")
+                    if kind not in ("target", "region"):
+                        self._send_json(400, {"error": "BAD_KIND"})
+                        return
+                    if service is None:
+                        self._send_json(503, {"error": "DWS_UNAVAILABLE"})
+                        return
+                    ro2 = open_ro()
+                    try:
+                        if kind == "target":
+                            out = service.target_overview(date.today() - timedelta(days=1))
+                        else:
+                            out = service.region_map(ro2, date.today() - timedelta(days=1))
+                    finally:
+                        ro2.close()
+                    fresh = out.get("dataFreshness") or {}
+                    self._send_json(200, {"ok": bool(fresh.get("ready")),
+                                          "reason": out.get("reason") if not fresh.get("ready") else "warm",
+                                          "dataFreshness": fresh})
+                    return
+                if u.path == "/admin/cache/invalidate":
+                    n = service.invalidate_cache() if service else 0
+                    self._send_json(200, {"cleared": n})
+                    return
+                self._send_json(404, {"error": "NOT_FOUND"})
+                return
             rw = open_rw()
             try:
                 raw=self.rfile.read(int(self.headers.get("Content-Length","0") or 0)); payload=json.loads(raw or b"{}")

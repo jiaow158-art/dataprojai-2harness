@@ -92,15 +92,57 @@ CREATE TABLE daily_brief_event (
 CREATE TABLE followup_session (
   id TEXT PRIMARY KEY, event_id TEXT NOT NULL, username TEXT NOT NULL,
   ui_session_id TEXT NOT NULL, gateway_session_id TEXT, created_at INTEGER);
+
+-- SCH-1（2026-10-09）调度服务化三表 ------------------------------------------------
+-- ① 流水线运行记录：调度/人工/重试统一记账（触发去重唯一键只管调度面，执行互斥见 pipeline_lock）
+CREATE TABLE pipeline_run (
+  run_id TEXT PRIMARY KEY,                 -- pr-<uuid>
+  job_type TEXT NOT NULL,                  -- daily | attribution_second | manual_rerun | prewarm_target | prewarm_region | cache_invalidate | reconciliation
+  phase TEXT NOT NULL,                     -- pipeline | scan | freeze | attribution | prewarm | invalidate（v1 worker 无 phase 拆分，记 pipeline）
+  brief_date TEXT, as_of_date TEXT,
+  scheduled_at INTEGER, started_at INTEGER, finished_at INTEGER,
+  status TEXT NOT NULL,                    -- queued|running|succeeded|partial|not_ready|failed|skipped|shadow
+  watermark_json TEXT, radar_status_json TEXT,
+  retry_count INTEGER NOT NULL DEFAULT 0, error_message TEXT,
+  trigger_type TEXT NOT NULL,              -- scheduled | manual | retry | shadow
+  triggered_by TEXT, heartbeat_at INTEGER);
+CREATE INDEX IF NOT EXISTS idx_pipeline_run_day ON pipeline_run(brief_date, job_type);
+-- 调度触发去重（修正A：仅去重，非互斥锁）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pipeline_fire ON pipeline_run(job_type, phase, scheduled_at);
+
+-- ② 执行互斥锁（单例）：定时/人工/重试共用；原子抢占+心跳+过期 CAS 夺回（修正A）
+CREATE TABLE pipeline_lock (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  holder TEXT NOT NULL,                    -- <hostname>:<pid>:<uuid>
+  acquired_at INTEGER NOT NULL, heartbeat_at INTEGER NOT NULL,
+  brief_date TEXT);
+
+-- ③ 跨进程手动触发队列（修正B）：admin→BFF→insight-api 入队，scheduler 原子领取执行
+CREATE TABLE trigger_queue (
+  request_id TEXT PRIMARY KEY,             -- rq-<uuid>
+  action TEXT NOT NULL,                    -- daily_run | prewarm_target | prewarm_region | cache_invalidate
+  brief_date TEXT,                         -- daily_run 限定今日/昨日（修正E：只暴露真实安全能力）
+  requested_by TEXT NOT NULL, requested_at INTEGER NOT NULL,
+  claimed_at INTEGER, claimed_by TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending | claimed | done | failed | rejected
+  result_run_id TEXT, note TEXT);
+CREATE INDEX IF NOT EXISTS idx_trigger_pending ON trigger_queue(status, requested_at);
+
+-- ④ scheduler 状态广播（管理后台读：mode/next_fire/pid——api 与 scheduler 分进程）
+CREATE TABLE scheduler_state (
+  k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL);
 """
 
 
-def open_db(path: str | Path) -> sqlite3.Connection:
-    """打开/初始化 insight.db（WAL）。调用方保证路径在 Temp 树外（spec §19）。"""
+def open_db(path: str | Path, *, check_same_thread: bool = True) -> sqlite3.Connection:
+    """打开/初始化 insight.db（WAL）。调用方保证路径在 Temp 树外（spec §19）。
+    check_same_thread=False 供常驻多线程方（SCH-1 scheduler：job/poll/心跳/广播线程
+    共用一条连接，短事务经 sqlite3 模块级串行化）。"""
     p = Path(path); p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(p)
+    conn = sqlite3.connect(p, check_same_thread=check_same_thread)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")   # SCH-1：跨进程（scheduler/api/worker）写碰撞等待
     # SCHEMA 保持 spec §6.1 逐字（供 diff 审）；幂等性在执行层转换，不改 SCHEMA 本身
     conn.executescript(SCHEMA.replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS "))
     conn.executescript('''CREATE TABLE IF NOT EXISTS insight_subscription (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, kind TEXT NOT NULL, value TEXT NOT NULL, label TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id,kind,value)); CREATE TABLE IF NOT EXISTS insight_notification (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, event_id TEXT, kind TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, severity TEXT, created_at TEXT NOT NULL, read_at TEXT, UNIQUE(user_id,event_id,kind));''')

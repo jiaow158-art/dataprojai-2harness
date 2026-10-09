@@ -97,16 +97,10 @@ def _brief_date(argv: list[str]) -> str:
         return date.fromisoformat(argv[argv.index("--brief-date") + 1]).isoformat()
     return datetime.now().date().isoformat()
 
-def run_prod():
-    """生产入口（pm2）。env：INSIGHT_DB_PATH / DWS_* / GW_URL / GW_AUTH_TOKEN / INSIGHT_GW_USER。
-    可选 --brief-date YYYY-MM-DD：补跑指定简报日（缺省 today）。"""
-    import os
-    import sys
+def run_pipeline_for(store: Store, data_date: str, brief_date: str, now: datetime):
+    """run_prod 的可复用内核（SCH-1：scheduler_main 同进程调用，保证调度与 CLI 完全同路径）。
+    返回 (run_day 产物, 归因结果列表)。"""
     from .watermark import Dependency, check_dependency
-    store = Store(open_db(os.environ["INSIGHT_DB_PATH"]))
-    d = date.fromisoformat(_brief_date(sys.argv[1:]))
-    data_date = (d - timedelta(days=1)).isoformat()
-    brief_date = d.isoformat()
     runners = {}
     wm_detail: dict[str, str] = {}            # watermark detail → radar_run.error 列
 
@@ -129,10 +123,24 @@ def run_prod():
     def freshness_detail(name):
         return wm_detail.get(name, "n/a")
 
-    out = run_day(store, data_date, brief_date, datetime.now(),
+    out = run_day(store, data_date, brief_date, now,
                   runner_for, watermark_ok, freshness_detail)
+    attrs = run_attributions(store, brief_date, now.time())
+    return out, attrs
+
+
+def run_prod():
+    """生产入口（pm2）。env：INSIGHT_DB_PATH / DWS_* / GW_URL / GW_AUTH_TOKEN / INSIGHT_GW_USER。
+    可选 --brief-date YYYY-MM-DD：补跑指定简报日（缺省 today）。"""
+    import os
+    import sys
+    store = Store(open_db(os.environ["INSIGHT_DB_PATH"]))
+    d = date.fromisoformat(_brief_date(sys.argv[1:]))
+    data_date = (d - timedelta(days=1)).isoformat()
+    brief_date = d.isoformat()
+    out, attrs = run_pipeline_for(store, data_date, brief_date, datetime.now())
     print(json.dumps({"brief": out["brief"]}, ensure_ascii=False))
-    for r in run_attributions(store, brief_date, datetime.now().time()):
+    for r in attrs:
         if r.get("error"):
             print(f"[attribution] {r['event_id']} failed: {r['error']}")
         else:
