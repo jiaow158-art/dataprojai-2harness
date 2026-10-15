@@ -105,22 +105,24 @@ export function parseArgs(argv, env = process.env) {
   }
   delete out._i;
   if (out.apply && out.dryRun) throw new UsageError("--apply 与 --dry-run 不可同时使用");
+  // --help 只打印用法、不触路径：先于盘符校验与 resolve 返回（posix 下缺省即 Windows 盘符形态，
+  // 不短路会把 --help 拦成用法错误）。
+  if (out.help) return out;
   // LIN-1 C7：posix 拒绝盘符形态路径（生产缺省是 Windows 路径，Linux 上 resolve 会产出
   // <cwd>/D:/... 垃圾路径且 isInside 恒拒绝）——Linux 必须显式传 env/CLI 的 POSIX 路径。
-  if (process.platform !== "win32") {
-    for (const [k, v] of Object.entries({
-      gatewayDb: out.gatewayDb, bffDb: out.bffDb, reports: out.reports, results: out.results, work: out.work,
-    })) {
-      if (typeof v === "string" && /^[A-Za-z]:[\\/]/.test(v)) {
-        throw new UsageError(`${k} 为 Windows 盘符形态（${v}）——Linux 上请用 env/CLI 传 POSIX 路径`);
-      }
+  // LIN-1B：校验对象是 resolve 前的原始值，且必须覆盖 CLI>env>生产缺省三级来源——只查
+  // CLI 已给值会漏掉 env 与缺省来源（二者在 posix 同样产出 <cwd>/D:/ 垃圾路径）。
+  const pickAndResolve = (key, raw) => {
+    if (process.platform !== "win32" && typeof raw === "string" && /^[A-Za-z]:[\\/]/.test(raw)) {
+      throw new UsageError(`${key} 为 Windows 盘符形态（${raw}）——Linux 上请用 env/CLI 传 POSIX 路径`);
     }
-  }
-  out.gatewayDb = resolve(out.gatewayDb ?? env.GW_DB_PATH ?? PROD_DEFAULTS.gatewayDb);
-  out.bffDb = resolve(out.bffDb ?? env.BFF_DB_PATH ?? PROD_DEFAULTS.bffDb);
-  out.reports = resolve(out.reports ?? env.GATEWAY_REPORTS_DIR ?? PROD_DEFAULTS.reports);
-  out.results = resolve(out.results ?? env.GW_RESULTS_ROOT ?? PROD_DEFAULTS.results);
-  out.work = resolve(out.work ?? env.GW_WORKROOT ?? PROD_DEFAULTS.work);
+    return resolve(raw);
+  };
+  out.gatewayDb = pickAndResolve("gatewayDb", out.gatewayDb ?? env.GW_DB_PATH ?? PROD_DEFAULTS.gatewayDb);
+  out.bffDb = pickAndResolve("bffDb", out.bffDb ?? env.BFF_DB_PATH ?? PROD_DEFAULTS.bffDb);
+  out.reports = pickAndResolve("reports", out.reports ?? env.GATEWAY_REPORTS_DIR ?? PROD_DEFAULTS.reports);
+  out.results = pickAndResolve("results", out.results ?? env.GW_RESULTS_ROOT ?? PROD_DEFAULTS.results);
+  out.work = pickAndResolve("work", out.work ?? env.GW_WORKROOT ?? PROD_DEFAULTS.work);
   if (out.now === undefined) out.now = Date.now();
   out.mode = out.apply ? "apply" : "dry-run";
   return out;
