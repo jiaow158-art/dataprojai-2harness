@@ -123,11 +123,14 @@ export class DshSdkClient {
     const command = this.opts.command ?? (process.platform === "win32" ? "dsh.cmd" : "dsh");
     const args = this.opts.args ?? ["--profile", "sdk"];
     // T16 形态：win32 必须 shell:true（npm .cmd shim）；stdio 三管道。
+    // LIN-1 C1：posix 下 detached 使子进程自成进程组长（PGID=PID）——defaultKillTree
+    // 的 kill(-pid) 进程组回收前提；win32 无此选项语义（taskkill /T 自带树遍历）。
     const child = this.spawnFn(command, args, {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: this.opts.cwd,
       env: this.opts.env,
       shell: process.platform === "win32",
+      detached: process.platform !== "win32",
     });
     this.child = child;
 
@@ -348,12 +351,15 @@ function defaultSpawn(command: string, args: string[], opts: any): ChildProcess 
   return spawn(command, args, opts) as ChildProcess;
 }
 
-/** 跨平台进程树击杀：Windows taskkill /T /F；POSIX SIGKILL（进程组由 backend 落地）。 */
+/** 跨平台进程树击杀：Windows taskkill /T /F；POSIX 按进程组 SIGKILL。
+ *  LIN-1 C1（M1 遗留 L-2 销账）：spawn detached 使 dsh 自成组长（PGID=PID），
+ *  kill(-pid) 只回收该组——MCP python/docker exec 等子孙一并收掉，且不波及网关
+ *  自身或无关进程（pid 守护 + ESRCH=组已亡静默）。 */
 export function defaultKillTree(pid: number | undefined): void {
-  if (pid === undefined) return;
+  if (pid === undefined || pid === process.pid) return;
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
   } else {
-    try { process.kill(pid, "SIGKILL"); } catch { /* 已死 */ }
+    try { process.kill(-pid, "SIGKILL"); } catch { /* 组已亡/已回收 */ }
   }
 }

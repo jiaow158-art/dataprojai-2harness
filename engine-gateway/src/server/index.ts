@@ -94,9 +94,15 @@ const server = createHttpServer({
 });
 
 pool.start();
-server.listen(envInt("GATEWAY_PORT", 8080), () => {
-  console.log(`[gateway] listening on :${envInt("GATEWAY_PORT", 8080)} db=${dbPath} workroot=${runnerPaths.workroot}`);
-});
+// LIN-1 R4：GATEWAY_HOST 可选绑定地址（生产建议 127.0.0.1，由同机 BFF/反代访问）；
+// 未设置 = 现行为（全接口监听），Windows 开发零变化。
+const gatewayPort = envInt("GATEWAY_PORT", 8080);
+const gatewayHost = process.env.GATEWAY_HOST;
+const onListening = () => {
+  console.log(`[gateway] listening on ${gatewayHost ? `${gatewayHost}:${gatewayPort}` : `:${gatewayPort}`} db=${dbPath} workroot=${runnerPaths.workroot}`);
+};
+if (gatewayHost) server.listen(gatewayPort, gatewayHost, onListening);
+else server.listen(gatewayPort, onListening);
 
 // ── 优雅停：停入流 → 停池（等在途 runner）→ 停 HTTP → 关库 ─────────────────────────
 async function shutdown(sig: string): Promise<void> {

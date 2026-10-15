@@ -53,12 +53,22 @@ const TEMPLATE_DIR = path.join(__dirname, "profile-template");
 const PLUGIN_DIR = path.resolve(__dirname, "..", "..", "m0", "dsh-plugin", "exec-script");
 // E-5 修复：读域围栏插件（tools/execute 瀑布拦 read/read_image/glob/grep）
 const FENCE_PLUGIN_DIR = path.resolve(__dirname, "..", "..", "m0", "dsh-plugin", "fs-read-fence");
-const MCP_PYTHON = "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe";
+// MCP 解释器：env 优先（Linux 部署传 venv python）；缺省按平台（LIN-1 C2——原为
+// Windows 固定事实字面量，现换机器只改 env 不改码）。
+const MCP_PYTHON = process.env.MCP_PYTHON ?? (process.platform === "win32"
+  ? "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  : "/usr/bin/python3");
 const MCP_SCRIPT = path.resolve(__dirname, "..", "..", "dws_mcp_server.py");
 const HEADLESS_RESULT_DIR = path.resolve(__dirname, "..", "..", "m0", "results");
 
+// dsh CLI：Windows 是 npm .cmd shim（须 shell:true 才可执行）；Linux 为普通可执行
+// （LIN-1 C3——与 dsh-sdk-client.ts 的平台规则同一套）。
+const DSH_BIN = process.platform === "win32" ? "dsh.cmd" : "dsh";
+const DSH_SHELL = process.platform === "win32";
+
 const PROFILES = {
   headless: { appBundle: "@deepseek-ai/dsh-headless", resultDirLine: `          RESULT_DIR: '${HEADLESS_RESULT_DIR}'` },
+
   // sdk（M1 网关用）：RESULT_DIR 改环境变量注入——网关每任务设子目录（Task 5）。
   // 防 T2 实测崩溃：裸 `!!js process.env.RESULT_DIR` 在未设置时求值为 undefined，
   // mcp-client env schema（仅字符串）拒绝 → 整个 profile 启动失败，且 dsh 的
@@ -146,8 +156,8 @@ for (const p of PLUGINS) {
   const linkOk = existsSync(linkTarget);
   if (!linkOk || force) {
     console.log(`[${profileName}] ${p.name} ${linkOk ? "force" : "link 缺失"} → dsh plugin add（bundle 注册 + pnpm link）`);
-    const r = spawnSync("dsh.cmd", ["plugin", "--profile", profileName, "add", p.dir], {
-      stdio: "inherit", shell: true, cwd: process.env.USERPROFILE || process.env.HOME,
+    const r = spawnSync(DSH_BIN, ["plugin", "--profile", profileName, "add", p.dir], {
+      stdio: "inherit", shell: DSH_SHELL, cwd: process.env.USERPROFILE || process.env.HOME,
     });
     if (r.status !== 0) {
       console.error(`[${profileName}] dsh plugin add ${p.name} 失败（exit ${r.status}）`);
@@ -160,12 +170,12 @@ for (const p of PLUGINS) {
 
 // ── 自检（dump-config 级；会话级断言属 Task 9 E2E）────────────────────────
 // dump-config 已实测为只读自检（不重写 package.json），安全用于 CI。
-const REQUIRED_DISABLED = ["tool-pwsh", "tool-web", "tool-workflow", "workflow-worker-thread", "tool-ralph"];
+const REQUIRED_DISABLED = ["tool-pwsh", "tool-bash", "bash-sandbox", "tool-web", "tool-workflow", "workflow-worker-thread", "tool-ralph"];
 const REQUIRED_PRESENT = ["m0-exec-script", "mcp-dws", "m0-fs-read-fence"];
 
 function selfCheck() {
-  const r = spawnSync("dsh.cmd", ["--profile", profileName, "--dump-config"], {
-    encoding: "utf8", shell: true, cwd: process.env.USERPROFILE || process.env.HOME, maxBuffer: 16 * 1024 * 1024,
+  const r = spawnSync(DSH_BIN, ["--profile", profileName, "--dump-config"], {
+    encoding: "utf8", shell: DSH_SHELL, cwd: process.env.USERPROFILE || process.env.HOME, maxBuffer: 16 * 1024 * 1024,
   });
   if (r.status !== 0) {
     console.error(`[${profileName}] SELF-CHECK FAIL: dump-config exit ${r.status}\n${r.stderr}`);
@@ -214,7 +224,7 @@ function selfCheck() {
     } catch {}
     return false;
   }
-  console.log(`[${profileName}] SELF-CHECK PASS: 五工具 disabled+patched by / m0-exec-script / mcp-dws / m0-fs-read-fence（dump-config 级）`);
+  console.log(`[${profileName}] SELF-CHECK PASS: ${REQUIRED_DISABLED.length} 工具 disabled+patched by / m0-exec-script / mcp-dws / m0-fs-read-fence（dump-config 级）`);
   return true;
 }
 
