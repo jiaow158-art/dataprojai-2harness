@@ -27,6 +27,14 @@
 - id: tool-ralph
   disabled: true
 
+# LIN-1（C6）：dsh-base 用 `disabled: !!js process.platform === 'win32'` 只在 Windows 禁
+# tool-bash/bash-sandbox——Linux 上会自动启用宿主 bash 执行通道，绕过 exec_script 沙箱
+# 唯一执行通道设计。此层显式禁用对 Windows 幂等（SDK 本就禁，白名单维持 26 项不变）。
+- id: bash-sandbox
+  disabled: true
+- id: tool-bash
+  disabled: true
+
 # 安全复审修复 MEDIUM：dsh 会话 cwd 改为任务 workdir 后，project-dsh skill root
 # （<repo>/.dsh/skills 按 .git 祖先探测）不再命中；用 customSkillDirs（rank 300，
 # findings dsh-api.md §2.1）显式指回。路径经环境变量注入，不硬编码；

@@ -37,9 +37,11 @@ const PATH_ARGS: Record<string, string> = {
   grep: 'path',
 }
 
-/** 归一为小写正斜杠形态（win32 大小写不敏感 + 分隔符统一），供包含判断。 */
+/** 归一为正斜杠形态（分隔符统一）；小写仅 win32（NTFS 大小写不敏感）——Linux 遵循
+ *  文件系统原生大小写语义，防止大小写变体把域判定放宽（LIN-1 R2）。 */
 function norm(p: string): string {
-  return p.replace(/\\/g, '/').toLowerCase()
+  const s = p.replace(/\\/g, '/')
+  return process.platform === 'win32' ? s.toLowerCase() : s
 }
 
 /** target 是否落在 root 内（含 root 本身；边界带分隔符防 d:\a 匹配 d:\ab）。 */

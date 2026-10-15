@@ -29,7 +29,10 @@ export MSYS_NO_PATHCONV=1
 # 两种形式；手写 winpath 会把 /tmp/x 错转成不存在的 T:\x。cygpath -w 输出 D:\... 形式，
 # Docker Desktop 的 -v 对其直接接受（含 MSYS_NO_PATHCONV=1 时）。冒烟两场景均以
 # "-v D:\...:/xxx" 混合形式真跑通过。
-winpath() { cygpath -w "$1"; }
+winpath() {
+  if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi
+}
+# Linux 原生引擎（无 cygpath）直接透传 POSIX 路径——docker -v 原样可用（LIN-1 C4）。
 
 # tmpfs /tmp（rw,noexec,nosuid,64m）：--read-only rootfs 下 tempfile 仍可用——
 # validate_report.py 的 node 语法检查临时文件、build.py --selftest 的 TemporaryDirectory
@@ -49,6 +52,14 @@ else
   CNAME="m0sandbox-$$-$(date +%s)"
 fi
 RC=0
+# Linux 原生引擎 bind mount 严格保留宿主 uid：仅对本任务目录放行容器用户 65534
+# （u:rwx 本任务 workdir；u:rX 本任务 results 与 assets）——每任务独立授权，不做
+# workroot 级共享可写目录。Windows/Docker Desktop 无此语义（uname 非 Linux）自动跳过。
+if [ "$(uname -s)" = "Linux" ] && command -v setfacl >/dev/null 2>&1; then
+  setfacl -m u:65534:rwx "${WORKDIR}" 2>/dev/null \
+    || echo "SANDBOX: WARN setfacl(workdir) 失败——容器可能无法写入 /workdir" >&2
+  setfacl -m u:65534:rX "${RESULTS_DIR}" "${ASSETS_DIR}" 2>/dev/null || true
+fi
 timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   --network none \
   --read-only \

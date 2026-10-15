@@ -23,9 +23,12 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 
 export const name = 'm0-exec-script'
 
-/** 从 dsh 进程环境解析 Git Bash（dsh 宿主就是 Node，PATH 同源）。 */
+/** 从 dsh 进程环境解析宿主 bash（dsh 宿主就是 Node，PATH 同源）。
+ *  M0_SANDBOX_BASH 优先；缺省按平台：win32=Git Bash（M0 实测定型），posix=/bin/bash（LIN-1 C5）。 */
 function resolveBashExe(): string {
-  return process.env.M0_SANDBOX_BASH ?? 'C:/Program Files/Git/bin/bash.exe'
+  return process.env.M0_SANDBOX_BASH ?? (process.platform === 'win32'
+    ? 'C:/Program Files/Git/bin/bash.exe'
+    : '/bin/bash')
 }
 
 /** 从 dsh 进程环境解析 run_in_sandbox.sh 的绝对路径。 */

@@ -40,6 +40,13 @@
 - id: tool-ralph
   disabled: true
 
+# LIN-1（C6）：dsh-base 只在 win32 禁 tool-bash/bash-sandbox——Linux 自动启用宿主 bash，
+# 绕过 exec_script 唯一执行通道。显式禁用（对 Windows 幂等）。与插件侧 patch 双写防呆。
+- id: bash-sandbox
+  disabled: true
+- id: tool-bash
+  disabled: true
+
 # Project skill root reroute (session cwd may sit outside the repo).
 - id: skill-filesystem
   config:

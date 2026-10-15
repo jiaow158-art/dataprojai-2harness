@@ -47,6 +47,23 @@ sys.exit(1)
 EOF
 bash m0/sandbox/run_in_sandbox.sh "$WD" t4.py >/dev/null 2>&1; check "只读挂载写入" $?
 
+# 5. 跨任务目录隔离：其他任务的 workdir 不挂载、不可发现（WD2 放标记文件，WD1 容器内
+#    有界扫描各挂载点与根——找到即泄漏）。LIN-1：bind mount 权限仅按任务目录放行。
+WD2=$(mktemp -d); echo "marker" > "$WD2/m0_marker_zq.txt"
+cat > "$WD/t5.py" <<'EOF'
+import os, sys
+for base in ("/", "/tmp", "/workdir", "/results", "/assets"):
+    for root, dirs, files in os.walk(base):
+        dirs[:] = [d for d in dirs if not d.startswith(("proc", "sys", "dev"))]
+        if root[len(base):].count(os.sep) >= 6:
+            dirs[:] = []
+        if "m0_marker_zq.txt" in files:
+            sys.exit(0)
+sys.exit(1)
+EOF
+bash m0/sandbox/run_in_sandbox.sh "$WD" t5.py >/dev/null 2>&1; check "跨任务目录可见" $?
+rm -rf "$WD2"
+
 echo "passed=$pass failed=$fail"
 exit $fail
 
