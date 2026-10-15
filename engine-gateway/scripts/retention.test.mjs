@@ -333,22 +333,33 @@ test("单类失败跳过不中断：bff.db 损坏 → 报错退出 1 但网关/�
 });
 
 test("parseArgs：CLI 参数 > env > 生产缺省；默认 dry-run；用法错误抛 UsageError", () => {
-  const env = { GW_DB_PATH: "E:/env/gw.db" };
-  // env 覆盖生产缺省
-  assert.equal(parseArgs([], env).gatewayDb, "E:\\env\\gw.db");
-  // CLI 参数覆盖 env
-  assert.equal(parseArgs(["--gateway-db", "C:/x/g.db"], env).gatewayDb, "C:\\x\\g.db");
-  // 无 env 无参数 → 生产缺省
-  const d = parseArgs([], {});
-  assert.equal(d.gatewayDb, parseArgs([], {}).gatewayDb);
-  const norm = (s) => s.replaceAll("/", "\\");
-  for (const [k, v] of Object.entries(PROD_DEFAULTS)) {
-    assert.equal(norm(d[k]), norm(v), `${k} 缺省应为生产值`);
+  if (process.platform === "win32") {
+    const env = { GW_DB_PATH: "E:/env/gw.db" };
+    // env 覆盖生产缺省
+    assert.equal(parseArgs([], env).gatewayDb, "E:\\env\\gw.db");
+    // CLI 参数覆盖 env
+    assert.equal(parseArgs(["--gateway-db", "C:/x/g.db"], env).gatewayDb, "C:\\x\\g.db");
+    // 无 env 无参数 → 生产缺省
+    const d = parseArgs([], {});
+    assert.equal(d.gatewayDb, parseArgs([], {}).gatewayDb);
+    const norm = (s) => s.replaceAll("/", "\\");
+    for (const [k, v] of Object.entries(PROD_DEFAULTS)) {
+      assert.equal(norm(d[k]), norm(v), `${k} 缺省应为生产值`);
+    }
+    assert.equal(d.mode, "dry-run");
+    assert.ok(Math.abs(d.now - Date.now()) < 60_000);
+  } else {
+    // LIN-1 C7：posix 拒绝盘符形态（env / CLI / 生产缺省三者皆拒），显式 POSIX 路径可跑
+    assert.throws(() => parseArgs([], { GW_DB_PATH: "E:/env/gw.db" }), UsageError);
+    assert.throws(() => parseArgs(["--gateway-db", "C:/x/g.db"], {}), UsageError);
+    assert.throws(() => parseArgs([], {}), UsageError); // 生产缺省即 D:/ 盘符形态
+    const d = parseArgs(["--gateway-db", "/tmp/g.db", "--bff-db", "/tmp/b.db",
+      "--reports", "/tmp/r", "--results", "/tmp/s", "--work", "/tmp/w"], {});
+    assert.equal(d.gatewayDb, "/tmp/g.db");
+    assert.equal(d.mode, "dry-run");
+    assert.ok(Math.abs(d.now - Date.now()) < 60_000);
   }
-  // 默认 dry-run + now 缺省取当前时钟
-  assert.equal(d.mode, "dry-run");
-  assert.ok(Math.abs(d.now - Date.now()) < 60_000);
-  // 用法错误
+  // 用法错误（两平台同形：参数循环与冲突检查先于路径解析）
   assert.throws(() => parseArgs(["--now", "abc"]), UsageError);
   assert.throws(() => parseArgs(["--bogus"]), UsageError);
   assert.throws(() => parseArgs(["--apply", "--dry-run"]), UsageError);
@@ -373,11 +384,18 @@ test("用法错误的 CLI 退出码：--help=0，未知参数/--now 非法/--app
   }
 });
 
-test("isInside 路径围栏：根内真包含才放行，自身/同级前缀/越界均拒绝（大小写不敏感）", () => {
+test("isInside 路径围栏：根内真包含才放行，自身/同级前缀/越界均拒绝（win32 大小写不敏感 / posix 大小写敏感）", () => {
   assert.ok(isInside("D:/root", "D:/root/child"));
-  assert.ok(isInside("D:\\Root", "d:\\root\\CHILD"));
   assert.ok(isInside("D:\\", "D:\\anywhere")); // 盘符根
   assert.ok(!isInside("D:/root", "D:/root")); // 根自身不可删
   assert.ok(!isInside("D:/root", "D:/root2/x")); // 同级前缀
   assert.ok(!isInside("D:/root", "E:/root/child"));
+  if (process.platform === "win32") {
+    assert.ok(isInside("D:\\Root", "d:\\root\\CHILD")); // NTFS 大小写不敏感
+  } else {
+    // LIN-1：Linux 遵循文件系统大小写语义——大小写变体判域外
+    assert.ok(!isInside("D:/Root", "d:/root/child"));
+    assert.ok(isInside("/srv/root", "/srv/root/child"));
+    assert.ok(!isInside("/srv/root", "/SRV/root/child"));
+  }
 });

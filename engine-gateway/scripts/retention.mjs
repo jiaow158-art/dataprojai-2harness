@@ -27,7 +27,7 @@
 
 import Database from "better-sqlite3";
 import { existsSync, lstatSync, readdirSync, realpathSync, rmSync, rmdirSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const DAY_MS = 86_400_000;
@@ -105,6 +105,17 @@ export function parseArgs(argv, env = process.env) {
   }
   delete out._i;
   if (out.apply && out.dryRun) throw new UsageError("--apply 与 --dry-run 不可同时使用");
+  // LIN-1 C7：posix 拒绝盘符形态路径（生产缺省是 Windows 路径，Linux 上 resolve 会产出
+  // <cwd>/D:/... 垃圾路径且 isInside 恒拒绝）——Linux 必须显式传 env/CLI 的 POSIX 路径。
+  if (process.platform !== "win32") {
+    for (const [k, v] of Object.entries({
+      gatewayDb: out.gatewayDb, bffDb: out.bffDb, reports: out.reports, results: out.results, work: out.work,
+    })) {
+      if (typeof v === "string" && /^[A-Za-z]:[\\/]/.test(v)) {
+        throw new UsageError(`${k} 为 Windows 盘符形态（${v}）——Linux 上请用 env/CLI 传 POSIX 路径`);
+      }
+    }
+  }
   out.gatewayDb = resolve(out.gatewayDb ?? env.GW_DB_PATH ?? PROD_DEFAULTS.gatewayDb);
   out.bffDb = resolve(out.bffDb ?? env.BFF_DB_PATH ?? PROD_DEFAULTS.bffDb);
   out.reports = resolve(out.reports ?? env.GATEWAY_REPORTS_DIR ?? PROD_DEFAULTS.reports);
@@ -117,13 +128,17 @@ export function parseArgs(argv, env = process.env) {
 
 // ---------- 路径围栏 ----------
 
-/** realpath 围栏：target 解析后必须严格位于 root 内（小写 + 斜杠归一——Windows 盘符/目录名
- *  大小写不敏感，正反斜杠等价；root 自身与同级前缀均不放行）。 */
+/** realpath 围栏：target 解析后必须严格位于 root 内（正反斜杠归一为 "/"；
+ *  大小写不敏感比较仅 win32——NTFS 语义；Linux 遵循文件系统原生大小写敏感语义，
+ *  防大小写变体放宽围栏（LIN-1 C7）；root 自身与同级前缀均不放行）。 */
 export function isInside(rootReal, targetReal) {
-  const norm = (p) => p.toLowerCase().replaceAll("/", "\\");
+  const norm = (p) => {
+    const s = p.replace(/[\\/]+/g, "/");
+    return process.platform === "win32" ? s.toLowerCase() : s;
+  };
   const r = norm(rootReal);
   const t = norm(targetReal);
-  return t.startsWith(r.endsWith(sep) ? r : r + sep);
+  return t.startsWith(r.endsWith("/") ? r : r + "/");
 }
 
 function realpathSafe(p) {

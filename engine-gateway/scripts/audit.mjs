@@ -18,8 +18,9 @@
 
 import Database from "better-sqlite3";
 
-const GATEWAY_DB = "D:/m0-sessions/prod/gateway.db";
-const BFF_DB = "D:/dataplat-ui/server/data-prod/bff.db";
+// LIN-1 C8：env 优先（Linux 传 POSIX 路径）；缺省保留 Windows 生产值（零退化）。
+const GATEWAY_DB = process.env.GW_DB_PATH ?? "D:/m0-sessions/prod/gateway.db";
+const BFF_DB = process.env.BFF_DB_PATH ?? "D:/dataplat-ui/server/data-prod/bff.db";
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
 // ---------- 参数解析（argparse 风格手写） ----------
