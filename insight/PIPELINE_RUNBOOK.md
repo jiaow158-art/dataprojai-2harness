@@ -76,6 +76,29 @@ pm2 start python --name insight-worker-1005 --no-autorestart --cron-restart "5 1
 Windows 任务计划程序方式：每日两条任务（09:05 / 10:05），操作均为
 `python -m insight.worker_main`，**"起始于"必须填仓根**（同 cwd 前提）。
 
+### Linux（Ubuntu）部署形态（LIN-1，2026-10-15）
+
+Linux 终态为 **systemd 单 service 托管，无 pm2、无 systemd timer/cron**——SCH-1 的
+触发全部来自 scheduler_main 内聚的 APScheduler（09:05/10:05 CronTrigger）+
+trigger_queue（管理后台手动补跑），与本 runbook 既有形态一致：
+
+```bash
+# scheduler（常驻——雷达/归因 CronTrigger + 队列消费 + 对账 全内聚，唯一调度托管）
+ExecStart=/srv/dpit/apps/harness/.venv/bin/python -m insight.scheduler_main
+# api（常驻；先 db 初始化 oneshot 再起）
+ExecStart=/srv/dpit/apps/harness/.venv/bin/python -m insight.api_main
+# worker_main 仅为手工/管理面入口——Linux 不设任何定时入口（防双触发）。
+```
+
+- env：`/etc/dpit/insight.env`（`INSIGHT_DB_PATH/DWS_*/GW_URL/GW_AUTH_TOKEN/
+  INSIGHT_ADMIN_TOKEN`，另 `PYTHONUTF8=1`、`LANG=C.UTF-8`、`TZ=Asia/Shanghai`）；
+  `WorkingDirectory=仓根`（`-m insight.*` 依赖 cwd 找包）。
+- 验证期不装 unit：tmux + `set -a && . /etc/dpit/insight.env && set +a` 手工起，
+  scheduler 用 `INSIGHT_SCHEDULER_SHADOW=1` + 临时库（只记账不执行不领队列）。
+- 完整命令清单（分级标注【只读/安装/权限变更/服务启动】）见
+  `docs/superpowers/plans/2026-10-15-lin-1-dp-server-runbook.md`；适配决策见同目录
+  `2026-10-15-lin-1-minimal-adaptation-plan.md`。
+
 **归因窗口提示**：`run_prod` 的归因阶段受 10:00-14:00 窗口门控，09:05 主跑时窗口未开、
 自动跳过（worker 打印完简报即退出）。若需**当日**完成归因，在窗口内（如 10:05）用同命令
 补发一次即可——雷达部分因同日已 ran 全部自动跳过（见 §4），只做归因，幂等安全；

@@ -33,6 +33,7 @@ import hashlib
 import http.client
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -605,9 +606,12 @@ def start_gateway(gw_dir: str) -> tuple[subprocess.Popen, GatewayClient, str]:
         os.makedirs(os.path.join(gw_dir, sub), exist_ok=True)
     log_path = os.path.join(gw_dir, "gateway.log")
     log_fd = open(log_path, "ab")
+    # LIN-1（R6）：posix 下 start_new_session 使网关自成进程组——stop_gateway 才能整组
+    # 回收（Windows 无此参数语义，条件注入零变化）。
     proc = subprocess.Popen([node, os.path.join("src", "server", "index.ts")],
                             cwd=os.path.join(PROJ_DIR, "engine-gateway"),
-                            env=env, stdout=log_fd, stderr=subprocess.STDOUT)
+                            env=env, stdout=log_fd, stderr=subprocess.STDOUT,
+                            **({"start_new_session": True} if os.name != "nt" else {}))
     client = GatewayClient("127.0.0.1", port, token)
     try:
         wait_gateway_healthy(client, proc, log_path)
@@ -627,7 +631,12 @@ def stop_gateway(proc: subprocess.Popen | None) -> bool:
             subprocess.run(["taskkill", "/pid", str(proc.pid), "/T", "/F"],
                            capture_output=True, timeout=30)
         else:
-            proc.terminate()
+            # LIN-1（R6）：进程组回收（start_gateway 已 start_new_session）——
+            # 网关派生的 dsh/MCP/docker 子孙一并收掉；组已亡则退回单点 terminate。
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            except Exception:
+                proc.terminate()
     except Exception:
         pass
     try:
