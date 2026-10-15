@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 受控执行：无网络(--network none)、rootfs只读(--read-only)、非root身份、
 # 目录白名单(结果/资产只读, workdir可写)、资源上限(mem/cpu/pids)、超时清理(timeout+--rm)
+# LIN-1B：Linux 下 ACL 初始化 fail closed——setfacl 缺失或任一授权失败即退出 78，不启动容器
 # 本地模拟形态：Docker Desktop on Windows (WSL2 backend)，Git Bash 调用
 #
 # 用法: RESULTS_DIR=... ASSETS_DIR=... bash run_in_sandbox.sh <workdir> <script> [args...]
@@ -55,10 +56,17 @@ RC=0
 # Linux 原生引擎 bind mount 严格保留宿主 uid：仅对本任务目录放行容器用户 65534
 # （u:rwx 本任务 workdir；u:rX 本任务 results 与 assets）——每任务独立授权，不做
 # workroot 级共享可写目录。Windows/Docker Desktop 无此语义（uname 非 Linux）自动跳过。
-if [ "$(uname -s)" = "Linux" ] && command -v setfacl >/dev/null 2>&1; then
-  setfacl -m u:65534:rwx "${WORKDIR}" 2>/dev/null \
-    || echo "SANDBOX: WARN setfacl(workdir) 失败——容器可能无法写入 /workdir" >&2
-  setfacl -m u:65534:rX "${RESULTS_DIR}" "${ASSETS_DIR}" 2>/dev/null || true
+# LIN-1B S2-B：ACL 初始化 fail closed（退出码 78=EX_CONFIG，先于 docker run，不启动任何
+# 容器）——静默降级会把故障后移成沙箱内的误导性权限错误，红队里还会伪装成"已阻断"。
+if [ "$(uname -s)" = "Linux" ]; then
+  command -v setfacl >/dev/null 2>&1 \
+    || { echo "SANDBOX-FATAL[78]: Linux 下需要 setfacl（apt install acl）——拒绝在无 ACL 支持下执行" >&2; exit 78; }
+  setfacl -m u:65534:rwx "${WORKDIR}" \
+    || { echo "SANDBOX-FATAL[78]: setfacl(workdir=${WORKDIR}) 失败——拒绝执行" >&2; exit 78; }
+  setfacl -m u:65534:rX "${RESULTS_DIR}" \
+    || { echo "SANDBOX-FATAL[78]: setfacl(results=${RESULTS_DIR}) 失败——拒绝执行" >&2; exit 78; }
+  setfacl -m u:65534:rX "${ASSETS_DIR}" \
+    || { echo "SANDBOX-FATAL[78]: setfacl(assets=${ASSETS_DIR}) 失败——拒绝执行" >&2; exit 78; }
 fi
 timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   --network none \
