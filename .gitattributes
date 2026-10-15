@@ -1,0 +1,10 @@
+# LIN-1 R7 行尾护栏（2026-10-15）
+# - *.sh 强制 LF：Linux bash 对 CRLF 直接报 $'\r' 错误；index 侧本就全 LF，此属性
+#   保证未来任何平台检出/提交均为 LF。
+# - 字节形态冻结（-text = 永不做 EOL 转换）：eval_dataset.json 是评测标准（CRLF/无 BOM，
+#   CLAUDE.md 数据集纪律）；huaweiclaude/ 为数据仓元数据镜像（7098 个 CRLF blob）——
+#   两处若被 `git add --renormalize` 或 autocrlf 规范化即破坏字节形态，故显式豁免。
+# 注意：本仓**禁止**全仓 `git add --renormalize .`（镜像会被整体重写）。
+*.sh text eol=lf
+eval_dataset.json -text
+huaweiclaude/** -text

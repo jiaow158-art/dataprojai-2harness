@@ -55,3 +55,4 @@ insight/bt-*.jsonl
 # 本地运行时状态/日志（不入库）
 .hammer.log
 eval_results/.etl-watch-state.json
+/sch*.log
