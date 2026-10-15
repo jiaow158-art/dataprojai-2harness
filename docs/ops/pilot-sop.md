@@ -22,6 +22,13 @@ node engine-gateway/scripts/audit.mjs --user pilot-01
 node engine-gateway/scripts/audit.mjs --date 2026-09-20
 ```
 
+> **Linux（dp-server）注意**：`pilot-daily.mjs` / `audit.mjs` / `retention.mjs` 的路径缺省值均为 Windows
+> 生产值，Linux 上会按"Windows 盘符形态"被拒绝（exit 2，stderr 说明原因）。须显式提供 POSIX 路径：
+> audit/pilot-daily 用 `GW_DB_PATH` / `BFF_DB_PATH`；retention 另加 `GATEWAY_REPORTS_DIR` /
+> `GW_RESULTS_ROOT` / `GW_WORKROOT` env，或显式传五个 `--gateway-db` 等参数。示例：
+> `GW_DB_PATH=/srv/dpit/data/…/gateway.db BFF_DB_PATH=/srv/dpit/data/…/bff.db node engine-gateway/scripts/pilot-daily.mjs`
+> （实际取值以部署 env 为准：`/etc/dpit/gateway.env`、`/etc/dpit/bff.env` 或 pm2 env）。
+
 - 巡检项：pm2 两 app online（`pm2 status`）→ 日报无未归因失败 → DeepSeek 余额（平台页面；低于预算阈值充值）
 - **每周数据保留清理**（策略：审计链 180 天/报告+双通道 90 天/UI 会话 90 天/工作目录 14 天）：
   ```bash

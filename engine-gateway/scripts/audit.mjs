@@ -19,8 +19,17 @@
 import Database from "better-sqlite3";
 
 // LIN-1 C8：env 优先（Linux 传 POSIX 路径）；缺省保留 Windows 生产值（零退化）。
-const GATEWAY_DB = process.env.GW_DB_PATH ?? "D:/m0-sessions/prod/gateway.db";
-const BFF_DB = process.env.BFF_DB_PATH ?? "D:/dataplat-ui/server/data-prod/bff.db";
+// LIN-1B：posix 拒绝盘符形态（与 retention.mjs 同形）——常量求值处即拦截，先于任何开库访问；
+// 否则缺省/env 的 Windows 路径会以 <cwd>/D:/... 形态去开库（报"库不可读"而非用法错误）。
+function pickDbPath(key, raw) {
+  if (process.platform !== "win32" && typeof raw === "string" && /^[A-Za-z]:[\\/]/.test(raw)) {
+    console.error(`${key} 为 Windows 盘符形态（${raw}）——Linux 上请用 env（GW_DB_PATH/BFF_DB_PATH）传 POSIX 路径`);
+    process.exit(2);
+  }
+  return raw;
+}
+const GATEWAY_DB = pickDbPath("gatewayDb", process.env.GW_DB_PATH ?? "D:/m0-sessions/prod/gateway.db");
+const BFF_DB = pickDbPath("bffDb", process.env.BFF_DB_PATH ?? "D:/dataplat-ui/server/data-prod/bff.db");
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
 // ---------- 参数解析（argparse 风格手写） ----------
