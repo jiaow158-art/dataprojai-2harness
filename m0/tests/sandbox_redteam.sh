@@ -31,7 +31,13 @@ chmod 711 "$TMPD"   # 允许 uid 65534 穿越（不可列目录）：宿主对�
 cleanup() { rm -rf "$TMPD"; }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-WD="$TMPD/taskA-workdir"; RES="$TMPD/taskA-results"; WD2="$TMPD/taskB-workdir"; ASSETS="$TMPD/assets"
+ROOT="$TMPD/taskroot"   # S4-B1r2：任务根深度须 ≥4（拒 /srv/dpit/data 级过宽根）——fixture 专门下沉一层
+WD="$ROOT/taskA-workdir"; RES="$ROOT/taskA-results"; WD2="$ROOT/taskB-workdir"; ASSETS="$ROOT/assets"
+if [ "$(uname -s)" = "Linux" ]; then
+  # S4-B1r2：runner 需授权任务根（fail closed）；ACL 状态目录走 runner 缺省（任务根下
+  # .sandbox-acl-state，0700+属主+非符号链接校验）——不依赖共享 /tmp，fixture 退出即清
+  export SANDBOX_TASK_ROOTS="$ROOT"
+fi
 mkdir -p "$WD" "$RES" "$WD2"; chmod 700 "$WD" "$RES" "$WD2"   # 每任务目录同 mktemp 语义（700）
 cp -r skills/report-generator "$ASSETS"                       # 测试资产专属副本：setfacl 只落副本，不碰仓库
 printf 'taskB-secret' > "$WD2/m0_marker_zq.txt"               # 跨任务读取探针标记
@@ -168,11 +174,22 @@ out=$(run "$WD" t6.py 2>&1); rc=$?; check "跨任务写入（tmpfs 除外）" "$
 #    对照组：任务 A workdir 经 run_in_sandbox 按任务授权后 65534 可读写（证明拒绝来自按任务
 #    ACL，而非"一律拒绝"）。最后核对任务 B 目录清单+sha256 前后一致。
 if [ "$(uname -s)" = "Linux" ]; then
-  if sudo -u nobody test -r "$WD" && sudo -u nobody test -w "$WD"; then
-    echo "[POSITIVE-OK] uid 65534 可读写任务 A workdir（授权对照）"
+  # 授权对照（S4-B1r2 闭环保留下改为「运行中」探针）：长任务运行期间（已授权）
+  # 65534 可读写任务 A workdir——证明任务 B 的拒绝来自按任务 ACL 而非一律拒绝
+  printf 'import time\ntime.sleep(6)\nprint("t7-ok")\n' > "$WD/t7long.py"
+  ( run "$WD" t7long.py > "$TMPD/t7.log" 2>&1 ) & T7PID=$!
+  T7LOCKED=0
+  _kA="$(printf '%s' "$(realpath -e "$WD")" | sha256sum | cut -c1-16)"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if ! flock -n "${ROOT}/.sandbox-acl-state/${_kA}.lock" true 2>/dev/null; then T7LOCKED=1; break; fi
+    sleep 0.5
+  done
+  if [ "$T7LOCKED" -eq 1 ] && sudo -u nobody test -r "$WD" && sudo -u nobody test -w "$WD"; then
+    echo "[POSITIVE-OK] uid 65534 运行期可读写任务 A workdir（授权对照，闭环保留下）"
   else
-    echo "[INVALID-FAIL] uid 65534 对任务 A workdir 无权限——按任务 ACL 授权链异常"; invalid=$((invalid+1))
+    echo "[INVALID-FAIL] uid 65534 运行期对任务 A workdir 无权限——按任务 ACL 授权链异常"; invalid=$((invalid+1))
   fi
+  wait "$T7PID"
   if sudo -u nobody test -r "$WD2"; then
     echo "[LEAK-FAIL] 任务 B 宿主 workdir 可被 uid 65534 读取"; fail=$((fail+1))
   elif sudo -u nobody test -w "$WD2"; then
@@ -196,6 +213,236 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
 else
   echo "[SKIP-OS] 宿主 UID/ACL 对照与仓库 ACL 审计（win32 无 ACL 语义）"; skipped=$((skipped+1))
+fi
+
+# 8. S4-B1r2 ACL 授权/恢复闭环（宿主层，Linux 专属）。用例：
+#    8a 0600 脚本+0700 嵌套目录+0600 多文件依赖（阳性） · 8b 恢复正确性（整树+results/assets
+#    零残留+模式位不变） · 8c 越界任务根拒绝（含同名目录陷阱） · 8c2 过宽根配置拒绝（/ 与
+#    深度<4） · 8c3/8c4 根外 assets 拒绝与 SANDBOX_ASSETS_ROOTS 授权面 · 8d stale 备份恢复
+#    闭环（伪造现场） · 8d2 真实 SIGKILL 后 stale 恢复 · 8e 损坏备份 fail-closed（79+保备份+
+#    不启容器） · 8f 同 workdir 并发（flock -n 直接 78）· 8g symlink/fifo 防护 ·
+#    8h 容器自建文件后二次调用 · 8i 任务中删除文件后恢复 · 8j 非零退出/超时后恢复 ·
+#    8k 既有 ACL/mask 字节级保持。
+if [ "$(uname -s)" = "Linux" ]; then
+  STATE="${ROOT}/.sandbox-acl-state"   # runner 缺省状态目录（任务根下）
+  # 8a 阳性：0600 脚本 + 0700 嵌套子目录 + 0600 多文件依赖，容器内可读可执行（修复目标）
+  WD3="$ROOT/s4-workdir"; mkdir -p "$WD3/sub"
+  printf 'print("s4-ok")\nprint(open("/workdir/sub/dep.txt").read().strip())\n' > "$WD3/r.py"; chmod 600 "$WD3/r.py"
+  printf 'dep-data\n' > "$WD3/sub/dep.txt"; chmod 600 "$WD3/sub/dep.txt"
+  printf 'open("/workdir/out.txt","w").write("gen-ok")\n' > "$WD3/sub/gen.py"; chmod 600 "$WD3/sub/gen.py"
+  chmod 700 "$WD3" "$WD3/sub"
+  out=$(run "$WD3" r.py 2>&1); rc=$?
+  out2=$(run "$WD3" sub/gen.py 2>&1); rc2=$?
+  if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q s4-ok && printf '%s' "$out" | grep -q dep-data \
+     && [ "$rc2" -eq 0 ] && [ "$(cat "$WD3/out.txt" 2>/dev/null)" = "gen-ok" ]; then
+    echo "[POSITIVE-OK] 8a 0600 脚本+0700 嵌套目录+多文件依赖容器内可执行（S4-B1 修复目标）"
+  else
+    echo "[INVALID-FAIL] 8a 私有模式脚本不可读/不可执行（rc=$rc/$rc2）：$out $out2"; invalid=$((invalid+1))
+  fi
+
+  # 8b 恢复正确性：workdir 整树 + results/assets 目录 零 u:65534 残留；模式位不变
+  residue=$(getfacl -Rcp --absolute-names "$WD3" 2>/dev/null | grep -c "^user:65534" || true)
+  residue_ra=$(getfacl -c --absolute-names "$RES" "$ASSETS" 2>/dev/null | grep -c "^user:65534" || true)
+  m_root=$(stat -c %a "$WD3"); m_sub=$(stat -c %a "$WD3/sub"); m_f=$(stat -c %a "$WD3/r.py")
+  if [ "${residue:-0}" -eq 0 ] && [ "${residue_ra:-0}" -eq 0 ] \
+     && [ "$m_root" = "700" ] && [ "$m_sub" = "700" ] && [ "$m_f" = "600" ]; then
+    echo "[BLOCKED-OK] 8b ACL 精确恢复闭环（workdir 树+results/assets 零残留；模式位 700/700/600 不变）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8b ACL 残留或模式漂移（树=$residue results/assets=$residue_ra modes=$m_root/$m_sub/$m_f）"; fail=$((fail+1))
+  fi
+
+  # 8c 越界任务根拒绝 + 同名目录陷阱（仅凭目录名不得通过——须解析后全路径前缀比对）
+  OUT8=$(mktemp -d "${TMPDIR:-/tmp}/s2b-outside-XXXXXX")
+  mkdir -p "$OUT8/taskA-workdir"; printf 'print("evil")\n' > "$OUT8/taskA-workdir/e.py"
+  out=$(RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" bash m0/sandbox/run_in_sandbox.sh "$OUT8/taskA-workdir" e.py 2>&1); rc=$?
+  if [ "$rc" -eq 78 ] && printf '%s' "$out" | grep -q "SANDBOX-FATAL\[78\]"; then
+    echo "[BLOCKED-OK] 8c 越界 workdir 拒绝（exit 78；同名目录不误判，容器未启动）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8c 越界路径未被拒（rc=$rc）：$out"; fail=$((fail+1))
+  fi
+  rm -rf "$OUT8"
+
+  # 8c2 过宽任务根配置拒绝："/"（黑名单）与 "$TMPD"（深度 3 <4）均须 exit 78
+  for badroot in "/" "$TMPD"; do
+    out=$(RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" SANDBOX_TASK_ROOTS="$badroot" \
+          bash m0/sandbox/run_in_sandbox.sh "$WD3" r.py 2>&1); rc=$?
+    if [ "$rc" -eq 78 ] && printf '%s' "$out" | grep -q "非法任务根"; then
+      echo "[BLOCKED-OK] 8c2 过宽任务根拒绝（root=${badroot}）"; pass=$((pass+1))
+    else
+      echo "[LEAK-FAIL] 8c2 过宽根未被拒（root=${badroot} rc=$rc）：$out"; fail=$((fail+1))
+    fi
+  done
+
+  # 8c3 根外 assets 拒绝：assets 指向任务根外且未配 SANDBOX_ASSETS_ROOTS → 78
+  AST_BASE=$(mktemp -d "${TMPDIR:-/tmp}/s2b-assets-XXXXXX"); AST_OUT="$AST_BASE/v1"; mkdir -p "$AST_OUT"
+  out=$(RESULTS_DIR="$RES" ASSETS_DIR="$AST_OUT" bash m0/sandbox/run_in_sandbox.sh "$WD3" r.py 2>&1); rc=$?
+  if [ "$rc" -eq 78 ] && printf '%s' "$out" | grep -q "SANDBOX_ASSETS_ROOTS/SANDBOX_TASK_ROOTS"; then
+    echo "[BLOCKED-OK] 8c3 根外 assets 拒绝（exit 78，容器未启动）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8c3 根外 assets 未被拒（rc=$rc）：$out"; fail=$((fail+1))
+  fi
+
+  # 8c4 可信资产根授权面：同一根外 assets 经 SANDBOX_ASSETS_ROOTS 显式放行 → 正常执行
+  out=$(RESULTS_DIR="$RES" ASSETS_DIR="$AST_OUT" SANDBOX_ASSETS_ROOTS="$AST_OUT" \
+        bash m0/sandbox/run_in_sandbox.sh "$WD3" r.py 2>&1); rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "[BLOCKED-OK] 8c4 可信资产根授权面生效（SANDBOX_ASSETS_ROOTS 显式放行）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8c4 资产根授权异常（rc=$rc）：$out"; fail=$((fail+1))
+  fi
+  rm -rf "$AST_BASE"
+
+  # 8d stale 备份闭环（伪造「已授权后被 SIGKILL」现场：树上残留 65534 + 备份对留存）
+  WD4="$ROOT/s4-stale"; mkdir -p "$WD4"; printf 'print("stale-ok")\n' > "$WD4/g.py"
+  k4="$(printf '%s' "$(realpath -e "$WD4")" | sha256sum | cut -c1-16)"
+  BAK4="${STATE}/${k4}.acl.bak"; SNAP4="${STATE}/${k4}.acl.snap"
+  getfacl --absolute-names "$WD4" 2>/dev/null > "$BAK4"
+  getfacl --absolute-names "$RES" 2>/dev/null >> "$BAK4"   # 对齐 runner 备份域（含 results/assets）
+  getfacl --absolute-names "$ASSETS" 2>/dev/null >> "$BAK4"
+  { printf '%s\td\t%s\n' "$WD4" "$(getfacl -c --absolute-names -- "$WD4" 2>/dev/null | paste -sd, -)"
+    printf '%s\td\t%s\n' "$RES" "$(getfacl -c --absolute-names -- "$RES" 2>/dev/null | paste -sd, -)"
+    printf '%s\td\t%s\n' "$ASSETS" "$(getfacl -c --absolute-names -- "$ASSETS" 2>/dev/null | paste -sd, -)"
+  } > "$SNAP4"
+  setfacl -m u:65534:rwx "$WD4" 2>/dev/null   # 伪造授权残留
+  out=$(run "$WD4" g.py 2>&1); rc=$?
+  res4=$(getfacl -Rcp --absolute-names "$WD4" 2>/dev/null | grep -c "^user:65534" || true)
+  if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q "检测到上次异常退出" && [ "${res4:-0}" -eq 0 ] && [ ! -e "$BAK4" ]; then
+    echo "[BLOCKED-OK] 8d stale 备份恢复闭环（基线还原→重授权→运行→恢复→清备份）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8d stale 处理异常（rc=$rc residue=$res4 bak留存=$([ -e "$BAK4" ] && echo y || echo n)）"; fail=$((fail+1))
+  fi
+
+  # 8d2 真实 SIGKILL：后台长任务进入运行段后 kill -9 runner → 下次调用检出 stale 并闭环
+  WD42="$ROOT/s4-kill"; mkdir -p "$WD42"; printf 'import time\ntime.sleep(5)\nprint("k-ok")\n' > "$WD42/k.py"
+  k42="$(printf '%s' "$(realpath -e "$WD42")" | sha256sum | cut -c1-16)"
+  BAK42="${STATE}/${k42}.acl.bak"
+  RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" bash m0/sandbox/run_in_sandbox.sh "$WD42" k.py \
+    > "$TMPD/kill.log" 2>&1 & KPID=$!
+  KLOCKED=0
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    [ -e "$BAK42" ] && { KLOCKED=1; break; }   # 备份落盘=已过备份段（授权中/已授权）
+    sleep 0.5
+  done
+  kill -9 "$KPID" 2>/dev/null; wait "$KPID" 2>/dev/null
+  if [ "$KLOCKED" -eq 1 ] && [ -e "$BAK42" ]; then
+    printf 'print("k2-ok")\n' > "$WD42/k2.py"
+    out=$(run "$WD42" k2.py 2>&1); rc=$?
+    res42=$(getfacl -Rcp --absolute-names "$WD42" 2>/dev/null | grep -c "^user:65534" || true)
+    if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q "检测到上次异常退出" && [ "${res42:-0}" -eq 0 ] && [ ! -e "$BAK42" ]; then
+      echo "[BLOCKED-OK] 8d2 真实 SIGKILL 后 stale 恢复闭环（kill -9 runner → 下次自愈）"; pass=$((pass+1))
+    else
+      echo "[LEAK-FAIL] 8d2 SIGKILL 恢复异常（rc=$rc residue=$res42）"; fail=$((fail+1))
+    fi
+  else
+    echo "[INVALID-FAIL] 8d2 未能进入运行段（备份未落盘），现场未成立"; invalid=$((invalid+1))
+  fi
+
+  # 8e 损坏备份 fail-closed：拒绝执行（容器不启动）、备份保留、exit 79
+  WD5="$ROOT/s4-corrupt"; mkdir -p "$WD5"; printf 'print("x")\n' > "$WD5/x.py"
+  k5="$(printf '%s' "$(realpath -e "$WD5")" | sha256sum | cut -c1-16)"
+  BAK5="${STATE}/${k5}.acl.bak"; SNAP5="${STATE}/${k5}.acl.snap"
+  printf 'not an acl file\n' > "$BAK5"; printf 'garbage\n' > "$SNAP5"
+  out=$(run "$WD5" x.py 2>&1); rc=$?
+  if [ "$rc" -eq 79 ] && [ -e "$BAK5" ] && printf '%s' "$out" | grep -q "SANDBOX-FATAL\[79\]"; then
+    echo "[BLOCKED-OK] 8e 损坏备份 fail-closed（exit 79，备份留存，容器未启动）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8e 恢复失败未保备份/未拒绝（rc=$rc bak=$([ -e "$BAK5" ] && echo y || echo n)）：$out"; fail=$((fail+1))
+  fi
+
+  # 8f 同 workdir 并发：flock -n——第二调用立即 78；首任务正常完成且零残留
+  WD6="$ROOT/s4-conc"; mkdir -p "$WD6"; printf 'import time\ntime.sleep(6)\nprint("c-ok")\n' > "$WD6/c.py"
+  k6="$(printf '%s' "$(realpath -e "$WD6")" | sha256sum | cut -c1-16)"
+  LOCK6="${STATE}/${k6}.lock"
+  ( run "$WD6" c.py > "$TMPD/conc.log" 2>&1 ) & CONC_PID=$!
+  CONFLICT_RC=-1
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if ! flock -n "$LOCK6" true 2>/dev/null; then
+      out2=$(run "$WD6" c.py 2>&1); CONFLICT_RC=$?; break
+    fi
+    sleep 0.5
+  done
+  if [ "$CONFLICT_RC" -eq 78 ] && printf '%s' "$out2" | grep -q "并发冲突"; then
+    echo "[BLOCKED-OK] 8f 同 workdir 并发第二调用立即拒绝（flock -n，exit 78）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8f 并发冲突未被拒（rc=$CONFLICT_RC）：$out2"; fail=$((fail+1))
+  fi
+  wait "$CONC_PID"; conc_rc=$?
+  res6=$(getfacl -Rcp --absolute-names "$WD6" 2>/dev/null | grep -c "^user:65534" || true)
+  if [ "$conc_rc" -eq 0 ] && [ "${res6:-0}" -eq 0 ]; then
+    echo "[POSITIVE-OK] 8f 首任务并发场景下正常完成且整树零残留"
+  else
+    echo "[INVALID-FAIL] 8f 首任务异常（rc=$conc_rc residue=$res6）：$(tail -3 "$TMPD/conc.log")"; invalid=$((invalid+1))
+  fi
+
+  # 8g symlink/fifo 防护：授权与恢复不得波及链接目标（域外文件零 65534），fifo 不炸流程
+  WD7="$ROOT/s4-link"; mkdir -p "$WD7"
+  ln -s "$WD2/m0_marker_zq.txt" "$WD7/leak.txt"
+  mkfifo "$WD7/pipe.fifo" 2>/dev/null || true
+  printf 'print("l-ok")\n' > "$WD7/l.py"; chmod 600 "$WD7/l.py"
+  out=$(run "$WD7" l.py 2>&1); rc=$?
+  tgt=$(getfacl -c --absolute-names "$WD2/m0_marker_zq.txt" 2>/dev/null | grep -c "^user:65534" || true)
+  if [ "$rc" -eq 0 ] && [ "${tgt:-0}" -eq 0 ] && [ -p "$WD7/pipe.fifo" ]; then
+    echo "[BLOCKED-OK] 8g symlink/fifo 防护（链接目标零越界授权；fifo 存活不炸备份/恢复）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8g symlink/fifo 防护异常（rc=$rc 目标65534=$tgt fifo=$([ -p "$WD7/pipe.fifo" ] && echo y || echo n)）"; fail=$((fail+1))
+  fi
+
+  # 8h 容器自建文件后第二次调用：容器产物（65534 属主）不进备份/授权域（-uid 过滤），
+  #     二次调用正常，产物留存可读，恢复零残留
+  WD8="$ROOT/s4-second"; mkdir -p "$WD8"
+  printf 'open("f2.txt","w").write("made-by-container")\nprint("w1-ok")\n' > "$WD8/w.py"; chmod 600 "$WD8/w.py"
+  printf 'print(open("/workdir/f2.txt").read().strip())\n' > "$WD8/r2.py"; chmod 600 "$WD8/r2.py"
+  out=$(run "$WD8" w.py 2>&1); rc=$?
+  out2=$(run "$WD8" r2.py 2>&1); rc2=$?
+  res8=$(getfacl -Rcp --absolute-names "$WD8" 2>/dev/null | grep -c "^user:65534" || true)
+  if [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] && printf '%s' "$out2" | grep -q made-by-container && [ "${res8:-0}" -eq 0 ]; then
+    echo "[BLOCKED-OK] 8h 容器自建文件后二次调用（属主过滤幂等，产物留存，零残留）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8h 二次调用异常（rc=$rc/$rc2 residue=$res8）：$out2"; fail=$((fail+1))
+  fi
+
+  # 8i 任务中删除文件后的恢复：verify 对已删路径跳过（合法变更），不误判 79，删除保持
+  WD9="$ROOT/s4-del"; mkdir -p "$WD9"
+  printf 'import os\nos.remove("/workdir/victim.txt")\nprint("d-ok")\n' > "$WD9/del.py"; chmod 600 "$WD9/del.py"
+  printf 'to-be-deleted\n' > "$WD9/victim.txt"; chmod 600 "$WD9/victim.txt"
+  out=$(run "$WD9" del.py 2>&1); rc=$?
+  if [ "$rc" -eq 0 ] && [ ! -e "$WD9/victim.txt" ]; then
+    echo "[BLOCKED-OK] 8i 任务内删除文件后恢复正常（skip-missing 语义，删除保持，非 79）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8i 删除场景恢复异常（rc=$rc victim=$([ -e "$WD9/victim.txt" ] && echo 存在 || echo 已删)）：$out"; fail=$((fail+1))
+  fi
+
+  # 8j 非零退出 / 超时：容器退出码透传，恢复闭环不受影响
+  WDj="$ROOT/s4-rc"; mkdir -p "$WDj"
+  printf 'import sys\nsys.exit(3)\n' > "$WDj/e3.py"; chmod 600 "$WDj/e3.py"
+  printf 'import time\ntime.sleep(8)\n' > "$WDj/slow.py"; chmod 600 "$WDj/slow.py"
+  out=$(run "$WDj" e3.py 2>&1); rc3=$?
+  resj1=$(getfacl -Rcp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
+  out=$(RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" SANDBOX_TIMEOUT_S=3 \
+        bash m0/sandbox/run_in_sandbox.sh "$WDj" slow.py 2>&1); rcT=$?
+  resj2=$(getfacl -Rcp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
+  if [ "$rc3" -eq 3 ] && [ "${resj1:-0}" -eq 0 ] \
+     && { [ "$rcT" -eq 124 ] || [ "$rcT" -eq 137 ]; } && [ "${resj2:-0}" -eq 0 ]; then
+    echo "[BLOCKED-OK] 8j 非零退出（rc=3）与超时（rc=$rcT）后均恢复闭环零残留"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8j 退出码/恢复异常（rc3=$rc3 rcT=$rcT residue=$resj1/$resj2）"; fail=$((fail+1))
+  fi
+
+  # 8k 既有 ACL/mask 字节级保持：预置 named 条目+限定 mask，全周期后 getfacl -c 全量一致
+  WD10="$ROOT/s4-mask"; mkdir -p "$WD10"
+  printf 'print(open("/workdir/keep.txt").read().strip())\n' > "$WD10/m.py"; chmod 600 "$WD10/m.py"
+  printf 'keep-data\n' > "$WD10/keep.txt"; chmod 600 "$WD10/keep.txt"
+  setfacl -m u:2000:r--,m::r-- "$WD10/keep.txt" 2>/dev/null
+  before=$(getfacl -c --absolute-names "$WD10/keep.txt" 2>/dev/null)
+  out=$(run "$WD10" m.py 2>&1); rc=$?
+  after=$(getfacl -c --absolute-names "$WD10/keep.txt" 2>/dev/null)
+  if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q keep-data && [ "$before" = "$after" ]; then
+    echo "[BLOCKED-OK] 8k 既有 ACL/mask 全量保持（named+mask 字节级一致，含运行期读授权）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8k ACL/mask 漂移（before[$before] after[$after] rc=$rc）"; fail=$((fail+1))
+  fi
+else
+  echo "[SKIP-OS] S4-B1r2 ACL 授权/恢复闭环（win32 无 ACL 语义）"; skipped=$((skipped+1))
 fi
 
 echo "passed=$pass failed=$fail invalid=$invalid skipped=$skipped（fixture 根 $TMPD，退出即清理）"
