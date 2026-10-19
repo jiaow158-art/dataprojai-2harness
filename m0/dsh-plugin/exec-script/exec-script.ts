@@ -167,6 +167,11 @@ function runSandbox(
           ASSETS_DIR: assetsDir,
           SANDBOX_WORKDIR: workdir,
           SANDBOX_INTERPRETER: interpreter,
+          // S4-B1：任务根/资产根/ACL 状态目录经白名单透传给 runner（仅设置时转发；
+          // Windows runner 不消费——uname 非 Linux 整段跳过，零行为变化）
+          ...(process.env.SANDBOX_TASK_ROOTS ? { SANDBOX_TASK_ROOTS: process.env.SANDBOX_TASK_ROOTS } : {}),
+          ...(process.env.SANDBOX_ASSETS_ROOTS ? { SANDBOX_ASSETS_ROOTS: process.env.SANDBOX_ASSETS_ROOTS } : {}),
+          ...(process.env.SANDBOX_ACL_STATE_DIR ? { SANDBOX_ACL_STATE_DIR: process.env.SANDBOX_ACL_STATE_DIR } : {}),
           ...sandboxRunIdEnv(),
         },
       },
