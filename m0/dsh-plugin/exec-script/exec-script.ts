@@ -17,6 +17,7 @@
 
 import { spawn } from 'node:child_process'
 import { access } from 'node:fs/promises'
+import { availableParallelism } from 'node:os'
 import { pathToFileURL } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -36,6 +37,98 @@ function resolveRunnerScript(): string {
   const p = process.env.M0_SANDBOX_RUNNER
   if (!p) throw new Error('M0_SANDBOX_RUNNER is not set in the dsh process environment')
   return p
+}
+
+/** 沙箱资源参数（S4-B1 检查点 B）。
+ *
+ *  只从可信的 DSH 进程环境读取，绝不接受工具参数覆盖。runner 的缺省 MEM 是 2g；
+ *  若此处不显式转发 SANDBOX_MEM，runner 会静默回退到 2g（真实模型复测已实测
+ *  HostConfig.Memory=2 GiB）。因此五项资源变量必须由本插件解析并显式传入。
+ *
+ *  缺失 → 受控默认值（512m / 1 / 64 / 120）；非法或越界 → fail closed（插件加载失败）。
+ *  这样既不会把缺省放大到 runner 的 2g，也不会让错误配置静默生效。
+ */
+interface SandboxResources {
+  mem: string
+  cpus: string
+  pids: string
+  timeoutS: string
+  image: string
+}
+
+const RESOURCE_DEFAULTS = {
+  mem: '512m',
+  cpus: '1',
+  pids: '64',
+  timeoutS: '120',
+} as const
+
+/** 固定可信镜像白名单。模型无法通过工具参数改镜像；环境给白名单外值即 fail closed。 */
+const TRUSTED_SANDBOX_IMAGES = ['dataplat-script:m0'] as const
+
+const MEM_MIN_BYTES = 128 * 1024 * 1024
+const MEM_MAX_BYTES = 2 * 1024 * 1024 * 1024
+const CPUS_MIN = 0.1
+/** CPU 上限跟随宿主并行度，避免静态值在 Windows 开发机/更大 Linux 主机上误拒。 */
+const CPUS_MAX = Math.max(1, availableParallelism())
+const PIDS_MIN = 16
+const PIDS_MAX = 512
+const TIMEOUT_MIN_S = 1
+/** 插件 tool timeout 为 150s；runner 超时必须留在其之前，保留 30s 兜底余量。 */
+const TIMEOUT_MAX_S = 120
+
+function parseMemoryBytes(raw: string): number | null {
+  const m = /^([0-9]+)([bkmg])?$/i.exec(raw.trim())
+  if (!m) return null
+  const n = Number(m[1])
+  if (!Number.isSafeInteger(n) || n <= 0) return null
+  const unit = (m[2] ?? 'b').toLowerCase()
+  const mul = unit === 'b' ? 1 : unit === 'k' ? 1024 : unit === 'm' ? 1024 ** 2 : 1024 ** 3
+  const bytes = n * mul
+  return Number.isSafeInteger(bytes) ? bytes : null
+}
+
+function readResourceEnv(name: string): string {
+  return (process.env[name] ?? '').trim()
+}
+
+/** 解析并校验资源变量；抛错即 fail closed，不启动任何容器。 */
+function resolveSandboxResources(): SandboxResources {
+  const rawMem = readResourceEnv('SANDBOX_MEM')
+  const mem = rawMem || RESOURCE_DEFAULTS.mem
+  const memBytes = parseMemoryBytes(mem)
+  if (memBytes === null || memBytes < MEM_MIN_BYTES || memBytes > MEM_MAX_BYTES) {
+    throw new Error(`m0-exec-script: SANDBOX_MEM "${rawMem || mem}" is invalid or outside [128m, 2g]`)
+  }
+
+  const rawCpus = readResourceEnv('SANDBOX_CPUS')
+  const cpus = rawCpus || RESOURCE_DEFAULTS.cpus
+  const cpusNum = Number(cpus)
+  if (!Number.isFinite(cpusNum) || cpusNum < CPUS_MIN || cpusNum > CPUS_MAX) {
+    throw new Error(`m0-exec-script: SANDBOX_CPUS "${rawCpus || cpus}" is invalid or outside [${CPUS_MIN}, ${CPUS_MAX}]`)
+  }
+
+  const rawPids = readResourceEnv('SANDBOX_PIDS')
+  const pids = rawPids || RESOURCE_DEFAULTS.pids
+  const pidsNum = Number(pids)
+  if (!Number.isSafeInteger(pidsNum) || pidsNum < PIDS_MIN || pidsNum > PIDS_MAX) {
+    throw new Error(`m0-exec-script: SANDBOX_PIDS "${rawPids || pids}" is invalid or outside [${PIDS_MIN}, ${PIDS_MAX}]`)
+  }
+
+  const rawTimeout = readResourceEnv('SANDBOX_TIMEOUT_S')
+  const timeoutS = rawTimeout || RESOURCE_DEFAULTS.timeoutS
+  const timeoutNum = Number(timeoutS)
+  if (!Number.isSafeInteger(timeoutNum) || timeoutNum < TIMEOUT_MIN_S || timeoutNum > TIMEOUT_MAX_S) {
+    throw new Error(`m0-exec-script: SANDBOX_TIMEOUT_S "${rawTimeout || timeoutS}" is invalid or outside [${TIMEOUT_MIN_S}, ${TIMEOUT_MAX_S}]`)
+  }
+
+  const rawImage = readResourceEnv('SANDBOX_IMAGE')
+  const image = rawImage || TRUSTED_SANDBOX_IMAGES[0]
+  if (!(TRUSTED_SANDBOX_IMAGES as readonly string[]).includes(image)) {
+    throw new Error(`m0-exec-script: SANDBOX_IMAGE "${rawImage}" is not in the trusted image allowlist`)
+  }
+
+  return { mem, cpus, pids, timeoutS, image }
 }
 
 /**
@@ -148,6 +241,7 @@ function runSandbox(
   workdir: string,
   resultsDir: string,
   assetsDir: string,
+  resources: SandboxResources,
   script: string,
   args: string[],
   interpreter: string,
@@ -167,6 +261,13 @@ function runSandbox(
           ASSETS_DIR: assetsDir,
           SANDBOX_WORKDIR: workdir,
           SANDBOX_INTERPRETER: interpreter,
+          // S4-B1 检查点 B：资源参数只来自可信 DSH 进程环境（apply 期解析），
+          // 不由工具参数控制。显式传入，避免 runner 的 2g 缺省被静默使用。
+          SANDBOX_MEM: resources.mem,
+          SANDBOX_CPUS: resources.cpus,
+          SANDBOX_PIDS: resources.pids,
+          SANDBOX_TIMEOUT_S: resources.timeoutS,
+          SANDBOX_IMAGE: resources.image,
           // S4-B1：任务根/资产根/ACL 状态目录经白名单透传给 runner（仅设置时转发；
           // Windows runner 不消费——uname 非 Linux 整段跳过，零行为变化）
           ...(process.env.SANDBOX_TASK_ROOTS ? { SANDBOX_TASK_ROOTS: process.env.SANDBOX_TASK_ROOTS } : {}),
@@ -212,6 +313,7 @@ export function apply(ctx: Context) {
   for (const [k, v] of [['M0_SANDBOX_WORKDIR', workdir], ['M0_RESULTS_DIR', resultsDir], ['M0_ASSETS_DIR', assetsDir]] as const) {
     if (!v) throw new Error(`m0-exec-script: ${k} must be set in the dsh process environment`)
   }
+  const resources = resolveSandboxResources()
 
   ctx.tools.register(defineTool({
     name: 'exec_script',
@@ -274,7 +376,7 @@ export function apply(ctx: Context) {
       const interpreter = interpreterOf(args.language)
       await waitForScript(workdir!, args.script, exec.signal)
       const res = await runSandbox(
-        runner, workdir!, resultsDir!, assetsDir!,
+        runner, workdir!, resultsDir!, assetsDir!, resources,
         args.script, args.args ?? [], interpreter, exec.signal,
       )
       if (res.spawnError !== undefined) {
