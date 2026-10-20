@@ -31,7 +31,9 @@ chmod 711 "$TMPD"   # 允许 uid 65534 穿越（不可列目录）：宿主对�
 cleanup() { rm -rf "$TMPD"; }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-ROOT="$TMPD/taskroot"   # S4-B1r2：任务根深度须 ≥4（拒 /srv/dpit/data 级过宽根）——fixture 专门下沉一层
+ROOT="$TMPD/fixture-root/taskroot"   # S4-B1r3：任务根深度须 ≥4（拒 /srv/dpit/data 级过宽根）；
+                                        # Linux 默认 /tmp/tmp.XXXX/taskroot 仅 3 级，故固定再下沉一层
+mkdir -p "$ROOT"
 WD="$ROOT/taskA-workdir"; RES="$ROOT/taskA-results"; WD2="$ROOT/taskB-workdir"; ASSETS="$ROOT/assets"
 if [ "$(uname -s)" = "Linux" ]; then
   # S4-B1r2：runner 需授权任务根（fail closed）；ACL 状态目录走 runner 缺省（任务根下
@@ -180,21 +182,26 @@ if [ "$(uname -s)" = "Linux" ]; then
   ( run "$WD" t7long.py > "$TMPD/t7.log" 2>&1 ) & T7PID=$!
   T7LOCKED=0
   _kA="$(printf '%s' "$(realpath -e "$WD")" | sha256sum | cut -c1-16)"
+  # S4-B1r3 采样时机：runner 先持锁、后备份并授权——须同时观察到「锁被持有 +
+  # uid 65534 已在 workdir 获得读写」才判定，避免授权完成前的毫秒级竞态误报 INVALID。
   for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if ! flock -n "${ROOT}/.sandbox-acl-state/${_kA}.lock" true 2>/dev/null; then T7LOCKED=1; break; fi
+    if ! flock -n "${ROOT}/.sandbox-acl-state/${_kA}.lock" true 2>/dev/null \
+       && sudo -n -u '#65534' test -r "$WD" && sudo -n -u '#65534' test -w "$WD"; then
+      T7LOCKED=1; break
+    fi
     sleep 0.5
   done
-  if [ "$T7LOCKED" -eq 1 ] && sudo -u nobody test -r "$WD" && sudo -u nobody test -w "$WD"; then
+  if [ "$T7LOCKED" -eq 1 ]; then
     echo "[POSITIVE-OK] uid 65534 运行期可读写任务 A workdir（授权对照，闭环保留下）"
   else
     echo "[INVALID-FAIL] uid 65534 运行期对任务 A workdir 无权限——按任务 ACL 授权链异常"; invalid=$((invalid+1))
   fi
   wait "$T7PID"
-  if sudo -u nobody test -r "$WD2"; then
+  if sudo -n -u '#65534' test -r "$WD2"; then
     echo "[LEAK-FAIL] 任务 B 宿主 workdir 可被 uid 65534 读取"; fail=$((fail+1))
-  elif sudo -u nobody test -w "$WD2"; then
+  elif sudo -n -u '#65534' test -w "$WD2"; then
     echo "[LEAK-FAIL] 任务 B 宿主 workdir 可被 uid 65534 写入"; fail=$((fail+1))
-  elif sudo -u nobody sh -c "printf x > '$WD2/uid_leak.txt'" 2>/dev/null; then
+  elif sudo -n -u '#65534' sh -c "printf x > '$WD2/uid_leak.txt'" 2>/dev/null; then
     echo "[LEAK-FAIL] 任务 B 宿主 workdir 实际写入成功"; fail=$((fail+1))
   else
     echo "[BLOCKED-OK] 任务 B 宿主 workdir：uid 65534 读写均拒（UID/ACL 隔离）"; pass=$((pass+1))
@@ -221,8 +228,8 @@ fi
 #    深度<4） · 8c3/8c4 根外 assets 拒绝与 SANDBOX_ASSETS_ROOTS 授权面 · 8d stale 备份恢复
 #    闭环（伪造现场） · 8d2 真实 SIGKILL 后 stale 恢复 · 8e 损坏备份 fail-closed（79+保备份+
 #    不启容器） · 8f 同 workdir 并发（flock -n 直接 78）· 8g symlink/fifo 防护 ·
-#    8h 容器自建文件后二次调用 · 8i 任务中删除文件后恢复 · 8j 非零退出/超时后恢复 ·
-#    8k 既有 ACL/mask 字节级保持。
+#    8h 容器自建文件后二次调用 · 8i 任务中删除文件后恢复 · 8i2 非删除恢复错误不被吞 ·
+#    8i3 任务期换入符号链接拒绝跟随 · 8j 非零退出/超时后恢复 · 8k 既有 ACL/mask 字节级保持。
 if [ "$(uname -s)" = "Linux" ]; then
   STATE="${ROOT}/.sandbox-acl-state"   # runner 缺省状态目录（任务根下）
   # 8a 阳性：0600 脚本 + 0700 嵌套子目录 + 0600 多文件依赖，容器内可读可执行（修复目标）
@@ -241,8 +248,8 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
 
   # 8b 恢复正确性：workdir 整树 + results/assets 目录 零 u:65534 残留；模式位不变
-  residue=$(getfacl -Rcp --absolute-names "$WD3" 2>/dev/null | grep -c "^user:65534" || true)
-  residue_ra=$(getfacl -c --absolute-names "$RES" "$ASSETS" 2>/dev/null | grep -c "^user:65534" || true)
+  residue=$(getfacl -Rncp --absolute-names "$WD3" 2>/dev/null | grep -c "^user:65534" || true)
+  residue_ra=$(getfacl -ncp --absolute-names "$RES" "$ASSETS" 2>/dev/null | grep -c "^user:65534" || true)
   m_root=$(stat -c %a "$WD3"); m_sub=$(stat -c %a "$WD3/sub"); m_f=$(stat -c %a "$WD3/r.py")
   if [ "${residue:-0}" -eq 0 ] && [ "${residue_ra:-0}" -eq 0 ] \
      && [ "$m_root" = "700" ] && [ "$m_sub" = "700" ] && [ "$m_f" = "600" ]; then
@@ -262,8 +269,11 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
   rm -rf "$OUT8"
 
-  # 8c2 过宽任务根配置拒绝："/"（黑名单）与 "$TMPD"（深度 3 <4）均须 exit 78
-  for badroot in "/" "$TMPD"; do
+  # 8c2 过宽任务根配置拒绝："/"（黑名单）与「深度 3 的现存在祖先」（深度规则）均须 exit 78
+  # ——候选根由 fixture 根逐级上溯计算，不依赖 TMPDIR 的实际深度（S4-B1r3）
+  SHALLOW="$ROOT"
+  while [ "$(printf '%s' "$SHALLOW" | tr -cd '/' | wc -c)" -ge 4 ]; do SHALLOW="$(dirname "$SHALLOW")"; done
+  for badroot in "/" "$SHALLOW"; do
     out=$(RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" SANDBOX_TASK_ROOTS="$badroot" \
           bash m0/sandbox/run_in_sandbox.sh "$WD3" r.py 2>&1); rc=$?
     if [ "$rc" -eq 78 ] && printf '%s' "$out" | grep -q "非法任务根"; then
@@ -274,7 +284,11 @@ if [ "$(uname -s)" = "Linux" ]; then
   done
 
   # 8c3 根外 assets 拒绝：assets 指向任务根外且未配 SANDBOX_ASSETS_ROOTS → 78
-  AST_BASE=$(mktemp -d "${TMPDIR:-/tmp}/s2b-assets-XXXXXX"); AST_OUT="$AST_BASE/v1"; mkdir -p "$AST_OUT"
+  # S4-B1r3：可信资产根同样受「深度≥4」校验——fixture 收拢在 TMPD 单一根下
+  # （EXIT trap 兜底），同时位于任务根 ROOT 之外，保持 8c3 拒绝 / 8c4 放行语义。
+  AST_TMP=$(mktemp -d "$TMPD/s2b-assets-XXXXXX")
+  AST_BASE="$AST_TMP/ext-assets-root"; AST_OUT="$AST_BASE/v1"; mkdir -p "$AST_OUT"
+  chmod 700 "$AST_TMP" "$AST_BASE"
   out=$(RESULTS_DIR="$RES" ASSETS_DIR="$AST_OUT" bash m0/sandbox/run_in_sandbox.sh "$WD3" r.py 2>&1); rc=$?
   if [ "$rc" -eq 78 ] && printf '%s' "$out" | grep -q "SANDBOX_ASSETS_ROOTS/SANDBOX_TASK_ROOTS"; then
     echo "[BLOCKED-OK] 8c3 根外 assets 拒绝（exit 78，容器未启动）"; pass=$((pass+1))
@@ -290,7 +304,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   else
     echo "[LEAK-FAIL] 8c4 资产根授权异常（rc=$rc）：$out"; fail=$((fail+1))
   fi
-  rm -rf "$AST_BASE"
+  rm -rf "$AST_TMP"
 
   # 8d stale 备份闭环（伪造「已授权后被 SIGKILL」现场：树上残留 65534 + 备份对留存）
   WD4="$ROOT/s4-stale"; mkdir -p "$WD4"; printf 'print("stale-ok")\n' > "$WD4/g.py"
@@ -305,7 +319,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   } > "$SNAP4"
   setfacl -m u:65534:rwx "$WD4" 2>/dev/null   # 伪造授权残留
   out=$(run "$WD4" g.py 2>&1); rc=$?
-  res4=$(getfacl -Rcp --absolute-names "$WD4" 2>/dev/null | grep -c "^user:65534" || true)
+  res4=$(getfacl -Rncp --absolute-names "$WD4" 2>/dev/null | grep -c "^user:65534" || true)
   if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q "检测到上次异常退出" && [ "${res4:-0}" -eq 0 ] && [ ! -e "$BAK4" ]; then
     echo "[BLOCKED-OK] 8d stale 备份恢复闭环（基线还原→重授权→运行→恢复→清备份）"; pass=$((pass+1))
   else
@@ -327,7 +341,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   if [ "$KLOCKED" -eq 1 ] && [ -e "$BAK42" ]; then
     printf 'print("k2-ok")\n' > "$WD42/k2.py"
     out=$(run "$WD42" k2.py 2>&1); rc=$?
-    res42=$(getfacl -Rcp --absolute-names "$WD42" 2>/dev/null | grep -c "^user:65534" || true)
+    res42=$(getfacl -Rncp --absolute-names "$WD42" 2>/dev/null | grep -c "^user:65534" || true)
     if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q "检测到上次异常退出" && [ "${res42:-0}" -eq 0 ] && [ ! -e "$BAK42" ]; then
       echo "[BLOCKED-OK] 8d2 真实 SIGKILL 后 stale 恢复闭环（kill -9 runner → 下次自愈）"; pass=$((pass+1))
     else
@@ -354,7 +368,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   k6="$(printf '%s' "$(realpath -e "$WD6")" | sha256sum | cut -c1-16)"
   LOCK6="${STATE}/${k6}.lock"
   ( run "$WD6" c.py > "$TMPD/conc.log" 2>&1 ) & CONC_PID=$!
-  CONFLICT_RC=-1
+  CONFLICT_RC=-1; out2=""   # S4-B1r3：未采样到锁时也保持 set -u 下可诊断
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     if ! flock -n "$LOCK6" true 2>/dev/null; then
       out2=$(run "$WD6" c.py 2>&1); CONFLICT_RC=$?; break
@@ -367,7 +381,7 @@ if [ "$(uname -s)" = "Linux" ]; then
     echo "[LEAK-FAIL] 8f 并发冲突未被拒（rc=$CONFLICT_RC）：$out2"; fail=$((fail+1))
   fi
   wait "$CONC_PID"; conc_rc=$?
-  res6=$(getfacl -Rcp --absolute-names "$WD6" 2>/dev/null | grep -c "^user:65534" || true)
+  res6=$(getfacl -Rncp --absolute-names "$WD6" 2>/dev/null | grep -c "^user:65534" || true)
   if [ "$conc_rc" -eq 0 ] && [ "${res6:-0}" -eq 0 ]; then
     echo "[POSITIVE-OK] 8f 首任务并发场景下正常完成且整树零残留"
   else
@@ -380,7 +394,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   mkfifo "$WD7/pipe.fifo" 2>/dev/null || true
   printf 'print("l-ok")\n' > "$WD7/l.py"; chmod 600 "$WD7/l.py"
   out=$(run "$WD7" l.py 2>&1); rc=$?
-  tgt=$(getfacl -c --absolute-names "$WD2/m0_marker_zq.txt" 2>/dev/null | grep -c "^user:65534" || true)
+  tgt=$(getfacl -ncp --absolute-names "$WD2/m0_marker_zq.txt" 2>/dev/null | grep -c "^user:65534" || true)
   if [ "$rc" -eq 0 ] && [ "${tgt:-0}" -eq 0 ] && [ -p "$WD7/pipe.fifo" ]; then
     echo "[BLOCKED-OK] 8g symlink/fifo 防护（链接目标零越界授权；fifo 存活不炸备份/恢复）"; pass=$((pass+1))
   else
@@ -394,7 +408,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   printf 'print(open("/workdir/f2.txt").read().strip())\n' > "$WD8/r2.py"; chmod 600 "$WD8/r2.py"
   out=$(run "$WD8" w.py 2>&1); rc=$?
   out2=$(run "$WD8" r2.py 2>&1); rc2=$?
-  res8=$(getfacl -Rcp --absolute-names "$WD8" 2>/dev/null | grep -c "^user:65534" || true)
+  res8=$(getfacl -Rncp --absolute-names "$WD8" 2>/dev/null | grep -c "^user:65534" || true)
   if [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] && printf '%s' "$out2" | grep -q made-by-container && [ "${res8:-0}" -eq 0 ]; then
     echo "[BLOCKED-OK] 8h 容器自建文件后二次调用（属主过滤幂等，产物留存，零残留）"; pass=$((pass+1))
   else
@@ -412,15 +426,55 @@ if [ "$(uname -s)" = "Linux" ]; then
     echo "[LEAK-FAIL] 8i 删除场景恢复异常（rc=$rc victim=$([ -e "$WD9/victim.txt" ] && echo 存在 || echo 已删)）：$out"; fail=$((fail+1))
   fi
 
+  # 8i2 非删除类恢复错误不得被吞：容器把基线文件替换为 uid 65534 属主文件后，
+  #     dp-user 无法对该路径 setfacl → 必须 79 且保留备份（与 8i 的合法删除区分）
+  WD9b="$ROOT/s4-del-err"; mkdir -p "$WD9b"
+  printf 'import os\nos.remove("/workdir/victim2.txt")\nopen("/workdir/victim2.txt","w").write("container-owned")\nprint("r-ok")\n' > "$WD9b/repl.py"
+  chmod 600 "$WD9b/repl.py"
+  printf 'baseline\n' > "$WD9b/victim2.txt"; chmod 600 "$WD9b/victim2.txt"
+  out=$(run "$WD9b" repl.py 2>&1); rc=$?
+  k9b="$(printf '%s' "$(realpath -e "$WD9b")" | sha256sum | cut -c1-16)"
+  BAK9b="${STATE}/${k9b}.acl.bak"; SNAP9b="${STATE}/${k9b}.acl.snap"
+  if [ "$rc" -eq 79 ] && [ -e "$BAK9b" ] && [ -e "$SNAP9b" ] \
+     && printf '%s' "$out" | grep -q "setfacl --restore 失败"; then
+    echo "[BLOCKED-OK] 8i2 非删除类恢复错误不被吞（exit 79，备份+报错留存）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8i2 恢复错误被吞/未保留备份（rc=$rc bak=$([ -e "$BAK9b" ] && echo y || echo n)）：$out"; fail=$((fail+1))
+  fi
+
+  # 8i3 任务期把备份域内目录换成指向域外的符号链接：setfacl --restore 默认会跟随
+  #     （实测 leaf 与父目录链接都会改写目标 ACL）——runner 必须拒绝跟随、exit 79、
+  #     备份留存，且域外目标 ACL 字节级不变。
+  WD9c="$ROOT/s4-symswap"; mkdir -p "$WD9c/sub"
+  TGT9c="$TMPD/outside-target"; mkdir -p "$TGT9c"
+  printf 'outside-original\n' > "$TGT9c/dep.txt"; chmod 600 "$TGT9c/dep.txt"
+  setfacl -m u:2000:r-- "$TGT9c/dep.txt" 2>/dev/null
+  printf 'workdir-original\n' > "$WD9c/sub/dep.txt"; chmod 600 "$WD9c/sub/dep.txt"
+  setfacl -m u:2001:r-- "$WD9c/sub/dep.txt" 2>/dev/null
+  printf 'import os, shutil\nshutil.rmtree("/workdir/sub")\nos.symlink("%s", "/workdir/sub")\nprint("s-ok")\n' \
+    "$TGT9c" > "$WD9c/swap.py"
+  chmod 600 "$WD9c/swap.py"
+  before9c=$(getfacl -ncp --absolute-names "$TGT9c/dep.txt" 2>/dev/null)
+  out=$(run "$WD9c" swap.py 2>&1); rc=$?
+  after9c=$(getfacl -ncp --absolute-names "$TGT9c/dep.txt" 2>/dev/null)
+  k9c="$(printf '%s' "$(realpath -e "$WD9c")" | sha256sum | cut -c1-16)"
+  BAK9c="${STATE}/${k9c}.acl.bak"
+  if [ "$rc" -eq 79 ] && [ -e "$BAK9c" ] && [ "$before9c" = "$after9c" ] \
+     && printf '%s' "$out" | grep -q "拒绝跟随"; then
+    echo "[BLOCKED-OK] 8i3 任务期换入符号链接不跟随（exit 79，域外 ACL 零变更，备份留存）"; pass=$((pass+1))
+  else
+    echo "[LEAK-FAIL] 8i3 符号链接跟随/域外 ACL 变更（rc=$rc bak=$([ -e "$BAK9c" ] && echo y || echo n) target_changed=$([ "$before9c" = "$after9c" ] && echo n || echo y)）：$out"; fail=$((fail+1))
+  fi
+
   # 8j 非零退出 / 超时：容器退出码透传，恢复闭环不受影响
   WDj="$ROOT/s4-rc"; mkdir -p "$WDj"
   printf 'import sys\nsys.exit(3)\n' > "$WDj/e3.py"; chmod 600 "$WDj/e3.py"
   printf 'import time\ntime.sleep(8)\n' > "$WDj/slow.py"; chmod 600 "$WDj/slow.py"
   out=$(run "$WDj" e3.py 2>&1); rc3=$?
-  resj1=$(getfacl -Rcp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
+  resj1=$(getfacl -Rncp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
   out=$(RESULTS_DIR="$RES" ASSETS_DIR="$ASSETS" SANDBOX_TIMEOUT_S=3 \
         bash m0/sandbox/run_in_sandbox.sh "$WDj" slow.py 2>&1); rcT=$?
-  resj2=$(getfacl -Rcp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
+  resj2=$(getfacl -Rncp --absolute-names "$WDj" 2>/dev/null | grep -c "^user:65534" || true)
   if [ "$rc3" -eq 3 ] && [ "${resj1:-0}" -eq 0 ] \
      && { [ "$rcT" -eq 124 ] || [ "$rcT" -eq 137 ]; } && [ "${resj2:-0}" -eq 0 ]; then
     echo "[BLOCKED-OK] 8j 非零退出（rc=3）与超时（rc=$rcT）后均恢复闭环零残留"; pass=$((pass+1))

@@ -192,7 +192,9 @@ if [ "$(uname -s)" = "Linux" ]; then
       echo "SANDBOX-FATAL[78]: 状态文件为符号链接（疑似劫持）：${_f}——拒绝执行" >&2; exit 78
     fi
   done
-  exec 9>>"${ACL_LOCK}" 2>/dev/null \
+  # 注意：不得写成 `exec 9>>file 2>/dev/null`——exec 的 stderr 重定向会永久作用于当前
+  # shell，吞掉其后所有 ACL 报错（S4-B1r3 定位）。打开失败由 bash 自身报错 + 下面兜底。
+  exec 9>>"${ACL_LOCK}" \
     || { echo "SANDBOX-FATAL[78]: 任务锁文件不可写：${ACL_LOCK}" >&2; exit 78; }
   # 非阻塞：同 workdir 已有在跑任务（持锁）→ 立即拒绝，不等待（在跑任务 ACL 不可被
   # 第三方触碰；stale 判定亦以持锁为前提——持锁后发现的备份必为前次 SIGKILL 残留）。
@@ -245,8 +247,75 @@ if [ "$(uname -s)" = "Linux" ]; then
       && [ "$(head -n 1 "${ACL_SNAP}" | cut -f 1)" = "${WD_REAL}" ]
   }
   acl_rollback() { # 恢复（覆盖 workdir 树 + results/assets）+ 全量校验 + 清备份
-    setfacl --restore="${ACL_BAK}" 2>/dev/null && acl_verify "${ACL_SNAP}" \
-      && rm -f "${ACL_BAK}" "${ACL_SNAP}" && return 0
+    # S4-B1r3：任务期间被合法删除的路径必须从 restore 清单剔除（否则 setfacl --restore
+    # 对缺失路径返回非零 → 误判 79）；其余任何恢复错误仍返回失败（不吞）。
+    # 安全：任务可写 workdir，若把备份域内路径/父目录换成符号链接，setfacl --restore
+    # 默认会跟随并把 ACL 应用到域外（实测）。故仅纳入「路径身份未变 + 位于授权域」
+    # 的现有条目；发现换链/越域条目即跳过并整体按失败（79）处理，绝不跟随。
+    local filtered="${ACL_BAK}.restore.$$" errf="${ACL_BAK}.restore.err.$$" cur="" buf="" line rc=0 bad=0
+
+    _emit_restore_section() { # 读取 cur/buf/bad（bash 动态作用域）
+      [ -n "${cur}" ] || return 0
+      if [ ! -e "${cur}" ]; then
+        return 0   # 任务期间合法删除：不恢复、不报错
+      fi
+      local rr in_domain=0
+      rr="$(realpath -m -- "${cur}" 2>/dev/null)" \
+        || { echo "SANDBOX: ACL 恢复路径不可解析（拒绝）：${cur}" >&2; bad=1; return 0; }
+      if [ "${rr}" != "${cur}" ] || [ -L "${cur}" ] || { [ ! -f "${cur}" ] && [ ! -d "${cur}" ]; }; then
+        echo "SANDBOX: ACL 恢复路径已变为符号链接/非普通文件（拒绝跟随）：${cur} -> ${rr}" >&2
+        bad=1
+        return 0
+      fi
+      if [ "${cur}" = "${RES_REAL}" ] || [ "${cur}" = "${AST_REAL}" ]; then
+        in_domain=1
+      else
+        case "${cur}" in "${WD_REAL}"|"${WD_REAL}"/*) in_domain=1 ;; esac
+      fi
+      if [ "${in_domain}" -ne 1 ]; then
+        echo "SANDBOX: ACL 恢复路径越出任务域（拒绝）：${cur}" >&2
+        bad=1
+        return 0
+      fi
+      printf '%s\n\n' "${buf}" >> "${filtered}"
+    }
+
+    [ -f "${ACL_BAK}" ] || return 1
+    : > "${filtered}" || return 1
+    while IFS= read -r line || [ -n "${line}" ]; do
+      case "${line}" in
+        "# file: "*)
+          _emit_restore_section
+          cur="${line#\# file: }"; buf="${line}"
+          ;;
+        "")
+          _emit_restore_section
+          cur=""; buf=""
+          ;;
+        *) buf="${buf}
+${line}" ;;
+      esac
+    done < "${ACL_BAK}"
+    _emit_restore_section
+    # S4-B1r3：只跳过「已合法删除」的路径；setfacl 的其余任何失败都必须显式上报，
+    # 不得再以 2>/dev/null 吞掉（否则真实恢复缺陷会被误当成 79 静默保留）。
+    if [ -s "${filtered}" ]; then
+      setfacl --restore="${filtered}" 2>"${errf}" || rc=$?
+    fi
+    if [ "${bad}" -eq 0 ] && [ "${rc}" -eq 0 ] && acl_verify "${ACL_SNAP}"; then
+      rm -f "${filtered}" "${errf}" "${ACL_BAK}" "${ACL_SNAP}"
+      return 0
+    fi
+    if [ "${bad}" -ne 0 ]; then
+      echo "SANDBOX: 恢复清单含换链/越域条目——按失败处理（备份保留，未跟随符号链接）" >&2
+    fi
+    if [ "${rc}" -ne 0 ]; then
+      echo "SANDBOX: setfacl --restore 失败（退出码 ${rc}）——恢复清单 ${filtered}" >&2
+      if [ -s "${errf}" ]; then
+        while IFS= read -r line; do printf '  setfacl: %s\n' "${line}" >&2; done < "${errf}"
+      fi
+    fi
+    rm -f "${filtered}" "${errf}"
     return 1
   }
 
@@ -283,6 +352,8 @@ if [ "$(uname -s)" = "Linux" ]; then
   fi
   ACL_GRANTED=1
 fi
+# 9>&-：锁 fd 只由本 runner 持有；否则 SIGKILL 后孤儿 timeout/docker 继承该 fd，
+# flock 会随打开文件描述延续到孤儿退出，令下一次 stale 恢复被并发检查（78）挡住（S4-B1r3）。
 timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   --network none \
   --read-only \
@@ -293,8 +364,8 @@ timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
   -v "$(winpath "${MOUNT_WD}"):/workdir" \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
   -w /workdir \
-  "${IMAGE}" "${INTERP}" "${SCRIPT_PATH}" "$@" || RC=$?
-docker rm -f "${CNAME}" >/dev/null 2>&1 || true
+  "${IMAGE}" "${INTERP}" "${SCRIPT_PATH}" "$@" 9>&- || RC=$?
+docker rm -f "${CNAME}" >/dev/null 2>&1 9>&- || true
 if [ "${RC}" -eq 124 ] || [ "${RC}" -eq 137 ]; then
   echo "SANDBOX: exit ${RC} — SANDBOX_TIMEOUT_S=${TMO}s 超时被杀（或容器 OOM），容器已强制清理" >&2
 fi
