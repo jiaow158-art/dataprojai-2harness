@@ -13,6 +13,7 @@
 //   SKILLS_DIR             Skills 根目录（必填）
 //   GATEWAY_REPORTS_DIR    发布树根 <GATEWAY_REPORTS_DIR>/<user>/<run_id>.html（必填）
 //   GW_DB_PATH             SQLite 路径（默认 ./gateway.db）
+//   DSH_PROFILE            DSH profile（sdk|sdk-s4b，默认 sdk；仅服务端 env）
 //   TASK_BUDGET_S          跨 attempt 总预算（默认 1800）
 //   MAX_REPAIR_ROUNDS      基础设施故障 attempt 上限（默认 3）
 import Database from "better-sqlite3";
@@ -20,6 +21,7 @@ import { resolve } from "node:path";
 import { TaskStore } from "../store/task-store.ts";
 import { TaskRunner } from "../orchestrator/task-runner.ts";
 import { DshBackend } from "../backends/dsh-backend.ts";
+import { resolveDshProfile } from "../config/dsh-profile.ts";
 import { WorkerPool } from "./worker-pool.ts";
 import { createHttpServer } from "./http.ts";
 import { randomUUID } from "node:crypto";
@@ -38,6 +40,10 @@ function requiredEnv(name: string): string {
   return v;
 }
 
+// S4-B2-B1：profile 只来自可信服务端 env。必须在打开 SQLite / 监听端口之前失败，
+// 非法值不得产生 DB 文件或半启动服务。缺省/空串 = sdk（Windows 现有行为不变）。
+const dshProfile = resolveDshProfile(process.env);
+
 // ── 建库 + WAL（T4 审查 Minor-3：WAL 断言——读回 journal_mode 必须 'wal'）──────────
 const dbPath = process.env.GW_DB_PATH || "./gateway.db";
 const db = new Database(resolve(dbPath));
@@ -50,7 +56,7 @@ if (journalMode !== "wal") {
 const store = new TaskStore(db);
 
 // ── 执行层组装：DshBackend → TaskRunner 工厂（池的注入点）──────────────────────────
-const backend = new DshBackend();
+const backend = new DshBackend({ profile: dshProfile });
 const runnerPaths = {
   workroot: requiredEnv("GW_WORKROOT"),
   resultsRoot: process.env.GW_RESULTS_ROOT || resolve(requiredEnv("GW_WORKROOT"), "results"),
@@ -99,7 +105,7 @@ pool.start();
 const gatewayPort = envInt("GATEWAY_PORT", 8080);
 const gatewayHost = process.env.GATEWAY_HOST;
 const onListening = () => {
-  console.log(`[gateway] listening on ${gatewayHost ? `${gatewayHost}:${gatewayPort}` : `:${gatewayPort}`} db=${dbPath} workroot=${runnerPaths.workroot}`);
+  console.log(`[gateway] listening on ${gatewayHost ? `${gatewayHost}:${gatewayPort}` : `:${gatewayPort}`} db=${dbPath} workroot=${runnerPaths.workroot} dsh_profile=${dshProfile}`);
 };
 if (gatewayHost) server.listen(gatewayPort, gatewayHost, onListening);
 else server.listen(gatewayPort, onListening);

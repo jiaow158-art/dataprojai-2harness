@@ -14,12 +14,10 @@
 // （DWS_PASSWORD 明文）。stderr 只进内存环形缓冲（尾 4KB），任何输出前 sanitize
 // （已知密钥值 → ***，另加 KEY=value 形态兜底），绝不原样外传。
 //
-// spawn env 全量注入清单（S3 spike 失败归因：少一个 M0_* 变量 → m0-exec-script
-// 插件树加载失败 → initialize 报 -32603 inactive context）：
-//   M0_SANDBOX_RUNNER / M0_SANDBOX_WORKDIR / M0_RESULTS_DIR / M0_ASSETS_DIR /
-//   M0_PROJECT_SKILL_DIR / RESULT_DIR / DWS_USER / DWS_PASSWORD / DEEPSEEK_API_KEY
-// 客户端不组装这份清单（职责在 DshBackend），但以 REQUIRED_ENV_KEYS 导出供
-// backend 组装与单测断言。
+// spawn env 契约（S4-B2-B1）：DshBackend 使用 dsh-env.ts 的继承白名单 + 显式注入。
+// REQUIRED_ENV_KEYS 是 sdk profile 的完整集合（含 DWS_USER/DWS_PASSWORD）；sdk-s4b
+// 只要求公共子集（无 DWS_*）。少一个 M0_* 变量 → m0-exec-script 插件树加载失败 →
+// initialize 报 -32603 inactive context。
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { spawnSync } from "node:child_process";

@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { normalize } from "./dsh-events.ts";
 import { DshSdkClient, REQUIRED_ENV_KEYS, SdkPromptError } from "./dsh-sdk-client.ts";
-import { DshBackend, type SessionOpts } from "./dsh-backend.ts";
+import { DshBackend, type EngineSession, type SessionOpts } from "./dsh-backend.ts";
 import { resolveDbAccount } from "../config/db-accounts.ts";
 import type { ChildProcess } from "node:child_process";
 
@@ -313,14 +313,16 @@ test("stderr 消毒：DWS_PASSWORD/DEEPSEEK_API_KEY 值在环形缓冲与输出�
 });
 
 // ── 6. createSession：目录 + env（resolveDbAccount 集成）+ historyPrefix + sessionId 唯一 ──
-const ENV_KEYS = ["DWS_RUN_USER", "DWS_RUN_PASSWORD", "DEEPSEEK_API_KEY"] as const;
+const ENV_KEYS = ["DWS_RUN_USER", "DWS_RUN_PASSWORD", "DEEPSEEK_API_KEY", "DSH_PROFILE"] as const;
 let savedEnv: Record<string, string | undefined>;
 beforeEach(() => {
   savedEnv = {};
   for (const k of ENV_KEYS) { savedEnv[k] = process.env[k]; }
-  process.env.DWS_RUN_USER = "dws_readonly";
+  process.env.DWS_RUN_USER = "aiuser";
   process.env.DWS_RUN_PASSWORD = "run-pass-77";
   process.env.DEEPSEEK_API_KEY = "sk-live";
+  // 既有 sdk 语义测试不受外部 DSH_PROFILE 影响
+  process.env.DSH_PROFILE = "sdk";
 });
 afterEach(() => {
   for (const k of ENV_KEYS) {
@@ -372,7 +374,7 @@ test("createSession：建目录 + env 全量注入（REQUIRED_ENV_KEYS）+ DWS �
       assert.ok(opts.env[k] !== undefined, `env 缺 ${k}`);
     }
     assert.equal(opts.env.DWS_PASSWORD, "run-pass-77"); // 经 db.passwordEnv（DWS_RUN_PASSWORD）
-    assert.equal(opts.env.DWS_USER, "dws_readonly");    // 经 resolveDbAccount
+    assert.equal(opts.env.DWS_USER, "aiuser");    // 经 resolveDbAccount（固定账号阶段）
     assert.equal(opts.env.DEEPSEEK_API_KEY, "sk-live");
     assert.equal(opts.env.M0_SANDBOX_WORKDIR, join(root, "sess-001", "workdir"));
     assert.equal(opts.env.M0_RESULTS_DIR, join(root, "sess-001", "results"));
@@ -524,5 +526,313 @@ test("createSession：缺 DWS_RUN_PASSWORD → CONFIG 快败（不 spawn）", as
     await assert.rejects(backend.createSession(makeSessionOpts(root, root)), /DWS_RUN_PASSWORD not set/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sdk：DWS_RUN_PASSWORD 缺失时不回退到父进程 DWS_PASSWORD", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-no-fallback-"));
+  try {
+    const backend = new DshBackend({
+      profile: "sdk",
+      sourceEnv: {
+        ...SOURCE_ENV,
+        DWS_RUN_PASSWORD: undefined,
+        DWS_PASSWORD: "parent-only-password-must-not-be-used",
+      },
+      spawnFn: () => { throw new Error("must not spawn"); },
+    });
+    await assert.rejects(
+      backend.createSession(sourceSessionOpts(root)),
+      /DWS_RUN_PASSWORD not set/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ── 8. S4-B2-B1：profile 选择 + DSH env 白名单（sourceEnv 单测隔离）─────────────
+function sourceSessionOpts(root: string): SessionOpts {
+  return {
+    ...makeSessionOpts(root, root),
+    // 不依赖进程 env 的 resolveDbAccount 结果；凭据由 sourceEnv 提供
+    db: { user: "aiuser", passwordEnv: "DWS_RUN_PASSWORD", note: "test" },
+  };
+}
+
+const SOURCE_ENV: NodeJS.ProcessEnv = {
+  PATH: "/usr/local/bin:/usr/bin:/bin",
+  HOME: "/verify/b2a/home",
+  LANG: "C.UTF-8",
+  TMPDIR: "/verify/b2a/tmp",
+  SystemRoot: "C:\\Windows",
+  ComSpec: "C:\\Windows\\System32\\cmd.exe",
+  PATHEXT: ".COM;.EXE;.BAT;.CMD",
+  USERPROFILE: "C:\\Users\\dpit",
+  APPDATA: "C:\\Users\\dpit\\AppData\\Roaming",
+  LOCALAPPDATA: "C:\\Users\\dpit\\AppData\\Local",
+  DSH_HOME: "/verify/b2a/dsh-home",
+  DSH_AGENTS_HOME: "/verify/b2a/agents-home",
+  MCP_PYTHON: "/srv/dpit/apps/harness/.venv/bin/python",
+  M0_SANDBOX_BASH: "/bin/bash",
+  SANDBOX_TASK_ROOTS: "/verify/b2a/tasks",
+  SANDBOX_ASSETS_ROOTS: "/verify/b2a/assets",
+  SANDBOX_ACL_STATE_DIR: "/verify/b2a/acl-state",
+  SANDBOX_MEM: "512m",
+  SANDBOX_CPUS: "1",
+  SANDBOX_PIDS: "64",
+  SANDBOX_TIMEOUT_S: "120",
+  SANDBOX_IMAGE: "dataplat-script:m0",
+  DWS_RUN_USER: "aiuser",
+  DWS_RUN_PASSWORD: "run-pass-placeholder",
+  DWS_PASSWORD: "parent-dws-password-must-not-leak",
+  DEEPSEEK_API_KEY: "deepseek-test-placeholder",
+  AUTH_TOKEN: "auth-test-token-must-not-leak",
+  NODE_OPTIONS: "--require=/tmp/evil.js",
+  NODE_PATH: "/tmp/evil-node-modules",
+  LD_PRELOAD: "/tmp/evil.so",
+  BASH_ENV: "/tmp/evil-bash-env",
+  GW_DB_PATH: "/verify/b2a/gateway.db",
+  DSH_PROFILE: "sdk-s4b", // sdk-s4b 显式 profile 下，证明显式参数优先且不进入子 env
+  M0_SANDBOX_RUNNER: "/tmp/evil-runner.sh",
+  M0_PROJECT_SKILL_DIR: "/tmp/evil-skills",
+  SANDBOX_RUN_ID: "evil-run-id",
+  SANDBOX_ATTEMPT: "999",
+};
+
+async function driveToSpawn(
+  session: EngineSession,
+  children: FakeChild[],
+): Promise<{ collected: any[]; done: Promise<void> }> {
+  const collected: any[] = [];
+  const done = (async () => {
+    for await (const ev of session.ask("q")) collected.push(ev);
+  })();
+  await waitFor(() => children.length >= 1 && childWrites(children[0]).some((f) => f.method === "initialize"), 3000, "initialize 帧");
+  return { collected, done };
+}
+
+test("DshBackend：sdk + aiuser 允许进入会话创建", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-fixed-ok-"));
+  try {
+    const backend = new DshBackend({
+      profile: "sdk",
+      sourceEnv: SOURCE_ENV,
+      spawnFn: () => { throw new Error("createSession must not spawn"); },
+    });
+    const session = await backend.createSession(sourceSessionOpts(root));
+    assert.ok(session);
+    assert.ok(existsSync(join(root, "sess-001", "workdir")));
+    assert.ok(existsSync(join(root, "sess-001", "results")));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("DshBackend：sdk + 非 aiuser → CONFIG 拒绝，不读密码、不建目录、不 spawn", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-fixed-bad-"));
+  const savedUser = process.env.DWS_RUN_USER;
+  process.env.DWS_RUN_USER = "other_db_user";
+  try {
+    let spawnCount = 0;
+    const backend = new DshBackend({
+      profile: "sdk",
+      sourceEnv: { ...SOURCE_ENV, DWS_RUN_USER: "other_db_user" },
+      spawnFn: () => {
+        spawnCount++;
+        throw new Error("must not spawn");
+      },
+    });
+    const opts = { ...makeSessionOpts(root, root), db: resolveDbAccount("default") };
+    assert.equal(opts.db.user, "other_db_user");
+
+    await assert.rejects(backend.createSession(opts), (err: unknown) => {
+      assert.ok(err instanceof Error);
+      assert.match(err.message, /\[CONFIG\] sdk profile mcp-dws is fixed to DWS_USER="aiuser"/);
+      assert.match(err.message, /other_db_user/);
+      // 错误消息不得包含任何密码/Key 值
+      assert.ok(!err.message.includes("run-pass-placeholder"));
+      assert.ok(!err.message.includes("deepseek-test-placeholder"));
+      assert.ok(!err.message.includes(SOURCE_ENV.DWS_PASSWORD!));
+      return true;
+    });
+    assert.equal(spawnCount, 0);
+    assert.equal(existsSync(join(root, "sess-001", "workdir")), false);
+    assert.equal(existsSync(join(root, "sess-001", "results")), false);
+  } finally {
+    if (savedUser === undefined) delete process.env.DWS_RUN_USER;
+    else process.env.DWS_RUN_USER = savedUser;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("DshBackend：sdk + DWS_RUN_USER 未配置 → 现有默认逻辑落到 aiuser 并允许", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-fixed-default-"));
+  const savedUser = process.env.DWS_RUN_USER;
+  delete process.env.DWS_RUN_USER;
+  try {
+    const db = resolveDbAccount("default");
+    assert.equal(db.user, "aiuser");
+    const backend = new DshBackend({
+      profile: "sdk",
+      sourceEnv: { ...SOURCE_ENV, DWS_RUN_USER: undefined },
+      spawnFn: () => { throw new Error("createSession must not spawn"); },
+    });
+    const session = await backend.createSession({ ...makeSessionOpts(root, root), db });
+    assert.ok(session);
+  } finally {
+    if (savedUser === undefined) delete process.env.DWS_RUN_USER;
+    else process.env.DWS_RUN_USER = savedUser;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("DshBackend：默认 profile=sdk，args 固定，DSH env 白名单不泄漏敏感变量", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-sdk-"));
+  try {
+    const children: FakeChild[] = [];
+    const spawns: { command: string; args: string[]; opts: any }[] = [];
+    const backend = new DshBackend({
+      sourceEnv: { ...SOURCE_ENV, DSH_PROFILE: undefined },
+      spawnFn: (command, args, opts) => {
+        const ch = makeFakeChild();
+        children.push(ch);
+        spawns.push({ command, args, opts });
+        return ch as unknown as ChildProcess;
+      },
+      killTreeFn: () => { children.forEach((c) => c.emit("exit", 9)); },
+    });
+    assert.equal(backend.profile, "sdk");
+
+    const session = await backend.createSession(sourceSessionOpts(root));
+    const { done } = await driveToSpawn(session, children);
+    const env = spawns[0].opts.env;
+    // 先收掉 fake child / initialize 定时器，再做断言，避免失败时挂 60s 定时器
+    children[0].emit("exit", 1);
+    await done;
+    await session.cancel();
+
+    assert.deepEqual(spawns[0].args, ["--profile", "sdk"]);
+    assert.equal(env.DWS_USER, "aiuser");
+    assert.equal(env.DWS_PASSWORD, "run-pass-placeholder");
+    assert.notEqual(env.DWS_PASSWORD, SOURCE_ENV.DWS_PASSWORD);
+    assert.equal(env.DEEPSEEK_API_KEY, "deepseek-test-placeholder");
+    assert.equal(env.MCP_PYTHON, "/srv/dpit/apps/harness/.venv/bin/python");
+    assert.equal(env.DSH_HOME, "/verify/b2a/dsh-home");
+    assert.equal(env.DSH_AGENTS_HOME, "/verify/b2a/agents-home");
+    assert.equal(env.SANDBOX_TASK_ROOTS, "/verify/b2a/tasks");
+    assert.equal(env.SANDBOX_ASSETS_ROOTS, "/verify/b2a/assets");
+    assert.equal(env.SANDBOX_ACL_STATE_DIR, "/verify/b2a/acl-state");
+    assert.equal(env.SANDBOX_MEM, "512m");
+    assert.equal(env.SANDBOX_CPUS, "1");
+    assert.equal(env.SANDBOX_PIDS, "64");
+    assert.equal(env.SANDBOX_TIMEOUT_S, "120");
+    assert.equal(env.SANDBOX_IMAGE, "dataplat-script:m0");
+    for (const key of ["AUTH_TOKEN", "DWS_RUN_USER", "DWS_RUN_PASSWORD", "NODE_OPTIONS", "NODE_PATH", "LD_PRELOAD", "BASH_ENV", "GW_DB_PATH", "DSH_PROFILE"]) {
+      assert.equal(env[key], undefined, `${key} 不得进入 DSH 子进程`);
+    }
+    assert.equal(env.M0_SANDBOX_RUNNER, "D:\\x\\run_in_sandbox.sh");
+    assert.equal(env.M0_PROJECT_SKILL_DIR, "D:\\x\\skills");
+    assert.equal(env.SANDBOX_RUN_ID, "sess-001");
+    assert.equal(env.SANDBOX_ATTEMPT, "3");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("DshBackend：sdk-s4b + 占位 DWS_RUN_USER 不注入任何 DWS 凭据，且不接受父 env 覆盖", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-s4b-"));
+  try {
+    const children: FakeChild[] = [];
+    const spawns: { command: string; args: string[]; opts: any }[] = [];
+    const backend = new DshBackend({
+      profile: "sdk-s4b",
+      sourceEnv: { ...SOURCE_ENV, DWS_RUN_USER: "FILL_ME_DWS_RUN_USER" },
+      spawnFn: (command, args, opts) => {
+        const ch = makeFakeChild();
+        children.push(ch);
+        spawns.push({ command, args, opts });
+        return ch as unknown as ChildProcess;
+      },
+      killTreeFn: () => { children.forEach((c) => c.emit("exit", 9)); },
+    });
+    assert.equal(backend.profile, "sdk-s4b");
+
+    const session = await backend.createSession({
+      ...sourceSessionOpts(root),
+      db: { user: "FILL_ME_DWS_RUN_USER", passwordEnv: "DWS_RUN_PASSWORD", note: "test" },
+    });
+    const { done } = await driveToSpawn(session, children);
+    const env = spawns[0].opts.env;
+    children[0].emit("exit", 1);
+    await done;
+    await session.cancel();
+
+    assert.deepEqual(spawns[0].args, ["--profile", "sdk-s4b"]);
+    assert.equal(Object.keys(env).filter((k) => k.startsWith("DWS_")).length, 0);
+    assert.equal(env.DWS_USER, undefined);
+    assert.equal(env.DWS_PASSWORD, undefined);
+    assert.equal(env.AUTH_TOKEN, undefined);
+    assert.equal(env.DEEPSEEK_API_KEY, "deepseek-test-placeholder");
+    assert.equal(env.MCP_PYTHON, "/srv/dpit/apps/harness/.venv/bin/python");
+    // 父 env 中的注入项被服务端计算值覆盖
+    assert.equal(env.M0_SANDBOX_RUNNER, "D:\\x\\run_in_sandbox.sh");
+    assert.equal(env.M0_PROJECT_SKILL_DIR, "D:\\x\\skills");
+    assert.equal(env.SANDBOX_RUN_ID, "sess-001");
+    assert.equal(env.SANDBOX_ATTEMPT, "3");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("DshBackend：DSH_PROFILE 默认解析与非法值 fail-fast（构造期，不 spawn）", () => {
+  const viaEnv = new DshBackend({ sourceEnv: { ...SOURCE_ENV, DSH_PROFILE: "sdk-s4b" } });
+  assert.equal(viaEnv.profile, "sdk-s4b");
+  const byDefault = new DshBackend({ sourceEnv: { ...SOURCE_ENV, DSH_PROFILE: undefined } });
+  assert.equal(byDefault.profile, "sdk");
+
+  assert.throws(
+    () => new DshBackend({ profile: "../sdk" }),
+    /\[CONFIG\] DSH_PROFILE/,
+  );
+  assert.throws(
+    () => new DshBackend({ profile: "/srv/dpit/runtime/dsh-home/profiles/sdk" }),
+    /\[CONFIG\] DSH_PROFILE/,
+  );
+  assert.throws(
+    () => new DshBackend({ sourceEnv: { DSH_PROFILE: "sdk;rm -rf /" } }),
+    /\[CONFIG\] DSH_PROFILE/,
+  );
+});
+
+test("DshBackend：sdk-s4b 无 DWS_RUN_PASSWORD 也允许创建；sdk 仍 fail-closed", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b1-nodws-"));
+  try {
+    const source: NodeJS.ProcessEnv = {
+      PATH: "/bin",
+      DEEPSEEK_API_KEY: "deepseek-test-placeholder",
+      DWS_RUN_USER: "aiuser",
+    };
+    const backend = new DshBackend({
+      profile: "sdk-s4b",
+      sourceEnv: source,
+      spawnFn: () => makeFakeChild() as unknown as ChildProcess,
+      killTreeFn: () => {},
+    });
+    const session = await backend.createSession(sourceSessionOpts(root));
+    assert.ok(session);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+
+  const sdkRoot = mkdtempSync(join(tmpdir(), "gw-b1-sdk-nodws-"));
+  try {
+    const backend = new DshBackend({
+      profile: "sdk",
+      sourceEnv: { PATH: "/bin", DEEPSEEK_API_KEY: "deepseek-test-placeholder" },
+      spawnFn: () => { throw new Error("must not spawn"); },
+    });
+    await assert.rejects(backend.createSession(sourceSessionOpts(sdkRoot)), /DWS_RUN_PASSWORD not set/);
+  } finally {
+    rmSync(sdkRoot, { recursive: true, force: true });
   }
 });

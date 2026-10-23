@@ -10,8 +10,10 @@
 //      session_id），不在 dsh 侧。
 //   2. cancel/超时 = killTree（协议面仅 initialize/session/prompt/shutdown 三方法，
 //      无 cancel；AbortSignal 只放弃客户端等待不终止服务端）。
-//   3. spawn env 全量注入（REQUIRED_ENV_KEYS）：少一个 M0_* 变量 → m0-exec-script
-//      插件树加载失败 → initialize 报 -32603 inactive context（前代理失败现场）。
+//   3. spawn env 显式白名单 + 服务端注入（S4-B2-B1）：继承白名单只放行运行所需
+//      非敏感变量；M0_*、run_id、DWS 运行账号、DeepSeek Key 由服务端注入。少一个
+//      M0_* 变量 → m0-exec-script 插件树加载失败 → initialize 报 -32603 inactive
+//      context（前代理失败现场）；sdk-s4b 无 mcp-dws，不注入任何 DWS_*。
 //
 // 目录布局（附录 A：workdir 必须在 Temp 树外——S3 spike 前代理把 workdir 建进
 // Temp 相关路径的教训同类）：`<workroot>/<sessionId>/workdir` 与
@@ -26,7 +28,9 @@ import { randomBytes } from "node:crypto";
 import { join, resolve, sep } from "node:path";
 import { tmpdir } from "node:os";
 import type { DbAccount } from "../config/db-accounts.ts";
-import { DshSdkClient, REQUIRED_ENV_KEYS, type TurnEnd } from "./dsh-sdk-client.ts";
+import { parseDshProfile, profileRequiresDws, resolveDshProfile, type DshProfile } from "../config/dsh-profile.ts";
+import { buildDshRuntimeEnv, requiredDshEnvKeys } from "./dsh-env.ts";
+import { DshSdkClient, type TurnEnd } from "./dsh-sdk-client.ts";
 import { EventNormalizer, type NormEvent, type RawSdkEvent, type UsageTotal } from "./dsh-events.ts";
 import type { ChildProcess } from "node:child_process";
 
@@ -78,19 +82,47 @@ export interface DshBackendDeps {
   provider?: string;
   model?: string;
   maxTokens?: number;
+  /** 服务端选定 profile；缺省读 sourceEnv.DSH_PROFILE（未设 → sdk）。 */
+  profile?: string;
+  /** 单测隔离注入；缺省 process.env。生产由 server/index.ts 传入 profile。 */
+  sourceEnv?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_PROMPT_TIMEOUT_MS = 15 * 60_000;
 
+/** S4-B2-B1 fixed-account phase: sdk mcp-dws is hardcoded to aiuser in the profile.
+ *  Keep the guard here so a future DbAccountResolver can replace this one decision point
+ *  without touching Profile/Runner/plugin code. sdk-s4b is not subject to this guard. */
+const FIXED_SDK_DWS_USER = "aiuser";
+
+function assertFixedSdkDwsAccount(db: DbAccount): void {
+  if (db.user !== FIXED_SDK_DWS_USER) {
+    // Account name is not a credential; never include password values here.
+    throw new Error(
+      `[CONFIG] sdk profile mcp-dws is fixed to DWS_USER="${FIXED_SDK_DWS_USER}"; ` +
+        `resolved account "${db.user}" is unsupported until DbAccountResolver is implemented`,
+    );
+  }
+}
+
 export class DshBackend implements BackendProvider {
   readonly id = "dsh";
+  readonly profile: DshProfile;
   private onWarn: (message: string) => void;
+  private sourceEnv: NodeJS.ProcessEnv;
   private spawnFn?: (command: string, args: string[], opts: any) => ChildProcess;
   private killTreeFn?: (pid: number | undefined) => void;
   private initParams: { provider: string; model: string; maxTokens?: number };
+  /** 固定内部分布式参数；任务/Agent 无法覆盖。 */
+  private dshArgs: readonly string[];
 
   constructor(deps: DshBackendDeps = {}) {
     this.onWarn = deps.onWarn ?? ((m) => console.warn(m));
+    this.sourceEnv = deps.sourceEnv ?? process.env;
+    this.profile = deps.profile === undefined
+      ? resolveDshProfile(this.sourceEnv)
+      : parseDshProfile(deps.profile);
+    this.dshArgs = Object.freeze(["--profile", this.profile]);
     this.spawnFn = deps.spawnFn;
     this.killTreeFn = deps.killTreeFn;
     this.initParams = {
@@ -101,6 +133,11 @@ export class DshBackend implements BackendProvider {
   }
 
   async createSession(opts: SessionOpts): Promise<EngineSession> {
+    // Fixed-account guard must run before directory creation and before reading any
+    // DWS password: sdk's mcp-dws ignores child DWS_USER and always uses aiuser.
+    const requiresDws = profileRequiresDws(this.profile);
+    if (requiresDws) assertFixedSdkDwsAccount(opts.db);
+
     const workdir = join(opts.workroot, opts.sessionId, "workdir");
     const resultsDir = join(opts.resultsRoot, opts.sessionId, "results");
     mkdirSync(workdir, { recursive: true });
@@ -110,36 +147,35 @@ export class DshBackend implements BackendProvider {
 
     // 密钥经 T3 resolveDbAccount（调用方已解析）；这里只取值进子进程 env，
     // 任何日志/事件不落密钥值（密钥红线）。
-    const dwsPassword = process.env[opts.db.passwordEnv];
-    if (!dwsPassword) {
+    // sdk-s4b 无 mcp-dws：不读取、不注入任何 DWS 凭据；sdk 才注入选定账号。
+    const dwsPassword = requiresDws ? this.sourceEnv[opts.db.passwordEnv] : undefined;
+    if (requiresDws && !dwsPassword) {
       throw new Error(`[CONFIG] ${opts.db.passwordEnv} not set — cannot spawn dsh (db account: ${opts.db.user})`);
     }
-    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const deepseekKey = this.sourceEnv.DEEPSEEK_API_KEY;
     if (!deepseekKey) {
       throw new Error("[CONFIG] DEEPSEEK_API_KEY not set — cannot spawn dsh");
     }
-    // DWS_USER 注入 db.user：当前 profile patch 暂钉 aiuser（T2 L4 集成注），
-    // 受限账号落地改 patch 读 env 时网关侧零改动。
-    const env: Record<string, string | undefined> = {
-      ...process.env,
-      M0_SANDBOX_RUNNER: opts.runnerPath,
-      M0_SANDBOX_WORKDIR: workdir,
-      M0_RESULTS_DIR: resultsDir,
-      M0_ASSETS_DIR: opts.assetsDir,
-      M0_PROJECT_SKILL_DIR: opts.skillsDir,
-      RESULT_DIR: resultsDir,
-      SANDBOX_RUN_ID: opts.runId ?? opts.sessionId,
-      SANDBOX_ATTEMPT: String(opts.attempt ?? 1),
-      DWS_USER: opts.db.user,
-      DWS_PASSWORD: dwsPassword,
-      DEEPSEEK_API_KEY: deepseekKey,
-    };
-    const missing = REQUIRED_ENV_KEYS.filter((k) => !env[k]);
+
+    const env = buildDshRuntimeEnv({
+      source: this.sourceEnv,
+      profile: this.profile,
+      workdir,
+      resultsDir,
+      assetsDir: opts.assetsDir,
+      skillsDir: opts.skillsDir,
+      runnerPath: opts.runnerPath,
+      runId: opts.runId ?? opts.sessionId,
+      attempt: opts.attempt ?? 1,
+      deepseekApiKey: deepseekKey,
+      ...(requiresDws ? { dbUser: opts.db.user, dbPassword: dwsPassword } : {}),
+    });
+    const missing = requiredDshEnvKeys(this.profile).filter((k) => !env[k]);
     if (missing.length) {
       throw new Error(`[CONFIG] env injection incomplete, missing: ${missing.join(", ")}`);
     }
 
-    return new DshEngineSession(opts, env, this.spawnFn, this.killTreeFn, this.initParams);
+    return new DshEngineSession(opts, env, this.spawnFn, this.killTreeFn, this.initParams, this.dshArgs);
   }
 
   /** 附录 A：workdir/results 必须在 Temp 树外（Temp 清理会吞产物/围栏证据）。 */
@@ -170,6 +206,7 @@ class DshEngineSession implements EngineSession {
   private spawnFn?: (command: string, args: string[], opts: any) => ChildProcess;
   private killTreeFn?: (pid: number | undefined) => void;
   private initParams?: { provider: string; model: string; maxTokens?: number };
+  private dshArgs: readonly string[];
 
   constructor(
     opts: SessionOpts,
@@ -177,12 +214,14 @@ class DshEngineSession implements EngineSession {
     spawnFn?: (command: string, args: string[], opts: any) => ChildProcess,
     killTreeFn?: (pid: number | undefined) => void,
     initParams?: { provider: string; model: string; maxTokens?: number },
+    dshArgs: readonly string[] = ["--profile", "sdk"],
   ) {
     this.opts = opts;
     this.env = env;
     this.spawnFn = spawnFn;
     this.killTreeFn = killTreeFn;
     this.initParams = initParams;
+    this.dshArgs = dshArgs;
     this.generation = opts.attempt ?? 1;
     this.spawnNonce = randomBytes(3).toString("hex");
   }
@@ -257,6 +296,7 @@ class DshEngineSession implements EngineSession {
     const client = new DshSdkClient({
       cwd: join(this.opts.workroot, this.opts.sessionId, "workdir"),
       env: this.env,
+      args: [...this.dshArgs],
       onEvent: (ev, sid) => this.sink?.(ev, sid),
       ...(this.spawnFn ? { spawnFn: this.spawnFn } : {}),
       ...(this.killTreeFn ? { killTreeFn: this.killTreeFn } : {}),
