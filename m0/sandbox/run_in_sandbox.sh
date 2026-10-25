@@ -53,6 +53,36 @@ if [ -n "${SANDBOX_RUN_ID:-}" ]; then
 else
   CNAME="m0sandbox-$$-$(date +%s)"
 fi
+
+# C1：仅在可信 Gateway 任务身份存在时添加 managed 标签。直接调用/旧调用不设
+# SANDBOX_RUN_ID → 不生成 managed=true，避免把非网关容器纳入 reaper 范围。
+# 身份值在 ACL 修改和 docker run 之前 fail-closed；模型参数无法覆盖这些 env。
+MANAGED_LABEL_ARGS=()
+if [ -n "${SANDBOX_RUN_ID:-}" ]; then
+  LABEL_ATTEMPT="${SANDBOX_ATTEMPT:-0}"
+  case "$SANDBOX_RUN_ID" in
+    [A-Za-z0-9]*) ;;
+    *) echo "SANDBOX-FATAL[78]: 非法 SANDBOX_RUN_ID（首字符须为字母或数字）——拒绝执行" >&2; exit 78 ;;
+  esac
+  case "$SANDBOX_RUN_ID" in
+    *[!A-Za-z0-9._-]*) echo "SANDBOX-FATAL[78]: 非法 SANDBOX_RUN_ID（仅允许字母/数字/._-）——拒绝执行" >&2; exit 78 ;;
+  esac
+  case "$SANDBOX_RUN_ID" in
+    *..*) echo "SANDBOX-FATAL[78]: 非法 SANDBOX_RUN_ID（禁止 ..）——拒绝执行" >&2; exit 78 ;;
+  esac
+  [ "${#SANDBOX_RUN_ID}" -le 128 ] \
+    || { echo "SANDBOX-FATAL[78]: SANDBOX_RUN_ID 过长（>128）——拒绝执行" >&2; exit 78; }
+  case "$LABEL_ATTEMPT" in
+    ''|*[!0-9]*) echo "SANDBOX-FATAL[78]: 非法 SANDBOX_ATTEMPT（须为十进制数字）——拒绝执行" >&2; exit 78 ;;
+  esac
+  [ "${#LABEL_ATTEMPT}" -le 9 ] \
+    || { echo "SANDBOX-FATAL[78]: SANDBOX_ATTEMPT 过长（>9 位）——拒绝执行" >&2; exit 78; }
+  MANAGED_LABEL_ARGS=(
+    --label "com.dpit.gateway.managed=true"
+    --label "com.dpit.gateway.task.run_id=${SANDBOX_RUN_ID}"
+    --label "com.dpit.gateway.task.attempt=${LABEL_ATTEMPT}"
+  )
+fi
 RC=0
 ACL_GRANTED=0   # S4-B1：1=已授权（workdir 树 + results/assets），docker 收尾后须恢复基线
 if [ "$(uname -s)" = "Linux" ]; then
@@ -355,6 +385,7 @@ fi
 # 9>&-：锁 fd 只由本 runner 持有；否则 SIGKILL 后孤儿 timeout/docker 继承该 fd，
 # flock 会随打开文件描述延续到孤儿退出，令下一次 stale 恢复被并发检查（78）挡住（S4-B1r3）。
 timeout --signal=KILL "${TMO}" docker run --rm --name "${CNAME}" \
+  "${MANAGED_LABEL_ARGS[@]}" \
   --network none \
   --read-only \
   --user 65534:65534 \
