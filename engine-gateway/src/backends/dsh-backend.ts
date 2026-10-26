@@ -30,7 +30,11 @@ import { tmpdir } from "node:os";
 import type { DbAccount } from "../config/db-accounts.ts";
 import { parseDshProfile, profileRequiresDws, resolveDshProfile, type DshProfile } from "../config/dsh-profile.ts";
 import { buildDshRuntimeEnv, requiredDshEnvKeys } from "./dsh-env.ts";
-import { DshSdkClient, type TurnEnd } from "./dsh-sdk-client.ts";
+import {
+  DshSdkClient,
+  type DshCleanupHandle,
+  type TurnEnd,
+} from "./dsh-sdk-client.ts";
 import { EventNormalizer, type NormEvent, type RawSdkEvent, type UsageTotal } from "./dsh-events.ts";
 import type { ChildProcess } from "node:child_process";
 
@@ -66,6 +70,11 @@ export interface AskOpts {
 export interface EngineSession {
   ask(question: string, opts?: AskOpts): AsyncIterable<NormEvent>;
   cancel(): Promise<void>;
+  /**
+   * C2-B2 清理句柄：spawn 后 PID/PGID/startTicks + 非破坏性 shutdown + 终止权移交。
+   * 未 spawn 时返回 null；旧 mock 可不实现（可选成员）。
+   */
+  cleanupHandle?(): DshCleanupHandle | null;
   /**
    * 最近一次 ask 的 usage 快照（M2-T0 done.tokens 数据源；每次 ask 归零重计，
    * respawn 后同样归零重计）。可选成员：旧实现/mock 可不提供——调用方以
@@ -280,6 +289,11 @@ class DshEngineSession implements EngineSession {
   async cancel(): Promise<void> {
     this.cancelled = true;
     if (this.client) await this.client.kill();
+  }
+
+  /** C2-B2：把当前 spawn 的清理句柄交给 coordinator；未 spawn 时 null。 */
+  cleanupHandle(): DshCleanupHandle | null {
+    return this.client?.cleanupHandle() ?? null;
   }
 
   /** M2-T0：最近一次 ask 的 usage 快照（编排层 TaskRunner 累计进 done.tokens）。 */

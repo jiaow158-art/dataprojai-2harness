@@ -37,6 +37,11 @@ export interface SandboxCleanupTarget {
   sessionId?: string;
 }
 
+export interface SandboxOperationOptions {
+  /** 本操作绝对截止时间（epoch ms）；超出后不再启动新的 docker 命令。 */
+  deadlineAt?: number;
+}
+
 export interface SandboxContainerReaperOptions {
   /** Gateway 启动时解析出的可信镜像 ID（sha256:...），不是可变 tag。 */
   trustedImageId: string;
@@ -73,6 +78,15 @@ export interface SandboxCleanupResult {
   mismatches: string[];
   warnings: string[];
   errors: string[];
+  containers: CleanupContainerInfo[];
+}
+
+/** C2-B2：只读 active 探针；查询/所有权不可证明时 ok=false，调用方不得据此放行进程组终止。 */
+export interface SandboxActiveProbeResult {
+  ok: boolean;
+  active: number;
+  mismatches: number;
+  reason?: string;
   containers: CleanupContainerInfo[];
 }
 
@@ -238,7 +252,136 @@ export class SandboxContainerReaper {
     this.runDocker = opts.runDocker ?? defaultRunDocker;
   }
 
-  async cleanup(target: SandboxCleanupTarget): Promise<SandboxCleanupResult> {
+  /**
+   * 只读探测本 attempt 是否有运行中的 managed 容器。
+   * - docker ps 失败 / inspect 失败 / 所有权不匹配均返回 ok=false；
+   * - ok=false 时调用方不得向 DSH 进程组发信号，也不得声称 Runner 已退出。
+   */
+  async probeActive(
+    target: SandboxCleanupTarget,
+    opts: SandboxOperationOptions = {},
+  ): Promise<SandboxActiveProbeResult> {
+    const result: SandboxActiveProbeResult = {
+      ok: false,
+      active: 0,
+      mismatches: 0,
+      containers: [],
+    };
+    const run = this.boundedDockerRunner(opts.deadlineAt);
+    const runId = String(target?.runId ?? "");
+    const attempt = Number(target?.attempt);
+    if (!validRunId(runId) || !validAttempt(attempt)) {
+      result.reason = "INVALID_TARGET";
+      return result;
+    }
+    if (!TRUSTED_IMAGE_RE.test(this.trustedImageId)) {
+      result.reason = "NO_TRUSTED_IMAGE";
+      return result;
+    }
+
+    let ps: DockerRunResult;
+    try {
+      ps = await run([
+        "ps", "-q",
+        "--filter", `label=${MANAGED_LABEL}=true`,
+        "--filter", `label=${RUN_ID_LABEL}=${runId}`,
+        "--filter", `label=${ATTEMPT_LABEL}=${attempt}`,
+      ]);
+    } catch {
+      result.reason = "DOCKER_QUERY_FAILED";
+      return result;
+    }
+    if (ps.code !== 0) {
+      result.reason = ps.error === "CLEANUP_TIME_BUDGET_EXCEEDED"
+        ? "CLEANUP_TIME_BUDGET_EXCEEDED"
+        : "DOCKER_QUERY_FAILED";
+      return result;
+    }
+    const ids = [...new Set(ps.stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean))];
+    if (ids.some((id) => !CONTAINER_ID_RE.test(id))) {
+      result.reason = "DOCKER_QUERY_FAILED";
+      return result;
+    }
+
+    for (const id of ids) {
+      let inspected: DockerRunResult;
+      try {
+        inspected = await run(["inspect", "--format", INSPECT_FORMAT, id]);
+      } catch {
+        result.reason = "INSPECT_FAILED";
+        return result;
+      }
+      if (inspected.code !== 0) {
+        if (inspected.error === "CLEANUP_TIME_BUDGET_EXCEEDED") {
+          result.reason = "CLEANUP_TIME_BUDGET_EXCEEDED";
+          return result;
+        }
+        if (notFound(inspected)) continue;
+        result.reason = "INSPECT_FAILED";
+        return result;
+      }
+      let raw: any;
+      try {
+        raw = JSON.parse(inspected.stdout);
+      } catch {
+        result.reason = "INSPECT_FAILED";
+        return result;
+      }
+      const name = String(raw?.name ?? "");
+      const image = String(raw?.image ?? "");
+      const imageId = String(raw?.image_id ?? "");
+      const state = raw?.state === undefined ? undefined : String(raw.state);
+      const labels = raw?.labels && typeof raw.labels === "object" ? raw.labels : {};
+      const info: CleanupContainerInfo = {
+        id,
+        name,
+        image,
+        imageId,
+        ...(state !== undefined ? { state } : {}),
+      };
+      const mismatch: string[] = [];
+      if (labels[MANAGED_LABEL] !== "true") mismatch.push("label.managed");
+      if (labels[RUN_ID_LABEL] !== runId) mismatch.push("label.run_id");
+      if (labels[ATTEMPT_LABEL] !== String(attempt)) mismatch.push("label.attempt");
+      if (!strictNameMatches(name, runId, attempt)) mismatch.push("container_name");
+      if (imageId.toLowerCase() !== this.trustedImageId.toLowerCase()) mismatch.push("image_id");
+      if (mismatch.length > 0) {
+        result.mismatches += 1;
+        result.containers.push(info);
+        result.reason = "OWNERSHIP_MISMATCH";
+        return result;
+      }
+      result.containers.push(info);
+      result.active += 1;
+    }
+    result.ok = true;
+    return result;
+  }
+
+  private boundedDockerRunner(deadlineAt?: number): DockerRunner {
+    return async (args, opts) => {
+      if (deadlineAt === undefined) return this.runDocker(args, opts);
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) {
+        return {
+          code: -1,
+          stdout: "",
+          stderr: "",
+          error: "CLEANUP_TIME_BUDGET_EXCEEDED",
+        };
+      }
+      return this.runDocker(args, {
+        ...opts,
+        timeoutMs: Math.min(opts?.timeoutMs ?? 15_000, remaining),
+      });
+    };
+  }
+
+  async cleanup(
+    target: SandboxCleanupTarget,
+    opts: SandboxOperationOptions = {},
+  ): Promise<SandboxCleanupResult> {
+    const run = this.boundedDockerRunner(opts.deadlineAt);
     const result: SandboxCleanupResult = {
       ok: false,
       busy: false,
@@ -318,7 +461,7 @@ export class SandboxContainerReaper {
       }
       await lockHandle.writeFile(`${process.pid}\n`, "utf8");
 
-      const ps = await this.runDocker([
+      const ps = await run([
         "ps", "-aq",
         "--filter", `label=${MANAGED_LABEL}=true`,
         "--filter", `label=${RUN_ID_LABEL}=${result.runId}`,
@@ -346,7 +489,7 @@ export class SandboxContainerReaper {
 
       const candidates: InspectedCandidate[] = [];
       for (const id of ids) {
-        const inspected = await this.runDocker(["inspect", "--format", INSPECT_FORMAT, id]);
+        const inspected = await run(["inspect", "--format", INSPECT_FORMAT, id]);
         if (inspected.code !== 0) {
           if (notFound(inspected)) {
             await this.audit({ action: "inspect", phase: "inspect", ok: true, run_id: result.runId, attempt: result.attempt, container_id: id, vanished: true });
@@ -396,7 +539,7 @@ export class SandboxContainerReaper {
       }
 
       for (const c of candidates) {
-        const stop = await this.runDocker(["stop", "--time", String(this.stopTimeoutSec), c.id], {
+        const stop = await run(["stop", "--time", String(this.stopTimeoutSec), c.id], {
           timeoutMs: (this.stopTimeoutSec + 10) * 1000,
         });
         if (stop.code !== 0 && notFound(stop)) {
@@ -417,19 +560,19 @@ export class SandboxContainerReaper {
 
         let remove: DockerRunResult;
         if (stopOk) {
-          remove = await this.runDocker(["rm", c.id]);
+          remove = await run(["rm", c.id]);
           // `docker run --rm` may remove the container as soon as stop completes.
           // A "No such container" from rm is already-success; do not force or warn.
           if (remove.code !== 0 && !notFound(remove)) {
             result.forced.push(c.id);
-            remove = await this.runDocker(["rm", "-f", c.id]);
+            remove = await run(["rm", "-f", c.id]);
           }
         } else {
           result.forced.push(c.id);
-          remove = await this.runDocker(["rm", "-f", c.id]);
+          remove = await run(["rm", "-f", c.id]);
         }
 
-        const finalInspect = await this.runDocker(["inspect", "--format", "{{.Id}}", c.id]);
+        const finalInspect = await run(["inspect", "--format", "{{.Id}}", c.id]);
         if (finalInspect.code === 0) {
           result.errors.push(`container still exists after removal: ${c.id}`);
           await this.audit({ action: "verify", phase: "verify", ok: false, run_id: result.runId, attempt: result.attempt, container_id: c.id, container_name: c.name, error: "container still exists" });

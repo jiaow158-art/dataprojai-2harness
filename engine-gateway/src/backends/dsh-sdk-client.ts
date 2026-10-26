@@ -23,6 +23,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { RawSdkEvent } from "./dsh-events.ts";
+import {
+  captureProcessIdentity,
+  type ProcessIdentity,
+} from "../orchestrator/process-termination.ts";
 
 /** spawn env 必含键（S3 spike 定型；见文件头注释）。 */
 export const REQUIRED_ENV_KEYS = [
@@ -55,6 +59,23 @@ export interface TurnEnd {
 }
 
 export type SdkEventCallback = (event: RawSdkEvent, sessionId: string) => void;
+
+/**
+ * C2-B2-2B：DSH 清理句柄。
+ * - identity 在 spawn 时采集；不得在进程退出后补采。
+ * - requestShutdown 只发 JSON-RPC shutdown，不调用 killTree。
+ * - markTerminationOwned 后旧 cancel/kill/stop 路径全部变为 no-op，防止旧 finally 重复击杀。
+ */
+export interface DshCleanupHandle {
+  identity: ProcessIdentity | null;
+  child: ChildProcess;
+  promptActive: boolean;
+  hasExited: boolean;
+  aclStateDir: string | null;
+  requestShutdown(graceMs?: number): Promise<boolean>;
+  markTerminationOwned(): void;
+  isTerminationOwned(): boolean;
+}
 
 export interface DshSdkClientOpts {
   cwd: string;
@@ -94,6 +115,9 @@ export class DshSdkClient {
   private spawnFn: (command: string, args: string[], opts: any) => ChildProcess;
   private killTreeFn: (pid: number | undefined) => void;
   private initTimeoutMs: number;
+  private processIdentity: ProcessIdentity | null = null;
+  private terminationOwned = false;
+  private readonly aclStateDir: string | null;
   /** 当前 prompt 的终态裁定器（同进程串行单 prompt；backend 侧按序驱动）。 */
   private activePrompt: {
     sessionId: string;
@@ -109,6 +133,9 @@ export class DshSdkClient {
     this.spawnFn = opts.spawnFn ?? defaultSpawn;
     this.killTreeFn = opts.killTreeFn ?? defaultKillTree;
     this.initTimeoutMs = opts.initTimeoutMs ?? 60_000;
+    const aclStateDir = opts.env.SANDBOX_ACL_STATE_DIR;
+    this.aclStateDir =
+      typeof aclStateDir === "string" && aclStateDir.length > 0 ? aclStateDir : null;
     for (const k of SECRET_ENV_KEYS) {
       const v = opts.env[k];
       if (v) this.secretValues.push(v);
@@ -131,6 +158,11 @@ export class DshSdkClient {
       detached: process.platform !== "win32",
     });
     this.child = child;
+    const childPid = (child as any).pid;
+    const identityPromise =
+      typeof childPid === "number" && childPid > 1
+        ? this.captureChildIdentity(child, childPid)
+        : Promise.resolve(null);
 
     child.stderr?.on("data", (d: Buffer) => this.appendStderr(d.toString()));
     child.on("exit", () => {
@@ -153,10 +185,28 @@ export class DshSdkClient {
         this.initTimeoutMs,
         () => new SdkPromptError("TIMEOUT", `initialize no response in ${this.initTimeoutMs}ms`, this.stderrTail()),
       );
+      this.processIdentity = await identityPromise;
       return result as { serverInfo: { name: string; version: string } };
     } catch (e) {
       this.killTree();
+      this.processIdentity = await identityPromise;
       throw e;
+    }
+  }
+
+  /** spawn 后立即发起身份采集；不阻塞 initialize 请求的同步写入。 */
+  private async captureChildIdentity(
+    child: ChildProcess,
+    pid: number,
+  ): Promise<ProcessIdentity | null> {
+    try {
+      const captured = await captureProcessIdentity(pid);
+      if (this.exited || (child as any).exitCode != null || (child as any).signalCode != null) {
+        return null;
+      }
+      return captured;
+    } catch {
+      return null;
     }
   }
 
@@ -202,8 +252,9 @@ export class DshSdkClient {
     }
   }
 
-  /** 优雅关闭（shutdown → 等 exit；超时强杀）。 */
+  /** 优雅关闭（shutdown → 等 exit；超时强杀）。终止权移交后完全 no-op。 */
   async stop(graceMs = 5000): Promise<void> {
+    if (this.terminationOwned) return;
     if (!this.child || this.exited) return;
     try {
       await this.withTimeout(this.send("shutdown", {}), graceMs, new Error("shutdown timeout"));
@@ -214,8 +265,52 @@ export class DshSdkClient {
     await this.waitExit(graceMs);
   }
 
+  /**
+   * 只发送 JSON-RPC shutdown，不调用 killTree。
+   * 返回 true 表示服务端应答；false 表示超时/失败/仍有 in-flight prompt。
+   */
+  async requestShutdown(graceMs = 5000): Promise<boolean> {
+    if (!this.child || this.exited) return true;
+    if (this.activePrompt) return false;
+    try {
+      await this.withTimeout(this.send("shutdown", {}), graceMs, new Error("shutdown timeout"));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** 终止权移交给 TaskCleanupCoordinator；此后旧 cancel/kill/stop 不得再发信号。 */
+  markTerminationOwned(): void {
+    this.terminationOwned = true;
+  }
+
+  get isTerminationOwned(): boolean {
+    return this.terminationOwned;
+  }
+
+  /** 返回清理句柄；未 spawn 时 null。identity 为 null 时调用方必须 pending。 */
+  cleanupHandle(): DshCleanupHandle | null {
+    const child = this.child;
+    if (!child) return null;
+    return {
+      identity: this.processIdentity,
+      child,
+      promptActive: this.activePrompt !== null,
+      hasExited:
+        this.exited ||
+        (child as any).exitCode != null ||
+        (child as any).signalCode != null,
+      aclStateDir: this.aclStateDir,
+      requestShutdown: (graceMs = 5000) => this.requestShutdown(graceMs),
+      markTerminationOwned: () => this.markTerminationOwned(),
+      isTerminationOwned: () => this.terminationOwned,
+    };
+  }
+
   /** 立即击杀进程树（超时/取消路径；cancel 语义 = 这个）。 */
   killTree(): void {
+    if (this.terminationOwned) return;
     if (!this.child || this.exited) return;
     try {
       this.killTreeFn((this.child as any).pid);
@@ -224,6 +319,7 @@ export class DshSdkClient {
 
   /** 击杀并等 exit（cancel 的完整语义：进程树确实终止后才返回）。 */
   async kill(graceMs = 5000): Promise<void> {
+    if (this.terminationOwned) return;
     this.killTree();
     await this.waitExit(graceMs);
   }

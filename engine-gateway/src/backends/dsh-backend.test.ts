@@ -611,6 +611,44 @@ async function driveToSpawn(
   return { collected, done };
 }
 
+test("DshBackend：cleanupHandle 暴露 client handle 与 SANDBOX_ACL_STATE_DIR；移交后 cancel 不 kill", async () => {
+  const root = mkdtempSync(join(tmpdir(), "gw-b2b-handle-"));
+  const children: FakeChild[] = [];
+  let kills = 0;
+  try {
+    const backend = new DshBackend({
+      profile: "sdk-s4b",
+      sourceEnv: SOURCE_ENV,
+      spawnFn: () => {
+        const ch = makeFakeChild();
+        children.push(ch);
+        return ch as unknown as ChildProcess;
+      },
+      killTreeFn: () => { kills += 1; children.forEach((c) => c.emit("exit", 9)); },
+    });
+    const session = await backend.createSession(sourceSessionOpts(root));
+    const { done } = await driveToSpawn(session, children);
+    const init = childWrites(children[0]).find((f) => f.method === "initialize");
+    assert.ok(init);
+    line(children[0], {
+      jsonrpc: "2.0",
+      id: init.id,
+      result: { serverInfo: { name: "fake", version: "test" } },
+    });
+    await waitFor(() => childWrites(children[0]).some((f) => f.method === "session/prompt"), 3000, "prompt frame");
+    const handle = session.cleanupHandle?.();
+    assert.ok(handle, "spawn 后必须可取得 cleanup handle");
+    assert.equal(handle!.aclStateDir, "/verify/b2a/acl-state");
+    handle!.markTerminationOwned();
+    await session.cancel();
+    assert.equal(kills, 0, "终止权移交后旧 finally cancel 不得再 kill");
+    children[0].emit("exit", 9);
+    await done.catch(() => {});
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("DshBackend：sdk + aiuser 允许进入会话创建", async () => {
   const root = mkdtempSync(join(tmpdir(), "gw-b1-fixed-ok-"));
   try {

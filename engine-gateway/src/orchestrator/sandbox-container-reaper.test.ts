@@ -2,6 +2,7 @@
 // 真实 Docker 集成由独立隔离红队脚本执行；本文件只注入 fake runDocker。
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -158,6 +159,144 @@ function secureReaperAt(root: string, lockDir: string, config: FakeConfig = {}):
   });
   return { reaper, calls: fake.calls, auditLogPath };
 }
+
+test("probeActive/cleanup：deadline 已过不启动新的 docker 命令", async () => {
+  const ctx = tempReaper({ ps: { code: 0, stdout: `${CID}\n`, stderr: "" } });
+  try {
+    const probe = await ctx.reaper.probeActive(
+      { runId: RUN, attempt: ATTEMPT },
+      { deadlineAt: Date.now() - 1 },
+    );
+    assert.equal(probe.ok, false);
+    assert.equal(probe.reason, "CLEANUP_TIME_BUDGET_EXCEEDED");
+    assert.equal(ctx.calls.length, 0);
+
+    const cleanup = await ctx.reaper.cleanup(
+      { runId: RUN, attempt: ATTEMPT },
+      { deadlineAt: Date.now() - 1 },
+    );
+    assert.equal(cleanup.ok, false);
+    assert.equal(cleanup.found, 0);
+    assert.equal(ctx.calls.length, 0);
+  } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test("probeActive：有效运行中容器 active=1，只读不删除", async () => {
+  const ctx = tempReaper({ ps: { code: 0, stdout: `${CID}\n`, stderr: "" } });
+  try {
+    const r = await ctx.reaper.probeActive({ runId: RUN, attempt: ATTEMPT });
+    assert.equal(r.ok, true);
+    assert.equal(r.active, 1);
+    assert.equal(r.mismatches, 0);
+    assert.equal(r.containers.length, 1);
+    assert.deepEqual(ctx.calls.map((a) => a[0]), ["ps", "inspect"]);
+  } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test("probeActive：无运行中容器 active=0", async () => {
+  const ctx = tempReaper({ ps: { code: 0, stdout: "", stderr: "" } });
+  try {
+    const r = await ctx.reaper.probeActive({ runId: RUN, attempt: ATTEMPT });
+    assert.equal(r.ok, true);
+    assert.equal(r.active, 0);
+    assert.deepEqual(ctx.calls.map((a) => a[0]), ["ps"]);
+  } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test("probeActive：docker ps 失败 → ok=false，绝不当无容器", async () => {
+  const ctx = tempReaper({ ps: { code: 1, stdout: "", stderr: "docker daemon down" } });
+  try {
+    const r = await ctx.reaper.probeActive({ runId: RUN, attempt: ATTEMPT });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "DOCKER_QUERY_FAILED");
+    assert.equal(r.active, 0);
+  } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test("probeActive：所有权/镜像不匹配 → ok=false", async () => {
+  const ctx = tempReaper({
+    ps: { code: 0, stdout: `${CID}\n`, stderr: "" },
+    inspect: inspectWith({ image_id: IMG_OTHER }),
+  });
+  try {
+    const r = await ctx.reaper.probeActive({ runId: RUN, attempt: ATTEMPT });
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, "OWNERSHIP_MISMATCH");
+    assert.equal(r.mismatches, 1);
+  } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test("真实 Docker：probeActive 识别本 attempt 容器，cleanup 精确回收", async () => {
+  let imageId: string;
+  try {
+    imageId = execFileSync("docker", ["image", "inspect", "dataplat-script:m0", "--format", "{{.Id}}"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return; // 无 Docker/隔离镜像时跳过（本地 CI 环境不强制）
+  }
+  const root = mkdtempSync(join(tmpdir(), "reaper-real-"));
+  const lockDir = join(root, "cleanup-locks");
+  mkdirSync(lockDir, { recursive: true, mode: 0o700 });
+  chmodSync(root, 0o700);
+  chmodSync(lockDir, 0o700);
+  const runId = "run-c2b22b-real";
+  const attempt = 1;
+  const name = `${runId}-a${attempt}-${Date.now()}`;
+  const auditLogPath = join(root, "audit", "cleanup.jsonl");
+  const reaper = new SandboxContainerReaper({
+    trustedImageId: imageId,
+    trustedRuntimeRoot: root,
+    cleanupLockDir: lockDir,
+    auditLogPath,
+    stopTimeoutSec: 5,
+  });
+  try {
+    execFileSync("docker", [
+      "run", "-d", "--name", name,
+      "--label", "com.dpit.gateway.managed=true",
+      "--label", `com.dpit.gateway.task.run_id=${runId}`,
+      "--label", `com.dpit.gateway.task.attempt=${attempt}`,
+      "--network", "none",
+      "--read-only",
+      "--user", "65534:65534",
+      "dataplat-script:m0",
+      "python3", "-c", "import time; time.sleep(30)",
+    ], { stdio: "ignore" });
+
+    let probe = await reaper.probeActive({ runId, attempt });
+    for (let i = 0; i < 20 && probe.active === 0; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      probe = await reaper.probeActive({ runId, attempt });
+    }
+    assert.equal(probe.ok, true);
+    assert.equal(probe.active, 1);
+
+    const cleaned = await reaper.cleanup({ runId, attempt });
+    assert.equal(cleaned.ok, true);
+    assert.equal(cleaned.found, 1);
+    assert.equal(cleaned.cleaned.length, 1);
+    assert.throws(() => execFileSync("docker", ["inspect", "--format", "{{.Id}}", name], { stdio: "ignore" }));
+  } finally {
+    try {
+      execFileSync("docker", ["rm", "-f", name], { stdio: "ignore" });
+    } catch {
+      /* already removed */
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("cleanupLockDir symlink 拒绝，且不调用 Docker", { skip: process.platform === "win32" }, async () => {
   const root = mkdtempSync(join(tmpdir(), "reaper-symlink-"));
