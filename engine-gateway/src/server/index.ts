@@ -605,6 +605,7 @@ export async function startGateway(env: NodeJS.ProcessEnv = process.env): Promis
       authToken,
       maxQueue,
       rateLimitQpm,
+      cleanupHoldMode: cleanupPolicy.mode === "linux_isolated",
     },
   });
 

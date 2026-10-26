@@ -13,7 +13,12 @@ import { TaskRunner, type TaskRunnerConfig } from "../orchestrator/task-runner.t
 import type { BackendProvider, EngineSession, SessionOpts } from "../backends/dsh-backend.ts";
 import type { NormEvent } from "../backends/dsh-events.ts";
 import { WorkerPool } from "./worker-pool.ts";
-import { createHttpServer } from "./http.ts";
+import {
+  CLEANUP_RECOVERY_SSE_CODE,
+  CLEANUP_RECOVERY_SSE_ID_BASE,
+  CLEANUP_RECOVERY_SSE_ID_MAX,
+  createHttpServer,
+} from "./http.ts";
 
 const TOKEN = "test-token";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -79,7 +84,7 @@ class SseClient {
   static connect(
     port: number,
     runId: string,
-    opts: { user?: string; lastEventId?: number; after?: number; token?: string | null } = {},
+    opts: { user?: string; lastEventId?: number | string; after?: number | string; token?: string | null } = {},
   ): Promise<SseClient> {
     return new Promise((resolve, reject) => {
       let path = `/api/tasks/${runId}/events`;
@@ -178,12 +183,13 @@ function request(
   port: number,
   method: string,
   path: string,
-  opts: { token?: string | null; user?: string | null; body?: unknown } = {},
+  opts: { token?: string | null; user?: string | null; body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {};
     if (opts.token !== null) headers.authorization = `Bearer ${opts.token ?? TOKEN}`;
     if (opts.user !== null) headers["x-user"] = opts.user ?? "u1";
+    Object.assign(headers, opts.headers ?? {});
     const payload = opts.body === undefined ? null : JSON.stringify(opts.body);
     if (payload !== null) {
       headers["content-type"] = "application/json";
@@ -216,6 +222,7 @@ const submit = (port: number, body: unknown, opts: { user?: string | null; token
 interface GatewayHandle {
   port: number;
   store: TaskStore;
+  db: Database.Database;
   pool: WorkerPool;
   errors: { runId: string; err: unknown }[];
   close: () => Promise<void>;
@@ -230,6 +237,8 @@ beforeEach(() => {
 
 afterEach(async () => {
   for (const gw of openHandles.splice(0)) await gw.close();
+  // 每个用例的 work/results 临时根：测试结束即删，避免长期运行积累 /tmp/gw-http-test-*。
+  if (root) rmSync(root, { recursive: true, force: true });
 });
 
 async function startGateway(opts: {
@@ -238,11 +247,14 @@ async function startGateway(opts: {
   qpm?: number;
   startPool?: boolean;
   maxConcurrent?: number;
+  /** Linux isolated cleanup hold 模式（HTTP + TaskStore 同步开启；测试通常配 startPool=false）。 */
+  cleanupHoldMode?: boolean;
   /** rider 测试用：包裹真实 runner 工厂 */
   runnerWrapper?: (real: (runId: string) => Promise<void>) => (runId: string) => Promise<void>;
 } = {}): Promise<GatewayHandle> {
   const db = new Database(":memory:");
-  const store = new TaskStore(db);
+  const cleanupHoldMode = opts.cleanupHoldMode === true;
+  const store = new TaskStore(db, Date.now, { cleanupHoldMode });
   const backend = makeBackend(opts.script ?? SUCCESS_SCRIPT);
   let wSeq = 0;
   const realFactory = (runId: string): Promise<void> =>
@@ -279,6 +291,7 @@ async function startGateway(opts: {
       rateLimitQpm: opts.qpm ?? 1000,
       ssePollMs: 15,
       heartbeatMs: 100,
+      cleanupHoldMode,
     },
   });
   const port = await new Promise<number>((resolve, reject) => {
@@ -294,6 +307,7 @@ async function startGateway(opts: {
   const handle: GatewayHandle = {
     port,
     store,
+    db,
     pool,
     errors,
     close: async () => {
@@ -394,6 +408,16 @@ test("SSE 断线重连：Last-Event-ID 补发且不重复；?after=0 全量重�
   const seqs = c3.events.map((e) => e.seq);
   assert.deepEqual(seqs, Array.from({ length: seqs.length }, (_, i) => i + 1), "全量重放 seq 连续单调");
   assert.equal(seqs.length, seen.size, "重连并集覆盖全部事件（无丢失）");
+
+  // 双通道同时存在：Last-Event-ID 优先于 ?after=0；否则会重放 seq 1 段。
+  const c4 = await SseClient.connect(gw.port, run_id, { lastEventId: lastSeq, after: 0 });
+  await c4.waitEvent("done");
+  await c4.waitForEnd();
+  assert.ok(c4.events.length > 0);
+  assert.ok(
+    c4.events.every((e) => e.seq > lastSeq),
+    `Last-Event-ID 必须优先：实际 seq=${c4.events.map((e) => e.seq)}`,
+  );
 });
 
 // ── 用例 3：幂等重提交 ─────────────────────────────────────────────────────────────
@@ -537,4 +561,297 @@ test("T7 rider：runner 抛未捕获异常 → 池捕获不 crash、受害者留
   const h = await request(gw.port, "GET", "/api/health");
   assert.equal(h.status, 200, "进程/服务未受未捕获异常影响");
   assert.equal(h.body.ok, true);
+});
+
+// ── 用例 9：recovery_required 受控 SSE 通知 + 有界关流 + GET 真状态 ─────────────────
+test("cleanup recovery_required：SSE 补发 code-only error 后关流，无 done；GET 返回真实 running", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "进入清理恢复的任务", client_submission_id: "recovery-1" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 1_000, 3600);
+  assert.ok(lease, "任务以 cleanup hold 模式 claim 成功");
+  assert.equal(lease.attempt, 1);
+
+  // 先建立实时连接（此时 hold 仍是 executing），再把租约判过期 → reaper 标
+  // recovery_required。SSE 必须由轮询主动发现，而不是靠后续业务事件。
+  const c = await SseClient.connect(gw.port, run_id);
+  await c.waitEvent("stage");
+  const checkpoint = c.lastSeq;
+  assert.ok(checkpoint > 0 && checkpoint < CLEANUP_RECOVERY_SSE_ID_BASE, "真实 seq 远离合成游标保留区");
+  const reaped = gw.store.reapExpiredWithHolds(Date.now() + 60_000, 3);
+  assert.deepEqual(
+    reaped.filter((r) => r.run_id === run_id).map((r) => r.action),
+    ["recovery_required"],
+  );
+
+  const err = await c.waitEvent("error", 3000);
+  assert.equal(
+    err.seq,
+    CLEANUP_RECOVERY_SSE_ID_BASE + checkpoint,
+    "合成通知 id 编码真实断点，且落在保留区",
+  );
+  assert.ok(err.seq <= CLEANUP_RECOVERY_SSE_ID_MAX);
+  assert.deepEqual(err.payload, { code: CLEANUP_RECOVERY_SSE_CODE, run_id });
+  await c.waitForEnd(3000);
+
+  const types = c.events.map((e) => e.type);
+  assert.ok(!types.includes("done"), "recovery_required 绝不伪造 done");
+  assert.ok(!c.events.some((e) => e.type === "done" && e.payload.status === "succeeded"));
+  assert.equal(gw.store.getTask(run_id)!.status, "running", "SSE 不强制改任务为 succeeded/failed");
+  assert.equal(gw.store.getCleanupHold(run_id, 1)!.state, "recovery_required");
+
+  // GET 是关流后的唯一事实源：仍返回真实 running + cleanup 恢复错误码。
+  const st = await request(gw.port, "GET", `/api/tasks/${run_id}`);
+  assert.equal(st.status, 200);
+  assert.deepEqual(Object.keys(st.body).sort(), ["attempt", "created_at", "error_code", "recovery_required", "run_id", "session_id", "stage", "status"]);
+  assert.equal(st.body.status, "running");
+  assert.equal(st.body.stage, null);
+  assert.equal(st.body.error_code, CLEANUP_RECOVERY_SSE_CODE);
+  assert.equal(st.body.attempt, 1);
+  assert.equal(st.body.recovery_required, true);
+
+  // EventSource 自动重连带合成 id → 204 终止重连；?after= 通道语义相同。
+  const r1 = await request(gw.port, "GET", `/api/tasks/${run_id}/events`, {
+    headers: { "last-event-id": String(err.seq) },
+  });
+  assert.equal(r1.status, 204);
+  assert.equal(r1.raw, "");
+  const r2 = await request(gw.port, "GET", `/api/tasks/${run_id}/events?after=${err.seq}`);
+  assert.equal(r2.status, 204);
+  assert.equal(r2.raw, "");
+
+  // 204 之后客户端仍能查询真实状态（不会误以为成功）。
+  const afterReconnect = await request(gw.port, "GET", `/api/tasks/${run_id}`);
+  assert.equal(afterReconnect.body.status, "running");
+  assert.equal(afterReconnect.body.error_code, CLEANUP_RECOVERY_SSE_CODE);
+  assert.equal(afterReconnect.body.recovery_required, true);
+});
+
+// ── 用例 10：清理证据生成失败的终态：真实 failed done 后追加 recovery 通知 ─────────────
+test("cleanup 证据失败终态：done 是真实 failed，SSE 在其后补发 recovery error，绝不 succeeded", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "清理证据失败的任务", client_submission_id: "recovery-2" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 3_600_000, 3600);
+  assert.ok(lease);
+  const cleanupId = "cleanup-recovery-2";
+  assert.equal(gw.store.beginCleanup(lease, cleanupId).fenced, false);
+  const fin = gw.store.finalizeCleanupFailure(lease, {
+    status: "failed",
+    cleanupId,
+    trigger: "engine_error",
+    platform: "linux",
+    errorCode: "ENGINE_ERROR",
+    errorMessage: "simulated cleanup evidence failure",
+    doneEvent: {
+      run_id,
+      status: "failed",
+      engine: "dsh",
+      elapsed_ms: 1,
+      tokens: null,
+      recovered: false,
+    },
+  });
+  assert.equal(fin.fenced, false);
+  assert.equal(gw.store.getCleanupHold(run_id, 1)!.state, "recovery_required");
+
+  const c = await SseClient.connect(gw.port, run_id);
+  const err = await c.waitEvent("error");
+  await c.waitForEnd();
+  assert.deepEqual(err.payload, { code: CLEANUP_RECOVERY_SSE_CODE, run_id });
+  const types = c.events.map((e) => e.type);
+  assert.deepEqual(types, ["stage", "done", "error"]);
+  const done = c.events.find((e) => e.type === "done")!;
+  assert.equal(done.payload.status, "failed", "done 只能承载任务真实终态");
+  assert.ok(
+    c.events.findIndex((e) => e.type === "done") < c.events.findIndex((e) => e.type === "error"),
+    "recovery 通知在真实 done 之后补发",
+  );
+  assert.ok(!c.events.some((e) => e.type === "done" && e.payload.status === "succeeded"));
+
+  const st = await request(gw.port, "GET", `/api/tasks/${run_id}`);
+  assert.equal(st.body.status, "failed");
+  assert.equal(st.body.error_code, "ENGINE_ERROR");
+  assert.equal(st.body.recovery_required, true, "真实 done 后仍可经 GET 识别 cleanup recovery");
+  assert.equal(gw.store.getCleanupHold(run_id, 1)!.state, "recovery_required");
+});
+
+// ── 用例 11：off 模式零查询 hold、旧 SSE 行为不变 ───────────────────────────────────
+test("cleanupHoldMode=false：库中即使存在 recovery hold，SSE 仍不读取、不通知、不关流", async () => {
+  const gw = await startGateway({ startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "off 模式恢复 hold 不应影响 SSE", client_submission_id: "recovery-off-1" })).body;
+  const ts = Date.now();
+  gw.db
+    .prepare(
+      `UPDATE tasks SET status='running', attempt=1, lease_owner=NULL, lease_expires_at=NULL,
+                        deadline=?, stage=NULL, error_code=NULL, updated_at=?
+       WHERE run_id=?`,
+    )
+    .run(ts + 60_000, ts, run_id);
+  gw.db
+    .prepare(
+      `INSERT INTO cleanup_holds
+         (run_id, attempt, state, lease_owner, cleanup_id,
+          retry_authorized, retry_trigger, reason, created_at, updated_at)
+       VALUES (?, 1, 'recovery_required', NULL, NULL, 0, NULL, 'OFF_SSE_TEST', ?, ?)`,
+    )
+    .run(run_id, ts, ts);
+
+  let holdReads = 0;
+  gw.store.getCleanupHold = () => {
+    holdReads += 1;
+    throw new Error("off mode must not read cleanup holds from SSE");
+  };
+
+  const c = await SseClient.connect(gw.port, run_id);
+  await sleep(80); // > 5 个 15ms poll 周期
+  assert.equal(holdReads, 0, "off/Windows 路径零 hold 查询");
+  assert.equal(c.ended, false, "旧路径仍保持 running 流打开，等待业务事件");
+  assert.ok(!c.events.some((e) => e.type === "error"), "off 路径不发送 recovery 通知");
+  c.destroy();
+
+  // off/Windows 不解释保留区：合成区 after 只是普通大游标，不产生 204/hold 查询。
+  const cSynthetic = await SseClient.connect(gw.port, run_id, {
+    after: CLEANUP_RECOVERY_SSE_ID_BASE + 5,
+  });
+  await sleep(50);
+  assert.equal(holdReads, 0);
+  assert.equal(cSynthetic.ended, false);
+  assert.ok(!cSynthetic.events.some((e) => e.type === "error"));
+  cSynthetic.destroy();
+});
+
+// ── 用例 12：合成游标在 hold 解除后必须还原真实断点，不得漏后续事件 ─────────────────
+test("人工恢复 hold 后，旧合成 Last-Event-ID 还原真实断点并继续补发新事件", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "合成游标恢复任务", client_submission_id: "recovery-cursor-1" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 1_000, 3600);
+  assert.ok(lease);
+  const c = await SseClient.connect(gw.port, run_id);
+  await c.waitEvent("stage");
+  const checkpoint = c.lastSeq;
+  assert.ok(checkpoint > 0 && checkpoint < CLEANUP_RECOVERY_SSE_ID_BASE);
+  gw.store.reapExpiredWithHolds(Date.now() + 60_000, 3);
+  const notification = await c.waitEvent("error");
+  await c.waitForEnd();
+  assert.equal(notification.seq, CLEANUP_RECOVERY_SSE_ID_BASE + checkpoint);
+
+  // 模拟人工恢复：hold=closed、任务重新进入 attempt=2、追加一条真实新事件。
+  // 这不是恢复 API 实现，只用于验证合成游标不能污染真实事件游标。
+  const ts = Date.now();
+  gw.db
+    .prepare(
+      `UPDATE cleanup_holds
+       SET state='closed', retry_authorized=0, retry_trigger=NULL,
+           reason='MANUAL_CLOSED_NO_RETRY', updated_at=?
+       WHERE run_id=? AND attempt=1`,
+    )
+    .run(ts, run_id);
+  gw.db
+    .prepare(
+      `UPDATE tasks
+       SET status='running', attempt=2, error_code=NULL, stage='analyzing',
+           lease_owner=NULL, lease_expires_at=NULL, updated_at=?
+       WHERE run_id=?`,
+    )
+    .run(ts, run_id);
+  const maxSeq = (gw.db.prepare("SELECT MAX(seq) AS n FROM events WHERE run_id=?").get(run_id) as { n: number }).n;
+  const nextSeq = maxSeq + 1;
+  assert.ok(nextSeq < CLEANUP_RECOVERY_SSE_ID_BASE);
+  gw.db
+    .prepare("INSERT INTO events (run_id, seq, type, payload, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(run_id, nextSeq, "stage", JSON.stringify({ stage: "analyzing", attempt: 2 }), ts);
+
+  // 携带旧合成 id 重连：不得 204（已非 recovery），也不得把合成值当 after 而漏掉 nextSeq。
+  const resumed = await SseClient.connect(gw.port, run_id, { lastEventId: notification.seq });
+  const ev = await resumed.waitEvent("stage", 3000);
+  assert.equal(ev.seq, nextSeq, "服务端还原真实断点并继续补发，未把合成 id 当普通 seq");
+  assert.equal(ev.payload.stage, "analyzing");
+  assert.ok(resumed.lastSeq < CLEANUP_RECOVERY_SSE_ID_BASE, "后续游标回到真实 seq 空间");
+  resumed.destroy();
+
+  const st = await request(gw.port, "GET", `/api/tasks/${run_id}`);
+  assert.equal(st.body.status, "running");
+  assert.equal("recovery_required" in st.body, false, "hold 解除后 GET 不再标记 recovery");
+});
+
+// ── 用例 13：204 只用于“合成游标 + 仍 recovery”，普通高游标不得被当成恢复标记 ─────────
+test("非保留区高游标不返回 204；仍 recovery 时发送新的 code-only 通知", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "非合成高游标任务", client_submission_id: "recovery-cursor-2" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 1_000, 3600);
+  assert.ok(lease);
+  gw.store.reapExpiredWithHolds(Date.now() + 60_000, 3);
+
+  // BASE-1 是普通高游标（非保留区）。必须 200 + SSE 通知，而不是 204。
+  const c = await SseClient.connect(gw.port, run_id, { after: CLEANUP_RECOVERY_SSE_ID_BASE - 1 });
+  const err = await c.waitEvent("error", 3000);
+  await c.waitForEnd(3000);
+  assert.deepEqual(err.payload, { code: CLEANUP_RECOVERY_SSE_CODE, run_id });
+  assert.equal(err.seq, CLEANUP_RECOVERY_SSE_ID_BASE + (CLEANUP_RECOVERY_SSE_ID_BASE - 1));
+  assert.ok(err.seq <= CLEANUP_RECOVERY_SSE_ID_MAX);
+});
+
+// ── 用例 14：非法游标不得 500 / 挂起 / 未捕获异常 ───────────────────────────────────
+test("非法、负数、非整数、超大与无穷游标均安全归一，不产生 500 或悬挂", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "非法游标任务", client_submission_id: "recovery-invalid-cursor" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 1_000, 3600);
+  assert.ok(lease);
+  gw.store.reapExpiredWithHolds(Date.now() + 60_000, 3);
+
+  const cases = [
+    { lastEventId: "abc" },
+    { after: "-5" },
+    { lastEventId: "1.5" },
+    { after: "999999999999999999999999" },
+    { lastEventId: "Infinity" },
+  ] as const;
+  for (const cur of cases) {
+    const c = await SseClient.connect(gw.port, run_id, cur);
+    const err = await c.waitEvent("error", 3000);
+    await c.waitForEnd(3000);
+    assert.deepEqual(err.payload, { code: CLEANUP_RECOVERY_SSE_CODE, run_id }, JSON.stringify(cur));
+  }
+
+  const health = await request(gw.port, "GET", "/api/health");
+  assert.equal(health.status, 200, "非法游标后网关仍存活");
+});
+
+// ── 用例 15：真实 seq 撞入保留区 → 拒绝编码并关流，不得未捕获异常 ────────────────────
+test("seq 进入合成 ID 保留区：recovery 编码 fail-closed 关流，不抛未捕获异常", async () => {
+  const gw = await startGateway({ cleanupHoldMode: true, startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "保留区碰撞任务", client_submission_id: "recovery-reserved-seq" })).body;
+  const lease = gw.store.claimLeaseWithCleanupHold(run_id, "w-recovery", 1_000, 3600);
+  assert.ok(lease);
+  gw.store.reapExpiredWithHolds(Date.now() + 60_000, 3);
+  const ts = Date.now();
+  gw.db
+    .prepare("INSERT INTO events (run_id, seq, type, payload, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(run_id, CLEANUP_RECOVERY_SSE_ID_BASE, "stage", JSON.stringify({ stage: "analyzing" }), ts);
+
+  const c = await SseClient.connect(gw.port, run_id);
+  await c.waitForEnd(3000);
+  assert.ok(
+    c.events.some((e) => e.type === "stage" && e.seq === CLEANUP_RECOVERY_SSE_ID_BASE),
+    "真实保留区 seq 已重放",
+  );
+  assert.ok(!c.events.some((e) => e.type === "error"), "无法编码时不伪造合成通知");
+  const st = await request(gw.port, "GET", `/api/tasks/${run_id}`);
+  assert.equal(st.body.recovery_required, true);
+  const health = await request(gw.port, "GET", "/api/health");
+  assert.equal(health.status, 200, "编码拒绝后网关仍存活");
+});
+
+// ── 用例 16：SSE 初始重放异常 → 有界关流，不二次 writeHead/不挂起 ───────────────────
+test("初始重放库异常：SSE 收尾关流，避免 headers 已发后二次 500", async () => {
+  const gw = await startGateway({ startPool: false });
+  const { run_id } = (await submit(gw.port, { question: "初始重放异常任务", client_submission_id: "sse-initial-error" })).body;
+  gw.store.listEvents = () => {
+    throw new Error("simulated event replay failure");
+  };
+
+  const c = await SseClient.connect(gw.port, run_id);
+  await c.waitForEnd(3000);
+  assert.equal(c.ended, true);
+  const health = await request(gw.port, "GET", "/api/health");
+  assert.equal(health.status, 200, "初始重放异常后网关未崩溃/未挂起");
 });

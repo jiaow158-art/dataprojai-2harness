@@ -13,6 +13,8 @@
 //   3. better-sqlite3 同步读 + PK(run_id,seq) 索引，网关规模（10 人）下单查询亚毫秒。
 // 代价是事件可见延迟 ≤500ms——spec D7 明示响应时间非首要指标。终态收流：done 事件
 // 发出后关闭；reaper 收尾的终态无 done 事件，以任务行 status 兜底判终态关流。
+// Linux isolated cleanup hold 为 recovery_required 时，额外发送一条 code-only error
+// （合成 id 编码真实断点 + 重连 204）并关流；off/Windows 不读 hold，旧行为逐字不变。
 //
 // stderr 红线（T2 发现）：错误响应一律 sendError 封闭集消息——异常对象文本（可能含
 // 路径/env/引擎 stderr）只进服务端日志，绝不序列化进响应体。引擎 error_message 已在
@@ -34,6 +36,41 @@ export interface HttpGatewayConfig {
   heartbeatMs?: number;
   /** POST body 上限字节（默认 1MB）。 */
   maxBodyBytes?: number;
+  /**
+   * Linux isolated cleanup hold 模式。缺省/false 时 SSE 保持旧行为，绝不读取
+   * cleanup_holds；只有显式开启才发送 recovery_required 受控通知。
+   */
+  cleanupHoldMode?: boolean;
+}
+
+/** SSE recovery 通知的错误码（与 TaskStore 的 CLEANUP_RECOVERY_REQUIRED 同值）。 */
+export const CLEANUP_RECOVERY_SSE_CODE = "CLEANUP_RECOVERY_REQUIRED";
+
+/**
+ * recovery 通知的合成 SSE id 保留区。它不是 events 表里的 seq：
+ *   id = CLEANUP_RECOVERY_SSE_ID_BASE + 收到通知时的真实 lastSeq
+ * 这样自动重连带回合成 id 时，服务端既能识别“已通知”，又能在 hold 已解除后
+ * 还原真实游标、从断点继续消费，绝不会因合成值大于所有真实 seq 而漏事件。
+ *
+ * 保留区上限 = BASE + (BASE - 1)：保证可还原的真实 lastSeq 始终低于 BASE，
+ * 不会把另一个保留区值误当成真实断点；同时整体低于 2^31-1，旧客户端 32 位解析不溢出。
+ * 真实 seq 必须远低于 BASE（任务级事件数不可能接近 10 亿）；越界视为协议损坏。
+ */
+export const CLEANUP_RECOVERY_SSE_ID_BASE = 1_000_000_000;
+export const CLEANUP_RECOVERY_SSE_ID_MAX = CLEANUP_RECOVERY_SSE_ID_BASE * 2 - 1;
+
+/** 仅当 id 落在保留区时返回其携带的真实 lastSeq；普通 seq 返回 null。 */
+export function recoverySseCheckpoint(id: number): number | null {
+  if (!Number.isSafeInteger(id)) return null;
+  if (id < CLEANUP_RECOVERY_SSE_ID_BASE || id > CLEANUP_RECOVERY_SSE_ID_MAX) return null;
+  return id - CLEANUP_RECOVERY_SSE_ID_BASE;
+}
+
+function recoverySseId(lastSeq: number): number {
+  if (!Number.isSafeInteger(lastSeq) || lastSeq < 0 || lastSeq >= CLEANUP_RECOVERY_SSE_ID_BASE) {
+    throw new Error("event sequence exceeded recovery cursor reserved range");
+  }
+  return CLEANUP_RECOVERY_SSE_ID_BASE + lastSeq;
 }
 
 export interface HttpGatewayDeps {
@@ -142,8 +179,54 @@ function sseFrame(seq: number, type: string, payload: unknown): string {
 }
 
 /**
+ * 是否处于 cleanup recovery_required：
+ * - 只读当前 tasks 行与当前 attempt 的 hold，每轮取最新值，避免 SSE 持有旧 attempt；
+ * - 只在 cleanupHoldMode 显式开启时生效，Windows/off 路径零查询、零行为变化；
+ * - hold 读取失败按 recovery 处理（fail-closed），不让连接静默悬挂。
+ */
+function cleanupRecoveryRequired(deps: HttpGatewayDeps, runId: string): boolean {
+  if (deps.config.cleanupHoldMode !== true) return false;
+  try {
+    const current = deps.store.getTask(runId);
+    if (!current) return false;
+    if (current.status === "running" && current.error_code === CLEANUP_RECOVERY_SSE_CODE) {
+      return true;
+    }
+    return deps.store.getCleanupHold(current.run_id, current.attempt)?.state === "recovery_required";
+  } catch (err) {
+    console.error(`[sse] cleanup hold 读取失败 run_id=${runId}:`, err);
+    return true;
+  }
+}
+
+/** code-only 通知：只给码和 run_id；文案由 BFF/UI 按码映射，不把其余状态带出网关。
+ *  若真实 seq 已进入保留区（协议损坏），拒绝编码并返回 null；调用方关流，绝不抛出
+ *  未捕获异常。GET 仍可通过 recovery_required 观察状态。 */
+function recoveryErrorFrame(runId: string, lastSeq: number): string | null {
+  try {
+    return sseFrame(recoverySseId(lastSeq), "error", {
+      code: CLEANUP_RECOVERY_SSE_CODE,
+      run_id: runId,
+    });
+  } catch (err) {
+    console.error(`[sse] recovery 游标编码失败 run_id=${runId}:`, err);
+    return null;
+  }
+}
+
+function sendRecoveryNotice(res: ServerResponse, runId: string, lastSeq: number): void {
+  const frame = recoveryErrorFrame(runId, lastSeq);
+  if (frame !== null) res.write(frame);
+}
+
+/**
  * 事件流：先重放 (afterSeq, …] 全量补发，再挂 500ms 轮询实时层；done 事件发出后
  * 服务端主动关流（正常结束语义），reaper 终态（无 done 事件）以任务行 status 兜底。
+ *
+ * cleanup hold 模式额外规则：只要当前 attempt 进入 recovery_required，就在已重放事件
+ * 之后补发一条 code-only error 并立即关流。通知 id 编码真实 lastSeq（BASE + lastSeq）；
+ * 自动重连带回时：仍 recovery → 204，已解除 → 还原断点继续消费，绝不把合成值当普通 seq。
+ * 这里绝不写任务状态、绝不补 done、绝不触发重试。
  */
 function streamEvents(req: IncomingMessage, res: ServerResponse, task: TaskRow, afterSeq: number, deps: HttpGatewayDeps): void {
   const { store, config } = deps;
@@ -165,28 +248,67 @@ function streamEvents(req: IncomingMessage, res: ServerResponse, task: TaskRow, 
     cleanup();
     res.end();
   };
+  const finishWithRecoveryNoticeIfNeeded = () => {
+    if (cleanupRecoveryRequired(deps, task.run_id)) {
+      sendRecoveryNotice(res, task.run_id, lastSeq);
+    }
+    finish();
+  };
 
   startSse(res);
 
-  // 1. 重放：与重连同一查询路径（seq > afterSeq），天然不重不漏。
-  for (const ev of store.listEvents(task.run_id, lastSeq)) {
-    res.write(sseFrame(ev.seq, ev.type, ev.payload));
-    lastSeq = ev.seq;
-    if (ev.type === "done") return finish();
+  try {
+    // 1. 重放：与重连同一查询路径（seq > afterSeq），天然不重不漏。done 是最后一条
+    // 业务事件；命中后先检查 recovery hold，再决定发通知/正常关流。
+    let replayedDone = false;
+    for (const ev of store.listEvents(task.run_id, lastSeq)) {
+      res.write(sseFrame(ev.seq, ev.type, ev.payload));
+      lastSeq = ev.seq;
+      if (ev.type === "done") {
+        replayedDone = true;
+        break;
+      }
+    }
+    if (replayedDone) return finishWithRecoveryNoticeIfNeeded();
+
+    // recovery_required 的任务保持 running（或已有 failed/cancelled done），SSE 不能等
+    // 待后续事件，也不能把任务伪装成终态；发受控通知后关闭。
+    if (cleanupRecoveryRequired(deps, task.run_id)) {
+      sendRecoveryNotice(res, task.run_id, lastSeq);
+      return finish();
+    }
+
+    // 重放即终态且无 done（reaper 收尾的终态不落 done 事件——T7/T4 裁定）→ 兜底关流。
+    const t0 = store.getTask(task.run_id);
+    if (t0 && TERMINAL_STATUS.has(t0.status)) return finish();
+  } catch (err) {
+    // headers 已发出后不能再走 sendError（会二次 writeHead）；这里必须收尾关流，
+    // 绝不让 SSE 请求因库/编码异常永久挂起。
+    console.error(`[sse] 初始重放失败 run_id=${task.run_id}:`, err);
+    return finish();
   }
-  // 重放即终态且无 done（reaper 收尾的终态不落 done 事件——T7/T4 裁定）→ 兜底关流。
-  const t0 = store.getTask(task.run_id);
-  if (t0 && TERMINAL_STATUS.has(t0.status)) return finish();
 
   // 2. 实时层：轮询新 seq（选型理由见文件头）。
   pollTimer = setInterval(() => {
     try {
       const evs = store.listEvents(task.run_id, lastSeq);
+      let sawDone = false;
       for (const ev of evs) {
         res.write(sseFrame(ev.seq, ev.type, ev.payload));
         lastSeq = ev.seq;
-        if (ev.type === "done") return finish();
+        if (ev.type === "done") {
+          sawDone = true;
+          break;
+        }
       }
+      if (sawDone) return finishWithRecoveryNoticeIfNeeded();
+
+      // reaper/boot recovery 不追加事件，必须在每轮 poll 主动检查 hold。
+      if (cleanupRecoveryRequired(deps, task.run_id)) {
+        sendRecoveryNotice(res, task.run_id, lastSeq);
+        return finish();
+      }
+
       if (evs.length === 0) {
         const t = store.getTask(task.run_id);
         if (t && TERMINAL_STATUS.has(t.status)) finish(); // 兜底：终态无 done（reaper 路径）
@@ -252,12 +374,14 @@ async function handleCreateTask(req: IncomingMessage, res: ServerResponse, deps:
   sendJson(res, 201, { run_id: task.run_id, session_id: task.session_id });
 }
 
-function handleGetTask(res: ServerResponse, runId: string, user: string, store: TaskStore): void {
-  const task = store.getTask(runId);
+function handleGetTask(res: ServerResponse, runId: string, user: string, deps: HttpGatewayDeps): void {
+  const task = deps.store.getTask(runId);
   if (!task) return sendError(res, 404, "NOT_FOUND", "task not found");
   if (task.user !== user) return sendError(res, 403, "FORBIDDEN", "task owner mismatch");
-  // 字段白名单（stderr 红线：error_message 不出网关——审计走库，前端看 stage/error_code）
-  sendJson(res, 200, {
+  // 字段白名单（stderr 红线：error_message 不出网关——审计走库，前端看 stage/error_code）。
+  // cleanup recovery 仅在 Linux isolated 且当前确实 recovery 时附加一个布尔字段：
+  // off/Windows/正常任务的 JSON 形状逐字不变；旧客户端可忽略未知字段。
+  const body: Record<string, unknown> = {
     run_id: task.run_id,
     session_id: task.session_id,
     status: task.status,
@@ -265,14 +389,33 @@ function handleGetTask(res: ServerResponse, runId: string, user: string, store: 
     attempt: task.attempt,
     error_code: task.error_code,
     created_at: task.created_at,
-  });
+  };
+  if (cleanupRecoveryRequired(deps, runId)) body.recovery_required = true;
+  sendJson(res, 200, body);
 }
 
 function handleGetEvents(req: IncomingMessage, res: ServerResponse, runId: string, user: string, deps: HttpGatewayDeps): void {
   const task = deps.store.getTask(runId);
   if (!task) return sendError(res, 404, "NOT_FOUND", "task not found");
   if (task.user !== user) return sendError(res, 403, "FORBIDDEN", "task owner mismatch");
-  streamEvents(req, res, task, resumeAfter(req, new URL(req.url ?? "/", "http://localhost")), deps);
+  const rawAfter = resumeAfter(req, new URL(req.url ?? "/", "http://localhost"));
+  // 合成 id 只用于“已收到 recovery 通知”的断点标记，不能当普通 seq：
+  // - 仍在 recovery_required → 204 终止自动重连；
+  // - hold 已解除/人工恢复 → 还原其携带的真实 lastSeq，从断点继续消费，避免漏事件；
+  // - 保留区之外的超大游标（真实 seq 不可能到这里）→ 从 0 重放，防越界污染。
+  // 仅在 cleanup 模式解释保留区；Windows/off 的任意 after 语义完全不变。
+  const recoveryCheckpoint =
+    deps.config.cleanupHoldMode === true ? recoverySseCheckpoint(rawAfter) : null;
+  if (recoveryCheckpoint !== null && cleanupRecoveryRequired(deps, runId)) {
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    res.end();
+    return;
+  }
+  const afterSeq =
+    deps.config.cleanupHoldMode === true
+      ? recoveryCheckpoint ?? (rawAfter >= CLEANUP_RECOVERY_SSE_ID_BASE ? 0 : rawAfter)
+      : rawAfter;
+  streamEvents(req, res, task, afterSeq, deps);
 }
 
 export function createHttpServer(deps: HttpGatewayDeps): Server {
@@ -308,7 +451,7 @@ async function route(req: IncomingMessage, res: ServerResponse, deps: HttpGatewa
       const user = trustedUser(req);
       if (!user) return sendError(res, 400, "BAD_REQUEST", "missing X-User header");
       const runId = decodeURIComponent(seg[2]!);
-      if (seg.length === 3) return handleGetTask(res, runId, user, deps.store);
+      if (seg.length === 3) return handleGetTask(res, runId, user, deps);
       if (seg.length === 4 && seg[3] === "events") return handleGetEvents(req, res, runId, user, deps);
     }
   }

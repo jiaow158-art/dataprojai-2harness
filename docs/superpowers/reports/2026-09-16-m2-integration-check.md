@@ -50,10 +50,13 @@ engine-gateway（本仓）→ dsh → DWS
 
 ```json
 { "run_id": "...", "session_id": "...", "status": "queued|running|succeeded|failed|cancelled",
-  "stage": "...", "attempt": 2, "error_code": "TIMEOUT|ENGINE_ERROR|CONFIG|REPORT_CHECK|null",
-  "created_at": "..." }
+  "stage": "...", "attempt": 2, "error_code": "TIMEOUT|ENGINE_ERROR|CONFIG|REPORT_CHECK|CLEANUP_RECOVERY_REQUIRED|null",
+  "created_at": "...", "recovery_required": true }
 ```
 
+- `recovery_required` 是**可选字段**：仅 Linux isolated 且当前确实处于 cleanup `recovery_required`
+  时出现且为 `true`；off/Windows/正常任务的响应 JSON 形状不变。它不等同于任务终态，终态仍以
+  `status` 为准。
 - `404 NOT_FOUND`；`403 FORBIDDEN`（任务属主≠X-User——BFF 透传即可，同账号多标签页不受影响）。
 
 ### GET /api/tasks/:run_id/events — SSE 事件流（§4）
@@ -70,6 +73,9 @@ queued ──→ running ──→ succeeded | failed | cancelled
 
 - 同 session 内任务**严格串行**（后到的排队，前序终态才轮到它）——UI 无需也无法干预顺序。
 - `attempt` >1 且出现 `stage: repairing` = 服务端故障恢复中（对用户可展示"恢复中"，结果语义不变）。
+- Linux isolated 的 cleanup hold 进入 `recovery_required` 时，任务状态不一定改变：可能仍为
+  `running`（等待人工清理确认），也可能已有真实 `failed`/`cancelled` 业务终态。该状态不是任务
+  状态机的新终态，SSE 通过 §4.1 的 code-only error 通知；禁止自动重试或直接改库放行。
 - `recovered: true` 的 done = 本任务经历过接管重试（UI 可加角标，非必须）。
 - 单任务预算默认 1800s（TASK_BUDGET_S），超时终态 failed/`TIMEOUT`。
 
@@ -78,7 +84,7 @@ queued ──→ running ──→ succeeded | failed | cancelled
 帧格式：
 
 ```
-id: <seq>              ← 任务内单调递增，事件表 PK(run_id, seq)
+id: <seq>              ← 正常事件为任务内单调 seq（events 表 PK）；§4.1 的 recovery 通知为保留区合成游标
 event: <type>          ← 六类词表见 §6
 data: <json>
 
@@ -89,6 +95,44 @@ data: <json>
 - 正常终态：`done` 事件发出后**服务端主动关流**。
 - 异常终态（reaper 收尾，无 done 事件）：流静默结束——客户端以 `GET /api/tasks/:id` 的 `status` 兜底判终态。
 - **浏览器原生 EventSource 不能设自定义头** → BFF 必须代理 SSE 端点（登录态换 X-User 后透传），不能让浏览器直连网关。代理时禁用响应缓冲（nginx `proxy_buffering off` 同理），心跳行可助中间层保活。
+
+### 4.1 Linux isolated：cleanup `recovery_required` 通知
+
+仅在 cleanup hold 模式（显式 `linux_isolated`）启用；Windows/off 分支不读 `cleanup_holds`，行为与旧版完全一致。
+
+- 当当前 attempt 的持久化 hold 为 `recovery_required` 时，服务端在已重放事件之后发送一条
+  `event: error`，payload 固定为 `{"code":"CLEANUP_RECOVERY_REQUIRED","run_id":"<id>"}`
+  （code-only，无 message/路径/审计详情），随后主动关流。
+- 通知的 SSE id 是**保留区合成游标**，不是 events 表 seq：
+
+```text
+id = 1_000_000_000 + 通知时的真实 lastSeq     （保留区 [1_000_000_000, 1_999_999_999]）
+```
+
+  - 真实事件 seq 必须远低于 `1_000_000_000`；越界属协议损坏。
+  - EventSource 自动重连带 `Last-Event-ID`（或 `?after=`）回到网关时：
+    - 任务**仍**处于 `recovery_required` → **HTTP 204**，终止自动重连；
+    - hold 已解除/人工恢复 → 服务端从合成 id **还原真实 lastSeq**，继续补发 `seq > lastSeq`
+      的真实事件，不会因为合成值高于全部真实 seq 而漏事件。
+  - 204 只用于“合成游标 + 当前确实 recovery”的组合；普通高 seq、非合成游标、已解除 hold
+    一律不得返回 204。服务端绝不通过无条件 204 隐藏已恢复任务的真实状态。
+  - 保留区之外、超过真实 seq 上限的游标视为协议损坏：cleanup 模式从 seq 0 重放（宁可重复，
+    不丢事件），不会把该值当作合成标记。
+- 客户端**不得**把保留区 id 当普通 seq 计算、加一或落成业务游标；客户端若重建全新 EventSource，
+  可不带 Last-Event-ID（从 seq 0 全量重放），也可透传旧合成 id 由网关还原断点。
+- 若真实事件 seq 已进入保留区（协议损坏），网关拒绝编码合成 id，记录服务端错误并直接收尾
+  关流；不发送无法安全重连的合成通知，不抛未捕获异常。GET 仍可通过 `recovery_required`
+  观察恢复状态，任务状态不被改写。
+- 若任务已有真实的业务 `done`（如 cleanup 证据失败导致的 `failed`/`cancelled`），该 done 原样
+  保留，recovery error 在其后补发；绝不改写为 `succeeded`，也不伪造 done。旧客户端若在 done
+  后立即关流，仍可用 `GET /api/tasks/:run_id` 的 `status` + 可选 `recovery_required=true`
+  识别“业务终态 + 仍需资源恢复”并存。
+- 服务端不修改任务状态、不触发自动重试。任务行可能仍为 `running`（例如 boot/reaper 恢复），
+  `GET` 会返回 `error_code: "CLEANUP_RECOVERY_REQUIRED"` 与 `recovery_required:true`；也可能
+  已是真实 `failed`/`cancelled`，但 hold 仍等待人工清理确认。
+- **客户端兼容要求**：新 UI/BFF 必须按 `CLEANUP_RECOVERY_REQUIRED` 映射“任务中断，等待恢复”
+  文案，并允许 error payload 不含 `message`；旧客户端应至少将其识别为 `error`，不得当作成功。
+  BFF 必须保留 SSE `id:` 帧、透传 `Last-Event-ID`，并把 204 作为正常停止信号而不是自行重连。
 
 ## 5. 幂等（A.3 提交层）
 
@@ -105,7 +149,7 @@ data: <json>
 | `sql` | `{sql, rows, truncated, result_ref?, elapsed_ms}` | 过程折叠条："查询中…N 行"；`result_ref` = 落盘结果文件名（D13 双通道，可下载明细） |
 | `answer` | `{markdown}` | 最终回答正文（Markdown 渲染，**须白名单 sanitize**） |
 | `report` | `{path}` | 报告产物相对路径（发布成功后才发） |
-| `error` | `{code, message}` | 失败原因（code 见 §2 GET 端点） |
+| `error` | `{code, message}`；§4.1 的 recovery 通知例外：仅 `{code, run_id}` | 失败原因（code 见 §2 GET 端点；recovery code-only 见 §4.1） |
 | `done` | `{run_id, status, engine, elapsed_ms, tokens, recovered}` | 终态：关流 + 计费展示（tokens `{input, output, cache_read}` 或 null） |
 
 `stage` 词表：`queued | analyzing | querying | script_running | report_checking | repairing | publishing`
