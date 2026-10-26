@@ -26,6 +26,11 @@ export interface PoolConfig {
   reapIntervalMs: number;
   /** reapExpired 的 attempt 上限——与 TaskRunner.maxAttempts 同源同值（index.ts 统一注入）。 */
   maxAttempts: number;
+  /**
+   * C2-B2-2B-2：Linux isolated cleanup 的持久 hold 模式。
+   * false/缺省 = 旧路径逐字不变；true 必须与 TaskStore.cleanupHoldMode 同时启用。
+   */
+  cleanupHoldMode?: boolean;
 }
 
 export interface PoolStats {
@@ -64,12 +69,31 @@ export class WorkerPool {
    * 启动派发/reap 双计时器。首步执行 A.1 boot 自愈：单服务部署不变量下，进程启动时
    * 不可能有合法租约持有者——上一次进程死亡残留的 running 任务全部回队（healOrphans），
    * 随后正常派发：claim 时 attempt+1 走恢复路径（A.4 行2），超预算者由 reaper 终态。
+   *
+   * cleanup hold 模式：boot 恢复必须先于任何派发完成；executing/cleanup_pending/
+   * recovery_required 的 hold 一律不回到可派发集合。boot 恢复本身失败（hold 缺失/
+   * 损坏/查询异常）时停止启动，不降级到 legacy 自愈。
    */
   start(): void {
     if (this.started) return;
     this.started = true;
-    const healed = this.store.healOrphans();
-    if (healed > 0) console.log(`[pool] boot 自愈：清理 ${healed} 个孤儿租约（A.1）`);
+    try {
+      if (this.config.cleanupHoldMode === true) {
+        const healed = this.store.healOrphansWithHolds(Date.now(), this.config.maxAttempts);
+        if (healed.requeued + healed.recoveryRequired > 0) {
+          console.log(
+            `[pool] boot hold 恢复：requeued=${healed.requeued} ` +
+              `recovery_required=${healed.recoveryRequired} unchanged=${healed.unchanged}`,
+          );
+        }
+      } else {
+        const healed = this.store.healOrphans();
+        if (healed > 0) console.log(`[pool] boot 自愈：清理 ${healed} 个孤儿租约（A.1）`);
+      }
+    } catch (err) {
+      this.started = false;
+      throw err;
+    }
     this.dispatchTimer = setInterval(() => this.dispatchTick(), this.config.pollIntervalMs);
     this.dispatchTimer.unref?.();
     this.reapTimer = setInterval(() => this.reapTick(), this.config.reapIntervalMs);
@@ -93,7 +117,11 @@ export class WorkerPool {
     try {
       const capacity = this.config.maxConcurrent - this.inFlight.size;
       if (capacity <= 0) return;
-      for (const t of this.store.listRunnable(capacity)) {
+      const candidates =
+        this.config.cleanupHoldMode === true
+          ? this.store.listRunnableWithCleanupHolds(capacity)
+          : this.store.listRunnable(capacity);
+      for (const t of candidates) {
         if (this.inFlight.has(t.run_id)) continue; // 防重复派发（reaper 回队窗口内旧 Promise 未 settle 时）
         this.launch(t.run_id);
       }
@@ -105,6 +133,13 @@ export class WorkerPool {
 
   private reapTick(): void {
     try {
+      if (this.config.cleanupHoldMode === true) {
+        const reaped = this.store.reapExpiredWithHolds(Date.now(), this.config.maxAttempts);
+        for (const r of reaped) {
+          console.log(`[pool] hold reaper: ${r.run_id} → ${r.action}`);
+        }
+        return;
+      }
       const reaped = this.store.reapExpired(Date.now(), this.config.maxAttempts);
       for (const r of reaped) console.log(`[pool] reaper: ${r.run_id} → ${r.status}`);
     } catch (err) {
