@@ -257,7 +257,7 @@ export class DshSdkClient {
     if (this.terminationOwned) return;
     if (!this.child || this.exited) return;
     try {
-      await this.withTimeout(this.send("shutdown", {}), graceMs, new Error("shutdown timeout"));
+      await this.withTimeout(this.send("shutdown", {}), graceMs, () => new Error("shutdown timeout"));
     } catch {
       // shutdown 无响应 → 直接 killTree
     }
@@ -273,7 +273,7 @@ export class DshSdkClient {
     if (!this.child || this.exited) return true;
     if (this.activePrompt) return false;
     try {
-      await this.withTimeout(this.send("shutdown", {}), graceMs, new Error("shutdown timeout"));
+      await this.withTimeout(this.send("shutdown", {}), graceMs, () => new Error("shutdown timeout"));
       return true;
     } catch {
       return false;

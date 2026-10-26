@@ -151,3 +151,136 @@ test("Linux 真实 detached spawn：采集 PID/PGID/startTicks，shutdown 不 ki
     child.stderr?.destroy();
   }
 });
+
+test("stop 正常 shutdown：应答后正常结束，不触发超时错误", async () => {
+  const child = fakeChild();
+  let shutdowns = 0;
+  let kills = 0;
+  child.stdin.write = (s: string) => {
+    const m = JSON.parse(s);
+    if (m.method === "initialize") {
+      setImmediate(() => child.stdout.write(JSON.stringify({
+        jsonrpc: "2.0", id: m.id, result: { serverInfo: { name: "fake", version: "test" } },
+      }) + "\n"));
+    } else if (m.method === "shutdown") {
+      shutdowns += 1;
+      setImmediate(() => {
+        child.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: {} }) + "\n");
+        child.emit("exit", 0);
+      });
+    }
+    return true;
+  };
+  const client = new DshSdkClient({
+    cwd: process.cwd(),
+    env: {},
+    initTimeoutMs: 1000,
+    spawnFn: () => child,
+    killTreeFn: () => { kills += 1; },
+  });
+  await client.start({ provider: "fake", model: "fake" });
+  await client.stop(500);
+  assert.equal(shutdowns, 1);
+  assert.equal(client.hasExited, true);
+  assert.equal(kills, 0, "正常 shutdown 已退出时 stop 的 killTree 应为 no-op");
+});
+
+test("requestShutdown never-respond：超时返回 false，不抛未捕获 TypeError", async () => {
+  const child = fakeChild();
+  child.stdin.write = (s: string) => {
+    const m = JSON.parse(s);
+    if (m.method === "initialize") {
+      setImmediate(() => child.stdout.write(JSON.stringify({
+        jsonrpc: "2.0", id: m.id, result: { serverInfo: { name: "fake", version: "test" } },
+      }) + "\n"));
+    }
+    // shutdown 故意永不响应。
+    return true;
+  };
+  const client = new DshSdkClient({
+    cwd: process.cwd(),
+    env: {},
+    initTimeoutMs: 1000,
+    spawnFn: () => child,
+    killTreeFn: () => {},
+  });
+  await client.start({ provider: "fake", model: "fake" });
+  const started = Date.now();
+  assert.equal(await client.requestShutdown(50), false);
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(client.hasExited, false);
+});
+
+test("stop never-respond：超时后按原语义 killTree 并返回，不抛未捕获 TypeError", async () => {
+  const child = fakeChild();
+  let shutdowns = 0;
+  let kills = 0;
+  child.stdin.write = (s: string) => {
+    const m = JSON.parse(s);
+    if (m.method === "initialize") {
+      setImmediate(() => child.stdout.write(JSON.stringify({
+        jsonrpc: "2.0", id: m.id, result: { serverInfo: { name: "fake", version: "test" } },
+      }) + "\n"));
+    } else if (m.method === "shutdown") {
+      shutdowns += 1;
+    }
+    return true;
+  };
+  const client = new DshSdkClient({
+    cwd: process.cwd(),
+    env: {},
+    initTimeoutMs: 1000,
+    spawnFn: () => child,
+    killTreeFn: () => { kills += 1; },
+  });
+  await client.start({ provider: "fake", model: "fake" });
+  const started = Date.now();
+  await client.stop(50);
+  assert.equal(shutdowns, 1);
+  assert.equal(kills, 1, "shutdown 超时仍必须按原语义调用 killTree");
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("Linux 真实 detached never-respond：requestShutdown 超时 false，不 kill、进程仍存活", { skip: process.platform === "win32" }, async () => {
+  const script = `
+    process.stdin.on("data", (d) => {
+      for (const line of d.toString().split("\\n")) {
+        if (!line) continue;
+        let m;
+        try { m = JSON.parse(line); } catch { continue; }
+        if (m.method === "initialize") {
+          process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result: { serverInfo: { name: "fake", version: "1" } } }) + "\\n");
+        }
+        // shutdown 故意不响应，也不退出。
+      }
+    });
+    setInterval(() => {}, 1000);
+  `;
+  const child = spawn(process.execPath, ["-e", script], {
+    detached: true,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let kills = 0;
+  try {
+    const client = new DshSdkClient({
+      cwd: process.cwd(),
+      env: { SANDBOX_ACL_STATE_DIR: "/tmp/acl-never-respond" },
+      initTimeoutMs: 2000,
+      spawnFn: () => child,
+      killTreeFn: () => { kills += 1; },
+    });
+    await client.start({ provider: "fake", model: "fake" });
+    assert.equal(await client.requestShutdown(80), false);
+    assert.equal(kills, 0, "requestShutdown 超时不得调用 killTree");
+    assert.equal(client.hasExited, false);
+    assert.doesNotThrow(() => process.kill(child.pid!, 0), "DSH 进程必须仍存活");
+  } finally {
+    try {
+      if (child.pid) process.kill(-child.pid, "SIGKILL");
+    } catch {
+      /* already gone */
+    }
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+  }
+});
