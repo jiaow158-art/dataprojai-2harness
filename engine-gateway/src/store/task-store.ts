@@ -123,6 +123,49 @@ export interface CleanupReportRow {
   created_at: number;
 }
 
+// ---------- C2-B2-2A：持久化 cleanup hold ----------
+
+export type CleanupHoldState =
+  | "executing"
+  | "cleanup_pending"
+  | "cleanup_verified"
+  | "recovery_required"
+  | "closed";
+
+export type CleanupRetryTrigger = "timeout" | "engine_error";
+
+export interface CleanupHoldRow {
+  run_id: string;
+  attempt: number;
+  state: CleanupHoldState;
+  lease_owner: string | null;
+  cleanup_id: string | null;
+  retry_authorized: boolean;
+  retry_trigger: CleanupRetryTrigger | null;
+  reason: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface CleanupHealResult {
+  requeued: number;
+  recoveryRequired: number;
+  unchanged: number;
+}
+
+export interface CleanupReapResult {
+  run_id: string;
+  action: "queued" | "recovery_required" | "failed";
+}
+
+export interface TaskStoreOptions {
+  /**
+   * 持久化 cleanup hold 模式。默认 false（Windows/off 旧路径）。
+   * 仅 Linux isolated cleanup 模式应显式开启；保护状态始终来自 SQLite，不使用内存集合。
+   */
+  cleanupHoldMode?: boolean;
+}
+
 export class CleanupStoreError extends Error {
   code: string;
 
@@ -164,6 +207,15 @@ const REPORT_KEYS = [
   "trigger",
   "version",
 ] as const;
+const CLEANUP_HOLD_STATES = new Set<CleanupHoldState>([
+  "executing",
+  "cleanup_pending",
+  "cleanup_verified",
+  "recovery_required",
+  "closed",
+]);
+const CLEANUP_RETRY_TRIGGERS = new Set<CleanupRetryTrigger>(["timeout", "engine_error"]);
+const CLEANUP_RECOVERY_ERROR_CODE = "CLEANUP_RECOVERY_REQUIRED";
 
 function cleanupFail(code: string, message: string): never {
   throw new CleanupStoreError(code, message);
@@ -512,10 +564,12 @@ const WITHIN_BUDGET = "(deadline IS NULL OR deadline >= ?)";
 export class TaskStore {
   private db: Database.Database;
   private now: () => number;
+  private cleanupHoldMode: boolean;
 
-  constructor(db: Database.Database, now: () => number = Date.now) {
+  constructor(db: Database.Database, now: () => number = Date.now, opts: TaskStoreOptions = {}) {
     this.db = db;
     this.now = now;
+    this.cleanupHoldMode = opts.cleanupHoldMode === true;
     db.exec(readFileSync(join(dirname(fileURLToPath(import.meta.url)), "schema.sql"), "utf8"));
   }
 
@@ -580,6 +634,7 @@ export class TaskStore {
    * 返回回队任务数（0 = 干净启动）。
    */
   healOrphans(): number {
+    this.assertLegacyApiAllowed("healOrphans");
     return this.db
       .prepare(
         `UPDATE tasks SET status='queued', lease_owner=NULL, lease_expires_at=NULL, stage=NULL
@@ -601,6 +656,7 @@ export class TaskStore {
    * （seq 在同一同步事务内 MAX(seq)+1 分配，A.3 事件层）。
    */
   claimLease(runId: string, workerId: string, ttlMs: number, budgetS: number): Lease | false {
+    this.assertLegacyApiAllowed("claimLease");
     const ts = this.now();
     return this.db.transaction(() => {
       const r = this.db
@@ -646,6 +702,7 @@ export class TaskStore {
     errorCode?: string,
     errorMessage?: string,
   ): FencedResult {
+    this.assertLegacyApiAllowed("finalize");
     const ts = this.now();
     const r = this.db
       .prepare(
@@ -713,6 +770,9 @@ export class TaskStore {
       if (this.countDoneEvents(lease.run_id) > 0) {
         cleanupFail("CLEANUP_DONE_ALREADY_EXISTS", "a done event already exists for this run");
       }
+      if (this.cleanupHoldMode) {
+        this.requireHoldForCleanup(lease, String(validated.report.cleanupId), "finalizeWithCleanup");
+      }
 
       this.insertCleanupReportRow({
         runId: lease.run_id,
@@ -755,6 +815,9 @@ export class TaskStore {
       }
 
       const doneSeq = this.insertEventUnfenced(lease.run_id, "done", input.doneEvent, ts);
+      if (this.cleanupHoldMode) {
+        this.finishHoldAfterFinalize(lease, validated.overallOk, ts);
+      }
       if (!this.updateTerminalInTransaction(lease, status, input.errorCode, input.errorMessage, ts)) {
         cleanupFail("CLEANUP_FENCED", "lease fence lost while committing cleanup terminal");
       }
@@ -786,6 +849,9 @@ export class TaskStore {
     const ts = this.now();
     const tx = this.db.transaction((): CleanupFencedResult => {
       if (!this.leaseHeldInTransaction(lease)) return { fenced: true };
+      if (this.cleanupHoldMode) {
+        this.requireHoldForCleanup(lease, String(validated.report.cleanupId), "releaseForRetryWithCleanup");
+      }
       if (this.countDoneEvents(lease.run_id) > 0) {
         cleanupFail("CLEANUP_DONE_ALREADY_EXISTS", "cannot release for retry after a done event");
       }
@@ -815,6 +881,19 @@ export class TaskStore {
         .run(ts, lease.run_id, lease.attempt, lease.lease_owner);
       if (r.changes === 0) {
         cleanupFail("CLEANUP_FENCED", "lease fence lost while releasing for retry");
+      }
+      if (this.cleanupHoldMode) {
+        const h = this.db
+          .prepare(
+            `UPDATE cleanup_holds
+             SET state='cleanup_verified', retry_authorized=1, retry_trigger=?,
+                 reason='RETRY_AUTHORIZED', updated_at=?
+             WHERE run_id=? AND attempt=? AND state='cleanup_pending' AND lease_owner=?`,
+          )
+          .run(validated.report.trigger, ts, lease.run_id, lease.attempt, lease.lease_owner);
+        if (h.changes === 0) {
+          cleanupFail("CLEANUP_HOLD_STATE_INVALID", "hold is not cleanup_pending for this owner");
+        }
       }
       return { fenced: false, reportStored: true };
     });
@@ -847,6 +926,9 @@ export class TaskStore {
       if (this.countDoneEvents(lease.run_id) > 0) {
         cleanupFail("CLEANUP_DONE_ALREADY_EXISTS", "a done event already exists for this run");
       }
+      if (this.cleanupHoldMode) {
+        this.requireHoldForCleanup(lease, cleanupId, "finalizeCleanupFailure");
+      }
       this.insertCleanupReportRow({
         runId: lease.run_id,
         attempt: lease.attempt,
@@ -860,6 +942,14 @@ export class TaskStore {
         createdAt: ts,
       });
       const doneSeq = this.insertEventUnfenced(lease.run_id, "done", input.doneEvent, ts);
+      if (this.cleanupHoldMode) {
+        this.markHoldRecoveryRequired(
+          lease.run_id,
+          lease.attempt,
+          "CLEANUP_FAILURE_REPORT_INVALID",
+          ts,
+        );
+      }
       if (!this.updateTerminalInTransaction(lease, input.status, errorCode, input.errorMessage, ts)) {
         cleanupFail("CLEANUP_FENCED", "lease fence lost while committing cleanup failure");
       }
@@ -913,6 +1003,430 @@ export class TaskStore {
     };
   }
 
+  // ---------- C2-B2-2A：持久化 cleanup hold ----------
+
+  getCleanupHold(runId: string, attempt: number): CleanupHoldRow | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT run_id, attempt, state, lease_owner, cleanup_id,
+                retry_authorized, retry_trigger, reason, created_at, updated_at
+         FROM cleanup_holds WHERE run_id = ? AND attempt = ?`,
+      )
+      .get(runId, attempt) as
+      | {
+          run_id: string;
+          attempt: number;
+          state: string;
+          lease_owner: string | null;
+          cleanup_id: string | null;
+          retry_authorized: number;
+          retry_trigger: string | null;
+          reason: string | null;
+          created_at: number;
+          updated_at: number;
+        }
+      | undefined;
+    if (!row) return undefined;
+    if (!CLEANUP_HOLD_STATES.has(row.state as CleanupHoldState)) {
+      cleanupFail("CLEANUP_HOLD_CORRUPT", "stored cleanup hold state is invalid");
+    }
+    if (row.retry_authorized !== 0 && row.retry_authorized !== 1) {
+      cleanupFail("CLEANUP_HOLD_CORRUPT", "stored retry_authorized is invalid");
+    }
+    if (
+      row.retry_trigger !== null &&
+      !CLEANUP_RETRY_TRIGGERS.has(row.retry_trigger as CleanupRetryTrigger)
+    ) {
+      cleanupFail("CLEANUP_HOLD_CORRUPT", "stored retry_trigger is invalid");
+    }
+    return {
+      run_id: row.run_id,
+      attempt: row.attempt,
+      state: row.state as CleanupHoldState,
+      lease_owner: row.lease_owner,
+      cleanup_id: row.cleanup_id,
+      retry_authorized: row.retry_authorized === 1,
+      retry_trigger: row.retry_trigger as CleanupRetryTrigger | null,
+      reason: row.reason,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  }
+
+  /**
+   * Hold-aware claim：新 attempt 的 hold 与 task claim 同一事务创建。
+   * 仅两类任务允许：
+   *   1. 全新 queued attempt=0 且无 hold；
+   *   2. 当前 hold=cleanup_verified 且 retry 明确授权、报告/trigger/cleanup_id 完全匹配。
+   */
+  claimLeaseWithCleanupHold(
+    runId: string,
+    workerId: string,
+    ttlMs: number,
+    budgetS: number,
+  ): Lease | false {
+    this.assertHoldMode("claimLeaseWithCleanupHold");
+    const ts = this.now();
+    const tx = this.db.transaction((): Lease | false => {
+      const task = this.getTask(runId);
+      if (!task) return false;
+      if (task.status !== "queued" && task.status !== "running") return false;
+      if (this.hasPublication(runId)) return false;
+      const leaseFree =
+        task.lease_owner === null ||
+        task.lease_expires_at === null ||
+        task.lease_expires_at < ts;
+      if (!leaseFree) return false;
+      if (task.deadline !== null && task.deadline < ts) return false;
+
+      const hold = this.getCleanupHold(runId, task.attempt);
+      const initialTask = task.status === "queued" && task.attempt === 0 && hold === undefined;
+      const retryTask =
+        hold !== undefined &&
+        hold.state === "cleanup_verified" &&
+        hold.retry_authorized === true &&
+        this.retryAuthorizationValid(hold);
+      if (!initialTask && !retryTask) return false;
+
+      const nextAttempt = task.attempt + 1;
+      const r = this.db
+        .prepare(
+          `UPDATE tasks
+           SET status='running', lease_owner=?, lease_expires_at=?,
+               attempt=?, deadline=COALESCE(deadline, created_at + ? * 1000), updated_at=?
+           WHERE run_id=? AND status IN ('queued','running') AND ${LEASE_FREE} AND ${WITHIN_BUDGET}`,
+        )
+        .run(workerId, ts + ttlMs, nextAttempt, budgetS, ts, runId, ts, ts);
+      if (r.changes === 0) return false;
+
+      this.insertCleanupHold({
+        runId,
+        attempt: nextAttempt,
+        state: "executing",
+        leaseOwner: workerId,
+        cleanupId: null,
+        retryAuthorized: false,
+        retryTrigger: null,
+        reason: "CLAIM",
+        createdAt: ts,
+        updatedAt: ts,
+      });
+      this.insertEventUnfenced(
+        runId,
+        "stage",
+        { stage: "queued", to: "running", attempt: nextAttempt },
+        ts,
+      );
+      return { run_id: runId, attempt: nextAttempt, lease_owner: workerId };
+    });
+    return tx.immediate();
+  }
+
+  /** 执行权仍在时，将本 attempt 的 hold 从 executing 切到 cleanup_pending。 */
+  beginCleanup(lease: Lease, cleanupId: string): FencedResult {
+    this.assertHoldMode("beginCleanup");
+    const id = validateCleanupId(cleanupId, "CLEANUP_HOLD_INVALID");
+    const ts = this.now();
+    const tx = this.db.transaction((): FencedResult => {
+      if (!this.leaseHeldInTransaction(lease)) return { fenced: true };
+      const hold = this.getCleanupHold(lease.run_id, lease.attempt);
+      if (!hold) {
+        cleanupFail("CLEANUP_HOLD_MISSING", "beginCleanup requires a persistent cleanup hold");
+      }
+      if (hold.state !== "executing" || hold.lease_owner !== lease.lease_owner) {
+        cleanupFail("CLEANUP_HOLD_STATE_INVALID", "hold is not executing for this lease owner");
+      }
+      const r = this.db
+        .prepare(
+          `UPDATE cleanup_holds
+           SET state='cleanup_pending', cleanup_id=?, retry_authorized=0,
+               retry_trigger=NULL, reason='CLEANUP_STARTED', updated_at=?
+           WHERE run_id=? AND attempt=? AND state='executing' AND lease_owner=?`,
+        )
+        .run(id, ts, lease.run_id, lease.attempt, lease.lease_owner);
+      if (r.changes === 0) {
+        cleanupFail("CLEANUP_HOLD_STATE_INVALID", "hold transition to cleanup_pending failed");
+      }
+      return { fenced: false };
+    });
+    return tx.immediate();
+  }
+
+  /**
+   * Hold-aware dispatch query。queued 任务仅在以下情况可见：
+   *   - attempt=0 且无 hold；
+   *   - 当前 hold=cleanup_verified 且 retry 授权/报告完全匹配。
+   */
+  listRunnableWithCleanupHolds(limit: number): TaskRow[] {
+    this.assertHoldMode("listRunnableWithCleanupHolds");
+    const now = this.now();
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM tasks t
+         WHERE t.status='queued'
+           AND t.rowid = (
+             SELECT r.rowid FROM tasks r
+             WHERE r.session_id = t.session_id AND r.status IN ('queued','running')
+             ORDER BY r.created_at, r.rowid LIMIT 1
+           )
+           AND (
+             (t.attempt = 0 AND NOT EXISTS (
+               SELECT 1 FROM cleanup_holds h
+               WHERE h.run_id = t.run_id AND h.attempt = t.attempt
+             ))
+             OR EXISTS (
+               SELECT 1 FROM cleanup_holds h
+               WHERE h.run_id = t.run_id AND h.attempt = t.attempt
+                 AND h.state = 'cleanup_verified'
+                 AND h.retry_authorized = 1
+                 AND h.retry_trigger IN ('timeout','engine_error')
+             )
+           )
+         ORDER BY t.created_at, t.rowid
+         LIMIT ?`,
+      )
+      .all(limit) as TaskRow[];
+    return rows.filter((t) => {
+      if (t.deadline !== null && t.deadline < now) return false;
+      const hold = this.getCleanupHold(t.run_id, t.attempt);
+      if (!hold) return t.attempt === 0 && !this.hasPublication(t.run_id);
+      return (
+        hold.state === "cleanup_verified" &&
+        hold.retry_authorized === true &&
+        this.retryAuthorizationValid(hold)
+      );
+    });
+  }
+
+  /**
+   * 启动恢复：只处理 running 任务。
+   * - cleanup_verified + 有效授权 + 预算内 → queued（明确重试，不成功）；
+   * - 其余 hold / 无 hold → recovery_required，保持 running + lease=NULL，绝不回 queued。
+   */
+  healOrphansWithHolds(now: number, maxAttempts: number): CleanupHealResult {
+    this.assertHoldMode("healOrphansWithHolds");
+    const tasks = this.db
+      .prepare("SELECT run_id FROM tasks WHERE status='running'")
+      .all() as { run_id: string }[];
+    const out: CleanupHealResult = { requeued: 0, recoveryRequired: 0, unchanged: 0 };
+    for (const t of tasks) {
+      const action = this.db
+        .transaction((): "requeued" | "recovery" | null => {
+          const task = this.getTask(t.run_id);
+          if (!task || task.status !== "running") return null;
+          const hold = this.getCleanupHold(task.run_id, task.attempt);
+          const retryValid =
+            hold !== undefined &&
+            hold.state === "cleanup_verified" &&
+            hold.retry_authorized === true &&
+            this.retryAuthorizationValid(hold);
+          const budgetOk = task.deadline === null || task.deadline >= now;
+          if (retryValid && task.attempt < maxAttempts && budgetOk) {
+            const r = this.db
+              .prepare(
+                `UPDATE tasks
+                 SET status='queued', lease_owner=NULL, lease_expires_at=NULL,
+                     stage=NULL, error_code=NULL, updated_at=?
+                 WHERE run_id=? AND status='running'`,
+              )
+              .run(now, task.run_id);
+            if (r.changes === 0) return null;
+            return "requeued";
+          }
+
+          let reason: string;
+          if (!hold) {
+            reason = "BOOT_NO_HOLD";
+            this.insertCleanupHold({
+              runId: task.run_id,
+              attempt: task.attempt,
+              state: "recovery_required",
+              leaseOwner: task.lease_owner,
+              cleanupId: null,
+              retryAuthorized: false,
+              retryTrigger: null,
+              reason,
+              createdAt: now,
+              updatedAt: now,
+            });
+          } else {
+            if (hold.state === "cleanup_verified") {
+              reason = !budgetOk || task.attempt >= maxAttempts
+                ? "RETRY_BUDGET_EXHAUSTED"
+                : "RETRY_AUTH_INVALID";
+            } else if (hold.state === "closed") {
+              reason = "CLOSED_WITH_RUNNING_TASK";
+            } else {
+              reason = "BOOT_RECOVERY";
+            }
+            this.markHoldRecoveryRequired(task.run_id, task.attempt, reason, now);
+          }
+          this.updateTaskRecoveryRequired(task.run_id, now);
+          return "recovery";
+        })
+        .immediate();
+      if (action === "requeued") out.requeued += 1;
+      else if (action === "recovery") out.recoveryRequired += 1;
+      else out.unchanged += 1;
+    }
+    return out;
+  }
+
+  /**
+   * 租约过期回收：不自动终态化任何带 hold 的任务。
+   * - cleanup_verified + 有效授权 + 预算内 → queued（下一 attempt）；
+   * - 其他 held/无 hold → recovery_required；
+   * - queued attempt=0 超 deadline 且无 hold → 保持旧 deadline-fail（从未执行）。
+   */
+  reapExpiredWithHolds(now: number, maxAttempts: number): CleanupReapResult[] {
+    this.assertHoldMode("reapExpiredWithHolds");
+    const out: CleanupReapResult[] = [];
+    const expired = this.db
+      .prepare(
+        `SELECT run_id FROM tasks
+         WHERE status='running'
+           AND (lease_owner IS NULL OR lease_expires_at IS NULL OR lease_expires_at < ?)`,
+      )
+      .all(now) as { run_id: string }[];
+
+    for (const t of expired) {
+      const res = this.db
+        .transaction((): CleanupReapResult | null => {
+          const task = this.getTask(t.run_id);
+          if (!task || task.status !== "running") return null;
+          const leaseFree =
+            task.lease_owner === null ||
+            task.lease_expires_at === null ||
+            task.lease_expires_at < now;
+          if (!leaseFree) return null;
+          const hold = this.getCleanupHold(task.run_id, task.attempt);
+          if (
+            hold?.state === "recovery_required" &&
+            task.lease_owner === null &&
+            task.lease_expires_at === null &&
+            task.error_code === CLEANUP_RECOVERY_ERROR_CODE
+          ) {
+            return null;
+          }
+          const retryValid =
+            hold !== undefined &&
+            hold.state === "cleanup_verified" &&
+            hold.retry_authorized === true &&
+            this.retryAuthorizationValid(hold);
+          const budgetOk = task.deadline === null || task.deadline >= now;
+          if (retryValid && task.attempt < maxAttempts && budgetOk) {
+            const r = this.db
+              .prepare(
+                `UPDATE tasks
+                 SET status='queued', lease_owner=NULL, lease_expires_at=NULL,
+                     stage=NULL, error_code=NULL, updated_at=?
+                 WHERE run_id=? AND status='running'
+                   AND (lease_owner IS NULL OR lease_expires_at IS NULL OR lease_expires_at < ?)`,
+              )
+              .run(now, task.run_id, now);
+            if (r.changes === 0) return null;
+            return { run_id: task.run_id, action: "queued" };
+          }
+
+          let reason: string;
+          if (!hold) {
+            reason = "REAP_NO_HOLD";
+            this.insertCleanupHold({
+              runId: task.run_id,
+              attempt: task.attempt,
+              state: "recovery_required",
+              leaseOwner: task.lease_owner,
+              cleanupId: null,
+              retryAuthorized: false,
+              retryTrigger: null,
+              reason,
+              createdAt: now,
+              updatedAt: now,
+            });
+          } else {
+            if (hold.state === "cleanup_verified") {
+              reason = !budgetOk || task.attempt >= maxAttempts
+                ? "RETRY_BUDGET_EXHAUSTED"
+                : "RETRY_AUTH_INVALID";
+            } else if (hold.state === "closed") {
+              reason = "CLOSED_WITH_RUNNING_TASK";
+            } else {
+              reason = "REAP_RECOVERY";
+            }
+            this.markHoldRecoveryRequired(task.run_id, task.attempt, reason, now);
+          }
+          this.updateTaskRecoveryRequired(task.run_id, now);
+          return { run_id: task.run_id, action: "recovery_required" };
+        })
+        .immediate();
+      if (res) out.push(res);
+    }
+
+    const zombies = this.db
+      .prepare("SELECT run_id FROM tasks WHERE status='queued' AND deadline IS NOT NULL AND deadline < ?")
+      .all(now) as { run_id: string }[];
+    for (const z of zombies) {
+      const res = this.db
+        .transaction((): CleanupReapResult | null => {
+          const task = this.getTask(z.run_id);
+          if (!task || task.status !== "queued" || task.deadline === null || task.deadline >= now) {
+            return null;
+          }
+          const hold = this.getCleanupHold(task.run_id, task.attempt);
+          if (!hold && task.attempt === 0) {
+            const r = this.db
+              .prepare(
+                `UPDATE tasks SET status='failed', error_code='UNRECOVERABLE',
+                                  error_message='reaper: deadline 已过（queued）', updated_at=?
+                 WHERE run_id=? AND status='queued' AND deadline < ?`,
+              )
+              .run(now, task.run_id, now);
+            return r.changes > 0 ? { run_id: task.run_id, action: "failed" } : null;
+          }
+
+          if (!hold) {
+            this.insertCleanupHold({
+              runId: task.run_id,
+              attempt: task.attempt,
+              state: "recovery_required",
+              leaseOwner: task.lease_owner,
+              cleanupId: null,
+              retryAuthorized: false,
+              retryTrigger: null,
+              reason: "REAP_NO_HOLD",
+              createdAt: now,
+              updatedAt: now,
+            });
+          } else {
+            const reason = hold.state === "cleanup_verified"
+              ? "RETRY_BUDGET_EXHAUSTED"
+              : "REAP_RECOVERY";
+            this.markHoldRecoveryRequired(task.run_id, task.attempt, reason, now);
+          }
+          this.updateTaskRecoveryRequired(task.run_id, now);
+          return { run_id: task.run_id, action: "recovery_required" };
+        })
+        .immediate();
+      if (res) out.push(res);
+    }
+    return out;
+  }
+
+  private assertLegacyApiAllowed(method: string): void {
+    if (this.cleanupHoldMode) {
+      cleanupFail(
+        "CLEANUP_HOLD_MODE_ACTIVE",
+        `${method} is disabled while persistent cleanup hold mode is enabled`,
+      );
+    }
+  }
+
+  private assertHoldMode(method: string): void {
+    if (!this.cleanupHoldMode) {
+      cleanupFail("CLEANUP_HOLD_MODE_REQUIRED", `${method} requires cleanup hold mode`);
+    }
+  }
+
   private leaseHeldInTransaction(lease: Lease): boolean {
     const held = this.db
       .prepare(`SELECT COUNT(*) AS n FROM tasks WHERE ${FENCE} AND status='running'`)
@@ -920,10 +1434,158 @@ export class TaskStore {
     return held > 0;
   }
 
+  private requireHoldForCleanup(
+    lease: Lease,
+    cleanupId: string,
+    method: string,
+  ): CleanupHoldRow {
+    const hold = this.getCleanupHold(lease.run_id, lease.attempt);
+    if (!hold) {
+      cleanupFail("CLEANUP_HOLD_MISSING", `${method} requires a persistent cleanup hold`);
+    }
+    if (hold.state !== "cleanup_pending") {
+      cleanupFail("CLEANUP_HOLD_STATE_INVALID", `${method} requires hold state cleanup_pending`);
+    }
+    if (hold.lease_owner !== lease.lease_owner) {
+      cleanupFail("CLEANUP_HOLD_OWNER_MISMATCH", `${method} hold is owned by another lease owner`);
+    }
+    if (!hold.cleanup_id || hold.cleanup_id !== cleanupId) {
+      cleanupFail(
+        "CLEANUP_HOLD_CLEANUP_ID_MISMATCH",
+        `${method} report cleanupId does not match the persistent hold`,
+      );
+    }
+    return hold;
+  }
+
+  private finishHoldAfterFinalize(lease: Lease, overallOk: boolean, ts: number): void {
+    const state = overallOk ? "closed" : "recovery_required";
+    const reason = overallOk ? "CLEANUP_CLOSED" : "TERMINAL_CLEANUP_INCOMPLETE";
+    const r = this.db
+      .prepare(
+        `UPDATE cleanup_holds
+         SET state=?, retry_authorized=0, retry_trigger=NULL, reason=?, updated_at=?
+         WHERE run_id=? AND attempt=? AND state='cleanup_pending' AND lease_owner=?`,
+      )
+      .run(state, reason, ts, lease.run_id, lease.attempt, lease.lease_owner);
+    if (r.changes === 0) {
+      cleanupFail("CLEANUP_HOLD_STATE_INVALID", "hold transition failed during finalize");
+    }
+  }
+
+  private markHoldRecoveryRequired(
+    runId: string,
+    attempt: number,
+    reason: string,
+    ts: number,
+  ): void {
+    if (!CLEANUP_REASON_RE.test(reason)) {
+      cleanupFail("CLEANUP_HOLD_REASON_INVALID", "cleanup hold recovery reason is invalid");
+    }
+    const r = this.db
+      .prepare(
+        `UPDATE cleanup_holds
+         SET state='recovery_required', retry_authorized=0, retry_trigger=NULL,
+             reason=?, updated_at=?
+         WHERE run_id=? AND attempt=?`,
+      )
+      .run(reason, ts, runId, attempt);
+    if (r.changes === 0) {
+      cleanupFail("CLEANUP_HOLD_MISSING", "cleanup hold is missing while marking recovery");
+    }
+  }
+
+  private updateTaskRecoveryRequired(runId: string, ts: number): void {
+    const r = this.db
+      .prepare(
+        `UPDATE tasks
+         SET status='running', lease_owner=NULL, lease_expires_at=NULL,
+             stage=NULL, error_code=?, updated_at=?
+         WHERE run_id=? AND status IN ('running','queued')`,
+      )
+      .run(CLEANUP_RECOVERY_ERROR_CODE, ts, runId);
+    if (r.changes === 0) {
+      cleanupFail("CLEANUP_HOLD_STATE_INVALID", "task is not eligible for recovery_required");
+    }
+  }
+
+  /**
+   * Retry 授权必须同时绑定 hold/run_id/attempt/cleanup_id/trigger 与 sealed report。
+   * 仅凭 cleanup_reports.overall_ok=true 不足以 claim。
+   */
+  private retryAuthorizationValid(hold: CleanupHoldRow): boolean {
+    if (hold.state !== "cleanup_verified" || hold.retry_authorized !== true) return false;
+    if (hold.retry_trigger !== "timeout" && hold.retry_trigger !== "engine_error") return false;
+    if (!hold.cleanup_id) return false;
+    if (this.hasPublication(hold.run_id)) return false;
+    let report: CleanupReportRow | undefined;
+    try {
+      report = this.getCleanupReport(hold.run_id, hold.attempt);
+    } catch {
+      return false;
+    }
+    if (!report || !report.sealed || !report.overall_ok || !report.report) return false;
+    if (report.cleanup_id !== hold.cleanup_id) return false;
+    if (report.trigger !== hold.retry_trigger) return false;
+    if (report.report.cleanupId !== hold.cleanup_id) return false;
+    if (report.report.runId !== hold.run_id || report.report.attempt !== hold.attempt) return false;
+    if (report.report.trigger !== hold.retry_trigger) return false;
+    return report.report.overallOk === true;
+  }
+
+  private insertCleanupHold(row: {
+    runId: string;
+    attempt: number;
+    state: CleanupHoldState;
+    leaseOwner: string | null;
+    cleanupId: string | null;
+    retryAuthorized: boolean;
+    retryTrigger: CleanupRetryTrigger | null;
+    reason: string | null;
+    createdAt: number;
+    updatedAt: number;
+  }): void {
+    if (row.reason !== null && !CLEANUP_REASON_RE.test(row.reason)) {
+      cleanupFail("CLEANUP_HOLD_REASON_INVALID", "cleanup hold reason is invalid");
+    }
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO cleanup_holds
+             (run_id, attempt, state, lease_owner, cleanup_id,
+              retry_authorized, retry_trigger, reason, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          row.runId,
+          row.attempt,
+          row.state,
+          row.leaseOwner,
+          row.cleanupId,
+          row.retryAuthorized ? 1 : 0,
+          row.retryTrigger,
+          row.reason,
+          row.createdAt,
+          row.updatedAt,
+        );
+    } catch {
+      cleanupFail(
+        "CLEANUP_HOLD_CREATE_FAILED",
+        "cleanup hold creation failed; enclosing transaction must roll back",
+      );
+    }
+  }
+
   private countDoneEvents(runId: string): number {
     return this.db
       .prepare("SELECT COUNT(*) AS n FROM events WHERE run_id = ? AND type = 'done'")
       .get(runId).n as number;
+  }
+
+  private hasPublication(runId: string): boolean {
+    return (
+      this.db.prepare("SELECT 1 AS present FROM publications WHERE run_id = ?").get(runId) !== undefined
+    );
   }
 
   private insertCleanupReportRow(row: {
@@ -989,6 +1651,7 @@ export class TaskStore {
    * 单调），写事件前先验围栏——失权者连事件都写不进（A.1）。
    */
   appendEvent(lease: Lease, type: string, payload: unknown): FencedResult & { seq?: number } {
+    if (type === "done") this.assertLegacyApiAllowed("appendEvent(done)");
     const ts = this.now();
     return this.db.transaction(() => {
       const held = this.db
@@ -1031,6 +1694,7 @@ export class TaskStore {
   // ---------- A.3 结果层：恰好一次发布 ----------
 
   recordPublication(runId: string, reportPath: string): { published: boolean; report_path: string } {
+    this.assertLegacyApiAllowed("recordPublication");
     return this.db.transaction((): { published: boolean; report_path: string } => {
       const r = this.db
         .prepare("INSERT OR IGNORE INTO publications (run_id, report_path, published_at) VALUES (?, ?, ?)")
@@ -1057,6 +1721,7 @@ export class TaskStore {
    * 的正确形态）。围栏条件写：失权返回 fenced，调用方不得再续跑。
    */
   releaseForRetry(lease: Lease): FencedResult {
+    this.assertLegacyApiAllowed("releaseForRetry");
     const ts = this.now();
     const r = this.db
       .prepare(
@@ -1089,6 +1754,7 @@ export class TaskStore {
    * 或回队后过预算——否则永久卡 queued 且堵死会话队首）→ failed/UNRECOVERABLE。
    */
   reapExpired(now: number, maxAttempts: number): ReapedTask[] {
+    this.assertLegacyApiAllowed("reapExpired");
     const expired = this.db
       .prepare(
         `SELECT run_id, lease_owner, attempt, cancel_requested, deadline
@@ -1149,6 +1815,7 @@ export class TaskStore {
    * 队首候选）。created_at 同毫秒用隐式 rowid 保持严格 FIFO。
    */
   listRunnable(limit: number): TaskRow[] {
+    this.assertLegacyApiAllowed("listRunnable");
     return this.db
       .prepare(
         `SELECT * FROM tasks t

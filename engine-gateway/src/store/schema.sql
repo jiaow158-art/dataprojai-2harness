@@ -37,5 +37,32 @@ CREATE TABLE IF NOT EXISTS cleanup_reports (  -- 每 attempt 一份最终权威�
   CHECK ((sealed = 1 AND report_json IS NOT NULL) OR
          (sealed = 0 AND report_json IS NULL AND overall_ok = 0))
 );
+CREATE TABLE IF NOT EXISTS cleanup_holds (  -- C2-B2-2A：每 attempt 的持久化清理围栏
+  run_id TEXT NOT NULL,
+  attempt INTEGER NOT NULL,
+  state TEXT NOT NULL,          -- executing|cleanup_pending|cleanup_verified|recovery_required|closed
+  lease_owner TEXT,             -- 最近持有该 attempt 的 worker id
+  cleanup_id TEXT,              -- beginCleanup 后与 cleanup_reports.cleanup_id 绑定
+  retry_authorized INTEGER NOT NULL DEFAULT 0,  -- 仅 releaseForRetryWithCleanup 可置 1
+  retry_trigger TEXT,           -- timeout|engine_error；仅 cleanup_verified 允许非 NULL
+  reason TEXT,                  -- code-only 诊断原因
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (run_id, attempt),
+  CHECK (attempt >= 1),
+  CHECK (state IN ('executing', 'cleanup_pending', 'cleanup_verified',
+                   'recovery_required', 'closed')),
+  CHECK (retry_authorized IN (0, 1)),
+  CHECK (
+    (state = 'cleanup_verified' AND retry_authorized = 1
+      AND cleanup_id IS NOT NULL
+      AND retry_trigger IN ('timeout', 'engine_error'))
+    OR
+    (state <> 'cleanup_verified' AND retry_authorized = 0
+      AND retry_trigger IS NULL)
+  ),
+  CHECK (reason IS NULL OR (length(reason) >= 1 AND length(reason) <= 64))
+);
+CREATE INDEX IF NOT EXISTS idx_cleanup_holds_state ON cleanup_holds(state);
 CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
