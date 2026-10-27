@@ -39,8 +39,9 @@ import {
   type TaskCleanupReportDraft,
 } from "./cleanup-report.ts";
 import {
-  probeLinuxProcessGroupState,
+  probeLinuxProcessGroupStateDetailed,
   terminateAndVerify,
+  type ProcessGroupProbeResult,
   type ProcessIdentity,
   type ProcessTerminationResult,
   type TerminateChild,
@@ -98,6 +99,8 @@ export interface TaskCleanupCoordinatorOptions {
   activeProbeIntervalMs?: number;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  /** 测试注入；默认使用真实 /proc 探针。 */
+  probeGroupState?: (pgid: number) => Promise<ProcessGroupProbeResult>;
 }
 
 export interface TaskCleanupCoordinatorResult {
@@ -132,6 +135,8 @@ const DEFAULT_GRACEFUL_MS = 3_000;
 const DEFAULT_KILL_MS = 5_000;
 const DEFAULT_RUNNER_DRAIN_MS = 10_000;
 const DEFAULT_ACTIVE_PROBE_INTERVAL_MS = 100;
+const UNKNOWN_PROBE_RECHECKS = 2;
+const UNKNOWN_PROBE_RECHECK_DELAY_MS = 20;
 
 function positiveInt(value: number | undefined, label: string, dflt: number): number {
   const v = value ?? dflt;
@@ -203,6 +208,8 @@ export class TaskCleanupCoordinator {
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly aclChecker: (target: AclCleanupTarget, deps?: AclCleanupDeps) => Promise<AclCleanupResult>;
+  private readonly probeGroupState: (pgid: number) => Promise<ProcessGroupProbeResult>;
+  private probeRechecksUsed = 0;
 
   constructor(opts: TaskCleanupCoordinatorOptions) {
     if (!opts || typeof opts !== "object") throw new Error("[CONFIG] coordinator options are required");
@@ -221,6 +228,7 @@ export class TaskCleanupCoordinator {
     this.now = opts.now ?? Date.now;
     this.sleep = opts.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.aclChecker = opts.aclChecker ?? ((target, deps) => checkAclCleanup(target, deps));
+    this.probeGroupState = opts.probeGroupState ?? probeLinuxProcessGroupStateDetailed;
     // 构造时只校验入口参数；实际 draft/run 在 run() 内初始化。
     createPendingTaskCleanupReport({
       runId: opts.runId,
@@ -244,6 +252,7 @@ export class TaskCleanupCoordinator {
       now: new Date(startMs).toISOString(),
     });
     this.resetChecks();
+    this.probeRechecksUsed = 0;
 
     try {
       await this.renewFence();
@@ -489,7 +498,8 @@ export class TaskCleanupCoordinator {
 
     await this.assertBudget();
     await this.renewFence();
-    const finalGroup = await probeLinuxProcessGroupState(dsh.identity.pgid);
+    const finalProbe = await this.probeGroupStateWithRechecks(dsh.identity.pgid, "dsh_final");
+    const finalGroup = finalProbe.state;
     if (finalGroup === "unknown") {
       this.setDshPending("PROCESS_GROUP_STATE_UNKNOWN", dsh);
       this.setRunnerPending("PROCESS_GROUP_STATE_UNKNOWN", dsh);
@@ -616,14 +626,58 @@ export class TaskCleanupCoordinator {
   ): Promise<"absent" | "exists" | "unknown"> {
     const end = Math.min(this.now() + Math.max(0, graceMs), this.deadline);
     const maxIterations = Math.max(1, Math.ceil(Math.max(1, graceMs) / 10) + 5);
-    let state = await probeLinuxProcessGroupState(identity.pgid);
+    let probe = await this.probeGroupStateWithRechecks(identity.pgid, "dsh_wait");
+    let state = probe.state;
     let iterations = 0;
     while (state === "exists" && this.now() < end && iterations < maxIterations) {
       iterations += 1;
       await this.sleep(Math.min(50, Math.max(1, end - this.now())));
-      state = await probeLinuxProcessGroupState(identity.pgid);
+      probe = await this.probeGroupStateWithRechecks(identity.pgid, "dsh_wait");
+      state = probe.state;
     }
     return state;
+  }
+
+  /**
+   * unknown 只做有限复核：每次仍然是完整 /proc 安全扫描；预算/lease fence 照常检查。
+   * 复核总次数按单次 cleanup 封顶 2 次；最终仍 unknown 时保持 pending，绝不改为 absent。
+   */
+  private async probeGroupStateWithRechecks(
+    pgid: number,
+    phase: "dsh_wait" | "dsh_final",
+  ): Promise<ProcessGroupProbeResult> {
+    let result = await this.probeGroupState(pgid);
+    while (
+      result.state === "unknown" &&
+      this.probeRechecksUsed < UNKNOWN_PROBE_RECHECKS
+    ) {
+      await this.assertBudget();
+      await this.renewFence();
+      const remaining = this.remainingMs();
+      if (remaining <= 0) {
+        await this.assertBudget();
+        break;
+      }
+      await this.sleep(Math.min(UNKNOWN_PROBE_RECHECK_DELAY_MS, remaining));
+      await this.assertBudget();
+      await this.renewFence();
+      this.probeRechecksUsed += 1;
+      result = await this.probeGroupState(pgid);
+    }
+    if (result.state === "unknown") {
+      await this.audit({
+        action: "cleanup_probe_unknown",
+        phase,
+        code: "PROCESS_GROUP_STATE_UNKNOWN",
+        pgid,
+        issues: result.issues.map(({ pid, code, errno }) => ({
+          pid,
+          code,
+          ...(errno ? { errno } : {}),
+        })),
+      });
+    }
+    return result;
   }
 
   private async ensureNoActiveRunners(): Promise<ActiveSafety> {

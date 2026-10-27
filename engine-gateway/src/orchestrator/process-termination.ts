@@ -78,17 +78,47 @@ export interface ProcessTerminationResult {
 
 export class ProcessTerminationError extends Error {
   code: string;
+  /** 原始 OS errno（仅用于诊断；不参与进程身份判断）。 */
+  errno?: string;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, errno?: string) {
     super(`[${code}] ${message}`);
     this.name = "ProcessTerminationError";
     this.code = code;
+    this.errno = errno;
   }
 }
 
-function fail(code: string, message: string): never {
-  throw new ProcessTerminationError(code, message);
+function fail(code: string, message: string, errno?: string): never {
+  throw new ProcessTerminationError(code, message, errno);
 }
+
+export interface LinuxProcProbeIo {
+  readdir(path: string): Promise<string[]>;
+  readFile(path: string, encoding: "utf8"): Promise<string>;
+}
+
+export interface ProcessGroupProbeIssue {
+  /** null 表示 /proc 目录级读取失败，没有单一 PID。 */
+  pid: number | null;
+  /** 内部状态码，例如 PROC_STAT_READ_FAILED / PROC_STAT_INVALID。 */
+  code: string;
+  /** 原始 errno，例如 EACCES/EPERM/EIO/EMFILE；解析错误可为空。 */
+  errno?: string;
+}
+
+export interface ProcessGroupProbeResult {
+  pgid: number;
+  state: ProcessGroupState;
+  scanned: number;
+  unreadableCount: number;
+  issues: ProcessGroupProbeIssue[];
+}
+
+const defaultProcIo: LinuxProcProbeIo = {
+  readdir: (path) => readdir(path),
+  readFile: (path, encoding) => readFile(path, encoding),
+};
 
 export function currentTerminationPlatform(): TerminationPlatform {
   if (process.platform === "linux") return "linux";
@@ -125,14 +155,20 @@ export function parseLinuxProcStat(expectedPid: number, raw: string): LinuxProcS
   return { pid, state, pgid, startTicks };
 }
 
-async function readLinuxProcStat(pid: number): Promise<LinuxProcStat | null> {
+async function readLinuxProcStat(
+  pid: number,
+  io: LinuxProcProbeIo = defaultProcIo,
+): Promise<LinuxProcStat | null> {
   try {
-    const raw = await readFile(`/proc/${pid}/stat`, "utf8");
+    const raw = await io.readFile(`/proc/${pid}/stat`, "utf8");
     return parseLinuxProcStat(pid, raw);
   } catch (e) {
-    if ((e as { code?: string }).code === "ENOENT") return null;
+    const errno = (e as { code?: string }).code;
+    // 进程在 readdir/read 之间消失：ENOENT 是 Linux /proc 的常见竞态；
+    // ESRCH 若由底层报告，也属于同一类“进程已不在”，不得当作 unknown。
+    if (errno === "ENOENT" || errno === "ESRCH") return null;
     if (e instanceof ProcessTerminationError) throw e;
-    fail("PROC_STAT_READ_FAILED", "cannot read /proc stat");
+    fail("PROC_STAT_READ_FAILED", "cannot read /proc stat", errno);
   }
 }
 
@@ -141,33 +177,80 @@ export function isLiveLinuxState(state: string): boolean {
   return state !== "Z" && state !== "X" && state !== "x";
 }
 
+function issueFromError(pid: number, e: unknown): ProcessGroupProbeIssue {
+  if (e instanceof ProcessTerminationError) {
+    return {
+      pid,
+      code: e.code,
+      ...(e.errno ? { errno: e.errno } : {}),
+    };
+  }
+  const errno = (e as { code?: string }).code;
+  return {
+    pid,
+    code: "PROC_STAT_READ_FAILED",
+    ...(typeof errno === "string" ? { errno } : {}),
+  };
+}
+
 /**
  * Linux 进程组存活判定：遍历 /proc，只有存在非 Z/X 组员才算 exists。
  * /proc 任一相关读取失败时返回 unknown（绝不把不可见误判成 absent）。
+ * 详细结果保留 PID/errno，便于 Coordinator 做有界复核与审计；不包含命令或 env。
  * 这是对 kill(-pgid, 0) 的替代——后者会把仅剩僵尸的组误报为存活。
  */
-export async function probeLinuxProcessGroupState(pgid: number): Promise<ProcessGroupState> {
-  if (!Number.isSafeInteger(pgid) || pgid <= 1) return "unknown";
+export async function probeLinuxProcessGroupStateDetailed(
+  pgid: number,
+  io: LinuxProcProbeIo = defaultProcIo,
+): Promise<ProcessGroupProbeResult> {
+  const result: ProcessGroupProbeResult = {
+    pgid,
+    state: "unknown",
+    scanned: 0,
+    unreadableCount: 0,
+    issues: [],
+  };
+  if (!Number.isSafeInteger(pgid) || pgid <= 1) {
+    result.issues.push({ pid: null, code: "INVALID_PGID" });
+    return result;
+  }
   let entries: string[];
   try {
-    entries = await readdir("/proc");
-  } catch {
-    return "unknown";
+    entries = await io.readdir("/proc");
+  } catch (e) {
+    const errno = (e as { code?: string }).code;
+    result.issues.push({
+      pid: null,
+      code: "PROC_READDIR_FAILED",
+      ...(typeof errno === "string" ? { errno } : {}),
+    });
+    result.unreadableCount = 1;
+    return result;
   }
-  let unreadable = false;
   for (const name of entries) {
     if (!/^[0-9]+$/.test(name)) continue;
+    const pid = Number(name);
+    result.scanned += 1;
     let st: LinuxProcStat | null;
     try {
-      st = await readLinuxProcStat(Number(name));
-    } catch {
-      unreadable = true;
+      st = await readLinuxProcStat(pid, io);
+    } catch (e) {
+      result.unreadableCount += 1;
+      result.issues.push(issueFromError(pid, e));
       continue;
     }
     if (!st) continue;
-    if (st.pgid === pgid && isLiveLinuxState(st.state)) return "exists";
+    if (st.pgid === pgid && isLiveLinuxState(st.state)) {
+      result.state = "exists";
+      return result;
+    }
   }
-  return unreadable ? "unknown" : "absent";
+  result.state = result.unreadableCount > 0 ? "unknown" : "absent";
+  return result;
+}
+
+export async function probeLinuxProcessGroupState(pgid: number): Promise<ProcessGroupState> {
+  return (await probeLinuxProcessGroupStateDetailed(pgid)).state;
 }
 
 export async function captureProcessIdentity(

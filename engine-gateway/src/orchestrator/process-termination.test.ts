@@ -7,7 +7,9 @@ import {
   captureProcessIdentity,
   parseLinuxProcStat,
   probeLinuxProcessGroupState,
+  probeLinuxProcessGroupStateDetailed,
   terminateAndVerify,
+  type LinuxProcProbeIo,
   type ProcessProbe,
 } from "./process-termination.ts";
 
@@ -120,6 +122,106 @@ test("parseLinuxProcStat：comm 含空格/括号，取 pgrp 与 starttime", () =
   );
   assert.equal(kernel.pgid, 0, "内核线程 pgid=0 不得让 /proc 扫描整体 unknown");
   assert.equal(kernel.startTicks, "37");
+});
+
+function procStatLine(pid: number, pgid: number, state = "S", startTicks = "123456"): string {
+  return `${pid} (node: worker (x)) ${state} 1 ${pgid} ${pgid} 0 -1 4194560 1 0 0 0 0 0 0 0 20 0 1 0 ${startTicks} 0 0`;
+}
+
+type FakeProcEntry = string | { error: string };
+
+function fakeProcIo(entries: Record<number, FakeProcEntry>, readdirError?: string): LinuxProcProbeIo {
+  const pids = Object.keys(entries).map(Number);
+  return {
+    readdir: async (path) => {
+      assert.equal(path, "/proc");
+      if (readdirError) {
+        const e = Object.assign(new Error("readdir failed"), { code: readdirError });
+        throw e;
+      }
+      return pids.map(String);
+    },
+    readFile: async (path, encoding) => {
+      assert.equal(encoding, "utf8");
+      const m = /^\/proc\/([0-9]+)\/stat$/.exec(path);
+      assert.ok(m, `unexpected proc path: ${path}`);
+      const pid = Number(m[1]);
+      const entry = entries[pid];
+      if (entry === undefined) {
+        const e = Object.assign(new Error("gone"), { code: "ENOENT" });
+        throw e;
+      }
+      if (typeof entry !== "string") {
+        const e = Object.assign(new Error("proc read failed"), { code: entry.error });
+        throw e;
+      }
+      return entry;
+    },
+  };
+}
+
+test("/proc 详细探针：目标组不存在 → absent，不产生无谓 unknown", async () => {
+  const io = fakeProcIo({
+    10: procStatLine(10, 10),
+    11: procStatLine(11, 11),
+  });
+  const r = await probeLinuxProcessGroupStateDetailed(999, io);
+  assert.equal(r.state, "absent");
+  assert.equal(r.unreadableCount, 0);
+  assert.deepEqual(r.issues, []);
+  assert.equal(r.scanned, 2);
+});
+
+test("/proc 详细探针：目标组仍存活 → exists", async () => {
+  const io = fakeProcIo({
+    20: procStatLine(20, 999),
+    21: procStatLine(21, 21),
+  });
+  const r = await probeLinuxProcessGroupStateDetailed(999, io);
+  assert.equal(r.state, "exists");
+  assert.equal(r.unreadableCount, 0);
+});
+
+test("/proc 详细探针：无关 PID EIO → unknown，不假判 absent", async () => {
+  const io = fakeProcIo({
+    30: procStatLine(30, 30),
+    31: { error: "EIO" },
+  });
+  const r = await probeLinuxProcessGroupStateDetailed(999, io);
+  assert.equal(r.state, "unknown");
+  assert.equal(r.unreadableCount, 1);
+  assert.deepEqual(r.issues, [{ pid: 31, code: "PROC_STAT_READ_FAILED", errno: "EIO" }]);
+});
+
+test("/proc 详细探针：持续权限错误 → unknown，保留 EACCES", async () => {
+  const io = fakeProcIo({ 41: { error: "EACCES" } });
+  const r = await probeLinuxProcessGroupStateDetailed(999, io);
+  assert.equal(r.state, "unknown");
+  assert.deepEqual(r.issues, [
+    { pid: 41, code: "PROC_STAT_READ_FAILED", errno: "EACCES" },
+  ]);
+});
+
+test("/proc 详细探针：ENOENT/ESRCH 是进程消失竞态，不作为 unknown", async () => {
+  for (const code of ["ENOENT", "ESRCH"]) {
+    const io = fakeProcIo({ 51: { error: code }, 52: procStatLine(52, 52) });
+    const r = await probeLinuxProcessGroupStateDetailed(999, io);
+    assert.equal(r.state, "absent", `${code} should be treated as disappearance`);
+    assert.equal(r.unreadableCount, 0, `${code} must not become an issue`);
+  }
+});
+
+test("/proc 详细探针：解析失败 → unknown，保留状态码", async () => {
+  const io = fakeProcIo({ 61: "not a valid stat line" });
+  const r = await probeLinuxProcessGroupStateDetailed(999, io);
+  assert.equal(r.state, "unknown");
+  assert.deepEqual(r.issues, [{ pid: 61, code: "PROC_STAT_INVALID" }]);
+});
+
+test("/proc 详细探针：readdir 失败 → unknown，保留 errno", async () => {
+  const r = await probeLinuxProcessGroupStateDetailed(999, fakeProcIo({}, "EIO"));
+  assert.equal(r.state, "unknown");
+  assert.deepEqual(r.issues, [{ pid: null, code: "PROC_READDIR_FAILED", errno: "EIO" }]);
 });
 
 test("正常 graceful 关闭：进程组真实退出，forced=false", { skip: !LINUX }, async () => {

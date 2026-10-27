@@ -224,10 +224,14 @@ test("真实 detached DSH 替身 + 真实 Docker 停止容器：Coordinator 终�
   await runner.runOnce(runId);
 
   const task = store.getTask(runId)!;
-  assert.equal(task.status, "succeeded", JSON.stringify(task));
+  assert.equal(
+    task.status,
+    "succeeded",
+    cleanupFailureDiagnostic(store, runId),
+  );
   const report = store.getCleanupReport(runId, 1)!;
   assert.equal(report.sealed, true);
-  assert.equal(report.overall_ok, true, JSON.stringify(report.report));
+  assert.equal(report.overall_ok, true, cleanupFailureDiagnostic(store, runId));
   assert.equal(report.report!.checks.dsh.status, "passed");
   assert.equal(report.report!.checks.runner.status, "passed");
   assert.equal(report.report!.checks.docker.status, "passed");
@@ -309,10 +313,14 @@ test("Host Runner 持有同源 flock：Coordinator 不向 DSH 进程组发信号
   dshPid = h.clientRef.handle?.identity?.pgid ?? 0;
 
   const task = store.getTask(runId)!;
-  assert.equal(task.status, "failed");
+  assert.equal(
+    task.status,
+    "failed",
+    cleanupFailureDiagnostic(store, runId),
+  );
   assert.equal(task.error_code, "CLEANUP_INCOMPLETE");
   const report = store.getCleanupReport(runId, 1)!;
-  assert.equal(report.overall_ok, false);
+  assert.equal(report.overall_ok, false, cleanupFailureDiagnostic(store, runId));
   assert.equal(report.report!.checks.dsh.status, "pending");
   assert.equal(report.report!.checks.dsh.reason, "RUNNER_LOCK_BUSY");
   assert.equal(report.report!.checks.runner.status, "pending");
@@ -361,6 +369,38 @@ async function waitForFile(path: string, ms = 3_000): Promise<void> {
     if (Date.now() > end) throw new Error(`waitForFile timeout: ${path}`);
     await sleep(20);
   }
+}
+
+/** 失败时输出脱敏清理现场；不包含路径、env、命令或模型内容。 */
+function cleanupFailureDiagnostic(store: TaskStore, runId: string): string {
+  const task = store.getTask(runId);
+  if (!task) return JSON.stringify({ task: null });
+  const cleanup = store.getCleanupReport(runId, task.attempt);
+  const report = cleanup?.report;
+  const checks = report
+    ? Object.fromEntries(
+        (["dsh", "runner", "docker", "acl", "audit"] as const).map((key) => [
+          key,
+          {
+            status: report.checks[key].status,
+            reason: report.checks[key].reason,
+            evidence: report.checks[key].evidence,
+          },
+        ]),
+      )
+    : null;
+  return JSON.stringify(
+    {
+      task: {
+        status: task.status,
+        attempt: task.attempt,
+        error_code: task.error_code,
+      },
+      cleanup: report ? { sealed: cleanup.sealed, overallOk: report.overallOk, checks } : null,
+    },
+    null,
+    2,
+  );
 }
 
 
@@ -462,7 +502,11 @@ test("取消路径：不移交前 kill、不碰 Runner flock；promptActive 只�
   dshPgid = h.clientRef.handle?.identity?.pgid ?? 0;
 
   const task = store.getTask(runId)!;
-  assert.equal(task.status, "cancelled");
+  assert.equal(
+    task.status,
+    "cancelled",
+    cleanupFailureDiagnostic(store, runId),
+  );
   assert.equal(task.error_code, "CLEANUP_INCOMPLETE");
   assert.equal(h.clientRef.cancelCount, 0, "不得在 handoff 前调用旧 cancel");
   assert.equal(h.clientRef.client!.hasExited, false, "promptActive 时不得强杀 DSH 进程组");
@@ -479,7 +523,7 @@ test("取消路径：不移交前 kill、不碰 Runner flock；promptActive 只�
 
   const report = store.getCleanupReport(runId, 1)!;
   assert.equal(report.sealed, true);
-  assert.equal(report.overall_ok, false);
+  assert.equal(report.overall_ok, false, cleanupFailureDiagnostic(store, runId));
   assert.equal(report.report!.checks.dsh.status, "pending");
   assert.equal(report.report!.checks.dsh.reason, "PROMPT_ACTIVE");
   assert.equal(store.getCleanupHold(runId, 1)!.state, "recovery_required");
@@ -530,7 +574,11 @@ test("DSH 内部 prompt timeout 不得绕过 Runner flock：提前终止权使 k
   dshPgid = h.clientRef.handle?.identity?.pgid ?? 0;
 
   const task = store.getTask(runId)!;
-  assert.equal(task.status, "failed");
+  assert.equal(
+    task.status,
+    "failed",
+    cleanupFailureDiagnostic(store, runId),
+  );
   assert.equal(task.error_code, "TIMEOUT");
   assert.equal(h.clientRef.cancelCount, 0);
   assert.equal(h.clientRef.client!.hasExited, false, "DSH 内部 timeout killTree 必须被终止权拦截");
@@ -544,7 +592,7 @@ test("DSH 内部 prompt timeout 不得绕过 Runner flock：提前终止权使 k
   }
   assert.equal(lockFree, false, "Runner-like flock holder 必须仍然持锁");
   const report = store.getCleanupReport(runId, 1)!;
-  assert.equal(report.overall_ok, false);
+  assert.equal(report.overall_ok, false, cleanupFailureDiagnostic(store, runId));
   assert.equal(report.report!.checks.dsh.status, "pending");
   assert.equal(report.report!.checks.dsh.reason, "RUNNER_LOCK_BUSY");
   assert.equal(store.getCleanupHold(runId, 1)!.state, "recovery_required");

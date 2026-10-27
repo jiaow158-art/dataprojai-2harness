@@ -5,17 +5,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   TaskCleanupCoordinator,
   type CleanupFence,
   type CoordinatorAudit,
+  type TaskCleanupCoordinatorResult,
 } from "./task-cleanup-coordinator.ts";
 import {
   captureProcessIdentity,
   probeLinuxProcessGroupState,
+  type ProcessGroupProbeResult,
   type ProcessIdentity,
 } from "./process-termination.ts";
 import type { DshCleanupHandle } from "../backends/dsh-sdk-client.ts";
@@ -145,22 +147,101 @@ function baseOptions(
   };
 }
 
+function probeResult(
+  state: ProcessGroupProbeResult["state"],
+  issues: ProcessGroupProbeResult["issues"] = [],
+): ProcessGroupProbeResult {
+  return {
+    pgid: 4242,
+    state,
+    scanned: 1,
+    unreadableCount: issues.length,
+    issues,
+  };
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function waitFor(cond: () => boolean, ms = 2_000, what = "condition"): Promise<void> {
   const end = Date.now() + ms;
   while (!cond()) {
     if (Date.now() > end) throw new Error(`waitFor timeout: ${what}`);
-    await new Promise((r) => setTimeout(r, 10));
+    await sleep(10);
   }
 }
 
-async function spawnDetached(script: string): Promise<{ child: ChildProcess; identity: ProcessIdentity }> {
-  const child = spawn(process.execPath, ["-e", script], {
-    detached: true,
-    stdio: ["ignore", "ignore", "ignore"],
+const READY_TIMEOUT_MS = 5_000;
+
+/** 等待子进程完成脚本初始化并显式发送 READY；提前退出/超时都直接失败。 */
+async function waitForReady(child: ChildProcess): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener("message", onMessage);
+      child.removeListener("exit", onExit);
+      child.removeListener("error", onError);
+      fn();
+    };
+    const onMessage = (message: unknown) => {
+      if (message === "READY") finish(resolve);
+    };
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      finish(() =>
+        reject(
+          new Error(
+            `child exited before READY (pid=${child.pid ?? "unknown"} code=${code} signal=${signal})`,
+          ),
+        ),
+      );
+    };
+    const onError = (err: Error) => finish(() => reject(err));
+    const timer = setTimeout(
+      () =>
+        finish(() =>
+          reject(
+            new Error(
+              `timeout waiting for READY (pid=${child.pid ?? "unknown"}, ${READY_TIMEOUT_MS}ms)`,
+            ),
+          ),
+        ),
+      READY_TIMEOUT_MS,
+    );
+    child.on("message", onMessage);
+    child.once("exit", onExit);
+    child.once("error", onError);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      onExit(child.exitCode, child.signalCode);
+    }
   });
-  await waitFor(() => typeof child.pid === "number" && child.pid > 1, 2_000, "child pid");
-  const identity = await captureProcessIdentity(child.pid!);
-  return { child, identity };
+}
+
+async function spawnDetached(script: string): Promise<{ child: ChildProcess; identity: ProcessIdentity }> {
+  // IPC 用于 READY handshake。READY 由子进程脚本末尾在 SIGTERM handler 安装完成后发送，
+  // 父测试必须在收到 READY 后才允许 Coordinator 进入终止流程。
+  const child = spawn(process.execPath, ["-e", `${script}\n;process.send?.("READY");`], {
+    detached: true,
+    stdio: ["ignore", "ignore", "ignore", "ipc"],
+  });
+  const ready = waitForReady(child);
+  void ready.catch(() => undefined); // 身份采集失败路径也必须消费 rejection
+  let identity: ProcessIdentity | null = null;
+  try {
+    await waitFor(() => typeof child.pid === "number" && child.pid > 1, 2_000, "child pid");
+    identity = await captureProcessIdentity(child.pid!);
+    await ready;
+    return { child, identity };
+  } catch (err) {
+    // 仅回收本次 spawn 的测试子进程；不触碰任何其他进程。
+    if (identity) killGroup(identity);
+    else if (child.pid) {
+      try { child.kill("SIGKILL"); } catch { /* already gone */ }
+    }
+    await ready.catch(() => undefined);
+    throw err;
+  }
 }
 
 function killGroup(identity: ProcessIdentity): void {
@@ -168,6 +249,153 @@ function killGroup(identity: ProcessIdentity): void {
     process.kill(-identity.pgid, "SIGKILL");
   } catch {
     /* already gone */
+  }
+}
+
+/** 非阻塞 flock 探测；不存在的锁文件不会被“创建成功”误判。 */
+function flockProbe(lockPath: string): boolean {
+  if (!existsSync(lockPath)) return false;
+  try {
+    execFileSync("flock", ["-n", lockPath, "true"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function procSnapshot(pid: number): string {
+  try {
+    const raw = readFileSync(`/proc/${pid}/stat`, "utf8");
+    const close = raw.lastIndexOf(")");
+    const tail = raw.slice(close + 1).trim().split(/\s+/);
+    const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8")
+      .split("\0")
+      .filter(Boolean)
+      .join(" ");
+    return `pid=${pid} state=${tail[0]} ppid=${tail[1]} pgid=${tail[2]} startTicks=${tail[19]} cmd=${cmdline}`;
+  } catch (e) {
+    return `pid=${pid} unreadable (${e instanceof Error ? e.message : String(e)})`;
+  }
+}
+
+function lockDiagnostics(lockPath: string): string {
+  let pids: number[] = [];
+  try {
+    const out = execFileSync("lsof", ["-nP", "-t", lockPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    pids = out.trim().split(/\s+/).filter(Boolean).map(Number).filter(Number.isSafeInteger);
+  } catch {
+    // 无 holder 或 lsof 不可用；后面 ps 仍会输出
+  }
+  const holderLines = pids.map(procSnapshot).join("\n") || "(lsof 未报告 lock holder)";
+  let fdLines = "";
+  for (const pid of pids) {
+    try {
+      const out = execFileSync("lsof", ["-nP", "-p", String(pid)], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      fdLines += out
+        .split("\n")
+        .filter((line) => line.startsWith("COMMAND") || line.includes(lockPath))
+        .join("\n");
+      fdLines += "\n";
+    } catch {
+      fdLines += `pid=${pid} lsof unavailable\n`;
+    }
+  }
+  let psLines = "";
+  try {
+    psLines = execFileSync("ps", ["-eo", "pid,ppid,pgid,stat,lstart,args"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .split("\n")
+      .filter((line) => line.includes(lockPath))
+      .join("\n");
+  } catch {
+    psLines = "(ps unavailable)";
+  }
+  return [
+    `lockPath=${lockPath}`,
+    `exists=${existsSync(lockPath)}`,
+    `flockProbe=${flockProbe(lockPath)}`,
+    "holders:",
+    holderLines,
+    "fd:",
+    fdLines.trim() || "(none)",
+    "ps:",
+    psLines || "(no matching process)",
+  ].join("\n");
+}
+
+/** 等待 Coordinator 的 lock holder 完全退出并释放 FD；超时保留现场并失败。 */
+async function waitForFlockRelease(
+  lockPath: string,
+  timeoutMs = 2_000,
+  intervalMs = 20,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (flockProbe(lockPath)) return;
+    await sleep(intervalMs);
+  }
+  throw new Error(`flock 未在 ${timeoutMs}ms 内释放\n${lockDiagnostics(lockPath)}`);
+}
+
+function coordinatorDiagnostics(
+  result: TaskCleanupCoordinatorResult,
+  extra: { identity?: ProcessIdentity | null; lockPath?: string | null } = {},
+): string {
+  const report = result.report;
+  const checks = report
+    ? Object.fromEntries(
+        (["dsh", "runner", "docker", "acl", "audit"] as const).map((key) => [
+          key,
+          { status: report.checks[key].status, reason: report.checks[key].reason },
+        ]),
+      )
+    : null;
+  return JSON.stringify(
+    {
+      overallOk: result.overallOk,
+      sealed: result.sealed,
+      fenced: result.fenced,
+      terminationOwned: result.terminationOwned,
+      failureCode: result.failureCode ?? null,
+      reason: result.reason ?? null,
+      checks,
+      dshIdentity: extra.identity ?? null,
+      runnerLock: extra.lockPath
+        ? {
+            path: extra.lockPath,
+            flockProbe: flockProbe(extra.lockPath),
+            diagnostics: lockDiagnostics(extra.lockPath),
+          }
+        : null,
+    },
+    null,
+    2,
+  );
+}
+
+async function assertWithDiagnostics(
+  t: { diagnostic: (message: string) => void },
+  result: TaskCleanupCoordinatorResult,
+  extra: { identity?: ProcessIdentity | null; lockPath?: string | null },
+  assertions: () => void | Promise<void>,
+): Promise<void> {
+  try {
+    await assertions();
+  } catch (err) {
+    try {
+      t.diagnostic(coordinatorDiagnostics(result, extra));
+    } catch {
+      /* diagnostic 本身不得掩盖原始失败 */
+    }
+    throw err;
   }
 }
 
@@ -223,7 +451,7 @@ test("Host Runner ACL 收尾窗口：Runner 持有 .lock 时不得向 DSH 进程
   const { child, identity } = await spawnDetached(
     'process.on("SIGTERM",()=>{}); setInterval(()=>{},1000);',
   );
-  const key = createHash("sha256").update(dir).digest("hex").slice(0, 16);
+  const key = createHash("sha256").update(realpathSync(dir)).digest("hex").slice(0, 16);
   const lockPath = join(dir, `${key}.lock`);
   const holder = spawn("flock", ["-n", lockPath, "sh", "-c", "printf HELD\\n; sleep 10"], {
     detached: true,
@@ -264,12 +492,14 @@ test("Host Runner gate 取得锁后强杀 DSH，并在完成后释放锁", async
     const result = await new TaskCleanupCoordinator(
       baseOptions(dir, r.reaper, audit, { dsh: handle, gracefulMs: 20 }),
     ).run();
-    assert.equal(result.overallOk, true);
-    assert.equal(result.report?.checks.dsh.evidence.forced, true);
-    const key = createHash("sha256").update(dir).digest("hex").slice(0, 16);
+    const key = createHash("sha256").update(realpathSync(dir)).digest("hex").slice(0, 16);
     const lockPath = join(dir, `${key}.lock`);
-    // 锁 holder 已被释放；flock 可立即再次取得。
-    execFileSync("flock", ["-n", lockPath, "true"], { stdio: "ignore" });
+    await assertWithDiagnostics(t, result, { identity, lockPath }, async () => {
+      assert.equal(result.overallOk, true);
+      assert.equal(result.report?.checks.dsh.evidence.forced, true);
+      // 锁 holder 完全退出后才算释放；等待有界，超时必须保留现场并失败。
+      await waitForFlockRelease(lockPath);
+    });
   } finally {
     killGroup(identity);
   }
@@ -378,6 +608,137 @@ test("正常 graceful 退出：requestShutdown 后组消失，不升级强杀", 
   }
 });
 
+test("unknown 单次瞬时读取失败：预算内复核为 absent，不阻断正常清理", async (t) => {
+  const dir = stateDir(t);
+  const { child, identity } = await spawnDetached(
+    'process.on("SIGTERM",()=>process.exit(0)); setInterval(()=>{},1000);',
+  );
+  const r = fakeReaper();
+  const audit = new FakeAudit();
+  let probes = 0;
+  try {
+    const { handle } = dshHandle(identity, child, dir, async () => false);
+    const result = await new TaskCleanupCoordinator(
+      baseOptions(dir, r.reaper, audit, {
+        dsh: handle,
+        gracefulMs: 20,
+        probeGroupState: async () => {
+          probes += 1;
+          return probes === 1
+            ? probeResult("unknown", [{ pid: 7001, code: "PROC_STAT_READ_FAILED", errno: "EIO" }])
+            : probeResult("absent");
+        },
+      }),
+    ).run();
+    assert.equal(result.overallOk, true);
+    assert.equal(result.report?.checks.dsh.status, "passed");
+    assert.equal(probes, 3, "首次 unknown + 1 次复核 + final 完整探针");
+    assert.equal(audit.events.some((e) => e.action === "cleanup_probe_unknown"), false);
+  } finally {
+    killGroup(identity);
+  }
+});
+
+test("unknown 两次复核后恢复：最多 2 次复核仍成功", async (t) => {
+  const dir = stateDir(t);
+  const { child, identity } = await spawnDetached(
+    'process.on("SIGTERM",()=>process.exit(0)); setInterval(()=>{},1000);',
+  );
+  const r = fakeReaper();
+  const audit = new FakeAudit();
+  let probes = 0;
+  try {
+    const { handle } = dshHandle(identity, child, dir, async () => false);
+    const result = await new TaskCleanupCoordinator(
+      baseOptions(dir, r.reaper, audit, {
+        dsh: handle,
+        gracefulMs: 20,
+        probeGroupState: async () => {
+          probes += 1;
+          return probes <= 2 ? probeResult("unknown") : probeResult("absent");
+        },
+      }),
+    ).run();
+    assert.equal(result.overallOk, true);
+    assert.equal(result.report?.checks.dsh.status, "passed");
+    assert.equal(probes, 4, "unknown + 2 次复核 + final 完整探针");
+    assert.equal(audit.events.some((e) => e.action === "cleanup_probe_unknown"), false);
+  } finally {
+    killGroup(identity);
+  }
+});
+
+test("unknown 持续权限错误：最多 2 次复核后仍 pending，绝不发信号", async (t) => {
+  const dir = stateDir(t);
+  const { child, identity } = await spawnDetached(
+    'process.on("SIGTERM",()=>process.exit(0)); setInterval(()=>{},1000);',
+  );
+  const r = fakeReaper();
+  const audit = new FakeAudit();
+  let probes = 0;
+  try {
+    const { handle } = dshHandle(identity, child, dir, async () => false);
+    const result = await new TaskCleanupCoordinator(
+      baseOptions(dir, r.reaper, audit, {
+        dsh: handle,
+        gracefulMs: 20,
+        probeGroupState: async () => {
+          probes += 1;
+          return probeResult("unknown", [
+            { pid: 7002, code: "PROC_STAT_READ_FAILED", errno: "EACCES" },
+          ]);
+        },
+      }),
+    ).run();
+    assert.equal(result.overallOk, false);
+    assert.equal(result.report?.checks.dsh.status, "pending");
+    assert.equal(result.report?.checks.dsh.reason, "PROCESS_GROUP_STATE_UNKNOWN");
+    assert.equal(probes, 3, "首次 unknown + 最多 2 次复核");
+    assert.equal(r.calls.cleanup, 0);
+    assert.doesNotThrow(() => process.kill(identity.pid, 0), "探针 unknown 不得发送信号");
+    const unknownEvent = audit.events.find((e) => e.action === "cleanup_probe_unknown");
+    assert.ok(unknownEvent, "unknown 必须留下脱敏审计");
+    assert.equal(unknownEvent!.code, "PROCESS_GROUP_STATE_UNKNOWN");
+    assert.deepEqual(unknownEvent!.issues, [
+      { pid: 7002, code: "PROC_STAT_READ_FAILED", errno: "EACCES" },
+    ]);
+  } finally {
+    killGroup(identity);
+  }
+});
+
+test("unknown 复核期间 fence 失权：不发送信号，返回 fenced", async (t) => {
+  const dir = stateDir(t);
+  const { child, identity } = await spawnDetached(
+    'process.on("SIGTERM",()=>process.exit(0)); setInterval(()=>{},1000);',
+  );
+  const r = fakeReaper();
+  const audit = new FakeAudit();
+  let fenceChecks = 0;
+  try {
+    const { handle } = dshHandle(identity, child, dir, async () => false);
+    const result = await new TaskCleanupCoordinator(
+      baseOptions(dir, r.reaper, audit, {
+        dsh: handle,
+        gracefulMs: 20,
+        fence: {
+          check: () => {
+            fenceChecks += 1;
+            return fenceChecks <= 2;
+          },
+        },
+        probeGroupState: async () => probeResult("unknown"),
+      }),
+    ).run();
+    assert.equal(result.fenced, true);
+    assert.equal(result.report, null);
+    assert.equal(r.calls.cleanup, 0);
+    assert.doesNotThrow(() => process.kill(identity.pid, 0), "fence 失权后不得发送信号");
+  } finally {
+    killGroup(identity);
+  }
+});
+
 test("graceful 超时：active 探针安全后 terminateAndVerify 强杀并验证组空", async (t) => {
   const dir = stateDir(t);
   const { child, identity } = await spawnDetached(
@@ -390,10 +751,12 @@ test("graceful 超时：active 探针安全后 terminateAndVerify 强杀并验�
     const result = await new TaskCleanupCoordinator(
       baseOptions(dir, r.reaper, audit, { dsh: handle, gracefulMs: 30 }),
     ).run();
-    assert.equal(result.overallOk, true);
-    assert.equal(result.report?.checks.dsh.status, "passed");
-    assert.equal(result.report?.checks.dsh.evidence.forced, true);
-    assert.equal(await probeLinuxProcessGroupState(identity.pgid), "absent");
+    await assertWithDiagnostics(t, result, { identity }, async () => {
+      assert.equal(result.overallOk, true);
+      assert.equal(result.report?.checks.dsh.status, "passed");
+      assert.equal(result.report?.checks.dsh.evidence.forced, true);
+      assert.equal(await probeLinuxProcessGroupState(identity.pgid), "absent");
+    });
   } finally {
     killGroup(identity);
   }
@@ -673,10 +1036,14 @@ test("ACL 状态目录与 DSH 配置不同源：failed，不调用 ACL 扫描", 
         },
       }),
     ).run();
-    assert.equal(result.overallOk, false);
-    assert.equal(result.report?.checks.acl.status, "failed");
-    assert.equal(result.report?.checks.acl.reason, "ACL_STATE_DIR_MISMATCH");
-    assert.equal(aclCalls, 0);
+    const key = createHash("sha256").update(realpathSync(dir)).digest("hex").slice(0, 16);
+    const lockPath = join(dir, `${key}.lock`);
+    await assertWithDiagnostics(t, result, { identity, lockPath }, async () => {
+      assert.equal(result.overallOk, false);
+      assert.equal(result.report?.checks.acl.status, "failed");
+      assert.equal(result.report?.checks.acl.reason, "ACL_STATE_DIR_MISMATCH");
+      assert.equal(aclCalls, 0);
+    });
   } finally {
     killGroup(identity);
   }
