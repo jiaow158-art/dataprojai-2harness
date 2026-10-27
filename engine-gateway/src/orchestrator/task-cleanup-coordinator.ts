@@ -137,6 +137,7 @@ const DEFAULT_RUNNER_DRAIN_MS = 10_000;
 const DEFAULT_ACTIVE_PROBE_INTERVAL_MS = 100;
 const UNKNOWN_PROBE_RECHECKS = 2;
 const UNKNOWN_PROBE_RECHECK_DELAY_MS = 20;
+const MAX_AUDIT_PROBE_ISSUES = 8;
 
 function positiveInt(value: number | undefined, label: string, dflt: number): number {
   const v = value ?? dflt;
@@ -665,17 +666,23 @@ export class TaskCleanupCoordinator {
       result = await this.probeGroupState(pgid);
     }
     if (result.state === "unknown") {
-      await this.audit({
+      // CleanupAuditLog only accepts flat code-only values: flatten issue data.
+      const issues = result.issues.slice(0, MAX_AUDIT_PROBE_ISSUES);
+      const auditEvent: Record<string, unknown> = {
         action: "cleanup_probe_unknown",
         phase,
         code: "PROCESS_GROUP_STATE_UNKNOWN",
         pgid,
-        issues: result.issues.map(({ pid, code, errno }) => ({
-          pid,
-          code,
-          ...(errno ? { errno } : {}),
-        })),
+        issue_count: issues.length,
+        issue_total: result.issues.length,
+        truncated: result.issues.length > issues.length,
+      };
+      issues.forEach((issue, index) => {
+        auditEvent[`issue_${index}_pid`] = issue.pid;
+        auditEvent[`issue_${index}_code`] = issue.code;
+        if (issue.errno) auditEvent[`issue_${index}_errno`] = issue.errno;
       });
+      await this.audit(auditEvent);
     }
     return result;
   }

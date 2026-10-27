@@ -699,10 +699,68 @@ test("unknown 持续权限错误：最多 2 次复核后仍 pending，绝不发�
     const unknownEvent = audit.events.find((e) => e.action === "cleanup_probe_unknown");
     assert.ok(unknownEvent, "unknown 必须留下脱敏审计");
     assert.equal(unknownEvent!.code, "PROCESS_GROUP_STATE_UNKNOWN");
-    assert.deepEqual(unknownEvent!.issues, [
-      { pid: 7002, code: "PROC_STAT_READ_FAILED", errno: "EACCES" },
-    ]);
+    assert.equal(unknownEvent!.issue_count, 1);
+    assert.equal(unknownEvent!.issue_0_pid, 7002);
+    assert.equal(unknownEvent!.issue_0_code, "PROC_STAT_READ_FAILED");
+    assert.equal(unknownEvent!.issue_0_errno, "EACCES");
+    assert.equal(Object.values(unknownEvent!).some((v) => typeof v === "object"), false, "审计必须是扁平值");
   } finally {
+    killGroup(identity);
+  }
+});
+
+test("unknown 审计使用真实 CleanupAuditLog 可接受的扁平字段", async (t) => {
+  const dir = stateDir(t);
+  const rtDir = mkdtempSync(join(tmpdir(), "c2b22b-audit-unknown-"));
+  t.after(() => rmSync(rtDir, { recursive: true, force: true }));
+  const rt = await prepareTrustedRuntime({ root: join(rtDir, "runtime"), forbiddenRoots: [] });
+  const logPath = join(rt.auditDir, "cleanup.jsonl");
+  const log = await CleanupAuditLog.open({ trustedRuntimeRoot: rt.root, auditLogPath: logPath });
+  const { child, identity } = await spawnDetached(
+    'process.on("SIGTERM",()=>process.exit(0)); setInterval(()=>{},1000);',
+  );
+  const r = fakeReaper();
+  try {
+    const { handle } = dshHandle(identity, child, dir, async () => false);
+    const result = await new TaskCleanupCoordinator(
+      baseOptions(dir, r.reaper, log, {
+        dsh: handle,
+        gracefulMs: 20,
+        probeGroupState: async () =>
+          probeResult("unknown", [
+            { pid: 7003, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7004, code: "PROC_STAT_READ_FAILED", errno: "EACCES" },
+            { pid: 7005, code: "PROC_STAT_INVALID" },
+            { pid: 7006, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7007, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7008, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7009, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7010, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7011, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+            { pid: 7012, code: "PROC_STAT_READ_FAILED", errno: "EIO" },
+          ]),
+      }),
+    ).run();
+    assert.equal(result.overallOk, false);
+    assert.equal(result.report?.checks.audit.status, "passed");
+    await log.close();
+    const events = readFileSync(logPath, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const event = events.find((e) => e.action === "cleanup_probe_unknown");
+    assert.ok(event, "真实审计文件必须包含 cleanup_probe_unknown");
+    assert.equal(event.issue_count, 8, "审计仅保留固定上限内的 issue 字段");
+    assert.equal(event.issue_total, 10);
+    assert.equal(event.truncated, true);
+    assert.equal(event.issue_0_pid, 7003);
+    assert.equal(event.issue_0_code, "PROC_STAT_READ_FAILED");
+    assert.equal(event.issue_0_errno, "EIO");
+    assert.equal(event.issue_7_pid, 7010);
+    assert.equal(event.issue_8_pid, undefined, "截断后不得再写动态字段");
+    assert.equal(Object.values(event).some((v) => typeof v === "object"), false, "审计必须是扁平值");
+  } finally {
+    await log.close().catch(() => {});
     killGroup(identity);
   }
 });

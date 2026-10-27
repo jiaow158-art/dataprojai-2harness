@@ -147,6 +147,12 @@ export interface CleanupHoldRow {
   updated_at: number;
 }
 
+/** 只读巡检行：当前 attempt 的 recovery_required hold 与 task。 */
+export interface RecoveryRequiredTask {
+  task: TaskRow;
+  hold: CleanupHoldRow;
+}
+
 export interface CleanupHealResult {
   requeued: number;
   recoveryRequired: number;
@@ -1051,6 +1057,34 @@ export class TaskStore {
       created_at: row.created_at,
       updated_at: row.updated_at,
     };
+  }
+
+  /**
+   * 只读巡检：列出当前 attempt 处于 recovery_required 的任务。
+   * 不修改任何状态；调用方可使用 readonly SQLite 连接。
+   */
+  listRecoveryRequired(limit = 100): RecoveryRequiredTask[] {
+    if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 1000) {
+      cleanupFail("CLEANUP_INPUT_INVALID", "limit must be an integer between 1 and 1000");
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT t.run_id AS run_id
+         FROM tasks t
+         JOIN cleanup_holds h
+           ON h.run_id = t.run_id AND h.attempt = t.attempt
+         WHERE h.state = 'recovery_required'
+         ORDER BY h.updated_at DESC, t.run_id
+         LIMIT ?`,
+      )
+      .all(limit) as { run_id: string }[];
+    const out: RecoveryRequiredTask[] = [];
+    for (const { run_id } of rows) {
+      const task = this.getTask(run_id);
+      const hold = task ? this.getCleanupHold(task.run_id, task.attempt) : undefined;
+      if (task && hold) out.push({ task, hold });
+    }
+    return out;
   }
 
   /**
